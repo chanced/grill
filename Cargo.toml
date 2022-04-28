@@ -1,0 +1,9 @@
+[package]
+name = "grill"
+version = "0.0.0"
+edition = "2021"
+description = "wip"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/chanced/grill"
+authors = ["chance dinkins"]
+[dependencies]
