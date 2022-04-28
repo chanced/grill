@@ -1,9 +1,10 @@
 mod draft_202012;
-use crate::{Error, Result};
+pub use draft_202012::*;
+use crate::{Dialect, Error, Result};
 
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use serde_json as json;
-use std::{collections::HashMap, result::Result as StdResult, str::FromStr, sync::Arc};
+use std::{collections::HashMap, result::Result as StdResult, str::FromStr};
 
 pub const SIMPLE_TYPES: &[&str] = &["string", "boolean", "object", "array", "number", "null"];
 
@@ -56,17 +57,6 @@ impl<'de> Visitor<'de> for SchemaMapVisitor {
             map.insert(key, schema);
         }
         Ok(map)
-    }
-}
-
-impl Draft202012 {
-    pub fn new(dialect: Dialect) -> Self {
-        Self {
-            dialect,
-            id: None,
-            typ: None,
-            properties: None,
-        }
     }
 }
 
@@ -244,13 +234,10 @@ pub fn deserialize_str(s: &str, dialect: Dialect) -> Result<Schema> {
 mod test {
     use crate::Schema;
 
-    use super::{deserialize_str, Dialect, SchemaVisitor, DEFAULT_VERSION};
-    fn set_default_version() {
-        DEFAULT_VERSION.set(Dialect::Draft202012).unwrap();
-    }
+    use super::{deserialize_str, Dialect, SchemaVisitor};
+
     #[test]
     fn testing_schema_deserialization() {
-        set_default_version();
         let s = r###"
         {
             `$id`: "https://example.com/tree",
