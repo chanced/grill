@@ -1,6 +1,5 @@
-use crate::error::Error;
-use once_cell::sync::OnceCell;
-use serde::{de::Visitor, Deserialize, Serialize};
+use crate::{error::Error, json};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::{result::Result as StdResult, str::FromStr};
 
 pub const SUPPORTED_DRAFTS: &[&str] = &[
@@ -84,17 +83,25 @@ impl FromStr for Dialect {
     }
 }
 
-struct DialectVisitor {}
-impl<'de> Visitor<'de> for DialectVisitor {
-    type Value = Dialect;
+// pub(crate) struct DialectVisitor {}
+// impl<'de> Visitor<'de> for DialectVisitor {
+//     type Value = Dialect;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a JSON Schema dialect identifier")
-    }
-    fn visit_str<E>(self, v: &str) -> StdResult<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Dialect::from_str(v).map_err(|e| serde::de::Error::custom(e.to_string()))
-    }
-}
+//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         formatter.write_str("a JSON Schema dialect identifier")
+//     }
+//     fn visit_str<E>(self, v: &str) -> StdResult<Self::Value, E>
+//     where
+//         E: serde::de::Error,
+//     {
+//         Dialect::from_str(v).map_err(|e| serde::de::Error::custom(e.to_string()))
+//     }
+// }
+// pub(crate) fn get_dialect<E: serde::de::Error>(
+//     map: &json::Map<String, json::Value>,
+//     default: Dialect,
+// ) -> StdResult<Dialect, E> {
+//     map.get("$schema")
+//         .map_or(Ok(default), |d| d.deserialize_str(DialectVisitor {}))
+//         .map_err(serde::de::Error::custom)
+// }
