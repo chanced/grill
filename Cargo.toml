@@ -1,27 +1,2 @@
-[package]
-name = "grill"
-version = "0.0.0"
-edition = "2021"
-description = "wip"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/chanced/grill"
-authors = ["chance dinkins"]
-
-[dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = [
-    "arbitrary_precision",
-    "raw_value",
-] }
-dashmap = { version = "5.2", features = ["send_guard"] }
-thiserror = "1.0.31"
-regex = "1.5"
-indexmap = "1.5"
-serde_yaml = "0.8.23"
-
-[features]
-default = ["std"]
-
-std = ["serde/std"]
-
-alloc = ["serde/alloc"]
+[workspace]
+members = ["grill", "tests"]
