@@ -1,174 +1,414 @@
-#![allow(dead_code)]
-mod data;
-mod dialect;
-mod draft;
-use crate::json;
-pub use dialect::*;
-pub use draft::*;
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_json::{Number, Value};
 
-// pub enum SchemaOrSchemas {
-//     Schema(Schema),
-//     Schemas(Vec<Schema>),
-// }
+use crate::{dependency::Dependency, StringOrStrings};
 
-// #[derive(Debug)]
-// pub enum Schema {
-//     Draft202012(Draft202012),
-// }
+pub struct Schema {
+    //
+    // -------------------------------------------
+    //                    core
+    // -------------------------------------------
+    //
+    /// The `$id` keyword identifies a schema resource with its canonical URI.
+    ///
+    /// Note that this URI is an identifier and not necessarily a network locator.
+    /// In the case of a network-addressable URL, a schema need not be downloadable
+    /// from its canonical URI.
+    ///
+    /// If present, the value for this keyword MUST be a string, and MUST represent
+    /// a valid URI-reference. This URI-reference SHOULD be normalized, and MUST
+    /// resolve to an absolute-URI (without a fragment). Therefore, `$id` MUST NOT
+    /// contain a non-empty fragment, and SHOULD NOT contain an empty fragment.
+    ///
+    /// Since an empty fragment in the context of the application/schema+json media
+    /// type refers to the same resource as the base URI without a fragment, an
+    /// implementation MAY normalize a URI ending with an empty fragment by removing
+    /// the fragment. However, schema authors SHOULD NOT rely on this behavior
+    /// across implementations. [CREF3]
+    ///
+    /// This URI also serves as the base URI for relative URI-references in keywords
+    /// within the schema resource, in accordance with RFC 3986 section 5.1.1
+    /// regarding base URIs embedded in content.
+    ///
+    /// The presence of `$id` in a subschema indicates that the subschema
+    /// constitutes a distinct schema resource within a single schema document.
+    /// Furthermore, in accordance with RFC 3986 section 5.1.2 regarding
+    /// encapsulating entities, if an `$id` in a subschema is a relative
+    /// URI-reference, the base URI for resolving that reference is the URI of the
+    /// parent schema resource.
+    ///
+    /// If no parent schema object explicitly identifies itself as a resource with
+    /// `$id`, the base URI is that of the entire document, as established by the
+    /// steps given in the previous section.
+    ///
+    /// https://json-schema.org/draft/2020-12/json-schema-core.html#rfc.section.8.2.1
+    ///
+    /// https://json-schema.org/understanding-json-schema/structuring.html#id
+    ///
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub id: Option<String>,
+    /// `$schema`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub schema: Option<String>,
+    /// `$ref`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub ref_: Option<String>,
+    /// `$anchor`
+    /// - 2020-12
+    /// - 2019-09
+    pub anchor: Option<String>,
+    /// `$dynamicRef`
+    /// - 2020-12
+    pub dynamic_ref: Option<String>,
+    /// `$dynamicAnchor`
+    /// - 2020-12
+    pub dynamic_anchor: Option<String>,
+    /// `$vocabulary`
+    /// - 2020-12
+    /// - 2019-09
+    pub vocabulary: Option<BTreeMap<String, bool>>,
+    /// `$comment`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub comment: Option<String>,
+    /// `$defs`
+    /// - 2020-12
+    /// - 2019-09
+    pub defs: Option<BTreeMap<String, Schema>>,
 
-// /// SchemaVisitor is the first step in the deserialization of JSON Schema. This
-// /// Visitor parses the various representations of a JSON Schema and and ensures
-// /// the proper Draft is selected based on
-// struct SchemaVisitor {
-//     dialect: Dialect,
-// }
+    //
+    // -------------------------------------------
+    //                applicator
+    // -------------------------------------------
+    //
+    /// `prefixItems`
+    /// - 2020-12
+    pub prefix_items: Option<Vec<Schema>>,
+    /// `additionalItems`
+    /// - 2019-09
+    /// - 07
+    pub additional_items: Option<Box<Schema>>,
+    /// `items`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub items: Option<Box<Schema>>,
+    /// `contains`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub contains: Option<Box<Schema>>,
+    /// `additionalProperties`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub additional_properties: Option<Box<Schema>>,
+    /// `properties`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    /// + default: `{}`
+    pub properties: Option<BTreeMap<String, Schema>>,
+    /// `patternProperties`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    /// + default: `{}`
+    pub pattern_properties: Option<BTreeMap<String, Schema>>,
+    /// `dependentSchemas`
+    /// - 2020-12
+    /// - 2019-09
+    pub dependent_schemas: Option<BTreeMap<String, Schema>>,
+    /// `propertyNames`
+    /// - 2020-12
+    /// - 2019-09
+    pub property_names: Option<Box<Schema>>,
+    /// `if`
+    /// - 2020-12
+    /// - 2019-09
+    pub if_: Option<Box<Schema>>,
+    /// `then`
+    /// - 2020-12
+    /// - 2019-09
+    pub then: Option<Box<Schema>>,
+    /// `else`
+    /// - 2020-12
+    /// - 2019-09
+    pub else_: Option<Box<Schema>>,
+    /// `allOf`
+    /// - 2020-12
+    /// - 2019-09
+    pub all_of: Option<Vec<Schema>>,
+    /// `anyOf`
+    /// - 2020-12
+    /// - 2019-09
+    pub any_of: Option<Vec<Schema>>,
+    /// `oneOf`
+    /// - 2020-12
+    /// - 2019-09
+    pub one_of: Option<Vec<Schema>>,
+    /// `not`
+    /// - 2020-12
+    /// - 2019-09
+    pub not: Option<Box<Schema>>,
+    //
+    // -------------------------------------------
+    //                unevaluated
+    // -------------------------------------------
+    //
+    /// The value of `unevaluatedItems` MUST be a valid JSON Schema.
+    ///
+    /// The behavior of this keyword depends on the annotation results of adjacent
+    /// keywords that apply to the instance location being validated. Specifically,
+    /// the annotations from "prefixItems", "items", and "contains", which can come
+    /// from those keywords when they are adjacent to the `unevaluatedItems` keyword.
+    /// Those three annotations, as well as `unevaluatedItems`, can also result from
+    /// any and all adjacent in-place applicator keywords. This includes but is not
+    /// limited to the in-place applicators defined in this document.
+    ///
+    /// If no relevant annotations are present, the `unevaluatedItems` subschema MUST
+    /// be applied to all locations in the array. If a boolean true value is present
+    /// from any of the relevant annotations, `unevaluatedItems` MUST be ignored.
+    /// Otherwise, the subschema MUST be applied to any index greater than the
+    /// largest annotation value for "prefixItems", which does not appear in any
+    /// annotation value for "contains".
+    ///
+    /// This means that "prefixItems", "items", "contains", and all in-place
+    /// applicators MUST be evaluated before this keyword can be evaluated. Authors
+    /// of extension keywords MUST NOT define an in-place applicator that would need
+    /// to be evaluated after this keyword.
+    ///
+    /// If the `unevaluatedItems` subschema is applied to any positions within the
+    /// instance array, it produces an annotation result of boolean true, analogous
+    /// to the behavior of "items". Omitting this keyword has the same assertion
+    /// behavior as an empty schema.
+    ///
+    /// https://json-schema.org/draft/2020-12/json-schema-core.html#rfc.section.11.2
+    /// - 2020-12
+    /// - 2019-09
+    pub unevaluated_items: Option<Box<Schema>>,
+    /// `unevaluatedProperties`
+    /// - 2020-12
+    /// - 2019-09
+    pub unevaluated_properties: Option<BTreeMap<String, Schema>>,
+    //
+    // -------------------------------------------
+    //                validation
+    // -------------------------------------------
+    //
+    /// `type`
+    /// - 2020-12
+    /// - 2019-09
+    pub type_: Option<StringOrStrings>,
+    /// `const`
+    /// - 2020-12
+    /// - 2019-09
+    pub const_: Option<Value>,
+    /// `enum`
+    /// - 2020-12
+    /// - 2019-09
+    pub enum_: Option<Vec<Value>>,
+    /// `multipleOf`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub multiple_of: Option<Number>,
+    /// `maximum`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub maximum: Option<Number>,
+    /// `exclusiveMaximum`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub exclusive_maximum: Option<Number>,
+    /// `minimum`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub minimum: Option<Number>,
+    /// `exclusiveMinimum`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub exclusive_minimum: Option<Number>,
+    /// `maxLength`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub max_length: Option<Number>,
+    /// `minLength`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub min_length: Option<Number>,
+    /// `pattern`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub pattern: Option<String>,
+    /// `maxItems`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub max_items: Option<Number>,
+    /// `minItems`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub min_items: Option<Number>,
+    /// `uniqueItems`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    /// + default: `true`
+    pub unique_items: Option<bool>,
+    /// `maxContains`
+    /// - 2020-12
+    /// - 2019-09
+    pub max_contains: Option<Number>,
+    /// `minContains`
+    /// - 2020-12
+    /// - 2019-09
+    pub min_contains: Option<Number>,
+    /// `maxProperties`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    /// + minimum: `0`
+    pub max_properties: Option<Number>,
+    /// `minProperties`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub min_properties: Option<Number>,
+    /// `required`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub required: Option<Vec<String>>,
+    /// `dependentRequired`
+    /// - 2020-12
+    /// - 2019-09
+    pub dependent_required: Option<BTreeMap<String, Vec<String>>>,
+    //
+    // -------------------------------------------
+    //                meta-data
+    // -------------------------------------------
+    //
+    /// `title`
+    /// - 2020-12
+    /// - 2019-09
+    pub title: Option<String>,
+    /// `description`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub description: Option<String>,
+    /// `default`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub default: Option<Value>,
+    /// `deprecated`
+    /// - 2020-12
+    /// - 2019-09
+    pub deprecated: Option<bool>,
+    /// `readOnly`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub read_only: Option<bool>,
+    /// `writeOnly`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub write_only: Option<bool>,
+    /// `examples`
+    /// - 2020-12
+    /// - 2019-09
+    /// - 07
+    pub examples: Option<Vec<Value>>,
+    //
+    // -------------------------------------------
+    //                 content
+    // -------------------------------------------
+    //
+    /// `contentEncoding`
+    /// - 2020-12
+    /// - 2019-09
+    pub content_encoding: Option<String>,
+    /// `contentMediaType`
+    /// - 2020-12
+    /// - 2019-09
+    pub content_media_type: Option<String>,
+    /// `contentSchema`
+    /// - 2020-12
+    /// - 2019-09
+    pub content_schema: Option<Box<Schema>>,
+    //
+    // -------------------------------------------
+    //            format-annotation
+    // -------------------------------------------
+    //
+    /// `format`
+    /// - 2020-12
+    /// - 2019-09
+    pub format: Option<String>,
+    // -------------------------------------------
+    //                 deprecated
+    // -------------------------------------------
+    /// `dependencies`
+    /// - 07
+    /// - 04
+    ///
+    /// for 2019+, split to `dependentSchemas` and `dependentRequired`
+    dependencies: BTreeMap<String, Dependency>,
+    /// `$recursiveRef`
+    /// - 2019-09
+    recursive_ref: Option<String>,
+    /// `$recursiveAnchor`
+    /// - 2019-09
+    recursive_anchor: Option<String>,
+    /// `id`
+    /// - 04
+    ///
+    /// if `$schema` is draft 04, then `id` will use this value.
+    /// Otherwise, the value of this field should be placed in
+    /// `unknown` with the key `id`.
+    old_id: Option<String>,
+    /// `definitions`
+    /// - 07
+    /// - 04
+    /// + warn about deprecation in schemas greater than 07
+    /// + combine with `$defs`
+    definitions: Option<BTreeMap<String, Schema>>,
+}
 
-// impl<'de> Visitor<'de> for SchemaVisitor {
-//     type Value = Schema;
+impl<'de> Deserialize<'de> for Schema {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
+    }
+}
 
-//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         formatter.write_str("a json schema")
-//     }
-//     fn visit_bool<E>(self, v: bool) -> StdResult<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         println!("visit_bool: {}", v);
-//         todo!()
-//     }
-
-//     fn visit_str<E>(self, v: &str) -> StdResult<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         println!("visit_str: {}", v);
-//         todo!()
-//     }
-
-//     fn visit_map<A>(self, mut access: A) -> StdResult<Self::Value, A::Error>
-//     where
-//         A: serde::de::MapAccess<'de>,
-//     {
-//         let mut map = read_access_map(&mut access)?;
-//         let dialect = get_dialect(&map, self.dialect)?;
-//         if !map.contains_key("$schema") {
-//             map.insert("$schema".to_string(), dialect.to_string().into());
-//         }
-
-//         json::Value::Object(map)
-//             .deserialize_map(DraftVisitor { dialect })
-//             .map_err(serde::de::Error::custom)
-//     }
-// }
-
-// // deserializes the json schema data prepared by SchemaVisitor
-// struct DraftVisitor {
-//     dialect: Dialect,
-// }
-// impl<'de> Visitor<'de> for DraftVisitor {
-//     type Value = Schema;
-
-//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         formatter.write_str(&format!("a json schema, version {}", self.dialect.name()))
-//     }
-
-//     fn visit_map<A>(self, mut map: A) -> StdResult<Self::Value, A::Error>
-//     where
-//         A: serde::de::MapAccess<'de>,
-//     {
-//         let map = read_access_map(&mut map)?;
-//         let dialect = get_dialect(&map, self.dialect)?;
-//         match dialect {
-//             Dialect::Draft202012 => parse_202012(&map, dialect).map(Schema::Draft202012),
-//             Dialect::Draft201909 => todo!(),
-//             Dialect::Draft07 => todo!(),
-//             Dialect::Draft04 => todo!(),
-//         }
-//     }
-// }
-
-// fn read_access_map<'de, A>(access: &mut A) -> StdResult<json::Map<String, json::Value>, A::Error>
-// where
-//     A: serde::de::MapAccess<'de>,
-// {
-//     let mut map = json::Map::with_capacity(access.size_hint().unwrap_or(0));
-
-//     while let Some((key, value)) = access.next_entry()? {
-//         map.insert(key, value);
-//     }
-//     Ok(map)
-// }
-
-// pub fn deserialize_str(s: &str, dialect: Dialect) -> Result<Schema> {
-//     let mut de = serde_json::Deserializer::from_str(s);
-//     de.deserialize_any(SchemaVisitor { dialect })
-//         .map_err(Error::from)
-// }
-
-// //
-// // ═══════════════════════════════════════════════
-// // ═══════════════════════════════════════════════
-// // ═══════════════════════════════════════════════
-// //
-// #[cfg(test)]
-// mod test {
-//     use crate::Schema;
-
-//     use super::{deserialize_str, Dialect, SchemaVisitor};
-
-//     #[test]
-//     fn testing_schema_deserialization() {
-//         let s = r###"
-//         {
-//             `$id`: "https://example.com/tree",
-//             "$schema": "https://json-schema.org/draft/2020-12/schema",
-//             "$dynamicAnchor": "node",
-//             "type": "object",
-//             "properties": {
-//               "data": true,
-//               "children": {
-//                 "type": "array",
-//                 "items": { "$dynamicRef": "#node" }
-//               }
-//             }
-//           }
-//         "###;
-//         let d = serde_json::Deserializer::from_str(s);
-//         let s = deserialize_str(s, Dialect::Draft07).unwrap();
-//         dbg!(s);
-//     }
-// }
-
-// // let schema: serde_json::Value = serde_json::from_str(val)?;
-// // let version = schema["$schema"].as_str().ok_or(Error::UnsupportedSchema {
-// //     schema: val.to_string(),
-// // })?;
-// // let version = Version::try_from(version)?;
-// // Ok(match version {
-// //     Version::V202012 => Schema::V202012(serde_json::from_str(val)?),
-// // })
-
-// // struct SchemaData {
-// //     data: json::Map<String, json::Value>,
-// //     dialect: Dialect,
-// // }
-// // impl<'de> DeserializeSeed<'de> for SchemaData {
-// //     type Value = Schema;
-
-// //     fn deserialize<D>(self, de: D) -> StdResult<Self::Value, D::Error>
-// //     where
-// //         D: serde::Deserializer<'de>,
-// //     {
-// //         let dialect = self
-// //             .data
-// //             .get("$schema")
-// //             .map_or(Ok(self.dialect), |v| {
-// //                 v.deserialize_string(DialectVisitor {})
-// //             })
-// //             .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
-// //         dbg!(dialect);
-// //         todo!()
-// //     }
-// // }
+impl Serialize for Schema {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
+}

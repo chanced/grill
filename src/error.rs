@@ -1,20 +1,20 @@
-use snafu::prelude::*;
 use std::path::PathBuf;
+use thiserror::Error;
 
 use std::result::Result as StdResult;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[snafu(display("error deserializing schema: {}", source))]
+    #[error("error deserializing schema: {}", source)]
     Deserialization { source: serde_json::Error },
-    #[snafu(display("could not open schema file from {}: {}", filename.display(), source))]
+    #[error("could not open schema file from {}: {}", filename.display(), source)]
     OpeningLocalSchema {
         filename: PathBuf,
         source: std::io::Error,
     },
-    #[snafu(display("unsupported schema version: {schema}"))]
+    #[error("unsupported schema version: {schema}")]
     UnsupportedSchema { schema: String },
-    #[snafu(display("invalid schema version: {schema}"))]
+    #[error("invalid schema version: {schema}")]
     MalformedSchemaDraft { schema: String },
 }
 impl From<serde_json::Error> for Error {

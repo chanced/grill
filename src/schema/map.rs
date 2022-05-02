@@ -4,6 +4,7 @@ use crate::{Dialect, Schema};
 use serde::de::Visitor;
 use serde::{Deserializer, Serializer};
 use std::collections::HashMap;
+
 struct SchemaMapVisitor {
     dialect: Dialect,
 }

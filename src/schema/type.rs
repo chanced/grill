@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use serde::de::Visitor;
 pub use serde::{Deserialize, Serialize};
 
@@ -12,8 +10,7 @@ pub enum TypeOrTypes {
     Types(Vec<Type>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, EnumString, Serialize, Deserialize)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Type {
     String,
     Boolean,
@@ -22,6 +19,8 @@ pub enum Type {
     Number,
     Null,
 }
+
+impl ToString for Type {}
 
 impl Type {
     pub fn type_names() -> &'static [&'static str] {
