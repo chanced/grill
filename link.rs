@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::hyper_schema::HyperSchema;
 use crate::map::Map;
 use crate::string::StringOrStrings;

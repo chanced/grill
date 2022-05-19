@@ -1,11 +1,4 @@
-use std::collections::BTreeMap;
-
-use serde::{Deserialize, Serialize};
-use serde_json::{Number, Value};
-
-use crate::{dependency::Dependency, StringOrStrings};
-
-pub struct Schema {
+pub struct CompiledSchema {
     //
     // -------------------------------------------
     //                    core
@@ -83,7 +76,7 @@ pub struct Schema {
     /// `$defs`
     /// - 2020-12
     /// - 2019-09
-    pub defs: Option<BTreeMap<String, Schema>>,
+    pub defs: Option<BTreeMap<String, SchemaDef>>,
 
     //
     // -------------------------------------------
@@ -92,74 +85,74 @@ pub struct Schema {
     //
     /// `prefixItems`
     /// - 2020-12
-    pub prefix_items: Option<Vec<Schema>>,
+    pub prefix_items: Option<Vec<SchemaDef>>,
     /// `additionalItems`
     /// - 2019-09
     /// - 07
-    pub additional_items: Option<Box<Schema>>,
+    pub additional_items: Option<Box<SchemaDef>>,
     /// `items`
     /// - 2020-12
     /// - 2019-09
     /// - 07
-    pub items: Option<Box<Schema>>,
+    pub items: Option<Box<SchemaDef>>,
     /// `contains`
     /// - 2020-12
     /// - 2019-09
     /// - 07
-    pub contains: Option<Box<Schema>>,
+    pub contains: Option<Box<SchemaDef>>,
     /// `additionalProperties`
     /// - 2020-12
     /// - 2019-09
     /// - 07
-    pub additional_properties: Option<Box<Schema>>,
+    pub additional_properties: Option<Box<SchemaDef>>,
     /// `properties`
     /// - 2020-12
     /// - 2019-09
     /// - 07
     /// + default: `{}`
-    pub properties: Option<BTreeMap<String, Schema>>,
+    pub properties: Option<BTreeMap<String, SchemaDef>>,
     /// `patternProperties`
     /// - 2020-12
     /// - 2019-09
     /// - 07
     /// + default: `{}`
-    pub pattern_properties: Option<BTreeMap<String, Schema>>,
+    pub pattern_properties: Option<BTreeMap<String, SchemaDef>>,
     /// `dependentSchemas`
     /// - 2020-12
     /// - 2019-09
-    pub dependent_schemas: Option<BTreeMap<String, Schema>>,
+    pub dependent_schemas: Option<BTreeMap<String, SchemaDef>>,
     /// `propertyNames`
     /// - 2020-12
     /// - 2019-09
-    pub property_names: Option<Box<Schema>>,
+    pub property_names: Option<Box<SchemaDef>>,
     /// `if`
     /// - 2020-12
     /// - 2019-09
-    pub if_: Option<Box<Schema>>,
+    pub if_: Option<Box<SchemaDef>>,
     /// `then`
     /// - 2020-12
     /// - 2019-09
-    pub then: Option<Box<Schema>>,
+    pub then: Option<Box<SchemaDef>>,
     /// `else`
     /// - 2020-12
     /// - 2019-09
-    pub else_: Option<Box<Schema>>,
+    pub else_: Option<Box<SchemaDef>>,
     /// `allOf`
     /// - 2020-12
     /// - 2019-09
-    pub all_of: Option<Vec<Schema>>,
+    pub all_of: Option<Vec<SchemaDef>>,
     /// `anyOf`
     /// - 2020-12
     /// - 2019-09
-    pub any_of: Option<Vec<Schema>>,
+    pub any_of: Option<Vec<SchemaDef>>,
     /// `oneOf`
     /// - 2020-12
     /// - 2019-09
-    pub one_of: Option<Vec<Schema>>,
+    pub one_of: Option<Vec<SchemaDef>>,
     /// `not`
     /// - 2020-12
     /// - 2019-09
-    pub not: Option<Box<Schema>>,
+    pub not: Option<Box<SchemaDef>>,
     //
     // -------------------------------------------
     //                unevaluated
@@ -195,11 +188,11 @@ pub struct Schema {
     /// https://json-schema.org/draft/2020-12/json-schema-core.html#rfc.section.11.2
     /// - 2020-12
     /// - 2019-09
-    pub unevaluated_items: Option<Box<Schema>>,
+    pub unevaluated_items: Option<Box<SchemaDef>>,
     /// `unevaluatedProperties`
     /// - 2020-12
     /// - 2019-09
-    pub unevaluated_properties: Option<BTreeMap<String, Schema>>,
+    pub unevaluated_properties: Option<BTreeMap<String, SchemaDef>>,
     //
     // -------------------------------------------
     //                validation
@@ -297,7 +290,19 @@ pub struct Schema {
     /// - 2019-09
     /// - 07
     pub required: Option<Vec<String>>,
-    /// `dependentRequired`
+    /// The `dependentRequired` keyword conditionally requires that certain
+    /// `properties` must be present if a given property is present in an
+    /// object. For example, suppose we have a schema representing a customer.
+    /// If you have their credit card number, you also want to ensure you have a
+    /// billing address. If you don’t have their credit card number, a billing
+    /// address would not be required. We represent this dependency of one
+    /// property on another using the dependentRequired keyword.
+    ///
+    /// The value of the `dependentRequired` keyword is an object. Each entry in
+    /// the object maps from the name of a property, p, to an array of strings
+    /// listing properties that are required if p is present.
+    ///
+    /// https://json-schema.org/understanding-json-schema/reference/conditionals.html#dependentrequired
     /// - 2020-12
     /// - 2019-09
     pub dependent_required: Option<BTreeMap<String, Vec<String>>>,
@@ -355,7 +360,7 @@ pub struct Schema {
     /// `contentSchema`
     /// - 2020-12
     /// - 2019-09
-    pub content_schema: Option<Box<Schema>>,
+    pub content_schema: Option<Box<SchemaDef>>,
     //
     // -------------------------------------------
     //            format-annotation
@@ -372,14 +377,15 @@ pub struct Schema {
     /// - 07
     /// - 04
     ///
-    /// for 2019+, split to `dependentSchemas` and `dependentRequired`
-    dependencies: BTreeMap<String, Dependency>,
+    /// Draft 2019-09 split `dependencies` into `dependentSchemas` and
+    /// `dependentRequired`
+    pub dependencies: Option<BTreeMap<String, Dependency>>,
     /// `$recursiveRef`
     /// - 2019-09
-    recursive_ref: Option<String>,
+    pub recursive_ref: Option<String>,
     /// `$recursiveAnchor`
     /// - 2019-09
-    recursive_anchor: Option<String>,
+    pub recursive_anchor: Option<bool>,
     /// `id`
     /// - 04
     ///
@@ -392,23 +398,22 @@ pub struct Schema {
     /// - 04
     /// + warn about deprecation in schemas greater than 07
     /// + combine with `$defs`
-    definitions: Option<BTreeMap<String, Schema>>,
-}
+    definitions: Option<BTreeMap<String, SchemaDef>>,
 
-impl<'de> Deserialize<'de> for Schema {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        todo!()
-    }
-}
-
-impl Serialize for Schema {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        todo!()
-    }
+    //
+    // -------------------------------------------
+    //             computed values
+    // -------------------------------------------
+    //
+    /// if the schema was a bool, assign the value here and use the long form
+    /// representation.
+    /// ```
+    /// true => {}
+    /// ```
+    /// ```
+    /// false => { not: {} }
+    /// ```
+    always: Option<bool>,
+    /// computed value for `$schema`
+    draft: Option<Draft>,
 }
