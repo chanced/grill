@@ -19,7 +19,7 @@ where
             match f(value.clone()) {
                 Ok(eval) => {
                     let sub_eval = next.call(value);
-                    // todo: merge sr to eval
+                    // todo: merge sub_eval with eval
                     sub_eval
                 }
                 Err(err) => Err(err),
