@@ -2,7 +2,7 @@
 pub(crate) mod macros;
 
 pub mod error;
-pub use error::Error;
+pub use error::*;
 
 pub mod context;
 pub use context::*;
@@ -19,15 +19,16 @@ pub use applicator::*;
 pub mod resolver;
 pub use resolver::*;
 
-pub mod annotations;
-pub use annotations::*;
-
-mod extensions;
-mod graph;
-
 pub mod eval;
 pub use eval::*;
 
+mod next;
+pub use next::Next;
+
+mod extensions;
+pub(crate) use extensions::Extensions;
+mod graph;
+pub(crate) use graph::Graph;
 mod injectable;
 pub use injectable::*;
 

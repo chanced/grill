@@ -7,9 +7,8 @@
 
 use std::sync::Arc;
 
+use crate::{Applicator, Error, Eval, Extensions, Graph, Injectable, Result, Value};
 use parking_lot::RwLock;
-
-use crate::{extensions::Extensions, graph::Graph, Applicator, Injectable};
 struct Layer<T: Clone + Send + Sync + 'static>(T);
 #[derive(Clone)]
 pub struct Interrogator {
@@ -39,11 +38,12 @@ impl Interrogator {
     }
 
     /// temp method to see if this will execute
-    pub fn call<A, V>(&self, run: A)
+    pub fn call<A, V, N>(&self, run: A)
     where
-        A: Applicator<V>,
+        N: FnOnce(Value) -> Result<Eval>,
+        A: Applicator<V, N>,
     {
-        run.call(self.clone())
+        let bf = run.setup(self.clone());
     }
 
     /// Provides

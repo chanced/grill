@@ -4,7 +4,6 @@ use std::fmt::{Debug, Display};
 use std::result::Result as StdResult;
 pub type Result<T> = StdResult<T, Error>;
 use serde_json::Error as JsonError;
-
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
 #[derive(Debug)]
@@ -13,11 +12,15 @@ pub enum Error {
     Validation(ValidationError),
     /// For use with applicators and validators to use when an internal
     /// error occurs (e.g. unable to connect to a database, request timeout).
-    Internal(Box<dyn std::error::Error + Send + Sync>),
+    Internal(Box<dyn StdError + Send + Sync>),
     /// An error occurred serializing or deserializing data.
     Serde(SerdeError),
 }
-
+impl Error {
+    pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
+        Error::Internal(Box::new(err))
+    }
+}
 impl From<JsonError> for Error {
     fn from(err: JsonError) -> Self {
         Error::Serde(SerdeError::from(err))
