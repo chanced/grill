@@ -1,13 +1,14 @@
-use crate::{Result, Value, Eval};
+use crate::{Evaluation, Result, Value};
 
-pub struct Next<C> {
-    func: Option<C>,
+pub struct Next {
+    prefix: String,
+    func: Option<Box<dyn FnOnce(Value) -> Result<Evaluation>>>,
 }
-impl<C> Next<C>
-where
-    C: FnOnce(Value) -> Result<Eval>,
-{
-    pub fn call(self, value: Value) -> Result<Eval> {
-        self.func.map_or(Ok(Eval::new()), |f| f(value))
+impl Next {
+    pub fn call(self, value: Value) -> Result<Evaluation> {
+        self.func.map_or(Ok(Evaluation::new()), |f| match f(value) {
+            Ok(eval) => eval.prefix(&self.prefix),
+            Err(err) => Err(err),
+        })
     }
 }

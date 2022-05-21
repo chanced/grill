@@ -1,140 +1,117 @@
-use serde::{Deserialize, Serialize};
-use std::error::Error as StdError;
-use std::fmt::{Debug, Display};
-use std::result::Result as StdResult;
-pub type Result<T> = StdResult<T, Error>;
-use serde_json::Error as JsonError;
-pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
+// use serde::{Deserialize, Serialize};
+// use std::error::Error as StdError;
+// use std::fmt::{Debug, Display};
+// use std::result::Result as StdResult;
+// pub type Result<T> = StdResult<T, Error>;
+// use serde_json::Error as JsonError;
 
-#[derive(Debug)]
-pub enum Error {
-    /// Contains one or more failed validations.
-    Validation(ValidationError),
-    /// For use with applicators and validators to use when an internal
-    /// error occurs (e.g. unable to connect to a database, request timeout).
-    Internal(Box<dyn StdError + Send + Sync>),
-    /// An error occurred serializing or deserializing data.
-    Serde(SerdeError),
-}
-impl Error {
-    pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
-        Error::Internal(Box::new(err))
-    }
-}
-impl From<JsonError> for Error {
-    fn from(err: JsonError) -> Self {
-        Error::Serde(SerdeError::from(err))
-    }
-}
-// impl From<YamlError> for Error {
-//     fn from(err: YamlError) -> Self {
+// pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
+
+// #[derive(Debug)]
+// pub enum Error {
+//     /// For use with applicators and validators to use when an internal
+//     /// error occurs (e.g. unable to connect to a database, request timeout).
+//     Internal(Box<dyn StdError + Send + Sync + 'static>),
+//     /// An error occurred serializing or deserializing data.
+//     Serde(SerdeError),
+// }
+// impl Error {
+//     pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
+//         Error::Internal(Box::new(err))
+//     }
+// }
+// impl From<JsonError> for Error {
+//     fn from(err: JsonError) -> Self {
 //         Error::Serde(SerdeError::from(err))
 //     }
 // }
-impl From<SerdeError> for Error {
-    fn from(err: SerdeError) -> Self {
-        Error::Serde(err)
-    }
-}
-impl From<ValidationError> for Error {
-    fn from(e: ValidationError) -> Self {
-        Error::Validation(e)
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Validation(err) => err.fmt(f),
-            Error::Internal(err) => Display::fmt(err, f),
-            Error::Serde(err) => Display::fmt(err, f),
-        }
-    }
-}
-
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            Error::Validation(_) => None,
-            Error::Internal(err) => Some(err.as_ref()),
-            Error::Serde(err) => Some(err),
-        }
-    }
-}
-
-/// A wrapper for serialization or deserialization errors in either JSON or
-/// YAML.
-#[derive(Debug)]
-pub enum SerdeError {
-    Json(JsonError),
-    // Yaml(YamlError),
-}
-
-impl From<JsonError> for SerdeError {
-    fn from(err: JsonError) -> Self {
-        SerdeError::Json(err)
-    }
-}
-// impl From<YamlError> for SerdeError {
-//     fn from(err: YamlError) -> Self {
-//         SerdeError::Yaml(err)
+// // impl From<YamlError> for Error {
+// //     fn from(err: YamlError) -> Self {
+// //         Error::Serde(SerdeError::from(err))
+// //     }
+// // }
+// impl From<SerdeError> for Error {
+//     fn from(err: SerdeError) -> Self {
+//         Error::Serde(err)
 //     }
 // }
 
-impl StdError for SerdeError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            SerdeError::Json(err) => err.source(),
-            // SerdeError::Yaml(err) => err.source(),
-        }
-    }
-}
+// impl Display for Error {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Error::Internal(err) => Display::fmt(err, f),
+//             Error::Serde(err) => Display::fmt(err, f),
+//         }
+//     }
+// }
 
-impl Display for SerdeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SerdeError::Json(err) => std::fmt::Display::fmt(&err, f),
-            // SerdeError::Yaml(err) => std::fmt::Display::fmt(&err, f),
-        }
-    }
-}
+// impl StdError for Error {
+//     fn source(&self) -> Option<&(dyn StdError + 'static)> {
+//         match self {
+//             Error::Internal(err) => Some(err.as_ref()),
+//             Error::Serde(err) => Some(err),
+//         }
+//     }
+// }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ValdiationSource {
-    Error(String),
-    // todo: better error message
-    Errors(Vec<ValidationError>),
-}
+// /// A wrapper for serialization or deserialization errors in either JSON or
+// /// YAML.
+// #[derive(Debug)]
+// pub enum SerdeError {
+//     Json(JsonError),
+//     // Yaml(YamlError),
+// }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ValidationError {
-    pub valid: bool,
-    pub keyword_location: String,
-    pub absolute_keyword_location: String,
-    pub source: ValdiationSource,
-}
+// impl From<JsonError> for SerdeError {
+//     fn from(err: JsonError) -> Self {
+//         SerdeError::Json(err)
+//     }
+// }
+// // impl From<YamlError> for SerdeError {
+// //     fn from(err: YamlError) -> Self {
+// //         SerdeError::Yaml(err)
+// //     }
+// // }
 
-#[derive(Clone)]
-pub enum IndexError {
-    /// the schema does not contain an identifier (id) and thus can not be
-    /// indexed
-    NotIdentified,
-}
-impl Debug for IndexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexError::NotIdentified => write!(f, "schema is not identifiable"),
-        }
-    }
-}
-impl Display for IndexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexError::NotIdentified => write!(f, "schema is not identifiable"),
-        }
-    }
-}
-impl StdError for IndexError {}
+// impl StdError for SerdeError {
+//     fn source(&self) -> Option<&(dyn StdError + 'static)> {
+//         match self {
+//             SerdeError::Json(err) => err.source(),
+//             // SerdeError::Yaml(err) => err.source(),
+//         }
+//     }
+// }
 
-#[derive(Debug)]
-pub struct MissingLayerError();
+// impl Display for SerdeError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             SerdeError::Json(err) => std::fmt::Display::fmt(&err, f),
+//             // SerdeError::Yaml(err) => std::fmt::Display::fmt(&err, f),
+//         }
+//     }
+// }
+
+// #[derive(Clone)]
+// pub enum IndexError {
+//     /// the schema does not contain an identifier (id) and thus can not be
+//     /// indexed
+//     NotIdentified,
+// }
+// impl Debug for IndexError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             IndexError::NotIdentified => write!(f, "schema is not identifiable"),
+//         }
+//     }
+// }
+// impl Display for IndexError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             IndexError::NotIdentified => write!(f, "schema is not identifiable"),
+//         }
+//     }
+// }
+// impl StdError for IndexError {}
+
+// #[derive(Debug)]
+// pub struct MissingLayerError();
