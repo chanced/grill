@@ -1,11 +1,10 @@
 [package]
 name = "grill-json-pointer"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
-description = "wip"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/chanced/grill"
+repository = "https://github.com/chanced/jsonptr"
 authors = ["chance dinkins"]
-
+description = "renamed to jsonptr"
 
 [dependencies]

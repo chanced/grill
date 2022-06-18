@@ -1,41 +1,49 @@
-// #[macro_use]
-// pub(crate) mod macros;
+#[macro_use]
+pub(crate) mod macros;
 
-// pub mod error;
-// pub use error::*;
+pub mod evaluation;
+pub use evaluation::Evaluation;
 
-// pub mod context;
-// pub use context::*;
+mod format;
+pub use format::*;
 
-// pub mod interrogator;
-// pub use interrogator::Interrogator;
+mod error;
+pub use error::*;
 
-// pub mod schema;
-// pub use schema::Schema;
+mod context;
+pub use context::*;
 
-// pub mod applicator;
-// pub use applicator::*;
+mod interrogator;
+pub use interrogator::Interrogator;
 
-// pub mod resolver;
-// pub use resolver::*;
+mod schema;
+pub use schema::Schema;
 
-// pub mod eval;
-// pub use eval::*;
+mod applicator;
+pub use applicator::*;
 
-// mod next;
-// pub use next::Next;
+mod resolver;
+pub use resolver::*;
 
-// mod extensions;
-// pub(crate) use extensions::Extensions;
-// mod graph;
-// pub(crate) use graph::Graph;
-// mod injectable;
-// pub use injectable::*;
+mod next;
+pub use next::Next;
 
-// /// Temporary placeholder for a future implementation.
-// pub type Value = serde_json::Value;
-// /// Temporary placeholder for a future implementation.
-// pub type Number = serde_json::Number;
+mod extensions;
+pub(crate) use extensions::Extensions;
 
-// /// Temporary placeholder for a future implementation.
-// pub type Object<K, V> = serde_json::Map<K, V>;
+mod graph;
+pub(crate) use graph::Graph;
+
+mod injectable;
+pub use injectable::*;
+
+mod implementation;
+pub use implementation::*;
+
+/// Temporary placeholder for a future implementation.
+pub type Value = serde_json::Value;
+/// Temporary placeholder for a future implementation.
+pub type Number = serde_json::Number;
+
+/// Temporary placeholder for a future implementation.
+pub type Object<K, V> = serde_json::Map<K, V>;
