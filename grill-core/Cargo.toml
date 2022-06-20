@@ -1,6 +1,6 @@
 [package]
 name = "grill-core"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 description = "use the grill crate instead"
 license = "MIT OR Apache-2.0"
