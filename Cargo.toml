@@ -1,2 +1,8 @@
 [workspace]
-members = ["grill", "test"]
+members = [
+    "grill",
+    "grill-core",
+    "grill-json-schema",
+    "grill-json-typedef",
+    "test",
+]
