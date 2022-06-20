@@ -132,7 +132,11 @@ pub enum FieldError {
         field: String,
     },
 }
-impl Display for FieldError {}
+impl Display for FieldError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
 
 impl From<MalformedPointerError> for Error {
     fn from(err: MalformedPointerError) -> Self {

@@ -4,10 +4,10 @@ use dashmap::DashSet;
 use serde_json::Value;
 #[derive(Clone, Debug)]
 pub struct Schema {
-    pub id: Option<Arc<String>>,
-    pub dialect: Option<Arc<String>>,
+    pub id: Option<String>,
+    pub dialect: Option<Arc<str>>,
     pub references: Arc<DashSet<String>>,
-    source: Arc<Value>,
+    pub source: Arc<Value>,
     // validators: Arc<DashMap<String, Validator>>,
 }
 
@@ -20,36 +20,14 @@ impl Schema {
             references: Arc::new(DashSet::new()),
         }
     }
-    pub fn references(&self) -> Arc<DashSet<String>> {
-        self.references.clone()
-    }
     /// Adds a single reference to the schema
-    pub fn add_reference(&self, ref_id: impl ToString) -> bool {
+    pub fn insert_reference(&self, ref_id: impl ToString) -> bool {
         self.references.insert(ref_id.to_string())
-    }
-    /// Adds a slice of references to the schema
-    pub fn add_references(&self, refs: &[impl ToString]) {
-        for ref_id in refs {
-            self.add_reference(ref_id.to_string());
-        }
-    }
-    pub fn id(&self) -> Option<Arc<String>> {
-        self.id.clone()
-    }
-    /// sets the schema's `id`
-    pub fn set_id(&mut self, id: Option<impl ToString>) {
-        self.id = id.map(|id| Arc::new(id.to_string()));
-    }
-    pub fn dialect(&self) -> Option<Arc<String>> {
-        self.dialect.clone()
     }
 
     /// sets schema's `dialect`
-    pub fn set_dialect(&mut self, dialect: Option<impl ToString>) {
+    pub fn set_dialect(&mut self, dialect: &str) {
         self.dialect = dialect.map(|dialect| Arc::new(dialect.to_string()));
-    }
-    pub fn source(&self) -> Arc<Value> {
-        self.source.clone()
     }
 }
 

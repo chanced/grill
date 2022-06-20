@@ -1,4 +1,7 @@
-use std::{borrow::Cow, string, marker::PhantomData};
+use std::{
+    borrow::{Borrow, Cow},
+    marker::PhantomData,
+};
 
 pub mod iter;
 
@@ -10,17 +13,17 @@ use serde::Serialize;
 use serde_json::{to_value, Map, Value};
 
 #[derive(Debug, Clone)]
-pub struct Evaluation<I: ?Sized> {
+pub struct Annotation<I: ?Sized> {
     instance_location: Pointer,
     keyword_location: Pointer,
-    pub nested: Vec<Evaluation<I>>,
-    pub error: Option<String>,
-    pub output: Output,
+    nested: Vec<Annotation<I>>,
+    error: Option<String>,
+    output: Output,
     data: Map<String, Value>,
     implementation: Box<I>,
 }
 ///
-impl<I> Evaluation<I>
+impl<I> Annotation<I>
 where
     I: Implementation + 'static,
 {
@@ -52,11 +55,11 @@ where
     }
 
     /// Appends an `Evaluation` to the back of the nested `Evaluations`
-    pub fn push(&self, value: Evaluation<I>) {
+    pub fn push(&self, value: Annotation<I>) {
         self.nested.push(value)
     }
     /// Appends elements to the collection of nested `Evaluation`s.
-    pub fn append(&mut self, evals: Vec<Evaluation<I>>) {
+    pub fn append(&mut self, evals: Vec<Annotation<I>>) {
         self.extend(evals.iter())
     }
 
@@ -140,10 +143,23 @@ where
     pub fn reset_error(&mut self) -> Option<String> {
         self.error.take()
     }
+    fn x(&self) {
+        let v = vec![Annotation::new(
+            *self.implementation.clone(),
+            Pointer::default(),
+            Pointer::default(),
+            Output::Basic,
+        )];
+        self.extend(v)
+    }
 }
 
-impl<I, A> Extend<A> for Evaluation<I> {
-    fn extend<T: IntoIterator<Item = A>>(&mut self, iter: T) {
+impl<I, E> Extend<E> for Annotation<I>
+where
+    E: Borrow<Annotation<I>>,
+    I: Implementation + 'static,
+{
+    fn extend<T: IntoIterator<Item = E>>(&mut self, iter: T) {
         let iter = iter.into_iter();
         let (_, hint) = iter.size_hint();
         if let Some(size) = hint {
@@ -152,7 +168,7 @@ impl<I, A> Extend<A> for Evaluation<I> {
             }
         }
         for eval in iter {
-            self.push(eval)
+            self.push(eval.borrow().clone())
         }
     }
 }
@@ -163,5 +179,5 @@ enum Field<I> {
     Keyword,
     Error,
     Data,
-    _phantom(PhantomData<I>)
+    _phantom(PhantomData<I>),
 }

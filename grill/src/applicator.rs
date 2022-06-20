@@ -1,4 +1,6 @@
-use crate::{Evaluation, Implementation, Interrogator, Next, Result, Value};
+use crate::{Annotation, Implementation, Interrogator, Result, Value};
+
+pub type Next<I> = dyn FnOnce(Interrogator<I>, Value, Annotation<I>) -> Result<Annotation<I>>;
 
 pub trait Applicator<T, I>
 where
@@ -7,23 +9,23 @@ where
     fn setup(
         self,
         interrogator: Interrogator<I>,
-    ) -> Box<dyn FnOnce(I, Value, Evaluation<I>, Next<I>) -> Result<Evaluation<I>>>;
+    ) -> Box<dyn FnOnce(Interrogator<I>, Value, Annotation<I>, Next<I>) -> Result<Annotation<I>>>;
 }
 
 impl<F, I> Applicator<(), I> for F
 where
-    F: FnOnce() -> Box<dyn FnOnce(I, Value, Evaluation<I>) -> Result<Evaluation<I>>>,
+    F: FnOnce() -> Box<dyn FnOnce(I, Value, Annotation<I>) -> Result<Annotation<I>>>,
     I: Implementation + 'static,
 {
     fn setup(
         self,
         _: Interrogator<I>,
-    ) -> Box<dyn FnOnce(I, Value, Evaluation<I>, Next<I>) -> Result<Evaluation<I>>> {
+    ) -> Box<dyn FnOnce(I, Value, Annotation<I>, Next<I>) -> Result<Annotation<I>>> {
         let f = self();
-        Box::new(move |imp, value, eval, next| -> Result<Evaluation<I>> {
+        Box::new(move |imp, value, eval, next| -> Result<Annotation<I>> {
             match f(imp, value.clone(), eval) {
                 Ok(eval) => {
-                    let sub_eval: Result<Evaluation<I>> = next.call(value);
+                    let sub_eval: Result<Annotation<I>> = next.call(value);
                     // todo: merge sub_eval with eval
                     sub_eval
                 }
@@ -62,8 +64,8 @@ mod test {
     use jsonptr::Pointer;
 
     use crate::Output;
+    use crate::{Annotation, Result, Value};
     use crate::{Context, Implementation, Interrogator};
-    use crate::{Evaluation, Result, Value};
 
     #[derive(Clone)]
     struct TestImpl {}
@@ -80,7 +82,7 @@ mod test {
         }
     }
 
-    fn spike<I: Implementation>() -> Box<dyn FnOnce(I, Value) -> Result<Evaluation<I>>> {
+    fn spike<I: Implementation>() -> Box<dyn FnOnce(I, Value) -> Result<Annotation<I>>> {
         Box::new(move |i: I, v: Value| {
             Ok(i.evaluation(
                 Pointer::new(&["example"]),
@@ -91,8 +93,8 @@ mod test {
     }
     fn spike1<I: Implementation>(
         Context(str): Context<String>,
-    ) -> Box<dyn FnOnce(I, Value) -> Result<Evaluation<I>>> {
-        Box::new(move |imp: I, _: Value| -> Result<Evaluation<I>> {
+    ) -> Box<dyn FnOnce(I, Value) -> Result<Annotation<I>>> {
+        Box::new(move |imp: I, _: Value| -> Result<Annotation<I>> {
             println!("inside closure");
             todo!()
         })
@@ -105,7 +107,7 @@ mod test {
     #[test]
     /// temp tests to get the API nailed down.
     fn test_injection_of_single_param() {
-        let mut i = Interrogator::new();
+        let mut i = Interrogator::new(TestImpl {});
         i.call(spike);
         // i.context(String::from("this is context"));
         // i.context(3i8);

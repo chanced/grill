@@ -1,6 +1,6 @@
 use jsonptr::Pointer;
 
-use crate::{evaluation::Field, Evaluation, Output};
+use crate::{annotation::Field, Annotation, Output};
 
 pub trait Implementation: Send + Sync + Clone {
     /// The name of the field which represents the location of the keyword field.
@@ -26,7 +26,7 @@ pub trait Implementation: Send + Sync + Clone {
         instance_location: Pointer,
         keyword_location: Pointer,
         output: Output,
-    ) -> Evaluation<Self> {
-        Evaluation::new(self, instance_location, keyword_location, output)
+    ) -> Annotation<Self> {
+        Annotation::new(self, instance_location, keyword_location, output)
     }
 }
