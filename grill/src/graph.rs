@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use crate::error::IndexError;
 use crate::Schema;
@@ -16,7 +17,7 @@ pub(crate) struct Graph {
 }
 
 impl Graph {
-    pub fn new(schemas: &[Schema]) -> Result<Graph, IndexError> {
+    pub fn new(schemas: &[Arc<Schema>]) -> Result<Graph, IndexError> {
         let mut g = Graph {
             index: HashMap::new(),
             graph: PetGraph::new(),
@@ -39,12 +40,12 @@ impl Graph {
             .or_insert_with(|| graph.add_node(id))
     }
 
-    pub fn add(&mut self, schema: Schema) -> Result<(), IndexError> {
+    pub fn add(&mut self, schema: Arc<Schema>) -> Result<(), IndexError> {
         if schema.id().is_none() {
             return Err(IndexError::NotIdentified);
         }
-        let schema_index = self.index(schema.id.as_ref().unwrap().clone());
-        for r in schema.references().iter() {
+        let schema_index = self.index(schema.id().ok_or(IndexError::NotIdentified)?);
+        for r in schema.references() {
             let ref_index = self.index(r.as_str());
             self.graph.add_edge(schema_index, ref_index, ());
         }

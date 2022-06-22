@@ -4,7 +4,9 @@ use std::result::Result as StdResult;
 pub type Result<T> = StdResult<T, Error>;
 use jsonptr::MalformedPointerError;
 use serde_json::Error as JsonError;
+use url::ParseError as UrlParseError;
 
+use crate::annotation::AnnotationField;
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
 #[derive(Debug)]
@@ -14,7 +16,7 @@ pub enum Error {
     Internal(Box<dyn StdError + Send + Sync + 'static>),
     /// An error occurred serializing or deserializing data.
     Serde(SerdeError),
-    Field(FieldError),
+    Annotation(AnnotationError),
 }
 
 impl Error {
@@ -25,6 +27,11 @@ impl Error {
 impl From<JsonError> for Error {
     fn from(err: JsonError) -> Self {
         Error::Serde(SerdeError::from(err))
+    }
+}
+impl From<UrlParseError> for Error {
+    fn from(err: UrlParseError) -> Self {
+        Error::Annotation(AnnotationError::from(err))
     }
 }
 // impl From<YamlError> for Error {
@@ -38,9 +45,9 @@ impl From<SerdeError> for Error {
     }
 }
 
-impl From<FieldError> for Error {
-    fn from(err: FieldError) -> Self {
-        Self::Field(err)
+impl From<AnnotationError> for Error {
+    fn from(err: AnnotationError) -> Self {
+        Self::Annotation(err)
     }
 }
 
@@ -49,7 +56,7 @@ impl Display for Error {
         match self {
             Error::Internal(err) => Display::fmt(err, f),
             Error::Serde(err) => Display::fmt(err, f),
-            Error::Field(err) => Display::fmt(err, f),
+            Error::Annotation(err) => Display::fmt(err, f),
         }
     }
 }
@@ -59,7 +66,7 @@ impl StdError for Error {
         match self {
             Error::Internal(err) => Some(err.as_ref()),
             Error::Serde(err) => Some(err),
-            Error::Field(err) => err.source,
+            Error::Annotation(err) => err.source(),
         }
     }
 }
@@ -123,24 +130,43 @@ impl Display for IndexError {
 }
 
 #[derive(Debug, Clone)]
-pub enum FieldError {
-    MalformedPointer {
-        error: MalformedPointerError,
-        field: String,
-    },
-    ExpectedString {
-        field: String,
-    },
+pub enum AnnotationError {
+    MalformedPointer(MalformedPointerError),
+    ExpectedString(AnnotationField),
+    ParseUrl(url::ParseError),
 }
-impl Display for FieldError {
+
+impl Display for AnnotationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            AnnotationError::MalformedPointer(err) => std::fmt::Display::fmt(&err, f),
+            AnnotationError::ExpectedString(field) => {
+                write!(f, "error: expected string for \"{}\"", field)
+            }
+            AnnotationError::ParseUrl(err) => std::fmt::Display::fmt(&err, f),
+        }
+    }
+}
+
+impl From<UrlParseError> for AnnotationError {
+    fn from(err: UrlParseError) -> Self {
+        Self::ParseUrl(err)
+    }
+}
+
+impl StdError for AnnotationError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            AnnotationError::MalformedPointer(err) => Some(err),
+            AnnotationError::ExpectedString(_) => None,
+            AnnotationError::ParseUrl(err) => Some(err),
+        }
     }
 }
 
 impl From<MalformedPointerError> for Error {
     fn from(err: MalformedPointerError) -> Self {
-        Error::MalformedPointer(err)
+        Error::Annotation(AnnotationError::MalformedPointer(err))
     }
 }
 

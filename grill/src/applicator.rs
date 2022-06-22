@@ -1,118 +1,49 @@
-use crate::{Annotation, Implementation, Interrogator, Result, Value};
+use std::sync::Arc;
 
-pub type Next<I> = dyn FnOnce(Interrogator<I>, Value, Annotation<I>) -> Result<Annotation<I>>;
+use serde_json::Value;
 
-pub trait Applicator<T, I>
-where
-    I: Implementation,
-{
-    fn setup(
-        self,
-        interrogator: Interrogator<I>,
-    ) -> Box<dyn FnOnce(Interrogator<I>, Value, Annotation<I>, Next<I>) -> Result<Annotation<I>>>;
+use crate::{Annotation, Interrogator, Result, Schema};
+
+pub struct Next {}
+
+pub type ApplicatorFn =
+    dyn 'static + Send + Sync + Fn(&serde_json::Value, Next) -> Result<Annotation>;
+
+impl Next {
+    pub fn call(&self, value: Value) -> Result<Annotation> {
+        todo!()
+    }
+}
+pub trait Applicator {
+    fn setup(&self, interrogator: Interrogator, schema: Schema) -> Arc<ApplicatorFn>;
 }
 
-impl<F, I> Applicator<(), I> for F
+fn x(a: impl Applicator) {
+    let i: Interrogator = Interrogator::new();
+    let s = Schema::new(Value::Null);
+    let x = a.setup(i, s);
+}
+
+impl<F> Applicator for F
 where
-    F: FnOnce() -> Box<dyn FnOnce(I, Value, Annotation<I>) -> Result<Annotation<I>>>,
-    I: Implementation + 'static,
+    F: Fn() -> Box<dyn Fn(&Value, Annotation) -> Result<Annotation>>,
 {
-    fn setup(
-        self,
-        _: Interrogator<I>,
-    ) -> Box<dyn FnOnce(I, Value, Annotation<I>, Next<I>) -> Result<Annotation<I>>> {
+    fn setup(&self, int: Interrogator, schema: Schema) -> Arc<ApplicatorFn> {
         let f = self();
-        Box::new(move |imp, value, eval, next| -> Result<Annotation<I>> {
-            match f(imp, value.clone(), eval) {
-                Ok(eval) => {
-                    let sub_eval: Result<Annotation<I>> = next.call(value);
-                    // todo: merge sub_eval with eval
-                    sub_eval
-                }
-                Err(err) => Err(err),
-            }
-        })
-    }
-}
-
-// macro_rules! impl_applicator {
-//     ( $($ty:ident),* $(,)? ) => {
-//         paste! {
-//             impl<F, N, R, $($ty,)* $([<V $ty>],)*> Applicator<($($ty,)*), N, R> for F
-//             where
-//                 $([<V $ty>]: Clone + Send + Sync + 'static, )*
-//                 $( $ty: Injectable<Value = [< V $ty >]>, )*
-//                 F: FnOnce($($ty,)*),
-//                 N: Clone + Send + Sync + 'static + FnOnce(Value) -> Result<Annotations, Error>,
-//                 R: FnOnce(Value, N) -> Result<Annotations, Error>,
-//             {
-//                 fn setup(self, interrogator: Interrogator) -> R {
-//                     $(
-//                         let [< inj_ $ty:lower >] = interrogator.resolve::<$ty, [< V $ty >]>();
-//                     )*
-//                     self($([< inj_ $ty:lower >],)*);
-//                     todo!()
-//                 }
-//             }
-//         }
-//     };
-// }
-// tuplize!(impl_applicator);
-
-#[cfg(test)]
-mod test {
-    use jsonptr::Pointer;
-
-    use crate::Output;
-    use crate::{Annotation, Result, Value};
-    use crate::{Context, Implementation, Interrogator};
-
-    #[derive(Clone)]
-    struct TestImpl {}
-
-    impl Implementation for TestImpl {
-        fn keyword_location_field() -> &'static str {
-            "keywordLocation"
-        }
-        fn instance_location_field() -> &'static str {
-            "instanceLocation"
-        }
-        fn error_field() -> &'static str {
-            "error"
-        }
-    }
-
-    fn spike<I: Implementation>() -> Box<dyn FnOnce(I, Value) -> Result<Annotation<I>>> {
-        Box::new(move |i: I, v: Value| {
-            Ok(i.evaluation(
-                Pointer::new(&["example"]),
-                Pointer::new(&["example"]),
-                Output::Basic,
-            ))
-        })
-    }
-    fn spike1<I: Implementation>(
-        Context(str): Context<String>,
-    ) -> Box<dyn FnOnce(I, Value) -> Result<Annotation<I>>> {
-        Box::new(move |imp: I, _: Value| -> Result<Annotation<I>> {
-            println!("inside closure");
+        Arc::new(|value, next| -> Result<Annotation> {
+            // match f(imp, value.clone(), eval) {
+            //     Ok(eval) => {
+            //         let sub_eval: Result<Annotation> = next.call(value);
+            //         // todo: merge sub_eval with eval
+            //         sub_eval
+            //     }
+            //     Err(err) => Err(err),
             todo!()
         })
     }
-
-    fn spike2(Context(str): Context<String>, Context(i): Context<i8>) {
-        println!("{} {}", str, i);
-    }
-
-    #[test]
-    /// temp tests to get the API nailed down.
-    fn test_injection_of_single_param() {
-        let mut i = Interrogator::new(TestImpl {});
-        i.call(spike);
-        // i.context(String::from("this is context"));
-        // i.context(3i8);
-        // i.call(spike2);
-        // i.call(spike);
-        // i.call(spike2);
-    }
+}
+#[cfg(test)]
+mod test {
+    #[derive(Clone)]
+    struct TestImpl {}
 }

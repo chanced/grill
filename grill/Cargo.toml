@@ -20,6 +20,7 @@ once_cell = { version = "1.10", features = ["parking_lot"] }
 paste = "1.0"
 jsonptr = "0.1"
 heck = "0.4.0"
+arc-swap = { version = "1.5", features = ["serde"] }
 
 # bigdecimal = { version = "0.3", features = ["serde"], optional = true }
 # num-bigint = { version = "0.4", features = ["serde"], optional = true }
