@@ -41,7 +41,7 @@ impl Annotation {
     }
 
     /// Appends an `Evaluation` to the back of the nested `Evaluations`
-    pub fn push(&self, value: Annotation) {
+    pub fn push(&mut self, value: Annotation) {
         self.nested.push(value)
     }
     /// Appends elements to the collection of nested `Evaluation`s.
@@ -51,8 +51,8 @@ impl Annotation {
 
     pub fn get(&self, key: &str) -> Option<Cow<Value>> {
         match AnnotationField::from(key) {
-            AnnotationField::InstanceLocation => Some(Cow::Owned(self.instance_location.into())),
-            AnnotationField::KeywordLocation => Some(Cow::Owned(self.keyword_location.into())),
+            AnnotationField::InstanceLocation => Some(Cow::Owned((&self.instance_location).into())),
+            AnnotationField::KeywordLocation => Some(Cow::Owned((&self.keyword_location).into())),
             AnnotationField::AbsoluteKeywordLocation => self
                 .absolute_keyword_location
                 .as_ref()
@@ -63,20 +63,19 @@ impl Annotation {
     }
     /// Sets the `instance_location` field, returning the previous value
     pub fn set_instance_location(&mut self, loc: Pointer) -> Pointer {
-        let v: Value;
-        let old = self.instance_location;
+        let old = self.instance_location.clone();
         self.instance_location = loc;
         old
     }
     /// Sets the `keyword_location` field, returning the previous value
     pub fn set_keyword_location(&mut self, loc: Pointer) -> Pointer {
-        let old = self.keyword_location;
+        let old = self.keyword_location.clone();
         self.keyword_location = loc;
         old
     }
 
     pub fn set_absolute_keyword_location(&mut self, url: Url) -> Option<Url> {
-        let old = self.absolute_keyword_location;
+        let old = self.absolute_keyword_location.clone();
         self.absolute_keyword_location = Some(url);
         old
     }
@@ -89,32 +88,33 @@ impl Annotation {
     pub fn insert(&mut self, k: String, v: impl Serialize) -> Result<Option<Value>, Error> {
         let v = to_value(v)?;
 
-        let as_str = |v: Value| -> Result<&str, Error> {
-            if let Some(s) = v.as_str() {
-                Ok(s)
-            } else {
-                Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
-            }
-        };
-
         match AnnotationField::from(k.as_str()) {
             AnnotationField::InstanceLocation => {
-                let s = as_str(v)?;
-                Ok(Some(
-                    self.set_instance_location(Pointer::try_from(s)?).into(),
-                ))
+                if let Some(s) = v.as_str() {
+                    Ok(Some(
+                        self.set_instance_location(Pointer::try_from(s)?).into(),
+                    ))
+                } else {
+                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                }
             }
             AnnotationField::KeywordLocation => {
-                let s = as_str(v)?;
-                Ok(Some(
-                    self.set_keyword_location(Pointer::try_from(s)?).into(),
-                ))
+                if let Some(s) = v.as_str() {
+                    Ok(Some(
+                        self.set_keyword_location(Pointer::try_from(s)?).into(),
+                    ))
+                } else {
+                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                }
             }
             AnnotationField::AbsoluteKeywordLocation => {
-                let s = as_str(v)?;
-                Ok(self
-                    .set_absolute_keyword_location(Url::parse(s)?)
-                    .map(|u| Value::String(u.to_string())))
+                if let Some(s) = v.as_str() {
+                    Ok(self
+                        .set_absolute_keyword_location(Url::parse(s)?)
+                        .map(|u| Value::String(u.to_string())))
+                } else {
+                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                }
             }
 
             AnnotationField::Error => {

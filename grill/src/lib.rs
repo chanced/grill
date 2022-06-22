@@ -7,9 +7,6 @@ pub use format::*;
 mod error;
 pub use error::*;
 
-mod context;
-pub use context::*;
-
 mod interrogator;
 pub use interrogator::Interrogator;
 
@@ -24,6 +21,3 @@ pub use resolver::*;
 
 mod graph;
 pub(crate) use graph::Graph;
-
-mod injectable;
-pub use injectable::*;

@@ -9,7 +9,7 @@ pub struct Iter<'a> {
 
 impl<'a> Iter<'a> {
     pub fn new(eval: &'a Annotation) -> Self {
-        let queue = VecDeque::new();
+        let mut queue = VecDeque::new();
         queue.push_front(eval);
         Self { eval, queue }
     }

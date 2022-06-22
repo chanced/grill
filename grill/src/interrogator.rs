@@ -1,6 +1,7 @@
-use crate::{Annotation, Applicator, Graph,  Result, Schema};
+use crate::{Annotation, Applicator, Graph, Next, Result, Schema};
 use parking_lot::RwLock;
-use std::{ sync::Arc};
+use serde_json::Value;
+use std::sync::Arc;
 struct Layer<T: Clone + Send + Sync + 'static>(T);
 
 /// Manages schemas and extensions.
@@ -28,7 +29,6 @@ impl Interrogator {
     {
         let applicator = applicator.setup(self.clone(), schema);
         let v = Value::Null;
-        applicator
         todo!()
     }
 }

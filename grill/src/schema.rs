@@ -45,11 +45,13 @@ impl Schema {
         }
     }
     pub fn id(&self) -> Option<String> {
-        self.id.load().map(|v| *v)
+        self.id.load().as_ref().map(|v| v.to_string())
     }
     /// Sets the id of the schema, returning the previous value if it exists.
     pub fn set_id(&self, val: String) -> Option<String> {
-        self.id.swap(Some(Arc::new(val))).map(|v| *v)
+        self.id
+            .swap(Some(Arc::new(val)))
+            .map(|v| v.as_ref().clone())
     }
     /// Adds a single reference to the schema. Returns `true` if the reference
     /// was not already present.
@@ -60,13 +62,13 @@ impl Schema {
         self.references.iter().map(|v| v.to_string()).collect()
     }
     pub fn dialect(&self) -> Option<String> {
-        self.dialect.load().map(|v| *v)
+        self.dialect.load().as_ref().map(|v| v.to_string())
     }
     /// sets schema's `dialect`, returning the previous value if it exists.
-    pub fn set_dialect(&self, dialect: String) -> Option<String> {
+    pub fn set_dialect(&self, dialect: impl ToString) -> Option<String> {
         self.dialect
             .swap(Some(Arc::new(dialect.to_string())))
-            .map(|v| *v)
+            .map(|v| v.as_ref().clone())
     }
 
     pub(crate) fn push_applicator(&self, applicator: impl Applicator + 'static) {
