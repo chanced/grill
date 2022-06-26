@@ -1,9 +1,7 @@
+use jsonptr::MalformedPointerError;
+use serde_json::Error as SerdeError;
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
-use std::result::Result as StdResult;
-pub type Result<T> = StdResult<T, Error>;
-use jsonptr::MalformedPointerError;
-use serde_json::Error as JsonError;
 use url::ParseError as UrlParseError;
 
 use crate::annotation::AnnotationField;
@@ -17,6 +15,7 @@ pub enum Error {
     /// An error occurred serializing or deserializing data.
     Serde(SerdeError),
     Annotation(AnnotationError),
+    InvalidSchema(InvalidSchemaError),
 }
 
 impl Error {
@@ -24,8 +23,8 @@ impl Error {
         Error::Internal(Box::new(err))
     }
 }
-impl From<JsonError> for Error {
-    fn from(err: JsonError) -> Self {
+impl From<SerdeError> for Error {
+    fn from(err: SerdeError) -> Self {
         Error::Serde(SerdeError::from(err))
     }
 }
@@ -34,16 +33,18 @@ impl From<UrlParseError> for Error {
         Error::Annotation(AnnotationError::from(err))
     }
 }
+
+impl From<InvalidSchemaError> for Error {
+    fn from(err: InvalidSchemaError) -> Self {
+        Error::InvalidSchema(err)
+    }
+}
+
 // impl From<YamlError> for Error {
 //     fn from(err: YamlError) -> Self {
 //         Error::Serde(SerdeError::from(err))
 //     }
 // }
-impl From<SerdeError> for Error {
-    fn from(err: SerdeError) -> Self {
-        Error::Serde(err)
-    }
-}
 
 impl From<AnnotationError> for Error {
     fn from(err: AnnotationError) -> Self {
@@ -57,6 +58,7 @@ impl Display for Error {
             Error::Internal(err) => Display::fmt(err, f),
             Error::Serde(err) => Display::fmt(err, f),
             Error::Annotation(err) => Display::fmt(err, f),
+            Error::InvalidSchema(err) => Display::fmt(err, f),
         }
     }
 }
@@ -67,43 +69,7 @@ impl StdError for Error {
             Error::Internal(err) => Some(err.as_ref()),
             Error::Serde(err) => Some(err),
             Error::Annotation(err) => err.source(),
-        }
-    }
-}
-
-/// A wrapper for serialization or deserialization errors in either JSON or
-/// YAML.
-#[derive(Debug)]
-pub enum SerdeError {
-    Json(JsonError),
-    // Yaml(YamlError),
-}
-
-impl From<JsonError> for SerdeError {
-    fn from(err: JsonError) -> Self {
-        SerdeError::Json(err)
-    }
-}
-// impl From<YamlError> for SerdeError {
-//     fn from(err: YamlError) -> Self {
-//         SerdeError::Yaml(err)
-//     }
-// }
-
-impl StdError for SerdeError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            SerdeError::Json(err) => err.source(),
-            // SerdeError::Yaml(err) => err.source(),
-        }
-    }
-}
-
-impl Display for SerdeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SerdeError::Json(err) => Display::fmt(&err, f),
-            // SerdeError::Yaml(err) => std::fmt::Display::fmt(&err, f),
+            Error::InvalidSchema(err) => Some(err),
         }
     }
 }
@@ -174,3 +140,14 @@ impl StdError for IndexError {}
 
 #[derive(Debug)]
 pub struct MissingLayerError();
+
+#[derive(Clone, Debug)]
+pub struct InvalidSchemaError;
+
+impl std::fmt::Display for InvalidSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "no applicators found for this schema")
+    }
+}
+
+impl StdError for InvalidSchemaError {}

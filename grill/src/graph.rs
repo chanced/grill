@@ -11,6 +11,7 @@ use petgraph::Graph as PetGraph;
 /// Builds a graph of schemas whose edges correspond to references.
 /// The goal is to determine compilation sequences and to recognize when
 /// schemas are recursively referenced.
+#[derive(Debug)]
 pub(crate) struct Graph {
     index: HashMap<String, NodeIndex>,
     graph: PetGraph<String, ()>,

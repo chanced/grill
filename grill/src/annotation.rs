@@ -11,15 +11,14 @@ use crate::{AnnotationError, Error, Output};
 use jsonptr::Pointer;
 use serde::Serialize;
 use serde_json::{to_value, Map, Value};
-
 #[derive(Debug, Clone)]
 pub struct Annotation {
-    pub instance_location: Pointer,
-    pub keyword_location: Pointer,
-    pub absolute_keyword_location: Option<Url>,
-    pub nested: Vec<Annotation>,
-    pub error: Option<String>,
-    pub output: Output,
+    instance_location: Pointer,
+    keyword_location: Pointer,
+    absolute_keyword_location: Option<Url>,
+    nested: Vec<Annotation>,
+    error: Option<String>,
+    output: Output,
     data: Map<String, Value>,
 }
 ///
@@ -37,7 +36,18 @@ impl Annotation {
     }
     /// Returns `true` if this or any nested `Annotation` has an error set
     pub fn is_valid(&self) -> bool {
-        !self.error.is_some() && !self.nested.iter().any(|n| !n.is_valid())
+        self.error.is_none() && self.nested.iter().all(Annotation::is_valid)
+    }
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+    /// Sets the error message
+    pub fn set_error(&mut self, error: &str) {
+        self.error = Some(error.to_string());
+    }
+    /// Returns the specified `Output`
+    pub fn output(&self) -> Output {
+        self.output.clone()
     }
 
     /// Appends an `Evaluation` to the back of the nested `Evaluations`
@@ -45,12 +55,15 @@ impl Annotation {
         self.nested.push(value)
     }
     /// Appends elements to the collection of nested `Evaluation`s.
-    pub fn append(&mut self, evals: Vec<Annotation>) {
-        self.extend(evals.iter())
+    pub fn append(&mut self, evals: impl IntoIterator<Item = Annotation>) {
+        self.extend(evals.into_iter())
     }
 
-    pub fn get(&self, key: &str) -> Option<Cow<Value>> {
-        match AnnotationField::from(key) {
+    pub fn get<K>(&self, key: &K) -> Option<Cow<Value>>
+    where
+        K: ?Sized + Borrow<str>,
+    {
+        match AnnotationField::from(key.borrow()) {
             AnnotationField::InstanceLocation => Some(Cow::Owned((&self.instance_location).into())),
             AnnotationField::KeywordLocation => Some(Cow::Owned((&self.keyword_location).into())),
             AnnotationField::AbsoluteKeywordLocation => self
@@ -58,20 +71,34 @@ impl Annotation {
                 .as_ref()
                 .map(|u| Cow::Owned(Value::String(u.to_string()))),
             AnnotationField::Error => self.error.clone().map(|e| Cow::Owned(Value::String(e))),
-            _ => self.data.get(key).map(Cow::Borrowed),
+            _ => self.data.get(key.borrow()).map(Cow::Borrowed),
         }
     }
+
+    pub fn instance_location(&self) -> &Pointer {
+        &self.instance_location
+    }
+
     /// Sets the `instance_location` field, returning the previous value
     pub fn set_instance_location(&mut self, loc: Pointer) -> Pointer {
         let old = self.instance_location.clone();
         self.instance_location = loc;
         old
     }
+
+    pub fn keyword_location(&self) -> &Pointer {
+        &self.keyword_location
+    }
+
     /// Sets the `keyword_location` field, returning the previous value
     pub fn set_keyword_location(&mut self, loc: Pointer) -> Pointer {
         let old = self.keyword_location.clone();
         self.keyword_location = loc;
         old
+    }
+
+    pub fn absolute_keyword_location(&self) -> Option<&Url> {
+        self.absolute_keyword_location.as_ref()
     }
 
     pub fn set_absolute_keyword_location(&mut self, url: Url) -> Option<Url> {
@@ -130,10 +157,6 @@ impl Annotation {
         }
     }
 
-    /// Sets the error message
-    pub fn set_error(&mut self, error: &str) {
-        self.error = Some(error.to_string());
-    }
     /// Sets the internal error to `None`
     /// - If the error was previously set, it is returned
     pub fn reset_error(&mut self) -> Option<String> {

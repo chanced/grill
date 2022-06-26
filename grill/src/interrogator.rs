@@ -1,34 +1,51 @@
-use crate::{Annotation, Applicator, Graph, Next, Result, Schema};
-use parking_lot::RwLock;
+use crate::{Applicator, Error, Graph, Schema};
+use arc_swap::ArcSwap;
 use serde_json::Value;
-use std::sync::Arc;
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 struct Layer<T: Clone + Send + Sync + 'static>(T);
+
+pub struct Builder {}
 
 /// Manages schemas and extensions.
 #[derive(Clone)]
 pub struct Interrogator {
-    // schemas: Arc<DashMap<String, Schema>>,
-    graph: Arc<RwLock<Graph>>,
-    // resolver: Arc<dyn Resolver>,
-    // applicators: Arc<RwLock<dyn Fn(&Schema) -> Arc<dyn FnOnce(&mut Schema) -> Result<(), Error>>>>,
+    schemas: Arc<ArcSwap<HashMap<String, Schema>>>,
+    graph: Arc<ArcSwap<Graph>>,
+    applicators: Arc<ArcSwap<Vec<Box<dyn Applicator>>>>,
 }
+
+impl Debug for Interrogator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Interrogator")
+            .field("schemas", &self.schemas)
+            .field("graph", &self.graph)
+            .finish_non_exhaustive()
+    }
+}
+
 // impl<R> Interrogator {}
 impl Interrogator {
     pub fn new() -> Self {
         Self {
-            graph: Arc::new(RwLock::new(Graph::new(&[]).unwrap())),
-            // resolver: Arc::new(RwLock::new(Resolver::new())),
-            // applicators: Arc::new(RwLock::new(Applicators::new())),
+            schemas: Arc::new(ArcSwap::from_pointee(HashMap::new())),
+            graph: Arc::new(ArcSwap::from_pointee(Graph::new(&[]).unwrap())),
+            applicators: Arc::new(ArcSwap::from_pointee(Vec::new())),
         }
     }
+    pub fn builder() -> Builder {
+        Builder {}
+    }
+    pub fn new_schema(&self, value: Value) -> Result<Schema, Error> {
+        Schema::new(value, self)
+    }
 
-    /// temp method to see if this will execute
-    pub fn call<A>(&self, applicator: A, schema: Schema) -> Result<Annotation>
-    where
-        A: Applicator,
-    {
-        let applicator = applicator.setup(self.clone(), schema);
-        let v = Value::Null;
-        todo!()
+    pub(crate) fn applicators(&self) -> Arc<Vec<Box<dyn Applicator>>> {
+        self.applicators.load().clone()
+    }
+}
+
+impl Default for Interrogator {
+    fn default() -> Self {
+        Self::new()
     }
 }

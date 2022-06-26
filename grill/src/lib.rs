@@ -1,23 +1,26 @@
 pub mod annotation;
 pub use annotation::Annotation;
 
-mod format;
-pub use format::*;
+mod output;
+pub use output::*;
 
 mod error;
 pub use error::*;
 
-mod interrogator;
+pub mod interrogator;
 pub use interrogator::Interrogator;
 
-mod schema;
+pub mod schema;
 pub use schema::Schema;
 
 mod applicator;
-pub use applicator::*;
+pub use applicator::{Applicator, ApplicatorFn};
 
 mod resolver;
 pub use resolver::*;
+
+mod next;
+pub use next::Next;
 
 mod graph;
 pub(crate) use graph::Graph;
