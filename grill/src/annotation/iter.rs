@@ -24,7 +24,7 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.queue.pop_front() {
             Some(next) => {
-                for n in next.nested.iter() {
+                for n in next.nested.iter().rev() {
                     self.queue.push_front(n)
                 }
                 Some(next)
