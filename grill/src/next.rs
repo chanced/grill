@@ -1,4 +1,4 @@
-use crate::{Annotation, ApplicatorFn, Error};
+use crate::{ApplicatorFn, Error, Evaluation};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -13,15 +13,17 @@ impl Next {
 }
 
 impl Next {
-    pub fn call(&self, annotation: Annotation, value: &Value) -> Result<Annotation, Error> {
+    pub fn call(&self, evaluation: Evaluation, value: &Value) -> Result<Evaluation, Error> {
         if let Some(f) = self.fns.get(self.idx) {
             let next = Self {
                 fns: self.fns.clone(),
                 idx: self.idx + 1,
             };
-            f(value, annotation, next)
+            // todo: check if call was invoked
+            // todo: return an error if f does not return an error and next was not called.
+            f(value, evaluation, next)
         } else {
-            Ok(annotation)
+            Ok(evaluation)
         }
     }
 }

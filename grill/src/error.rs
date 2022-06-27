@@ -4,7 +4,8 @@ use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
 use url::ParseError as UrlParseError;
 
-use crate::annotation::AnnotationField;
+use crate::evaluation::Field;
+use crate::Schema;
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub enum Error {
     Serde(SerdeError),
     Annotation(AnnotationError),
     InvalidSchema(InvalidSchemaError),
+    UnindentifiedSchema(UnidentifiedSchemaError),
 }
 
 impl Error {
@@ -23,9 +25,16 @@ impl Error {
         Error::Internal(Box::new(err))
     }
 }
+
+impl From<UnidentifiedSchemaError> for Error {
+    fn from(err: UnidentifiedSchemaError) -> Self {
+        Error::UnindentifiedSchema(err)
+    }
+}
+
 impl From<SerdeError> for Error {
     fn from(err: SerdeError) -> Self {
-        Error::Serde(SerdeError::from(err))
+        Error::Serde(err)
     }
 }
 impl From<UrlParseError> for Error {
@@ -59,6 +68,7 @@ impl Display for Error {
             Error::Serde(err) => Display::fmt(err, f),
             Error::Annotation(err) => Display::fmt(err, f),
             Error::InvalidSchema(err) => Display::fmt(err, f),
+            Error::UnindentifiedSchema(err) => Display::fmt(err, f),
         }
     }
 }
@@ -70,9 +80,23 @@ impl StdError for Error {
             Error::Serde(err) => Some(err),
             Error::Annotation(err) => err.source(),
             Error::InvalidSchema(err) => Some(err),
+            Error::UnindentifiedSchema(err) => Some(err),
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct UnidentifiedSchemaError {
+    pub schema: Schema,
+}
+
+impl std::fmt::Display for UnidentifiedSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "schema $id not set")
+    }
+}
+
+impl StdError for UnidentifiedSchemaError {}
 
 #[derive(Clone)]
 pub enum IndexError {
@@ -98,7 +122,7 @@ impl Display for IndexError {
 #[derive(Debug, Clone)]
 pub enum AnnotationError {
     MalformedPointer(MalformedPointerError),
-    ExpectedString(AnnotationField),
+    ExpectedString(Field),
     ParseUrl(url::ParseError),
 }
 

@@ -1,8 +1,7 @@
-use crate::{Applicator, Error, Graph, Schema};
+use crate::{Applicator, Error, Graph, Schema, UnidentifiedSchemaError};
 use arc_swap::ArcSwap;
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
-struct Layer<T: Clone + Send + Sync + 'static>(T);
 
 pub struct Builder {}
 
@@ -41,6 +40,22 @@ impl Interrogator {
 
     pub(crate) fn applicators(&self) -> Arc<Vec<Box<dyn Applicator>>> {
         self.applicators.load().clone()
+    }
+
+    pub fn insert_schema(&self, schema: Schema) -> Result<Option<Schema>, Error> {
+        if let Some(id) = schema.id() {
+            let guard = self.schemas.load();
+            let schemas = guard.clone();
+            let old = guard.get(id.as_str());
+            let mut data = HashMap::with_capacity(schemas.len());
+            for (k, v) in schemas.iter() {
+                data.insert(k.clone(), v.clone());
+            }
+            self.schemas.store(Arc::new(data));
+            Ok(old.cloned())
+        } else {
+            Err(UnidentifiedSchemaError { schema }.into())
+        }
     }
 }
 

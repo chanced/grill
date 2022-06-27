@@ -1,25 +1,25 @@
 use std::collections::VecDeque;
 
-use super::Annotation;
+use super::Evaluation;
 
 pub struct Iter<'a> {
-    eval: &'a Annotation,
-    queue: VecDeque<&'a Annotation>,
+    eval: &'a Evaluation,
+    queue: VecDeque<&'a Evaluation>,
 }
 
 impl<'a> Iter<'a> {
-    pub fn new(eval: &'a Annotation) -> Self {
+    pub fn new(eval: &'a Evaluation) -> Self {
         let mut queue = VecDeque::new();
         queue.push_front(eval);
         Self { eval, queue }
     }
-    pub fn source(&self) -> &'a Annotation {
+    pub fn source(&self) -> &'a Evaluation {
         self.eval
     }
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Annotation;
+    type Item = &'a Evaluation;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.queue.pop_front() {

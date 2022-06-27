@@ -1,9 +1,9 @@
 use serde_json::Value;
 
-use crate::{Annotation, Error, Interrogator, Next, Schema};
+use crate::{Error, Evaluation, Interrogator, Next, Schema};
 
 pub type ApplicatorFn =
-    dyn 'static + Send + Sync + Fn(&Value, Annotation, Next) -> Result<Annotation, Error>;
+    dyn 'static + Send + Sync + Fn(&Value, Evaluation, Next) -> Result<Evaluation, Error>;
 
 pub trait Applicator {
     fn setup(

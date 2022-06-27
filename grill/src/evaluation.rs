@@ -12,17 +12,17 @@ use jsonptr::Pointer;
 use serde::Serialize;
 use serde_json::{to_value, Map, Value};
 #[derive(Debug, Clone)]
-pub struct Annotation {
+pub struct Evaluation {
     instance_location: Pointer,
     keyword_location: Pointer,
     absolute_keyword_location: Option<Url>,
-    nested: Vec<Annotation>,
+    nested: Vec<Evaluation>,
     error: Option<String>,
     output: Output,
     data: Map<String, Value>,
 }
 ///
-impl Annotation {
+impl Evaluation {
     pub fn new(instance_location: Pointer, keyword_location: Pointer, output: Output) -> Self {
         Self {
             output,
@@ -36,7 +36,7 @@ impl Annotation {
     }
     /// Returns `true` if this or any nested `Annotation` has an error set
     pub fn is_valid(&self) -> bool {
-        self.error.is_none() && self.nested.iter().all(Annotation::is_valid)
+        self.error.is_none() && self.nested.iter().all(Evaluation::is_valid)
     }
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
@@ -51,11 +51,11 @@ impl Annotation {
     }
 
     /// Appends an `Evaluation` to the back of the nested `Evaluations`
-    pub fn push(&mut self, value: Annotation) {
+    pub fn push(&mut self, value: Evaluation) {
         self.nested.push(value)
     }
     /// Appends elements to the collection of nested `Evaluation`s.
-    pub fn append(&mut self, evals: impl IntoIterator<Item = Annotation>) {
+    pub fn append(&mut self, evals: impl IntoIterator<Item = Evaluation>) {
         self.extend(evals.into_iter())
     }
 
@@ -63,14 +63,14 @@ impl Annotation {
     where
         K: ?Sized + Borrow<str>,
     {
-        match AnnotationField::from(key.borrow()) {
-            AnnotationField::InstanceLocation => Some(Cow::Owned((&self.instance_location).into())),
-            AnnotationField::KeywordLocation => Some(Cow::Owned((&self.keyword_location).into())),
-            AnnotationField::AbsoluteKeywordLocation => self
+        match Field::from(key.borrow()) {
+            Field::InstanceLocation => Some(Cow::Owned((&self.instance_location).into())),
+            Field::KeywordLocation => Some(Cow::Owned((&self.keyword_location).into())),
+            Field::AbsoluteKeywordLocation => self
                 .absolute_keyword_location
                 .as_ref()
                 .map(|u| Cow::Owned(Value::String(u.to_string()))),
-            AnnotationField::Error => self.error.clone().map(|e| Cow::Owned(Value::String(e))),
+            Field::Error => self.error.clone().map(|e| Cow::Owned(Value::String(e))),
             _ => self.data.get(key.borrow()).map(Cow::Borrowed),
         }
     }
@@ -115,42 +115,42 @@ impl Annotation {
     pub fn insert(&mut self, k: String, v: impl Serialize) -> Result<Option<Value>, Error> {
         let v = to_value(v)?;
 
-        match AnnotationField::from(k.as_str()) {
-            AnnotationField::InstanceLocation => {
+        match Field::from(k.as_str()) {
+            Field::InstanceLocation => {
                 if let Some(s) = v.as_str() {
                     Ok(Some(
                         self.set_instance_location(Pointer::try_from(s)?).into(),
                     ))
                 } else {
-                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
                 }
             }
-            AnnotationField::KeywordLocation => {
+            Field::KeywordLocation => {
                 if let Some(s) = v.as_str() {
                     Ok(Some(
                         self.set_keyword_location(Pointer::try_from(s)?).into(),
                     ))
                 } else {
-                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
                 }
             }
-            AnnotationField::AbsoluteKeywordLocation => {
+            Field::AbsoluteKeywordLocation => {
                 if let Some(s) = v.as_str() {
                     Ok(self
                         .set_absolute_keyword_location(Url::parse(s)?)
                         .map(|u| Value::String(u.to_string())))
                 } else {
-                    Err(AnnotationError::ExpectedString(AnnotationField::from(k)).into())
+                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
                 }
             }
 
-            AnnotationField::Error => {
+            Field::Error => {
                 if let Some(s) = v.as_str() {
                     let old = self.error.take();
                     self.error = Some(s.to_string());
                     Ok(old.map(Value::from))
                 } else {
-                    Err(AnnotationError::ExpectedString(AnnotationField::Error).into())
+                    Err(AnnotationError::ExpectedString(Field::Error).into())
                 }
             }
             _ => Ok(self.data.insert(k, v)),
@@ -164,9 +164,9 @@ impl Annotation {
     }
 }
 
-impl<E> Extend<E> for Annotation
+impl<E> Extend<E> for Evaluation
 where
-    E: Borrow<Annotation>,
+    E: Borrow<Evaluation>,
 {
     fn extend<T: IntoIterator<Item = E>>(&mut self, iter: T) {
         let iter = iter.into_iter();
@@ -183,7 +183,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum AnnotationField {
+pub enum Field {
     InstanceLocation,
     KeywordLocation,
     AbsoluteKeywordLocation,
@@ -191,29 +191,29 @@ pub enum AnnotationField {
     Data(String),
 }
 
-impl From<&str> for AnnotationField {
+impl From<&str> for Field {
     fn from(s: &str) -> Self {
         match s {
-            "instanceLocation" => AnnotationField::InstanceLocation,
-            "keywordLocation" => AnnotationField::KeywordLocation,
-            "absoluteKeywordLocation" => AnnotationField::AbsoluteKeywordLocation,
-            "error" => AnnotationField::Error,
-            _ => AnnotationField::Data(s.to_string()),
+            "instanceLocation" => Field::InstanceLocation,
+            "keywordLocation" => Field::KeywordLocation,
+            "absoluteKeywordLocation" => Field::AbsoluteKeywordLocation,
+            "error" => Field::Error,
+            _ => Field::Data(s.to_string()),
         }
     }
 }
-impl Display for AnnotationField {
+impl Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AnnotationField::InstanceLocation => write!(f, "instanceLocation"),
-            AnnotationField::KeywordLocation => write!(f, "keywordLocation"),
-            AnnotationField::AbsoluteKeywordLocation => write!(f, "absoluteKeywordLocation"),
-            AnnotationField::Error => write!(f, "error"),
-            AnnotationField::Data(s) => write!(f, "{}", s),
+            Field::InstanceLocation => write!(f, "instanceLocation"),
+            Field::KeywordLocation => write!(f, "keywordLocation"),
+            Field::AbsoluteKeywordLocation => write!(f, "absoluteKeywordLocation"),
+            Field::Error => write!(f, "error"),
+            Field::Data(s) => write!(f, "{}", s),
         }
     }
 }
-impl From<String> for AnnotationField {
+impl From<String> for Field {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
     }
