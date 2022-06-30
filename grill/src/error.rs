@@ -1,28 +1,67 @@
-use jsonptr::MalformedPointerError;
+use crate::evaluation::Field;
+use crate::Schema;
+use jsonptr::{Error as PointerError, MalformedPointerError};
 use serde_json::Error as SerdeError;
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
-use url::ParseError as UrlParseError;
-
-use crate::evaluation::Field;
-use crate::Schema;
+use std::sync::Arc;
+use uniresid::Error as UriError;
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     /// For use with applicators and validators to use when an internal
     /// error occurs (e.g. unable to connect to a database, request timeout).
-    Internal(Box<dyn StdError + Send + Sync + 'static>),
+    Internal(Arc<dyn StdError + Send + Sync + 'static>),
     /// An error occurred serializing or deserializing data.
-    Serde(SerdeError),
-    Annotation(AnnotationError),
+    Serde(Arc<SerdeError>),
+    /// A Schema did not have any matching `Applicator`s.
     InvalidSchema(InvalidSchemaError),
+    /// A top-level `Schema` was not identifiable.
     UnindentifiedSchema(UnidentifiedSchemaError),
+    /// An error occurred parsing a JSON Pointer.
+    Pointer(PointerError),
+    /// An `Evaluation` field required a String value but was provided something
+    /// else.
+    ExpectedString(ExpectedStringError),
+    /// An error occurred parsing a URI.
+    Uri(UriError),
 }
-
 impl Error {
     pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
-        Error::Internal(Box::new(err))
+        Error::Internal(Arc::new(err))
+    }
+    /// Returns `true` if the error is an `Internal` error.
+    pub fn is_internal(&self) -> bool {
+        matches!(self, Error::Internal(_))
+    }
+
+    /// Returns `true` if the error is a `Serde` error.
+    pub fn is_serde(&self) -> bool {
+        matches!(self, Error::Serde(_))
+    }
+    /// Returns `true` if the error is an `InvalidSchema` error.
+    pub fn is_invalid_schema(&self) -> bool {
+        matches!(self, Error::InvalidSchema(_))
+    }
+    /// Returns `true` if the error is an `UnindentifiedSchema` error.
+    pub fn is_unindentified_schema(&self) -> bool {
+        matches!(self, Error::UnindentifiedSchema(_))
+    }
+
+    /// Returns `true` if the error is a `MalformedPointer` error.
+    pub fn is_malformed_pointer(&self) -> bool {
+        matches!(self, Error::Pointer(_))
+    }
+
+    /// Returns `true` if the error is an `ExpectedString` error.
+    pub fn is_expected_string(&self) -> bool {
+        matches!(self, Error::ExpectedString(_))
+    }
+
+    /// Returns `true` if the error is a `MalformedUri` error.
+    pub fn is_malformed_uri(&self) -> bool {
+        matches!(self, Error::Uri(_))
     }
 }
 
@@ -34,12 +73,12 @@ impl From<UnidentifiedSchemaError> for Error {
 
 impl From<SerdeError> for Error {
     fn from(err: SerdeError) -> Self {
-        Error::Serde(err)
+        Error::Serde(Arc::new(err))
     }
 }
-impl From<UrlParseError> for Error {
-    fn from(err: UrlParseError) -> Self {
-        Error::Annotation(AnnotationError::from(err))
+impl From<UriError> for Error {
+    fn from(err: UriError) -> Self {
+        Error::Uri(err)
     }
 }
 
@@ -48,16 +87,26 @@ impl From<InvalidSchemaError> for Error {
         Error::InvalidSchema(err)
     }
 }
-
-// impl From<YamlError> for Error {
-//     fn from(err: YamlError) -> Self {
-//         Error::Serde(SerdeError::from(err))
+// impl From<SerdeError> for Error {
+//     fn from(err: SerdeError) -> Self {
+//         Error::Serde(err)
 //     }
 // }
+impl From<PointerError> for Error {
+    fn from(err: PointerError) -> Self {
+        Error::Pointer(err)
+    }
+}
 
-impl From<AnnotationError> for Error {
-    fn from(err: AnnotationError) -> Self {
-        Self::Annotation(err)
+impl From<MalformedPointerError> for Error {
+    fn from(err: MalformedPointerError) -> Self {
+        Error::Pointer(err.into())
+    }
+}
+
+impl From<ExpectedStringError> for Error {
+    fn from(err: ExpectedStringError) -> Self {
+        Self::ExpectedString(err)
     }
 }
 
@@ -66,9 +115,11 @@ impl Display for Error {
         match self {
             Error::Internal(err) => Display::fmt(err, f),
             Error::Serde(err) => Display::fmt(err, f),
-            Error::Annotation(err) => Display::fmt(err, f),
             Error::InvalidSchema(err) => Display::fmt(err, f),
             Error::UnindentifiedSchema(err) => Display::fmt(err, f),
+            Error::Pointer(err) => Display::fmt(err, f),
+            Error::ExpectedString(err) => Display::fmt(err, f),
+            Error::Uri(err) => Display::fmt(err, f),
         }
     }
 }
@@ -78,9 +129,11 @@ impl StdError for Error {
         match self {
             Error::Internal(err) => Some(err.as_ref()),
             Error::Serde(err) => Some(err),
-            Error::Annotation(err) => err.source(),
             Error::InvalidSchema(err) => Some(err),
             Error::UnindentifiedSchema(err) => Some(err),
+            Error::Pointer(err) => Some(err),
+            Error::ExpectedString(err) => Some(err),
+            Error::Uri(err) => Some(err),
         }
     }
 }
@@ -119,47 +172,6 @@ impl Display for IndexError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum AnnotationError {
-    MalformedPointer(MalformedPointerError),
-    ExpectedString(Field),
-    ParseUrl(url::ParseError),
-}
-
-impl Display for AnnotationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AnnotationError::MalformedPointer(err) => std::fmt::Display::fmt(&err, f),
-            AnnotationError::ExpectedString(field) => {
-                write!(f, "error: expected string for \"{}\"", field)
-            }
-            AnnotationError::ParseUrl(err) => std::fmt::Display::fmt(&err, f),
-        }
-    }
-}
-
-impl From<UrlParseError> for AnnotationError {
-    fn from(err: UrlParseError) -> Self {
-        Self::ParseUrl(err)
-    }
-}
-
-impl StdError for AnnotationError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            AnnotationError::MalformedPointer(err) => Some(err),
-            AnnotationError::ExpectedString(_) => None,
-            AnnotationError::ParseUrl(err) => Some(err),
-        }
-    }
-}
-
-impl From<MalformedPointerError> for Error {
-    fn from(err: MalformedPointerError) -> Self {
-        Error::Annotation(AnnotationError::MalformedPointer(err))
-    }
-}
-
 impl StdError for IndexError {}
 
 #[derive(Debug)]
@@ -170,8 +182,21 @@ pub struct InvalidSchemaError;
 
 impl std::fmt::Display for InvalidSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "no applicators found for this schema")
+        write!(f, "error: no applicators found for this schema")
     }
 }
 
 impl StdError for InvalidSchemaError {}
+
+#[derive(Debug, Clone)]
+pub struct ExpectedStringError {
+    pub field: Field,
+}
+
+impl Display for ExpectedStringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error: expected string for field \"{}\".", self.field)
+    }
+}
+
+impl StdError for ExpectedStringError {}

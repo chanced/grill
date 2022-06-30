@@ -24,3 +24,13 @@ pub use next::Next;
 
 mod graph;
 pub(crate) use graph::Graph;
+
+mod initializer;
+pub use initializer::Initializer;
+
+pub use uniresid as uri;
+
+pub use uri::Uri;
+
+pub use jsonptr;
+pub use jsonptr::Pointer;

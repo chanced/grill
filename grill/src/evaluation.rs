@@ -1,5 +1,6 @@
 pub mod iter;
 pub use iter::Iter;
+use uniresid::AbsoluteUri;
 use url::Url;
 
 use std::{
@@ -7,7 +8,7 @@ use std::{
     fmt::Display,
 };
 
-use crate::{AnnotationError, Error, Output};
+use crate::{Error, ExpectedStringError, Output};
 use jsonptr::Pointer;
 use serde::Serialize;
 use serde_json::{to_value, Map, Value};
@@ -15,7 +16,7 @@ use serde_json::{to_value, Map, Value};
 pub struct Evaluation {
     instance_location: Pointer,
     keyword_location: Pointer,
-    absolute_keyword_location: Option<Url>,
+    absolute_keyword_location: Option<AbsoluteUri>,
     nested: Vec<Evaluation>,
     error: Option<String>,
     output: Output,
@@ -97,13 +98,13 @@ impl Evaluation {
         old
     }
 
-    pub fn absolute_keyword_location(&self) -> Option<&Url> {
+    pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
         self.absolute_keyword_location.as_ref()
     }
 
-    pub fn set_absolute_keyword_location(&mut self, url: Url) -> Option<Url> {
-        let old = self.absolute_keyword_location.clone();
-        self.absolute_keyword_location = Some(url);
+    pub fn set_absolute_keyword_location(&mut self, uri: AbsoluteUri) -> Option<AbsoluteUri> {
+        let old = self.absolute_keyword_location.take();
+        self.absolute_keyword_location = Some(uri);
         old
     }
 
@@ -122,7 +123,10 @@ impl Evaluation {
                         self.set_instance_location(Pointer::try_from(s)?).into(),
                     ))
                 } else {
-                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
+                    Err(ExpectedStringError {
+                        field: Field::from(k),
+                    }
+                    .into())
                 }
             }
             Field::KeywordLocation => {
@@ -131,16 +135,22 @@ impl Evaluation {
                         self.set_keyword_location(Pointer::try_from(s)?).into(),
                     ))
                 } else {
-                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
+                    Err(ExpectedStringError {
+                        field: Field::from(k),
+                    }
+                    .into())
                 }
             }
             Field::AbsoluteKeywordLocation => {
                 if let Some(s) = v.as_str() {
                     Ok(self
-                        .set_absolute_keyword_location(Url::parse(s)?)
+                        .set_absolute_keyword_location(AbsoluteUri::parse(s)?)
                         .map(|u| Value::String(u.to_string())))
                 } else {
-                    Err(AnnotationError::ExpectedString(Field::from(k)).into())
+                    Err(ExpectedStringError {
+                        field: Field::from(k),
+                    }
+                    .into())
                 }
             }
 
@@ -150,7 +160,10 @@ impl Evaluation {
                     self.error = Some(s.to_string());
                     Ok(old.map(Value::from))
                 } else {
-                    Err(AnnotationError::ExpectedString(Field::Error).into())
+                    Err(ExpectedStringError {
+                        field: Field::Error,
+                    }
+                    .into())
                 }
             }
             _ => Ok(self.data.insert(k, v)),

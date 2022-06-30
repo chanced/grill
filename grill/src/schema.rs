@@ -1,17 +1,16 @@
-use arc_swap::{ArcSwap, ArcSwapOption};
-use dashmap::DashSet;
-use serde_json::{Map, Value};
-
 use crate::{ApplicatorFn, Error, Evaluation, Interrogator, Next, Output};
+use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
-use std::sync::Arc;
+use serde_json::{Map, Value};
+use std::{borrow::Borrow, collections::HashSet, sync::Arc};
+use uniresid::Uri;
 
 struct Inner {
-    id: ArcSwapOption<String>,
+    id: ArcSwapOption<Uri>,
     dialect: ArcSwapOption<String>,
-    references: Arc<DashSet<String>>,
+    references: Arc<ArcSwap<HashSet<Uri>>>,
     source: Arc<Value>,
-    applicator_fns: ArcSwap<Vec<Box<ApplicatorFn>>>,
+    applicator_fns: Arc<ArcSwap<Vec<Box<ApplicatorFn>>>>,
 }
 #[derive(Clone)]
 pub struct Schema {
@@ -20,6 +19,7 @@ pub struct Schema {
 
 pub struct Builder {
     dialect: Option<String>,
+    base_uri: Option<Uri>,
 }
 
 impl Schema {
@@ -28,11 +28,11 @@ impl Schema {
             id: ArcSwapOption::default(),
             dialect: ArcSwapOption::default(),
             source: Arc::new(source),
-            references: Arc::new(DashSet::new()),
-            applicator_fns: ArcSwap::new(Arc::new(Vec::new())),
+            references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
+            applicator_fns: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
         });
 
-        let mut schema = Self { inner };
+        let schema = Self { inner };
         schema.initialize(interrogator)?;
         Ok(schema)
     }
@@ -43,9 +43,13 @@ impl Schema {
         next.call(eval, value)
     }
 
-    fn initialize(&mut self, interrogator: &Interrogator) -> Result<(), Error> {
+    pub(crate) fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
+        for initializer in interrogator.initializers().iter() {
+            initializer.call(interrogator.clone(), self.clone())?;
+        }
         let applicators = interrogator.applicators();
         let mut fns = Vec::with_capacity(applicators.len());
+
         for applicator in applicators.iter() {
             if let Some(f) = applicator.setup(interrogator.clone(), self.clone())? {
                 fns.push(f);
@@ -133,15 +137,15 @@ impl Schema {
     }
 
     /// Returns the associated id if set. Otherwise returns `None`.
-    pub fn id(&self) -> Option<String> {
-        self.inner.id.load().as_ref().map(|s| s.to_string())
+    pub fn id(&self) -> Option<Arc<Uri>> {
+        self.inner.id.load().as_ref().cloned()
     }
 
     /// Sets the id of the schema, returning the previous value if it exists.
-    pub fn set_id(&self, val: String) -> Option<String> {
+    pub fn set_id(&self, val: impl Borrow<Uri>) -> Option<Uri> {
         self.inner
             .id
-            .swap(Some(Arc::new(val)))
+            .swap(Some(Arc::new(val.borrow().clone())))
             .map(|v| v.as_ref().clone())
     }
 
@@ -152,13 +156,23 @@ impl Schema {
 
     /// Adds a reference to the schema. Returns `true` if the reference was not
     /// already present.
-    pub fn add_reference(&self, ref_id: impl ToString) -> bool {
-        self.inner.references.insert(ref_id.to_string())
+    pub fn add_reference(&self, reference: Uri) -> bool {
+        let g = self.inner.references.load();
+        if g.contains(&reference) {
+            return false;
+        }
+        let mut set = HashSet::new();
+        for u in g.iter() {
+            set.insert(u.clone());
+        }
+        self.inner.references.store(Arc::new(set));
+        true
     }
 
     /// Returns the associated `
-    pub fn references(&self) -> Vec<String> {
-        self.inner.references.iter().map(|s| s.clone()).collect()
+    pub fn references(&self) -> Vec<Uri> {
+        let guard = self.inner.references.load();
+        guard.iter().map(|s| s.clone()).collect()
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.
