@@ -1,6 +1,6 @@
 use crate::{Applicator, Error, Graph, Initializer, Schema, UnidentifiedSchemaError};
 use arc_swap::ArcSwap;
-use std::{collections::HashMap, fmt::Debug, ops::Deref, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use uniresid::Uri;
 
 pub struct Builder {}
@@ -46,7 +46,7 @@ impl Interrogator {
     }
     /// Returns the `Schema` with the given `id` if it exists.
     pub fn schema(&self, id: &Uri) -> Option<Schema> {
-        self.schemas.load().get(id).map(|s| s.clone())
+        self.schemas.load().get(id).cloned()
     }
     /// Adds a top-level `Schema` to the `Interrogator`, associated by its `id`.
     /// If the `Schema` already exists, it is overwritten and returned. `None`

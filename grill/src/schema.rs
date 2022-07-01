@@ -3,7 +3,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
 use serde_json::{Map, Value};
 use std::{borrow::Borrow, collections::HashSet, sync::Arc};
-use uniresid::Uri;
+use uniresid::{AbsoluteUri, Uri};
 
 struct Inner {
     id: ArcSwapOption<Uri>,
@@ -18,8 +18,38 @@ pub struct Schema {
 }
 
 pub struct Builder {
-    dialect: Option<String>,
-    base_uri: Option<Uri>,
+    source: Value,
+    dialect: Option<AbsoluteUri>,
+    base_uri: Option<AbsoluteUri>,
+}
+
+impl Builder {
+    pub fn default_dialect(mut self, dialect: AbsoluteUri) -> Self {
+        self.dialect = Some(dialect);
+        self
+    }
+    pub fn default_base_uri(mut self, base_uri: AbsoluteUri) -> Self {
+        self.base_uri = Some(base_uri);
+        self
+    }
+
+    pub fn build(self, interrogator: &Interrogator) -> Result<Schema, Error> {
+        let schema = Schema::new(self.source, interrogator)?;
+        if let Some(base_uri) = self.base_uri {
+            if let Some(id) = schema.id() {
+                if id.scheme().is_none() {
+                    let id = base_uri.resolve(id);
+                    schema.set_id(id);
+                }
+            }
+        }
+        if let Some(dialect) = self.dialect {
+            if schema.dialect().is_none() {
+                schema.set_dialect(dialect);
+            }
+        }
+        Ok(schema)
+    }
 }
 
 impl Schema {
@@ -37,10 +67,18 @@ impl Schema {
         Ok(schema)
     }
 
-    pub fn evaluate(&self, value: &Value, output: Output) -> Result<Evaluation, Error> {
+    pub fn builder(source: Value) -> Builder {
+        Builder {
+            dialect: None,
+            base_uri: None,
+            source,
+        }
+    }
+
+    pub fn evaluate(&self, value: Value, output: Output) -> Result<Evaluation, Error> {
         let next = Next::new(self.applicator_fns().clone());
-        let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
-        next.call(eval, value)
+        let eval = Evaluation::new(Pointer::default(), Pointer::default(), value, output);
+        next.call(eval)
     }
 
     pub(crate) fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
@@ -170,9 +208,8 @@ impl Schema {
     }
 
     /// Returns the associated `
-    pub fn references(&self) -> Vec<Uri> {
-        let guard = self.inner.references.load();
-        guard.iter().map(|s| s.clone()).collect()
+    pub fn references(&self) -> Arc<HashSet<Uri>> {
+        self.inner.references.load().clone()
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.

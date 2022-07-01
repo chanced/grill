@@ -1,7 +1,6 @@
 pub mod iter;
 pub use iter::Iter;
 use uniresid::AbsoluteUri;
-use url::Url;
 
 use std::{
     borrow::{Borrow, Cow},
@@ -10,7 +9,7 @@ use std::{
 
 use crate::{Error, ExpectedStringError, Output};
 use jsonptr::Pointer;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Map, Value};
 #[derive(Debug, Clone)]
 pub struct Evaluation {
@@ -21,10 +20,16 @@ pub struct Evaluation {
     error: Option<String>,
     output: Output,
     data: Map<String, Value>,
+    value: Value,
 }
 ///
 impl Evaluation {
-    pub fn new(instance_location: Pointer, keyword_location: Pointer, output: Output) -> Self {
+    pub fn new(
+        instance_location: Pointer,
+        keyword_location: Pointer,
+        value: Value,
+        output: Output,
+    ) -> Self {
         Self {
             output,
             nested: Vec::new(),
@@ -33,6 +38,7 @@ impl Evaluation {
             instance_location,
             keyword_location,
             absolute_keyword_location: None,
+            value,
         }
     }
     /// Returns `true` if this or any nested `Annotation` has an error set
@@ -42,6 +48,15 @@ impl Evaluation {
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
+
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    pub fn deserialize_value<'de, T: Deserialize<'de>>(&'de self) -> Result<T, serde_json::Error> {
+        T::deserialize(&self.value)
+    }
+
     /// Sets the error message
     pub fn set_error(&mut self, error: &str) {
         self.error = Some(error.to_string());
