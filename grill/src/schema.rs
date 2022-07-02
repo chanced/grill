@@ -28,12 +28,14 @@ struct Inner {
     sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
 }
 
+/// Data structure representing a single [JSON Schema](https://json-schema.org/).
 #[derive(Clone)]
 pub struct Schema {
     inner: Arc<Inner>,
 }
 
 impl Schema {
+    /// Creates and returns a new `Schema`.
     pub fn new(source: Value, interrogator: &Interrogator) -> Result<Self, Error> {
         let inner = Arc::new(Inner {
             id: ArcSwapOption::default(),
@@ -49,7 +51,7 @@ impl Schema {
         schema.initialize(interrogator)?;
         Ok(schema)
     }
-
+    /// Returns a [`SchemaBuilder`](crate::schema::SchemaBuilder) which can be used to construct a [`Schema`]
     pub fn builder(source: Value) -> SchemaBuilder {
         SchemaBuilder {
             dialect: None,
@@ -115,14 +117,16 @@ impl Schema {
             }
         })
     }
+
+    /// Returns the [`SubSchema`](crate::schema::SubSchema) associated with the given `field`.
     pub fn sub_schema(&self, field: &str) -> Option<SubSchema> {
         self.inner.sub_schemas.load().get(field).cloned()
     }
-
+    /// Returns a [`HashMap`] of associated [`SubSchema`](crate::schema::SubSchema).
     pub fn sub_schemas(&self) -> Arc<HashMap<String, SubSchema>> {
         self.inner.sub_schemas.load().clone()
     }
-    pub(crate) fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
+    fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
         let applicators = interrogator.applicators();
         let mut fns = Vec::with_capacity(applicators.len());
         for app in applicators.iter() {

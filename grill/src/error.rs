@@ -6,8 +6,9 @@ use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use uniresid::Error as UriError;
-pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
+/// Represents all possible errors that can occur while initializing, setting up
+/// or using an [`Interrogator`] and [`Schema`].
 #[derive(Debug, Clone)]
 pub enum Error {
     /// For use with applicators and validators to use when an internal
@@ -28,6 +29,9 @@ pub enum Error {
     Uri(UriError),
 }
 impl Error {
+    /// Wraps a `std::error::Error` in an [`Error::Internal`](Error::Internal).
+    /// This should be used in an `Applicator` when an internal error arises which
+    /// does not fit in one of the other error classifications.
     pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
         Error::Internal(Arc::new(err))
     }
@@ -138,8 +142,11 @@ impl StdError for Error {
     }
 }
 
+/// Indicates that the [`Schema`] was not identified. Top-level [`Schema`]s must
+/// have an `id` set.
 #[derive(Debug, Clone)]
 pub struct UnidentifiedSchemaError {
+    /// The [`Schema`] which lacks an `id`.
     pub schema: Schema,
 }
 
@@ -150,32 +157,6 @@ impl std::fmt::Display for UnidentifiedSchemaError {
 }
 
 impl StdError for UnidentifiedSchemaError {}
-
-#[derive(Clone)]
-pub enum IndexError {
-    /// the schema does not contain an identifier (id) and thus can not be
-    /// indexed
-    NotIdentified,
-}
-impl Debug for IndexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexError::NotIdentified => write!(f, "schema is not identifiable"),
-        }
-    }
-}
-impl Display for IndexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexError::NotIdentified => write!(f, "schema is not identifiable"),
-        }
-    }
-}
-
-impl StdError for IndexError {}
-
-#[derive(Debug)]
-pub struct MissingLayerError();
 
 #[derive(Clone, Debug)]
 pub struct InvalidSchemaError;

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::error::IndexError;
-use crate::Schema;
+use crate::{Schema, UnidentifiedSchemaError};
 use petgraph::algo::has_path_connecting;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph as PetGraph;
@@ -18,7 +16,7 @@ pub(crate) struct Graph {
 }
 
 impl Graph {
-    pub fn new(schemas: &[Arc<Schema>]) -> Result<Graph, IndexError> {
+    pub fn new(schemas: &[Schema]) -> Result<Graph, UnidentifiedSchemaError> {
         let mut g = Graph {
             index: HashMap::new(),
             graph: PetGraph::new(),
@@ -40,22 +38,20 @@ impl Graph {
             .or_insert_with(|| graph.add_node(id))
     }
 
-    pub fn add(&mut self, schema: Arc<Schema>) -> Result<(), IndexError> {
+    pub fn add(&mut self, schema: Schema) -> Result<(), UnidentifiedSchemaError> {
         if schema.id().is_none() {
-            return Err(IndexError::NotIdentified);
+            return Err(UnidentifiedSchemaError { schema });
         }
-        let schema_index = self.index(
-            &schema
-                .id()
-                .as_deref()
-                .cloned()
-                .ok_or(IndexError::NotIdentified)?,
-        );
+        let schema_index = self.index(&schema.id().as_deref().cloned().ok_or(
+            UnidentifiedSchemaError {
+                schema: schema.clone(),
+            },
+        )?);
+
         for r in schema.references().iter() {
             let ref_index = self.index(r);
             self.graph.add_edge(schema_index, ref_index, ());
         }
-
         Ok(())
     }
 

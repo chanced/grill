@@ -3,9 +3,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use uniresid::{AbsoluteUri, Uri};
 
-pub struct Builder {}
-
-/// Manages schemas and extensions.
+/// Centeral hub to manage [`Schema`] and [`Applicator`] instances.
 #[derive(Clone)]
 pub struct Interrogator {
     schemas: Arc<ArcSwap<HashMap<Uri, Schema>>>,
@@ -23,8 +21,8 @@ impl Debug for Interrogator {
     }
 }
 
-// impl<R> Interrogator {}
 impl Interrogator {
+    /// Creates
     pub fn new() -> Self {
         Self {
             schemas: Arc::new(ArcSwap::from_pointee(HashMap::new())),
@@ -32,9 +30,6 @@ impl Interrogator {
             applicators: Arc::new(ArcSwap::from_pointee(Vec::new())),
             base_uri: Arc::new(ArcSwapOption::default()),
         }
-    }
-    pub fn builder() -> Builder {
-        Builder {}
     }
 
     pub(crate) fn applicators(&self) -> Arc<Vec<Box<dyn Applicator>>> {
@@ -63,6 +58,7 @@ impl Interrogator {
     /// If the `id` of the `Schema` is not set, an `Error::UnidentifiedSchema`
     /// is returned and the `Schema` is not inserted.
     pub fn insert_schema(&self, schema: Schema) -> Result<Option<Schema>, Error> {
+        schema.setup(self)?;
         if let Some(id) = schema.id() {
             let guard = self.schemas.load();
             let schemas = guard.clone();
@@ -77,6 +73,28 @@ impl Interrogator {
         } else {
             Err(UnidentifiedSchemaError { schema }.into())
         }
+    }
+    /// Adds a slice of top-level [`Schema`] to the `Interrogator`, associated
+    /// by its `id`. [`Schema`] which already exists are overwritten and
+    /// returned. `None` is returned otherwise.
+    ///
+    /// If an `id` of a [`Schema`] is not set, an [`Error::UnidentifiedSchema`]
+    /// is returned and the [`Schema`] is not inserted.
+    pub fn insert_schemas(&self, schemas: &[Schema]) -> Result<Option<Vec<Schema>>, Error> {
+        let mut schemas_to_add = HashMap::with_capacity(schemas.len());
+        let mut existing_schemas = self.schemas.load().as_ref().clone();
+
+        for schema in schemas {
+            if let Some(id) = schema.id() {
+                schemas_to_add.insert(id.clone(), schema.clone());
+            } else {
+                return Err(UnidentifiedSchemaError {
+                    schema: schema.clone(),
+                }
+                .into());
+            }
+        }
+        todo!()
     }
 }
 
