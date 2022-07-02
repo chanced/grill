@@ -2,18 +2,21 @@ use std::collections::VecDeque;
 
 use super::Evaluation;
 
+/// Iterator over a tree of [`Evaluations`](Evaluation).
 pub struct Iter<'a> {
     eval: &'a Evaluation,
     queue: VecDeque<&'a Evaluation>,
 }
 
 impl<'a> Iter<'a> {
+    /// Returns a new iterator over the provided [`Evaluation`](Evaluation).
     pub fn new(eval: &'a Evaluation) -> Self {
         let mut queue = VecDeque::new();
         queue.push_front(eval);
         Self { eval, queue }
     }
-    pub fn source(&self) -> &'a Evaluation {
+    /// Returns the originating [`Evaluation`](Evaluation).
+    pub fn origin(&self) -> &'a Evaluation {
         self.eval
     }
 }

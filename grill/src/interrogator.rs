@@ -1,7 +1,7 @@
 use crate::{Applicator, Error, Graph, Initializer, Schema, UnidentifiedSchemaError};
-use arc_swap::ArcSwap;
+use arc_swap::{ArcSwap, ArcSwapOption};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
-use uniresid::Uri;
+use uniresid::{AbsoluteUri, Uri};
 
 pub struct Builder {}
 
@@ -11,7 +11,7 @@ pub struct Interrogator {
     schemas: Arc<ArcSwap<HashMap<Uri, Schema>>>,
     graph: Arc<ArcSwap<Graph>>,
     applicators: Arc<ArcSwap<Vec<Box<dyn Applicator>>>>,
-    initializers: Arc<ArcSwap<Vec<Box<dyn Initializer>>>>,
+    base_uri: Arc<ArcSwapOption<AbsoluteUri>>,
 }
 
 impl Debug for Interrogator {
@@ -30,7 +30,7 @@ impl Interrogator {
             schemas: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             graph: Arc::new(ArcSwap::from_pointee(Graph::new(&[]).unwrap())),
             applicators: Arc::new(ArcSwap::from_pointee(Vec::new())),
-            initializers: Arc::new(ArcSwap::from_pointee(Vec::new())),
+            base_uri: Arc::new(ArcSwapOption::default()),
         }
     }
     pub fn builder() -> Builder {
@@ -41,13 +41,21 @@ impl Interrogator {
         self.applicators.load().clone()
     }
 
-    pub(crate) fn initializers(&self) -> Arc<Vec<Box<dyn Initializer>>> {
-        self.initializers.load().clone()
-    }
     /// Returns the `Schema` with the given `id` if it exists.
     pub fn schema(&self, id: &Uri) -> Option<Schema> {
         self.schemas.load().get(id).cloned()
     }
+    /// Returns the [`AbsoluteUri`](uniresid::AbsoluteUri) which .
+    pub fn base_uri(&self) -> Option<Arc<AbsoluteUri>> {
+        self.base_uri.load().clone()
+    }
+    /// Sets the base URI for all relative URIs found within each
+    /// [`Schema`](Schema) attached to this [`Interrogator`](Interrogator).
+    pub fn set_base_uri(&self, uri: AbsoluteUri) -> Option<Arc<AbsoluteUri>> {
+        // todo: reinitialize and setup all schemas
+        self.base_uri.swap(Some(Arc::new(uri)))
+    }
+
     /// Adds a top-level `Schema` to the `Interrogator`, associated by its `id`.
     /// If the `Schema` already exists, it is overwritten and returned. `None`
     /// is returned otherwise.

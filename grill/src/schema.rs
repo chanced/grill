@@ -1,55 +1,32 @@
-use crate::{ApplicatorFn, Error, Evaluation, Interrogator, Next, Output};
+mod schema_builder;
+pub use schema_builder::SchemaBuilder;
+
+mod sub_schema;
+pub use sub_schema::SubSchema;
+
+use crate::{ApplicatorFn, Error, Evaluation, Interrogator, Next, OutputFmt};
 use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
 use serde_json::{Map, Value};
-use std::{borrow::Borrow, collections::HashSet, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use uniresid::{AbsoluteUri, Uri};
 
 struct Inner {
     id: ArcSwapOption<Uri>,
-    dialect: ArcSwapOption<String>,
+    dialect: ArcSwapOption<AbsoluteUri>,
     references: Arc<ArcSwap<HashSet<Uri>>>,
     source: Arc<Value>,
     applicator_fns: Arc<ArcSwap<Vec<Box<ApplicatorFn>>>>,
+    sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
 }
+
 #[derive(Clone)]
 pub struct Schema {
     inner: Arc<Inner>,
-}
-
-pub struct Builder {
-    source: Value,
-    dialect: Option<AbsoluteUri>,
-    base_uri: Option<AbsoluteUri>,
-}
-
-impl Builder {
-    pub fn default_dialect(mut self, dialect: AbsoluteUri) -> Self {
-        self.dialect = Some(dialect);
-        self
-    }
-    pub fn default_base_uri(mut self, base_uri: AbsoluteUri) -> Self {
-        self.base_uri = Some(base_uri);
-        self
-    }
-
-    pub fn build(self, interrogator: &Interrogator) -> Result<Schema, Error> {
-        let schema = Schema::new(self.source, interrogator)?;
-        if let Some(base_uri) = self.base_uri {
-            if let Some(id) = schema.id() {
-                if id.scheme().is_none() {
-                    let id = base_uri.resolve(id);
-                    schema.set_id(id);
-                }
-            }
-        }
-        if let Some(dialect) = self.dialect {
-            if schema.dialect().is_none() {
-                schema.set_dialect(dialect);
-            }
-        }
-        Ok(schema)
-    }
 }
 
 impl Schema {
@@ -60,6 +37,7 @@ impl Schema {
             source: Arc::new(source),
             references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
             applicator_fns: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
+            sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
         });
 
         let schema = Self { inner };
@@ -67,20 +45,50 @@ impl Schema {
         Ok(schema)
     }
 
-    pub fn builder(source: Value) -> Builder {
-        Builder {
+    pub fn builder(source: Value) -> SchemaBuilder {
+        SchemaBuilder {
             dialect: None,
             base_uri: None,
             source,
         }
     }
 
-    pub fn evaluate(&self, value: Value, output: Output) -> Result<Evaluation, Error> {
+    pub fn evaluate(&self, value: Value, output: OutputFmt) -> Result<Evaluation, Error> {
         let next = Next::new(self.applicator_fns().clone());
-        let eval = Evaluation::new(Pointer::default(), Pointer::default(), value, output);
+        let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
         next.call(eval)
     }
+    /// Creates and returns a new [`Schema`] that is nested within this [`Schema`].
+    ///
+    /// Adding the [`Schema`] as a
+    /// sub-schema ensures that the dialect is set accordingly and  all
+    /// referenced [`Schema`](Schema)s are resolved in the proper order.
+    pub fn add_sub_schema(
+        &self,
+        source: &Value,
+        interrogator: &Interrogator,
+    ) -> Result<SubSchema, Error> {
+        let mut subs = HashMap::new();
 
+        match source {
+            Value::Array(arr) => {
+                for v in arr {
+                    let b = SchemaBuilder {
+                        source: v.clone(),
+                        dialect: self.dialect(),
+                        base_uri: interrogator.base_uri(),
+                    };
+                }
+                todo!()
+            }
+            _ => {
+                todo!()
+            }
+        }
+    }
+    pub fn sub_schema(&self, field: &str) -> Option<&SubSchema> {
+        self.inner.sub_schemas.load().get(field)
+    }
     pub(crate) fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
         for initializer in interrogator.initializers().iter() {
             initializer.call(interrogator.clone(), self.clone())?;
@@ -97,7 +105,21 @@ impl Schema {
         Ok(())
     }
 
-    /// Returns the associated `&str` if the source `serde_json::Value` is a
+    /// Prepares the schema for use calling `setup` of all [Applicators](crate::Applicator)
+    /// attached to the [Interrogator]. Those which return an [ApplicatorFn] will be
+    /// invoked upon calls to `evaluate`.
+    ///
+    pub(crate) fn setup(&self, interrogator: &Interrogator) -> Result<(), Error> {
+        let mut fns = Vec::new();
+        for applicator in interrogator.applicators().iter() {
+            if let Some(f) = applicator.setup(interrogator.clone(), self.clone())? {
+                fns.push(f);
+            }
+        }
+        self.inner.applicator_fns.store(Arc::new(fns));
+        Ok(())
+    }
+    /// Returns the associated `&str` if the source [Value] is a
     /// `String`. Returns `None` otherwise.
     pub fn as_str(&self) -> Option<&str> {
         self.inner.source.as_str()
@@ -106,69 +128,69 @@ impl Schema {
         self.inner.source.as_array()
     }
     /// Returns the associated `serde_json::Map` if the source
-    /// `serde_json::Value` is an `Object`. Returns `None` otherwise.
+    /// [Value] is an `Object`. Returns `None` otherwise.
     pub fn as_object(&self) -> Option<&Map<String, Value>> {
         self.inner.source.as_object()
     }
-    /// Returns the associated `bool` if the source `serde_json::Value` is a
+    /// Returns the associated `bool` if the source [Value] is a
     /// `Boolean`. Returns `None` otherwise
     pub fn as_bool(&self) -> Option<bool> {
         self.inner.source.as_bool()
     }
-    /// If the source `serde_json::Value` is `Null`, returns `Some(())`. Returns
+    /// If the source [Value] is `Null`, returns `Some(())`. Returns
     /// `None` otherwise.
     pub fn as_null(&self) -> Option<()> {
         self.inner.source.as_null()
     }
-    /// If the source `serde_json::Value` is a number, represent it as an `i64` if possible.
+    /// If the source [Value] is a number, represent it as an `i64` if possible.
     /// Returns `None` otherwise.
     pub fn as_i64(&self) -> Option<i64> {
         self.inner.source.as_i64()
     }
-    /// If the source `serde_json::Value` is a number, represent it as an `f64` if possible.
+    /// If the source [Value] is a number, represent it as an `f64` if possible.
     /// Returns `None` otherwise.
     pub fn as_f64(&self) -> Option<f64> {
         self.inner.source.as_f64()
     }
-    /// If the source `serde_json::Value` is a number, represent it as an `u64`
+    /// If the source [Value] is a number, represent it as an `u64`
     /// if possible. Returns `None` otherwise.
     pub fn as_u64(&self) -> Option<u64> {
         self.inner.source.as_u64()
     }
-    /// Returns `true` if the source `serde_json::Value` is a `Number`. Returns
+    /// Returns `true` if the source [Value] is a `Number`. Returns
     /// `false` otherwise.
     pub fn is_number(&self) -> bool {
         self.inner.source.is_number()
     }
-    /// Returns `true` if the source `serde_json::Value` is an `Object`. Returns
+    /// Returns `true` if the source [Value] is an `Object`. Returns
     /// `None` otherwise.
     pub fn is_object(&self) -> bool {
         self.inner.source.is_object()
     }
 
-    /// Returns `true` if the source `serde_json::Value` is a `Boolean`. Returns
+    /// Returns `true` if the source [Value] is a `Boolean`. Returns
     /// `None` otherwise.
     pub fn is_boolean(&self) -> bool {
         self.inner.source.is_boolean()
     }
 
-    /// Returns `true` if the source `serde_json::Value` is an integer between
+    /// Returns `true` if the source [Value] is an integer between
     /// `i64::MIN` and `i64::MAX`.
     pub fn is_i64(&self) -> bool {
         self.inner.source.is_i64()
     }
-    /// Returns `true` if the source `serde_json::Value` can be represented as
+    /// Returns `true` if the source [Value] can be represented as
     /// an `f64`.
     pub fn is_f64(&self) -> bool {
         self.inner.source.is_f64()
     }
-    /// Returns `true` if the source `serde_json::Value` can be represented as an `u64`.
+    /// Returns `true` if the source [Value] can be represented as an `u64`.
     /// Returns `false` otherwise.
     pub fn is_u64(&self) -> bool {
         self.inner.source.is_u64()
     }
 
-    /// Returns `true` if the source `serde_json::Value` is a `Null`. Returns
+    /// Returns `true` if the source [Value] is a `Null`. Returns
     /// `false` otherwise.
     pub fn is_null(&self) -> bool {
         self.inner.source.is_null()
@@ -188,8 +210,8 @@ impl Schema {
     }
 
     /// Returns the associated dialect if set. Otherwise returns `None`.
-    pub fn dialect(&self) -> Option<String> {
-        self.inner.dialect.load().as_ref().map(|s| s.to_string())
+    pub fn dialect(&self) -> Option<&AbsoluteUri> {
+        self.inner.dialect.load().as_deref()
     }
 
     /// Adds a reference to the schema. Returns `true` if the reference was not
@@ -213,10 +235,10 @@ impl Schema {
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.
-    pub fn set_dialect(&self, dialect: impl ToString) -> Option<String> {
+    pub fn set_dialect(&self, dialect: AbsoluteUri) -> Option<AbsoluteUri> {
         self.inner
             .dialect
-            .swap(Some(Arc::new(dialect.to_string())))
+            .swap(Some(Arc::new(dialect)))
             .map(|v| v.as_ref().clone())
     }
 

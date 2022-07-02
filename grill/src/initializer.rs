@@ -19,3 +19,14 @@ where
         self(interrogator, schema)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+//                                           Initializers
+// -------------------------------------------------------------------------------------------------
+
+pub fn identify_draft_04(interrogator: Interrogator, schema: Schema) -> Result<(), Error> {
+    todo!()
+}
+pub fn identify(interrogator: Interrogator, schema: Schema) -> Result<(), Error> {
+    todo!()
+}

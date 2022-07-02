@@ -7,10 +7,16 @@ use std::{
     fmt::Display,
 };
 
-use crate::{Error, ExpectedStringError, Output};
+use crate::{Error, ExpectedStringError, OutputFmt};
 use jsonptr::Pointer;
 use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Map, Value};
+
+/// An `Evaluation` is the constructed by [`Applicators`](crate::Applicator) and returned from
+/// annotating pertinent information, based upon the specified
+/// [`OutputFmt`](crate::OutputFmt), regarding the validation state of the keyword
+/// (and thus the [`Schema`](crate::Schema))
+/// [`Schema::evaluate`](crate::Schema::evaluate)
 #[derive(Debug, Clone)]
 pub struct Evaluation {
     instance_location: Pointer,
@@ -18,18 +24,12 @@ pub struct Evaluation {
     absolute_keyword_location: Option<AbsoluteUri>,
     nested: Vec<Evaluation>,
     error: Option<String>,
-    output: Output,
+    output: OutputFmt,
     data: Map<String, Value>,
-    value: Value,
 }
 ///
 impl Evaluation {
-    pub fn new(
-        instance_location: Pointer,
-        keyword_location: Pointer,
-        value: Value,
-        output: Output,
-    ) -> Self {
+    pub fn new(instance_location: Pointer, keyword_location: Pointer, output: OutputFmt) -> Self {
         Self {
             output,
             nested: Vec::new(),
@@ -38,7 +38,6 @@ impl Evaluation {
             instance_location,
             keyword_location,
             absolute_keyword_location: None,
-            value,
         }
     }
     /// Returns `true` if this or any nested `Annotation` has an error set
@@ -49,20 +48,12 @@ impl Evaluation {
         self.error.as_deref()
     }
 
-    pub fn value(&self) -> &Value {
-        &self.value
-    }
-
-    pub fn deserialize_value<'de, T: Deserialize<'de>>(&'de self) -> Result<T, serde_json::Error> {
-        T::deserialize(&self.value)
-    }
-
     /// Sets the error message
     pub fn set_error(&mut self, error: &str) {
         self.error = Some(error.to_string());
     }
-    /// Returns the specified `Output`
-    pub fn output(&self) -> Output {
+    /// Returns the specified `OutputFmt`
+    pub fn output(&self) -> OutputFmt {
         self.output.clone()
     }
 

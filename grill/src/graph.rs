@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::error::IndexError;
