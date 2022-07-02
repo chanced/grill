@@ -51,8 +51,9 @@ pub type SetupFn =
 /// upon the specified [`OutputFmt`](crate::OutputFmt).
 ///
 ///
-
 ///
+///
+
 pub trait Applicator {
     fn init(
         &self,
@@ -61,16 +62,18 @@ pub trait Applicator {
     ) -> Result<Option<Box<SetupFn>>, Error>;
 }
 
-impl<F> Applicator for F where
-    F: 'static + Send + Sync + Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>
+impl<F> Applicator for F
+where
+    F: 'static + Send + Sync + Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>,
 {
+    fn init(
+        &self,
+        interrogator: Interrogator,
+        schema: Schema,
+    ) -> Result<Option<Box<SetupFn>>, Error> {
+        self(interrogator, schema)
+    }
 }
-/// ```
-impl<F> Applicator for F where
-    F: 'static + Send + Sync + Fn(Interrogator, Schema) -> Result<Option<Box<ExecutorFn>>, Error>
-{
-}
-
 #[cfg(test)]
 mod test {
     #[derive(Clone)]

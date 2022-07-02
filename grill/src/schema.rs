@@ -4,7 +4,10 @@ pub use schema_builder::SchemaBuilder;
 mod sub_schema;
 pub use sub_schema::SubSchema;
 
-use crate::{ApplicatorFn, Error, Evaluation, Interrogator, Next, OutputFmt};
+use crate::{
+    applicator::{ExecutorFn, SetupFn},
+    Error, Evaluation, Interrogator, Next, OutputFmt,
+};
 use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
 use serde_json::{Map, Value};
@@ -13,14 +16,15 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use uniresid::{AbsoluteUri, Uri};
+use uniresid::Uri;
 
 struct Inner {
     id: ArcSwapOption<Uri>,
-    dialect: ArcSwapOption<AbsoluteUri>,
+    dialect: ArcSwapOption<Uri>,
     references: Arc<ArcSwap<HashSet<Uri>>>,
     source: Arc<Value>,
-    applicator_fns: Arc<ArcSwap<Vec<Box<ApplicatorFn>>>>,
+    setup_fns: Arc<ArcSwap<Vec<Box<SetupFn>>>>,
+    executors: Arc<ArcSwap<Vec<Box<ExecutorFn>>>>,
     sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
 }
 
@@ -36,7 +40,8 @@ impl Schema {
             dialect: ArcSwapOption::default(),
             source: Arc::new(source),
             references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
-            applicator_fns: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
+            setup_fns: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
+            executors: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
             sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
         });
 
@@ -53,55 +58,79 @@ impl Schema {
         }
     }
 
-    pub fn evaluate(&self, value: Value, output: OutputFmt) -> Result<Evaluation, Error> {
-        let next = Next::new(self.applicator_fns().clone());
-        let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
-        next.call(eval)
+    fn executors(&self) -> Arc<Vec<Box<ExecutorFn>>> {
+        self.inner.executors.load().clone()
     }
+    fn setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
+        self.inner.setup_fns.load().clone()
+    }
+    /// Evaluates `value` against this `Schema`.
+    pub fn evaluate(
+        &self,
+        value: &Value,
+        evaluation: Evaluation,
+        output: OutputFmt,
+    ) -> Result<Evaluation, Error> {
+        let next = Next::new(self.executors());
+        let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
+        next.call(value, evaluation)
+    }
+
     /// Creates and returns a new [`Schema`] that is nested within this [`Schema`].
     ///
     /// Adding the [`Schema`] as a
     /// sub-schema ensures that the dialect is set accordingly and  all
     /// referenced [`Schema`](Schema)s are resolved in the proper order.
-    pub fn add_sub_schema(
+    pub fn new_sub_schema(
         &self,
+        key: &str,
         source: &Value,
         interrogator: &Interrogator,
     ) -> Result<SubSchema, Error> {
-        let mut subs = HashMap::new();
-
-        match source {
+        let mut sub_schemas = HashMap::new();
+        Ok(match source {
             Value::Array(arr) => {
+                let base_uri = interrogator.base_uri().as_deref().cloned();
+                let dialect = self.dialect();
+                let mut subs = Vec::with_capacity(arr.len());
                 for v in arr {
                     let b = SchemaBuilder {
                         source: v.clone(),
-                        dialect: self.dialect(),
-                        base_uri: interrogator.base_uri(),
+                        dialect: dialect.clone(),
+                        base_uri: base_uri.clone(),
                     };
+                    subs.push(b.build(interrogator)?);
                 }
-                todo!()
+                SubSchema::Array(Arc::new(subs))
             }
             _ => {
-                todo!()
+                let b = SchemaBuilder {
+                    source: source.clone(),
+                    dialect: self.dialect(),
+                    base_uri: interrogator.base_uri().as_deref().cloned(),
+                };
+                let new = b.build(interrogator)?;
+                sub_schemas.insert(key.to_string(), new.clone());
+                SubSchema::Single(new)
             }
-        }
+        })
     }
-    pub fn sub_schema(&self, field: &str) -> Option<&SubSchema> {
-        self.inner.sub_schemas.load().get(field)
+    pub fn sub_schema(&self, field: &str) -> Option<SubSchema> {
+        self.inner.sub_schemas.load().get(field).cloned()
+    }
+
+    pub fn sub_schemas(&self) -> Arc<HashMap<String, SubSchema>> {
+        self.inner.sub_schemas.load().clone()
     }
     pub(crate) fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
-        for initializer in interrogator.initializers().iter() {
-            initializer.call(interrogator.clone(), self.clone())?;
-        }
         let applicators = interrogator.applicators();
         let mut fns = Vec::with_capacity(applicators.len());
-
-        for applicator in applicators.iter() {
-            if let Some(f) = applicator.setup(interrogator.clone(), self.clone())? {
-                fns.push(f);
+        for app in applicators.iter() {
+            if let Some(setup_fn) = app.init(interrogator.clone(), self.clone())? {
+                fns.push(setup_fn)
             }
         }
-        self.inner.applicator_fns.store(Arc::new(fns));
+        self.inner.setup_fns.store(Arc::new(fns));
         Ok(())
     }
 
@@ -110,13 +139,17 @@ impl Schema {
     /// invoked upon calls to `evaluate`.
     ///
     pub(crate) fn setup(&self, interrogator: &Interrogator) -> Result<(), Error> {
-        let mut fns = Vec::new();
-        for applicator in interrogator.applicators().iter() {
-            if let Some(f) = applicator.setup(interrogator.clone(), self.clone())? {
-                fns.push(f);
+        let setup_fns = self.setup_fns();
+        let mut fns = Vec::with_capacity(setup_fns.len());
+        for f in setup_fns.iter() {
+            if let Some(exec) = f(interrogator.clone(), self.clone())? {
+                fns.push(exec)
             }
         }
-        self.inner.applicator_fns.store(Arc::new(fns));
+        self.inner.executors.store(Arc::new(fns));
+        for (_, sub) in self.sub_schemas().iter() {
+            sub.setup(interrogator)?;
+        }
         Ok(())
     }
     /// Returns the associated `&str` if the source [Value] is a
@@ -210,8 +243,8 @@ impl Schema {
     }
 
     /// Returns the associated dialect if set. Otherwise returns `None`.
-    pub fn dialect(&self) -> Option<&AbsoluteUri> {
-        self.inner.dialect.load().as_deref()
+    pub fn dialect(&self) -> Option<Uri> {
+        self.inner.dialect.load().as_deref().cloned()
     }
 
     /// Adds a reference to the schema. Returns `true` if the reference was not
@@ -235,15 +268,11 @@ impl Schema {
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.
-    pub fn set_dialect(&self, dialect: AbsoluteUri) -> Option<AbsoluteUri> {
+    pub fn set_dialect(&self, dialect: Uri) -> Option<Uri> {
         self.inner
             .dialect
             .swap(Some(Arc::new(dialect)))
             .map(|v| v.as_ref().clone())
-    }
-
-    pub(crate) fn applicator_fns(&self) -> Arc<Vec<Box<ApplicatorFn>>> {
-        self.inner.applicator_fns.load().clone()
     }
 }
 

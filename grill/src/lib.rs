@@ -22,8 +22,8 @@ pub use interrogator::Interrogator;
 pub mod schema;
 pub use schema::Schema;
 
-mod applicator;
-pub use applicator::{Applicator, ApplicatorFn};
+pub mod applicator;
+pub use applicator::Applicator;
 
 mod resolver;
 pub use resolver::*;
@@ -33,9 +33,6 @@ pub use next::Next;
 
 mod graph;
 pub(crate) use graph::Graph;
-
-mod initializer;
-pub use initializer::Initializer;
 
 pub use uniresid as uri;
 

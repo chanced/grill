@@ -1,19 +1,21 @@
-use crate::{ApplicatorFn, Error, Evaluation};
-use std::sync::Arc;
+use serde_json::Value;
 
+use crate::{applicator::ExecutorFn, Error, Evaluation};
+use std::sync::Arc;
+#[must_use]
 pub struct Next {
-    fns: Arc<Vec<Box<ApplicatorFn>>>,
+    fns: Arc<Vec<Box<ExecutorFn>>>,
     idx: usize,
 }
 
 impl Next {
-    pub(crate) fn new(fns: Arc<Vec<Box<ApplicatorFn>>>) -> Self {
+    pub(crate) fn new(fns: Arc<Vec<Box<ExecutorFn>>>) -> Self {
         Self { fns, idx: 0 }
     }
 }
 
 impl Next {
-    pub fn call(&self, evaluation: Evaluation) -> Result<Evaluation, Error> {
+    pub fn call(&self, value: &Value, evaluation: Evaluation) -> Result<Evaluation, Error> {
         if let Some(f) = self.fns.get(self.idx) {
             let next = Self {
                 fns: self.fns.clone(),
@@ -21,7 +23,7 @@ impl Next {
             };
             // todo: check if call was invoked
             // todo: return an error if f does not return an error and next was not called.
-            f(evaluation, next)
+            f(value, evaluation, next)
         } else {
             Ok(evaluation)
         }

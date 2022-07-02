@@ -1,4 +1,4 @@
-use crate::{Applicator, Error, Graph, Initializer, Schema, UnidentifiedSchemaError};
+use crate::{Applicator, Error, Graph, Schema, UnidentifiedSchemaError};
 use arc_swap::{ArcSwap, ArcSwapOption};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use uniresid::{AbsoluteUri, Uri};

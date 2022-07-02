@@ -1,16 +1,16 @@
 use serde_json::Value;
-use uniresid::AbsoluteUri;
+use uniresid::{AbsoluteUri, Uri};
 
 use crate::{Error, Interrogator, Schema};
 
 pub struct SchemaBuilder {
-    source: Value,
-    dialect: Option<AbsoluteUri>,
-    base_uri: Option<AbsoluteUri>,
+    pub(crate) source: Value,
+    pub(crate) dialect: Option<Uri>,
+    pub(crate) base_uri: Option<AbsoluteUri>,
 }
 
 impl SchemaBuilder {
-    pub fn default_dialect(mut self, dialect: AbsoluteUri) -> Self {
+    pub fn default_dialect(mut self, dialect: Uri) -> Self {
         self.dialect = Some(dialect);
         self
     }
