@@ -1,21 +1,28 @@
 use crate::{Applicator, Error, Graph, Schema, UnidentifiedSchemaError};
-use arc_swap::{ArcSwap, ArcSwapOption};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use arc_swap::ArcSwapOption;
+use parking_lot::{Mutex, RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 use uniresid::{AbsoluteUri, Uri};
 
 /// Centeral hub to manage [`Schema`] and [`Applicator`] instances.
 #[derive(Clone)]
 pub struct Interrogator {
-    schemas: Arc<ArcSwap<HashMap<Uri, Schema>>>,
-    graph: Arc<ArcSwap<Graph>>,
-    applicators: Arc<ArcSwap<Vec<Box<dyn Applicator>>>>,
+    schemas: Arc<RwLock<Schemas>>,
+    graph: Arc<RwLock<Graph>>,
+    applicators: Arc<RwLock<Arc<Vec<Box<dyn Applicator>>>>>,
     base_uri: Arc<ArcSwapOption<AbsoluteUri>>,
+    lock: Arc<Mutex<()>>,
 }
 
 impl Debug for Interrogator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let schemas = self.schemas.read();
         f.debug_struct("Interrogator")
-            .field("schemas", &self.schemas)
+            .field("schemas", &schemas.schemas)
             .field("graph", &self.graph)
             .finish_non_exhaustive()
     }
@@ -25,20 +32,23 @@ impl Interrogator {
     /// Creates
     pub fn new() -> Self {
         Self {
-            schemas: Arc::new(ArcSwap::from_pointee(HashMap::new())),
-            graph: Arc::new(ArcSwap::from_pointee(Graph::new(&[]).unwrap())),
-            applicators: Arc::new(ArcSwap::from_pointee(Vec::new())),
+            schemas: Arc::new(RwLock::new(Schemas::new())),
+            graph: Arc::new(RwLock::new(Graph::new(&[]).unwrap())),
+            applicators: Arc::new(RwLock::new(Arc::new(Vec::new()))),
             base_uri: Arc::new(ArcSwapOption::default()),
+            lock: Arc::new(Mutex::new(())),
         }
     }
 
     pub(crate) fn applicators(&self) -> Arc<Vec<Box<dyn Applicator>>> {
-        self.applicators.load().clone()
+        let r = self.applicators.read();
+        r.clone()
     }
 
     /// Returns the `Schema` with the given `id` if it exists.
     pub fn schema(&self, id: &Uri) -> Option<Schema> {
-        self.schemas.load().get(id).cloned()
+        let r = self.schemas.read();
+        r.get(id)
     }
     /// Returns the [`AbsoluteUri`](uniresid::AbsoluteUri) which .
     pub fn base_uri(&self) -> Option<Arc<AbsoluteUri>> {
@@ -58,48 +68,203 @@ impl Interrogator {
     /// If the `id` of the `Schema` is not set, an `Error::UnidentifiedSchema`
     /// is returned and the `Schema` is not inserted.
     pub fn insert_schema(&self, schema: Schema) -> Result<Option<Schema>, Error> {
-        schema.setup(self)?;
-        if let Some(id) = schema.id() {
-            let guard = self.schemas.load();
-            let schemas = guard.clone();
-            let old = schemas.get(&id);
-            let mut data = HashMap::with_capacity(schemas.len());
-            for (k, v) in schemas.iter() {
-                data.insert(k.clone(), v.clone());
+        // this mutex lock ensures that only one process can modify the schemas at a time.
+        // this is necessary because the RwLock guarding schemas cannot be held for
+        // the duration of the `insert_schema` call as it would cause a deadlock.
+        let g = self.lock.lock();
+
+        match {
+            let schemas = self.schemas.write();
+            match schemas.insert(schema) {
+                Ok(old) => match schema.setup(self) {
+                    Ok(_) => Ok(old),
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e.into()),
             }
-            data.insert(id.as_ref().clone(), schema);
-            self.schemas.store(Arc::new(data));
-            Ok(old.cloned())
-        } else {
-            Err(UnidentifiedSchemaError { schema }.into())
+        } {
+            Err(err) => {
+                let schemas = self.schemas.write();
+                schemas.clear_pending();
+                Err(err)
+            }
+            Ok(old) => {
+                let values = {
+                    let s = self.schemas.read();
+                    s.values()
+                };
+                // this is safe as all schemas should be identified
+                let new_graph = Graph::new(&values).expect("Encountered unidentified schema. This is a bug. Please report it to https://github.com/chanced/grill/issues.");
+                for s in values.iter().cloned() {
+                    if s == schema {
+                        continue;
+                    }
+                    if new_graph.is_referenced(s, schema) {
+                        if let Err(err) = schema.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        if let Err(err) = s.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        continue;
+                    }
+                    if new_graph.is_referenced(schema, s) {
+                        if let Err(err) = schema.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        if let Err(err) = s.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                    }
+                }
+                let schemas = self.schemas.write();
+                schemas.finalize();
+                let graph = self.graph.write();
+                graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report it to https://github.com/chanced/grill/issues");
+                Ok(old)
+            }
         }
     }
-    /// Adds a slice of top-level [`Schema`] to the `Interrogator`, associated
-    /// by its `id`. [`Schema`] which already exists are overwritten and
+    /// Adds a slice of top-level [`Schema`] to the `Interrogator`, each associated
+    /// by its `id`. [`Schema`] which already exist are overwritten and
     /// returned. `None` is returned otherwise.
     ///
-    /// If an `id` of a [`Schema`] is not set, an [`Error::UnidentifiedSchema`]
-    /// is returned and the [`Schema`] is not inserted.
-    pub fn insert_schemas(&self, schemas: &[Schema]) -> Result<Option<Vec<Schema>>, Error> {
-        let mut schemas_to_add = HashMap::with_capacity(schemas.len());
-        let mut existing_schemas = self.schemas.load().as_ref().clone();
+    /// If an `id` of a [`Schema`] is not set, [`Error::UnidentifiedSchema`]
+    /// is returned and none of the [`Schema`] are inserted.
+    pub fn insert_schemas(&self, schemas_to_add: &[Schema]) -> Result<Option<Vec<Schema>>, Error> {
+        // this mutex lock ensures that only one process can modify the schemas at a time.
+        // this is necessary because the RwLock guarding schemas cannot be held for
+        // the duration of the `insert_schemas` call as it would cause a deadlock.
+        let mutex = self.lock.lock();
 
-        for schema in schemas {
-            if let Some(id) = schema.id() {
-                schemas_to_add.insert(id.clone(), schema.clone());
-            } else {
-                return Err(UnidentifiedSchemaError {
-                    schema: schema.clone(),
+        match {
+            let schemas = self.schemas.write();
+            for schema in schemas_to_add {
+                match schemas.insert(*schema) {
+                    Ok(old) => match schema.setup(self) {
+                        Ok(_) => Ok(old),
+                        Err(e) => Err(e),
+                    },
+                    Err(e) => Err(e.into()),
                 }
-                .into());
+            }
+            match schemas.insert(schema) {
+                Ok(old) => match schema.setup(self) {
+                    Ok(_) => Ok(old),
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e.into()),
+            }
+        } {
+            Err(err) => {
+                let schemas = self.schemas.write();
+                schemas.clear_pending();
+                Err(err)
+            }
+            Ok(old) => {
+                let values = {
+                    let s = self.schemas.read();
+                    s.values()
+                };
+                // this is safe as all schemas should be identified
+                let new_graph = Graph::new(&values).expect("Encountered unidentified schema. This is a bug. Please report it to https://github.com/chanced/grill/issues.");
+                for s in values.iter().cloned() {
+                    if s == schema {
+                        continue;
+                    }
+                    if new_graph.is_referenced(s, schema) {
+                        if let Err(err) = schema.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        if let Err(err) = s.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        continue;
+                    }
+                    if new_graph.is_referenced(schema, s) {
+                        if let Err(err) = schema.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                        if let Err(err) = s.setup(self) {
+                            let schemas = self.schemas.write();
+                            schemas.clear_pending();
+                            return Err(err);
+                        }
+                    }
+                }
+                let schemas = self.schemas.write();
+                schemas.finalize();
+                let graph = self.graph.write();
+                graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report it to https://github.com/chanced/grill/issues");
+                Ok(old)
             }
         }
-        todo!()
     }
 }
 
 impl Default for Interrogator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+struct Schemas {
+    schemas: HashMap<Uri, Schema>,
+    pending: HashMap<Uri, Schema>,
+}
+
+impl Schemas {
+    fn new() -> Self {
+        Self {
+            schemas: HashMap::new(),
+            pending: HashMap::new(),
+        }
+    }
+    fn get(&self, id: &Uri) -> Option<Schema> {
+        self.schemas.get(id).or(self.pending.get(id)).cloned()
+    }
+    fn insert(&self, schema: Schema) -> Result<Option<Schema>, UnidentifiedSchemaError> {
+        if let Some(id) = schema.id() {
+            let prev = self.schemas.get(&id);
+            self.pending.insert(id.as_ref().clone(), schema);
+            Ok(prev.cloned())
+        } else {
+            Err(UnidentifiedSchemaError { schema })
+        }
+    }
+    fn values(&self) -> Vec<Schema> {
+        let mut set = HashSet::new();
+        for s in self.pending.values() {
+            set.insert(s.clone());
+        }
+        for s in self.schemas.values() {
+            set.insert(s.clone());
+        }
+        set.iter().cloned().collect()
+    }
+    fn finalize(&self) -> Vec<Schema> {
+        for (_, schema) in self.pending.drain() {
+            let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
+            self.schemas.insert(id, schema.clone());
+        }
+        self.schemas.values().cloned().collect()
+    }
+
+    fn clear_pending(&self) {
+        self.pending.clear()
     }
 }

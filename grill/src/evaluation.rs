@@ -1,15 +1,14 @@
-pub mod iter;
+mod iter;
 pub use iter::Iter;
-use uniresid::AbsoluteUri;
-
 use std::{
     borrow::{Borrow, Cow},
     fmt::Display,
 };
+use uniresid::AbsoluteUri;
 
 use crate::{Error, ExpectedStringError, OutputFmt};
 use jsonptr::Pointer;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{to_value, Map, Value};
 
 /// An `Evaluation` is the constructed by [`Applicators`](crate::Applicator) and returned from
@@ -29,6 +28,7 @@ pub struct Evaluation {
 }
 ///
 impl Evaluation {
+    /// Creates and returns a new `Evaluation`.
     pub fn new(instance_location: Pointer, keyword_location: Pointer, output: OutputFmt) -> Self {
         Self {
             output,
@@ -44,6 +44,7 @@ impl Evaluation {
     pub fn is_valid(&self) -> bool {
         self.error.is_none() && self.nested.iter().all(Evaluation::is_valid)
     }
+    /// The associated `error`, if one exists.
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
@@ -65,7 +66,7 @@ impl Evaluation {
     pub fn append(&mut self, evals: impl IntoIterator<Item = Evaluation>) {
         self.extend(evals.into_iter())
     }
-
+    /// Returns the field at the given `key` if it exists.
     pub fn get<K>(&self, key: &K) -> Option<Cow<Value>>
     where
         K: ?Sized + Borrow<str>,
@@ -82,6 +83,11 @@ impl Evaluation {
         }
     }
 
+    /// The location of the JSON value within the instance being validated. The
+    /// value MUST be expressed as a JSON Pointer.
+    ///
+    /// See [JSON Schema Core Specification 12.3.3 for more
+    /// information](https://json-schema.org/draft/2020-12/json-schema-core.html#name-instance-location).
     pub fn instance_location(&self) -> &Pointer {
         &self.instance_location
     }
@@ -92,22 +98,33 @@ impl Evaluation {
         self.instance_location = loc;
         old
     }
-
+    /// The relative location of the validating keyword that follows the
+    /// validation path.
+    ///
+    /// See [JSON Schema Core Specification 12.3.1 for more
+    /// information](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-relative-location).
     pub fn keyword_location(&self) -> &Pointer {
         &self.keyword_location
     }
 
-    /// Sets the `keyword_location` field, returning the previous value
+    /// Sets the `"keywordLocation"` field, returning the previous value
     pub fn set_keyword_location(&mut self, loc: Pointer) -> Pointer {
         let old = self.keyword_location.clone();
         self.keyword_location = loc;
         old
     }
-
+    /// The absolute, dereferenced location of the validating keyword. The value
+    /// MUST be expressed as a full URI using the canonical URI of the relevant
+    /// schema resource with a JSON Pointer fragment, and it MUST NOT include
+    /// by-reference applicators such as "$ref" or "$dynamicRef" as non-terminal
+    /// path components. It MAY end in such keywords if the error or annotation
+    /// is for that keyword, such as an unresolvable reference.
+    ///
+    /// See [JSON Schema Core Specification 12.3.2 for more information.](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-absolute-location)
     pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
         self.absolute_keyword_location.as_ref()
     }
-
+    /// Sets the `"absoluteKeywordLocation"` field, returning the previous value
     pub fn set_absolute_keyword_location(&mut self, uri: AbsoluteUri) -> Option<AbsoluteUri> {
         let old = self.absolute_keyword_location.take();
         self.absolute_keyword_location = Some(uri);
@@ -201,12 +218,18 @@ where
     }
 }
 
+/// Represents a field of an `Evaluation`
 #[derive(Debug, Clone)]
 pub enum Field {
+    /// The `"instanceLocation"` field.
     InstanceLocation,
+    /// The `"keywordLocation"` field.
     KeywordLocation,
+    /// The `"absoluteKeywordLocation"` field.
     AbsoluteKeywordLocation,
+    /// The `"error"` field.
     Error,
+    /// A custom field.
     Data(String),
 }
 

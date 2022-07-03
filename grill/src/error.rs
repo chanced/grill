@@ -17,7 +17,7 @@ pub enum Error {
     /// An error occurred serializing or deserializing data.
     Serde(Arc<SerdeError>),
     /// A Schema did not have any matching `Applicator`s.
-    InvalidSchema(InvalidSchemaError),
+    InvalidSchema(NoApplicatorsError),
     /// A top-level `Schema` was not identifiable.
     UnindentifiedSchema(UnidentifiedSchemaError),
     /// An error occurred parsing a JSON Pointer.
@@ -86,8 +86,8 @@ impl From<UriError> for Error {
     }
 }
 
-impl From<InvalidSchemaError> for Error {
-    fn from(err: InvalidSchemaError) -> Self {
+impl From<NoApplicatorsError> for Error {
+    fn from(err: NoApplicatorsError) -> Self {
         Error::InvalidSchema(err)
     }
 }
@@ -159,18 +159,28 @@ impl std::fmt::Display for UnidentifiedSchemaError {
 impl StdError for UnidentifiedSchemaError {}
 
 #[derive(Clone, Debug)]
-pub struct InvalidSchemaError;
+/// Indicates that no [`Applicator`](crate::Applicator) was applicable for the
+/// given [`Schema`](crate::Schema).
+pub struct NoApplicatorsError;
 
-impl std::fmt::Display for InvalidSchemaError {
+impl std::fmt::Display for NoApplicatorsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "error: no applicators found for this schema")
     }
 }
 
-impl StdError for InvalidSchemaError {}
+impl StdError for NoApplicatorsError {}
 
 #[derive(Debug, Clone)]
+/// Indicates that the [`Field`] expected a
+/// [`Value::String`](serde_json::Value::String) but received something else.
+///
+/// This is applicable to reserved fields:
+/// ```
+/// ["instanceLocation"`, "keywordLocation", `"absoluteKeywordLocation", "error"]
+/// ```
 pub struct ExpectedStringError {
+    /// The [`Field`] which was expected to be a `String`(serde_json::Value::String).
     pub field: Field,
 }
 

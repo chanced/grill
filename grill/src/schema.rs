@@ -290,6 +290,17 @@ impl std::fmt::Debug for Schema {
             .finish_non_exhaustive()
     }
 }
+impl std::cmp::Eq for Schema {}
+impl std::cmp::PartialEq for Schema {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id() && self.inner.source == other.inner.source
+    }
+}
+impl std::hash::Hash for Schema {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id().hash(state);
+    }
+}
 
 #[cfg(test)]
 mod tests {}
