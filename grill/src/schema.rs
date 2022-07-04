@@ -66,9 +66,7 @@ impl Functions {
     fn executor_fns(&self) -> Arc<Vec<Box<ExecutorFn>>> {
         self.executor_fns.load().clone()
     }
-    fn setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
-        self.setup_fns.load().clone()
-    }
+
     fn pending_setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
         let lock = self.pending_setup.lock();
         lock.clone()
