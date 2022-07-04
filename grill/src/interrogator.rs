@@ -71,11 +71,12 @@ impl Interrogator {
         // this mutex lock ensures that only one process can modify the schemas at a time.
         // this is necessary because the RwLock guarding schemas cannot be held for
         // the duration of the `insert_schema` call as it would cause a deadlock.
+        #[allow(unused_variables)]
         let g = self.lock.lock();
 
         match {
             let schemas = self.schemas.write();
-            match schemas.insert(schema) {
+            match schemas.insert(schema.clone()) {
                 Ok(old) => match schema.setup(self) {
                     Ok(_) => Ok(old),
                     Err(e) => Err(e),
@@ -84,7 +85,7 @@ impl Interrogator {
             }
         } {
             Err(err) => {
-                let schemas = self.schemas.write();
+                let mut schemas = self.schemas.write();
                 schemas.clear_pending();
                 Err(err)
             }
@@ -99,35 +100,35 @@ impl Interrogator {
                     if s == schema {
                         continue;
                     }
-                    if new_graph.is_referenced(s, schema) {
+                    if new_graph.is_referenced(&s, &schema) {
                         if let Err(err) = schema.setup(self) {
-                            let schemas = self.schemas.write();
+                            let mut schemas = self.schemas.write();
                             schemas.clear_pending();
                             return Err(err);
                         }
                         if let Err(err) = s.setup(self) {
-                            let schemas = self.schemas.write();
+                            let mut schemas = self.schemas.write();
                             schemas.clear_pending();
                             return Err(err);
                         }
                         continue;
                     }
-                    if new_graph.is_referenced(schema, s) {
+                    if new_graph.is_referenced(&schema, &s) {
                         if let Err(err) = schema.setup(self) {
-                            let schemas = self.schemas.write();
+                            let mut schemas = self.schemas.write();
                             schemas.clear_pending();
                             return Err(err);
                         }
                         if let Err(err) = s.setup(self) {
-                            let schemas = self.schemas.write();
+                            let mut schemas = self.schemas.write();
                             schemas.clear_pending();
                             return Err(err);
                         }
                     }
                 }
-                let schemas = self.schemas.write();
-                schemas.finalize();
-                let graph = self.graph.write();
+                let mut schemas = self.schemas.write();
+                schemas.publish();
+                let mut graph = self.graph.write();
                 graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report it to https://github.com/chanced/grill/issues");
                 Ok(old)
             }
@@ -188,7 +189,7 @@ impl Schemas {
         }
         set.iter().cloned().collect()
     }
-    fn finalize(&self) -> Vec<Schema> {
+    fn publish(&mut self) -> Vec<Schema> {
         for (_, schema) in self.pending.drain() {
             let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
             self.schemas.insert(id, schema.clone());
@@ -196,7 +197,7 @@ impl Schemas {
         self.schemas.values().cloned().collect()
     }
 
-    fn clear_pending(&self) {
+    fn clear_pending(&mut self) {
         self.pending.clear()
     }
 }

@@ -68,7 +68,7 @@ impl Graph {
     }
 
     /// Returns `true` if `reference` is referenced by `source`.
-    pub fn is_referenced(&self, reference: Schema, source: Schema) -> bool {
+    pub fn is_referenced(&self, reference: &Schema, source: &Schema) -> bool {
         let rid = reference.id();
         let sid = source.id();
 
@@ -91,7 +91,10 @@ impl Graph {
     }
 
     pub fn nodes(&self) -> Nodes {
-        Nodes::new(petgraph::algo::kosaraju_scc(&self.graph), self.nodes)
+        Nodes::new(
+            petgraph::algo::kosaraju_scc(&self.graph),
+            self.nodes.clone(),
+        )
     }
 }
 
