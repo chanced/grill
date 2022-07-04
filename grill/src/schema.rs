@@ -48,7 +48,7 @@ impl Functions {
         let mut f = self.pending_setup.lock();
         *f = Arc::new(fns);
     }
-    fn clear_pending(&self) {
+    fn rollback(&self) {
         let mut s = self.pending_setup.lock();
         let mut e = self.pending_executor.lock();
         *s = Arc::new(Vec::new());
@@ -216,10 +216,13 @@ impl Schema {
     pub fn as_str(&self) -> Option<&str> {
         self.inner.source.as_str()
     }
+
+    /// Returns the associated `` if the source
+    /// [Value] is an `Object`. Returns `None` otherwise.
     pub fn as_array(&self) -> Option<&Vec<Value>> {
         self.inner.source.as_array()
     }
-    /// Returns the associated `serde_json::Map` if the source
+    /// Returns the associated [`Map`](serde_json::Map) if the source
     /// [Value] is an `Object`. Returns `None` otherwise.
     pub fn as_object(&self) -> Option<&Map<String, Value>> {
         self.inner.source.as_object()
@@ -229,7 +232,7 @@ impl Schema {
     pub fn as_bool(&self) -> Option<bool> {
         self.inner.source.as_bool()
     }
-    /// If the source [Value] is `Null`, returns `Some(())`. Returns
+    /// If the source [`Value`] is [`Null`](serde_json::Value::Null), returns `Some(())`. Returns
     /// `None` otherwise.
     pub fn as_null(&self) -> Option<()> {
         self.inner.source.as_null()
@@ -332,6 +335,10 @@ impl Schema {
             .dialect
             .swap(Some(Arc::new(dialect)))
             .map(|v| v.as_ref().clone())
+    }
+
+    pub(crate) fn rollback(&self) {
+        self.inner.functions.rollback();
     }
 }
 

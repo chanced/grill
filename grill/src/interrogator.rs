@@ -8,12 +8,14 @@ use std::{
 };
 use uniresid::{AbsoluteUri, Uri};
 
+type Applicators = Arc<RwLock<Arc<Vec<Box<dyn Applicator>>>>>;
+
 /// Centeral hub to manage [`Schema`] and [`Applicator`] instances.
 #[derive(Clone)]
 pub struct Interrogator {
     schemas: Arc<RwLock<Schemas>>,
     graph: Arc<RwLock<Graph>>,
-    applicators: Arc<RwLock<Arc<Vec<Box<dyn Applicator>>>>>,
+    applicators: Applicators,
     base_uri: Arc<ArcSwapOption<AbsoluteUri>>,
     lock: Arc<Mutex<()>>,
 }
@@ -75,7 +77,7 @@ impl Interrogator {
         let g = self.lock.lock();
 
         match {
-            let schemas = self.schemas.write();
+            let mut schemas = self.schemas.write();
             match schemas.insert(schema.clone()) {
                 Ok(old) => match schema.setup(self) {
                     Ok(_) => Ok(old),
@@ -86,7 +88,7 @@ impl Interrogator {
         } {
             Err(err) => {
                 let mut schemas = self.schemas.write();
-                schemas.clear_pending();
+                schemas.rollback();
                 Err(err)
             }
             Ok(old) => {
@@ -103,12 +105,12 @@ impl Interrogator {
                     if new_graph.is_referenced(&s, &schema) {
                         if let Err(err) = schema.setup(self) {
                             let mut schemas = self.schemas.write();
-                            schemas.clear_pending();
+                            schemas.rollback();
                             return Err(err);
                         }
                         if let Err(err) = s.setup(self) {
                             let mut schemas = self.schemas.write();
-                            schemas.clear_pending();
+                            schemas.rollback();
                             return Err(err);
                         }
                         continue;
@@ -116,12 +118,12 @@ impl Interrogator {
                     if new_graph.is_referenced(&schema, &s) {
                         if let Err(err) = schema.setup(self) {
                             let mut schemas = self.schemas.write();
-                            schemas.clear_pending();
+                            schemas.rollback();
                             return Err(err);
                         }
                         if let Err(err) = s.setup(self) {
                             let mut schemas = self.schemas.write();
-                            schemas.clear_pending();
+                            schemas.rollback();
                             return Err(err);
                         }
                     }
@@ -164,13 +166,13 @@ impl Schemas {
         }
     }
     fn get(&self, id: &Uri) -> Option<Schema> {
-        self.schemas.get(id).or(self.pending.get(id)).cloned()
-    }
-    fn len(&self) -> usize {
-        self.schemas.len()
+        self.pending
+            .get(id)
+            .or_else(|| self.schemas.get(id))
+            .cloned()
     }
 
-    fn insert(&self, schema: Schema) -> Result<Option<Schema>, UnidentifiedSchemaError> {
+    fn insert(&mut self, schema: Schema) -> Result<Option<Schema>, UnidentifiedSchemaError> {
         if let Some(id) = schema.id() {
             let prev = self.schemas.get(&id);
             self.pending.insert(id.as_ref().clone(), schema);
@@ -192,12 +194,16 @@ impl Schemas {
     fn publish(&mut self) -> Vec<Schema> {
         for (_, schema) in self.pending.drain() {
             let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
-            self.schemas.insert(id, schema.clone());
+            schema.publish();
+            self.schemas.insert(id, schema);
         }
         self.schemas.values().cloned().collect()
     }
 
-    fn clear_pending(&mut self) {
+    fn rollback(&mut self) {
+        for s in self.pending.values() {
+            s.rollback()
+        }
         self.pending.clear()
     }
 }
