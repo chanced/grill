@@ -2,6 +2,7 @@ mod schema_builder;
 pub use schema_builder::SchemaBuilder;
 
 mod sub_schema;
+pub use parking_lot::Mutex;
 pub use sub_schema::SubSchema;
 
 use crate::{
@@ -18,14 +19,69 @@ use std::{
 };
 use uniresid::Uri;
 
+#[derive(Clone)]
+struct Functions {
+    setup_fns: Arc<ArcSwap<Vec<Box<SetupFn>>>>,
+    executor_fns: Arc<ArcSwap<Vec<Box<ExecutorFn>>>>,
+    pending_setup: Arc<Mutex<Arc<Vec<Box<SetupFn>>>>>,
+    pending_executor: Arc<Mutex<Arc<Vec<Box<ExecutorFn>>>>>,
+}
+
+impl Functions {
+    fn new() -> Self {
+        Self {
+            setup_fns: Arc::new(ArcSwap::from_pointee(Vec::new())),
+            executor_fns: Arc::new(ArcSwap::from_pointee(Vec::new())),
+
+            // using 2 phase load
+            pending_setup: Arc::new(Mutex::new(Arc::new(Vec::new()))),
+            pending_executor: Arc::new(Mutex::new(Arc::new(Vec::new()))),
+        }
+    }
+
+    fn store_executors(&self, fns: Vec<Box<ExecutorFn>>) {
+        let mut f = self.pending_executor.lock();
+        *f = Arc::new(fns);
+    }
+
+    fn store_setup(&self, fns: Vec<Box<SetupFn>>) {
+        let mut f = self.pending_setup.lock();
+        *f = Arc::new(fns);
+    }
+    fn clear_pending(&self) {
+        let mut s = self.pending_setup.lock();
+        let mut e = self.pending_executor.lock();
+        *s = Arc::new(Vec::new());
+        *e = Arc::new(Vec::new());
+    }
+    fn finalize(&self) {
+        let mut pending_executor = self.pending_executor.lock();
+        let mut pending_setup = self.pending_setup.lock();
+        self.executor_fns.store(pending_executor.clone());
+        self.setup_fns.store(pending_setup.clone());
+        *pending_executor = Arc::new(Vec::new());
+        *pending_setup = Arc::new(Vec::new());
+    }
+
+    fn executor_fns(&self) -> Arc<Vec<Box<ExecutorFn>>> {
+        self.executor_fns.load().clone()
+    }
+    fn setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
+        self.setup_fns.load().clone()
+    }
+    fn pending_setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
+        let lock = self.pending_setup.lock();
+        lock.clone()
+    }
+}
+
 struct Inner {
     id: ArcSwapOption<Uri>,
     dialect: ArcSwapOption<Uri>,
     references: Arc<ArcSwap<HashSet<Uri>>>,
     source: Arc<Value>,
-    setup_fns: Arc<ArcSwap<Vec<Box<SetupFn>>>>,
-    executors: Arc<ArcSwap<Vec<Box<ExecutorFn>>>>,
     sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
+    functions: Functions,
 }
 
 /// Data structure representing a single [JSON Schema](https://json-schema.org/).
@@ -42,9 +98,8 @@ impl Schema {
             dialect: ArcSwapOption::default(),
             source: Arc::new(source),
             references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
-            setup_fns: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
-            executors: Arc::new(ArcSwap::new(Arc::new(Vec::new()))),
             sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
+            functions: Functions::new(),
         });
 
         let schema = Self { inner };
@@ -59,23 +114,17 @@ impl Schema {
             source,
         }
     }
-
     fn executors(&self) -> Arc<Vec<Box<ExecutorFn>>> {
-        self.inner.executors.load().clone()
+        self.inner.functions.executor_fns()
     }
     fn setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
-        self.inner.setup_fns.load().clone()
+        self.inner.functions.pending_setup_fns()
     }
     /// Evaluates `value` against this `Schema`.
-    pub fn evaluate(
-        &self,
-        value: &Value,
-        evaluation: Evaluation,
-        output: OutputFmt,
-    ) -> Result<Evaluation, Error> {
+    pub fn evaluate(&self, value: &Value, output: OutputFmt) -> Result<Evaluation, Error> {
         let next = Next::new(self.executors());
         let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
-        next.call(value, evaluation)
+        next.call(value, eval)
     }
 
     /// Creates and returns a new [`Schema`] that is nested within this [`Schema`].
@@ -126,6 +175,7 @@ impl Schema {
     pub fn sub_schemas(&self) -> Arc<HashMap<String, SubSchema>> {
         self.inner.sub_schemas.load().clone()
     }
+
     fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
         let applicators = interrogator.applicators();
         let mut fns = Vec::with_capacity(applicators.len());
@@ -134,7 +184,7 @@ impl Schema {
                 fns.push(setup_fn)
             }
         }
-        self.inner.setup_fns.store(Arc::new(fns));
+        self.inner.functions.store_setup(fns);
         Ok(())
     }
 
@@ -150,12 +200,17 @@ impl Schema {
                 fns.push(exec)
             }
         }
-        self.inner.executors.store(Arc::new(fns));
+        self.inner.functions.store_executors(fns);
         for (_, sub) in self.sub_schemas().iter() {
             sub.setup(interrogator)?;
         }
         Ok(())
     }
+
+    pub(crate) fn publish(&self) {
+        self.inner.functions.finalize();
+    }
+
     /// Returns the associated `&str` if the source [Value] is a
     /// `String`. Returns `None` otherwise.
     pub fn as_str(&self) -> Option<&str> {

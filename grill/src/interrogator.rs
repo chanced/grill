@@ -140,79 +140,7 @@ impl Interrogator {
     /// If an `id` of a [`Schema`] is not set, [`Error::UnidentifiedSchema`]
     /// is returned and none of the [`Schema`] are inserted.
     pub fn insert_schemas(&self, schemas_to_add: &[Schema]) -> Result<Option<Vec<Schema>>, Error> {
-        // this mutex lock ensures that only one process can modify the schemas at a time.
-        // this is necessary because the RwLock guarding schemas cannot be held for
-        // the duration of the `insert_schemas` call as it would cause a deadlock.
-        let mutex = self.lock.lock();
-
-        match {
-            let schemas = self.schemas.write();
-            for schema in schemas_to_add {
-                match schemas.insert(*schema) {
-                    Ok(old) => match schema.setup(self) {
-                        Ok(_) => Ok(old),
-                        Err(e) => Err(e),
-                    },
-                    Err(e) => Err(e.into()),
-                }
-            }
-            match schemas.insert(schema) {
-                Ok(old) => match schema.setup(self) {
-                    Ok(_) => Ok(old),
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e.into()),
-            }
-        } {
-            Err(err) => {
-                let schemas = self.schemas.write();
-                schemas.clear_pending();
-                Err(err)
-            }
-            Ok(old) => {
-                let values = {
-                    let s = self.schemas.read();
-                    s.values()
-                };
-                // this is safe as all schemas should be identified
-                let new_graph = Graph::new(&values).expect("Encountered unidentified schema. This is a bug. Please report it to https://github.com/chanced/grill/issues.");
-                for s in values.iter().cloned() {
-                    if s == schema {
-                        continue;
-                    }
-                    if new_graph.is_referenced(s, schema) {
-                        if let Err(err) = schema.setup(self) {
-                            let schemas = self.schemas.write();
-                            schemas.clear_pending();
-                            return Err(err);
-                        }
-                        if let Err(err) = s.setup(self) {
-                            let schemas = self.schemas.write();
-                            schemas.clear_pending();
-                            return Err(err);
-                        }
-                        continue;
-                    }
-                    if new_graph.is_referenced(schema, s) {
-                        if let Err(err) = schema.setup(self) {
-                            let schemas = self.schemas.write();
-                            schemas.clear_pending();
-                            return Err(err);
-                        }
-                        if let Err(err) = s.setup(self) {
-                            let schemas = self.schemas.write();
-                            schemas.clear_pending();
-                            return Err(err);
-                        }
-                    }
-                }
-                let schemas = self.schemas.write();
-                schemas.finalize();
-                let graph = self.graph.write();
-                graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report it to https://github.com/chanced/grill/issues");
-                Ok(old)
-            }
-        }
+        todo!()
     }
 }
 
@@ -237,6 +165,10 @@ impl Schemas {
     fn get(&self, id: &Uri) -> Option<Schema> {
         self.schemas.get(id).or(self.pending.get(id)).cloned()
     }
+    fn len(&self) -> usize {
+        self.schemas.len()
+    }
+
     fn insert(&self, schema: Schema) -> Result<Option<Schema>, UnidentifiedSchemaError> {
         if let Some(id) = schema.id() {
             let prev = self.schemas.get(&id);
