@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use crate::{Schema, UnidentifiedSchemaError};
 use petgraph::algo::has_path_connecting;
@@ -14,7 +13,7 @@ use uniresid::Uri;
 pub(crate) struct Graph {
     index: HashMap<Uri, NodeIndex>,
     graph: PetGraph<Uri, ()>,
-    nodes: Arc<HashMap<NodeIndex, Schema>>,
+    nodes: HashMap<NodeIndex, Schema>,
 }
 
 impl Graph {
@@ -22,7 +21,7 @@ impl Graph {
         let mut g = Graph {
             index: HashMap::new(),
             graph: PetGraph::new(),
-            nodes: Arc::new(HashMap::new()),
+            nodes: HashMap::new(),
         };
         for schema in schemas.iter().cloned() {
             g.add(schema)?;
@@ -44,7 +43,7 @@ impl Graph {
         let Graph {
             ref mut index,
             ref mut graph,
-            ref mut nodes,
+            nodes: _,
         } = *self;
         let id = id.clone();
         *index
@@ -100,11 +99,11 @@ impl Graph {
 
 pub struct Nodes {
     indexes: Vec<Vec<NodeIndex>>,
-    nodes: Arc<HashMap<NodeIndex, Schema>>,
+    nodes: HashMap<NodeIndex, Schema>,
     index: (usize, usize),
 }
 impl Nodes {
-    fn new(indexes: Vec<Vec<NodeIndex>>, nodes: Arc<HashMap<NodeIndex, Schema>>) -> Self {
+    fn new(indexes: Vec<Vec<NodeIndex>>, nodes: HashMap<NodeIndex, Schema>) -> Self {
         Self {
             indexes,
             nodes,
