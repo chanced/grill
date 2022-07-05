@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![doc = include_str!("../../README.md")]
 /// Contains data structures pertaining to the response of the method `evaluate`
 /// of a [`Schema`](crate::Schema).

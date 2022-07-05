@@ -8,7 +8,7 @@ use std::{
 };
 use uniresid::{AbsoluteUri, Uri};
 
-type Applicators = Arc<RwLock<Arc<Vec<Box<dyn Applicator>>>>>;
+type Applicators = Arc<RwLock<Arc<Vec<Arc<dyn Applicator>>>>>;
 
 /// Centeral hub to manage [`Schema`] and [`Applicator`] instances.
 #[derive(Clone)]
@@ -42,7 +42,7 @@ impl Interrogator {
         }
     }
 
-    pub(crate) fn applicators(&self) -> Arc<Vec<Box<dyn Applicator>>> {
+    pub(crate) fn applicators(&self) -> Arc<Vec<Arc<dyn Applicator>>> {
         let r = self.applicators.read();
         r.clone()
     }
@@ -143,7 +143,98 @@ impl Interrogator {
     /// If an `id` of a [`Schema`] is not set, [`Error::UnidentifiedSchema`]
     /// is returned and none of the [`Schema`] are inserted.
     pub fn insert_schemas(&self, schemas_to_add: &[Schema]) -> Result<Option<Vec<Schema>>, Error> {
-        todo!()
+        // this mutex lock ensures that only one process can modify the schemas at a time.
+        // this is necessary because the RwLock guarding schemas cannot be held for
+        // the duration of the `insert_schema` call as it would cause a deadlock.
+        #[allow(unused_variables)]
+        let g = self.lock.lock();
+
+        let mut schemas = self.schemas.write();
+        let mut existing = Vec::new();
+        for s in schemas_to_add {
+            match schemas.insert(s.clone()) {
+                Ok(Some(old)) => existing.push(old),
+                Err(e) => {
+                    schemas.rollback();
+                    return Err(e.into());
+                }
+                _ => {}
+            }
+        }
+
+        let all_schemas = schemas.values();
+        let temp_graph = Graph::new(&all_schemas).expect("Encountered unidentified schema. This is a bug. Please report it to https://github.com/chanced/grill/issues.");
+        let mut schemas_to_update = HashSet::with_capacity(schemas_to_add.len());
+        // releasing the lock
+        drop(schemas);
+
+        for s in schemas_to_add {
+            schemas_to_update.insert(s.clone());
+        }
+
+        for s in all_schemas {
+            for ns in schemas_to_add {
+                if s == ns.clone() {
+                    continue;
+                }
+                if temp_graph.is_referenced(ns, &s) {
+                    schemas_to_update.insert(s.clone());
+                }
+            }
+        }
+        for s in schemas_to_update {
+            if let Err(err) = s.setup(self) {
+                let mut schemas = self.schemas.write();
+                schemas.rollback();
+                return Err(err);
+            }
+        }
+        let mut schemas = self.schemas.write();
+        schemas.publish();
+        if existing.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(existing))
+        }
+    }
+
+    pub fn add_applicator(&self, applicator: impl Applicator + 'static) -> Result<(), Error> {
+        let mut applicators = self.applicators.write();
+        let previous = applicators.clone();
+        let mut temp = applicators.iter().cloned().collect::<Vec<_>>();
+        temp.push(Arc::new(applicator));
+        *applicators = Arc::new(temp);
+        // dropping applicators so that each Schema can access the list of applicators.
+        drop(applicators);
+        let schemas = {
+            let guard = self.schemas.read();
+            guard.values()
+        };
+        let mut updated = Vec::with_capacity(schemas.len());
+        for s in schemas {
+            match s.duplicate(self) {
+                Ok(s) => updated.push(s),
+                Err(e) => {
+                    let mut guard = self.schemas.write();
+                    guard.rollback();
+                    return Err(e);
+                }
+            }
+        }
+
+        for s in updated {
+            if let Err(err) = s.setup(self) {
+                let mut guard = self.schemas.write();
+                guard.rollback();
+                return Err(err);
+            }
+        }
+
+        let mut schemas = self.schemas.write();
+        println!("#4");
+        schemas.publish();
+        println!("#5");
+        Ok(())
     }
 }
 
@@ -205,5 +296,39 @@ impl Schemas {
             s.rollback()
         }
         self.pending.clear()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        applicator::{ExecutorFn, SetupFn},
+        Error, Evaluation, Interrogator, Next, Schema,
+    };
+    use serde_json::{json, Value};
+
+    fn spike(interrogator: Interrogator, schema: Schema) -> Result<Option<Box<SetupFn>>, Error> {
+        println!("inside init");
+        Ok(Some(Box::new(|interrogator, schema| {
+            println!("inside setup");
+            Ok(Some(Box::new(|value, evaluation, next| {
+                println!("inside execute");
+                next.call(value, evaluation)
+            })))
+        })))
+    }
+
+    #[test]
+    fn it_works() {
+        let i = Interrogator::new();
+        println!("before add_applicator");
+        i.add_applicator(spike).unwrap();
+        println!("after add_applicator");
+        let s1 = Schema::new(json! {{}}, &i).unwrap();
+        s1.set_id("http://example.com/1".try_into().unwrap());
+        i.insert_schema(s1.clone()).unwrap();
+        s1.evaluate(&json!({}), crate::OutputFmt::Basic).unwrap();
+
+        panic!("...")
     }
 }

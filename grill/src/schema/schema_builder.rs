@@ -35,7 +35,7 @@ impl SchemaBuilder {
             if let Some(id) = schema.id() {
                 if id.scheme().is_none() {
                     let id = base_uri.resolve(id);
-                    schema.set_id(id);
+                    schema.set_id(id.into());
                 }
             }
         }

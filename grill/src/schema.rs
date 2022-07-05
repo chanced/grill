@@ -7,13 +7,12 @@ pub use sub_schema::SubSchema;
 
 use crate::{
     applicator::{ExecutorFn, SetupFn},
-    Error, Evaluation, Interrogator, Next, OutputFmt,
+    interrogator, Error, Evaluation, Interrogator, InvalidSchemaError, Next, OutputFmt,
 };
 use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
 use serde_json::{Map, Value};
 use std::{
-    borrow::Borrow,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
@@ -82,6 +81,19 @@ struct Inner {
     functions: Functions,
 }
 
+impl Inner {
+    pub(crate) fn new(source: Value) -> Arc<Self> {
+        Arc::new(Inner {
+            id: ArcSwapOption::default(),
+            dialect: ArcSwapOption::default(),
+            source: Arc::new(source),
+            references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
+            sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
+            functions: Functions::new(),
+        })
+    }
+}
+
 /// Data structure representing a single [JSON Schema](https://json-schema.org/).
 #[derive(Clone)]
 pub struct Schema {
@@ -91,15 +103,7 @@ pub struct Schema {
 impl Schema {
     /// Creates and returns a new `Schema`.
     pub fn new(source: Value, interrogator: &Interrogator) -> Result<Self, Error> {
-        let inner = Arc::new(Inner {
-            id: ArcSwapOption::default(),
-            dialect: ArcSwapOption::default(),
-            source: Arc::new(source),
-            references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
-            sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
-            functions: Functions::new(),
-        });
-
+        let inner = Inner::new(source);
         let schema = Self { inner };
         schema.initialize(interrogator)?;
         Ok(schema)
@@ -182,8 +186,15 @@ impl Schema {
                 fns.push(setup_fn)
             }
         }
-        self.inner.functions.store_setup(fns);
-        Ok(())
+        if fns.is_empty() {
+            self.inner.functions.rollback();
+            Err(Error::InvalidSchema(InvalidSchemaError {
+                schema: self.clone(),
+            }))
+        } else {
+            self.inner.functions.store_setup(fns);
+            Ok(())
+        }
     }
 
     /// Prepares the schema for use calling `setup` of all [Applicators](crate::Applicator)
@@ -295,10 +306,10 @@ impl Schema {
     }
 
     /// Sets the id of the schema, returning the previous value if it exists.
-    pub fn set_id(&self, val: impl Borrow<Uri>) -> Option<Uri> {
+    pub fn set_id(&self, val: Uri) -> Option<Uri> {
         self.inner
             .id
-            .swap(Some(Arc::new(val.borrow().clone())))
+            .swap(Some(Arc::new(val)))
             .map(|v| v.as_ref().clone())
     }
 
@@ -337,6 +348,14 @@ impl Schema {
 
     pub(crate) fn rollback(&self) {
         self.inner.functions.rollback();
+    }
+
+    /// Clones the value and nothing else
+    pub(crate) fn duplicate(&self, interrogator: &Interrogator) -> Result<Schema, Error> {
+        let inner = Inner::new(self.inner.source.as_ref().clone());
+        let schema = Self { inner };
+        schema.initialize(interrogator)?;
+        Ok(schema)
     }
 }
 
