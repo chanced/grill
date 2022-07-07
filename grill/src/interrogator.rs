@@ -1,5 +1,5 @@
-use crate::{Applicator, Error, Graph, Schema, UnidentifiedSchemaError};
-use arc_swap::ArcSwapOption;
+use crate::{Error, Graph, Schema, UnidentifiedSchemaError, Vocabulary};
+use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
@@ -8,15 +8,13 @@ use std::{
 };
 use uniresid::{AbsoluteUri, Uri};
 
-type Applicators = Arc<RwLock<Arc<Vec<Arc<dyn Applicator>>>>>;
-
 /// Centeral hub to manage [`Schema`] and [`Applicator`] instances.
 #[derive(Clone)]
 pub struct Interrogator {
     schemas: Arc<RwLock<Schemas>>,
     graph: Arc<RwLock<Graph>>,
-    applicators: Applicators,
-    base_uri: Arc<ArcSwapOption<AbsoluteUri>>,
+    base_uri: Arc<RwLock<Option<Arc<AbsoluteUri>>>>,
+    vocabularies: Arc<DashMap<String, Vocabulary>>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -36,15 +34,10 @@ impl Interrogator {
         Self {
             schemas: Arc::new(RwLock::new(Schemas::new())),
             graph: Arc::new(RwLock::new(Graph::new(&[]).unwrap())),
-            applicators: Arc::new(RwLock::new(Arc::new(Vec::new()))),
-            base_uri: Arc::new(ArcSwapOption::default()),
+            base_uri: Arc::new(RwLock::new(None)),
             lock: Arc::new(Mutex::new(())),
+            vocabularies: Arc::new(DashMap::new()),
         }
-    }
-
-    pub(crate) fn applicators(&self) -> Arc<Vec<Arc<dyn Applicator>>> {
-        let r = self.applicators.read();
-        r.clone()
     }
 
     /// Returns the `Schema` with the given `id` if it exists.
@@ -54,13 +47,14 @@ impl Interrogator {
     }
     /// Returns the [`AbsoluteUri`](uniresid::AbsoluteUri) which .
     pub fn base_uri(&self) -> Option<Arc<AbsoluteUri>> {
-        self.base_uri.load().clone()
+        self.base_uri.read().clone()
     }
     /// Sets the base URI for all relative URIs found within each
     /// [`Schema`](Schema) attached to this [`Interrogator`](Interrogator).
     pub fn set_base_uri(&self, uri: AbsoluteUri) -> Option<Arc<AbsoluteUri>> {
         // todo: reinitialize and setup all schemas
-        self.base_uri.swap(Some(Arc::new(uri)))
+        let mut guard = self.base_uri.write();
+        guard.replace(Arc::new(uri))
     }
 
     /// Adds a top-level `Schema` to the `Interrogator`, associated by its `id`.
@@ -97,41 +91,69 @@ impl Interrogator {
                     s.values()
                 };
                 // this is safe as all schemas should be identified
-                let new_graph = Graph::new(&values).expect("Encountered unidentified schema. This is a bug. Please report it to https://github.com/chanced/grill/issues.");
+                let new_graph = {
+                    match Graph::new(&values) {
+                        Ok(g) => g,
+                        Err(err) => {
+                            let mut schemas = self.schemas.write();
+                            schemas.rollback();
+                            return Err(err.into());
+                        }
+                    }
+                };
+                let mut setup = HashSet::new();
                 for s in values.iter().cloned() {
                     if s == schema {
                         continue;
                     }
-                    if new_graph.is_referenced(&s, &schema) {
-                        if let Err(err) = schema.setup(self) {
-                            let mut schemas = self.schemas.write();
-                            schemas.rollback();
-                            return Err(err);
+                    if !setup.contains(&schema)
+                        && !setup.contains(&s)
+                        && new_graph.is_referenced(&s, &schema)
+                    {
+                        if !setup.contains(&schema) {
+                            if let Err(err) = schema.setup(self) {
+                                let mut schemas = self.schemas.write();
+                                schemas.rollback();
+                                return Err(err);
+                            } else {
+                                setup.insert(schema.clone());
+                            }
                         }
-                        if let Err(err) = s.setup(self) {
-                            let mut schemas = self.schemas.write();
-                            schemas.rollback();
-                            return Err(err);
+                        if !setup.contains(&s) {
+                            if let Err(err) = s.setup(self) {
+                                let mut schemas = self.schemas.write();
+                                schemas.rollback();
+                                return Err(err);
+                            } else {
+                                setup.insert(s.clone());
+                            }
                         }
                         continue;
                     }
-                    if new_graph.is_referenced(&schema, &s) {
-                        if let Err(err) = schema.setup(self) {
-                            let mut schemas = self.schemas.write();
-                            schemas.rollback();
-                            return Err(err);
+                    if !setup.contains(&schema)
+                        && !setup.contains(&s)
+                        && new_graph.is_referenced(&schema, &s)
+                    {
+                        if !setup.contains(&schema) {
+                            if let Err(err) = schema.setup(self) {
+                                let mut schemas = self.schemas.write();
+                                schemas.rollback();
+                                return Err(err);
+                            }
                         }
-                        if let Err(err) = s.setup(self) {
-                            let mut schemas = self.schemas.write();
-                            schemas.rollback();
-                            return Err(err);
+                        if !setup.contains(&s) {
+                            if let Err(err) = s.setup(self) {
+                                let mut schemas = self.schemas.write();
+                                schemas.rollback();
+                                return Err(err);
+                            }
                         }
                     }
                 }
                 let mut schemas = self.schemas.write();
-                schemas.publish();
+                schemas.commit();
                 let mut graph = self.graph.write();
-                graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report it to https://github.com/chanced/grill/issues");
+                graph.rebuild(&values).expect("Rebuilding the graph failed which is a bug. Please report this to https://github.com/chanced/grill/issues");
                 Ok(old)
             }
         }
@@ -190,7 +212,7 @@ impl Interrogator {
             }
         }
         let mut schemas = self.schemas.write();
-        schemas.publish();
+        schemas.commit();
         if existing.is_empty() {
             Ok(None)
         } else {
@@ -198,44 +220,46 @@ impl Interrogator {
         }
     }
 
-    pub fn add_applicator(&self, applicator: impl Applicator + 'static) -> Result<(), Error> {
-        let mut applicators = self.applicators.write();
-        let previous = applicators.clone();
-        let mut temp = applicators.iter().cloned().collect::<Vec<_>>();
-        temp.push(Arc::new(applicator));
-        *applicators = Arc::new(temp);
-        // dropping applicators so that each Schema can access the list of applicators.
-        drop(applicators);
-        let schemas = {
-            let guard = self.schemas.read();
-            guard.values()
-        };
-        let mut updated = Vec::with_capacity(schemas.len());
-        for s in schemas {
-            match s.duplicate(self) {
-                Ok(s) => updated.push(s),
-                Err(e) => {
-                    let mut guard = self.schemas.write();
-                    guard.rollback();
-                    return Err(e);
-                }
-            }
-        }
+    //     pub fn add_applicator(&self, applicator: impl Applicator + 'static) -> Result<(), Error> {
+    //         #[allow(unused_variables)]
+    //         let lock = self.lock.lock();
+    //         self.applicators.push(applicator);
+    //         let schemas = {
+    //             let s = self.schemas.read();
+    //             s.values()
+    //         };
+    //         let mut initialized = Vec::with_capacity(schemas.len());
+    //         for s in schemas {
+    //             match s.duplicate(self) {
+    //                 Ok(ds) => {
+    //                     initialized.push(ds);
+    //                 }
+    //                 Err(err) => {
+    //                     self.applicators.rollback();
+    //                     return Err(err);
+    //                 }
+    //             }
+    //         }
+    //         let mut setup = Schemas::new();
+    //         for schema in initialized.drain(..) {
+    //             if let Err(err) = schema.setup(self) {
+    //                 self.applicators.rollback();
+    //                 return Err(err);
+    //             }
+    //             if let Err(err) = setup.insert(schema) {
+    //                 self.applicators.rollback();
+    //                 return Err(err.into());
+    //             }
+    //         }
+    //         self.applicators.commit();
 
-        for s in updated {
-            if let Err(err) = s.setup(self) {
-                let mut guard = self.schemas.write();
-                guard.rollback();
-                return Err(err);
-            }
-        }
+    //         for schema in setup.values() {
+    //             todo!()
+    //         }
 
-        let mut schemas = self.schemas.write();
-        println!("#4");
-        schemas.publish();
-        println!("#5");
-        Ok(())
-    }
+    //         Ok(())
+    //     }
+    // }
 }
 
 impl Default for Interrogator {
@@ -244,6 +268,7 @@ impl Default for Interrogator {
     }
 }
 
+#[derive(Debug)]
 struct Schemas {
     schemas: HashMap<Uri, Schema>,
     pending: HashMap<Uri, Schema>,
@@ -282,10 +307,11 @@ impl Schemas {
         }
         set.iter().cloned().collect()
     }
-    fn publish(&mut self) -> Vec<Schema> {
+    fn commit(&mut self) -> Vec<Schema> {
         for (_, schema) in self.pending.drain() {
             let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
-            schema.publish();
+
+            // schema.commit();
             self.schemas.insert(id, schema);
         }
         self.schemas.values().cloned().collect()
@@ -293,42 +319,85 @@ impl Schemas {
 
     fn rollback(&mut self) {
         for s in self.pending.values() {
-            s.rollback()
+            // TODO: LOOK INTO THIS
+            // s.rollback()
         }
         self.pending.clear()
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::{
-        applicator::{ExecutorFn, SetupFn},
-        Error, Evaluation, Interrogator, Next, Schema,
-    };
-    use serde_json::{json, Value};
+// #[cfg(test)]
+// mod test {
+//     use crate::{applicator::SetupFn, Error, Interrogator, OutputFmt, Schema};
+//     use serde_json::json;
+//     use uniresid::Uri;
 
-    fn spike(interrogator: Interrogator, schema: Schema) -> Result<Option<Box<SetupFn>>, Error> {
-        println!("inside init");
-        Ok(Some(Box::new(|interrogator, schema| {
-            println!("inside setup");
-            Ok(Some(Box::new(|value, evaluation, next| {
-                println!("inside execute");
-                next.call(value, evaluation)
-            })))
-        })))
-    }
+//     fn spike(_int: Interrogator, schema: Schema) -> Result<Option<Box<SetupFn>>, Error> {
+//         let id_str = schema
+//             .as_object()
+//             .unwrap()
+//             .get("id")
+//             .unwrap()
+//             .as_str()
+//             .unwrap()
+//             .to_string();
+//         let id = Uri::parse(id_str).unwrap();
+//         schema.set_id(id);
+//         Ok(Some(Box::new(move |_int, _schema: Schema| {
+//             Ok(Box::new(move |value, evaluation, next| {
+//                 println!("inside execute");
+//                 next.call(value, evaluation)
+//             }))
+//         })))
+//     }
 
-    #[test]
-    fn it_works() {
-        let i = Interrogator::new();
-        println!("before add_applicator");
-        i.add_applicator(spike).unwrap();
-        println!("after add_applicator");
-        let s1 = Schema::new(json! {{}}, &i).unwrap();
-        s1.set_id("http://example.com/1".try_into().unwrap());
-        i.insert_schema(s1.clone()).unwrap();
-        s1.evaluate(&json!({}), crate::OutputFmt::Basic).unwrap();
+//     fn spike2(_int: Interrogator, _schema: Schema) -> Result<Option<Box<SetupFn>>, Error> {
+//         Ok(Some(Box::new(move |_int, _schema: Schema| {
+//             println!("inside setup 2");
+//             Ok(Box::new(move |value, evaluation, next| {
+//                 println!("inside execute 2");
+//                 next.call(value, evaluation)
+//             }))
+//         })))
+//     }
 
-        panic!("...")
-    }
-}
+//     #[test]
+//     fn it_works() {
+//         let i = Interrogator::new();
+//         println!("before add_applicator");
+//         i.add_applicator(spike).unwrap();
+//         println!("after add_applicator");
+//         println!("---");
+
+//         println!("creating s1");
+//         let s1 = Schema::new(json!({"id":"/s1"}), &i).unwrap();
+//         println!("---");
+//         println!("adding s1");
+//         i.insert_schema(s1.clone()).unwrap();
+//         println!("---");
+
+//         println!("evaluating with s1");
+//         s1.evaluate(&json!({}), OutputFmt::Basic).unwrap();
+//         println!("---");
+
+//         println!("adding spike2");
+//         i.add_applicator(spike2).unwrap();
+//         println!("---");
+
+//         println!("evaluating with s1");
+//         s1.evaluate(&json!({}), OutputFmt::Basic).unwrap();
+//         println!("---");
+
+//         println!("creating s2");
+//         let s2 = Schema::new(json!({"id":"/s2"}), &i).unwrap();
+//         println!("---");
+
+//         println!("adding s2");
+//         i.insert_schema(s2.clone()).unwrap();
+//         println!("---");
+
+//         println!("evaluating with s2");
+//         s2.evaluate(&json!({}), OutputFmt::Basic).unwrap();
+//         println!("---");
+//     }
+// }

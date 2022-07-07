@@ -1,19 +1,33 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 use uniresid::{AbsoluteUri, Uri};
 
-use crate::{Error, Interrogator, Schema};
+use crate::{
+    applicator::{InitFn, SetupFn},
+    Error, Interrogator, MetaSchema, Schema,
+};
 /// Used to construct a [`Schema`] with default values.
 pub struct SchemaBuilder {
     pub(crate) source: Value,
-    pub(crate) dialect: Option<Uri>,
+    pub(crate) meta_schema: Option<MetaSchema>,
     pub(crate) base_uri: Option<AbsoluteUri>,
+    pub(crate) id: Option<Uri>,
 }
 
 impl SchemaBuilder {
-    /// Sets the default `dialect` for a [`Schema`]. If the [`Schema`] has a
-    /// `dialect` defined, that will be used instead.
-    pub fn default_dialect(mut self, dialect: Uri) -> Self {
-        self.dialect = Some(dialect);
+    pub fn new(source: Value) -> Self {
+        Self {
+            base_uri: None,
+            source,
+            id: None,
+            meta_schema: None,
+        }
+    }
+    /// Sets the default [`MetaSchema`] for the [`Schema`]. If the [`Schema`] has a
+    /// `$schema` field defined, that will be used instead.
+    pub fn default_meta_schema(mut self, meta_schema: MetaSchema) -> Self {
+        self.meta_schema = Some(meta_schema);
         self
     }
     /// Sets the base URI of of the [`Schema`]. This enables for a [`Schema`]
@@ -39,11 +53,34 @@ impl SchemaBuilder {
                 }
             }
         }
-        if let Some(dialect) = self.dialect {
-            if schema.dialect().is_none() {
-                schema.set_dialect(dialect);
+        if let Some(meta_schema) = self.meta_schema {
+            if schema.meta_schema().is_none() {
+                schema.set_meta_schema(meta_schema);
             }
         }
         Ok(schema)
     }
+}
+
+fn assign_default_id(id: Uri) -> Box<InitFn> {
+    // let id = Arc::new(id);
+    Box::new(move |_, schema| {
+        if schema.id().is_none() {
+            schema.set_id(id.clone());
+        }
+        Ok(Some(Box::new(move |_, _| {
+            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
+        })))
+    })
+}
+
+fn assign_default_meta_schema(meta_schema: MetaSchema) -> Box<InitFn> {
+    Box::new(move |_, schema| {
+        if schema.id().is_none() {
+            schema.set_meta_schema(meta_schema.clone());
+        }
+        Ok(Some(Box::new(move |i: Interrogator, s: Schema| {
+            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
+        })))
+    })
 }

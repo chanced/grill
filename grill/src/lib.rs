@@ -20,7 +20,7 @@ pub use interrogator::Interrogator;
 /// Contains data structures pertaining to JSON Schemas, including
 /// [crate::Schema] and [crate::schema::Builder]
 pub mod schema;
-pub use schema::Schema;
+pub use schema::{MetaSchema, Schema, SubSchema};
 
 pub mod applicator;
 pub use applicator::Applicator;
@@ -43,3 +43,12 @@ pub use jsonptr::Pointer;
 
 mod draft;
 pub use draft::*;
+
+mod vocabulary;
+pub use vocabulary::*;
+
+mod keyword;
+pub use keyword::*;
+
+pub mod dialect;
+pub use dialect::Dialect;

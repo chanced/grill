@@ -1,5 +1,5 @@
 use crate::evaluation::Field;
-use crate::Schema;
+use crate::{Evaluation, Schema};
 use jsonptr::{Error as PointerError, MalformedPointerError};
 use serde_json::Error as SerdeError;
 use std::error::Error as StdError;
@@ -164,11 +164,18 @@ impl StdError for UnidentifiedSchemaError {}
 pub struct InvalidSchemaError {
     /// The [`Schema`] for which no [`Applicator`](crate::Applicator) were found.
     pub schema: Schema,
+    pub evaluation: Evaluation,
 }
 
 impl std::fmt::Display for InvalidSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error: no applicators found for this schema")
+        write!(
+            f,
+            "the schema{} has validation errors",
+            self.schema
+                .id()
+                .map_or("".to_string(), |v| format!(" [{}]", &v))
+        )
     }
 }
 

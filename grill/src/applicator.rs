@@ -1,14 +1,42 @@
+use std::sync::Arc;
+
 use crate::{Error, Evaluation, Interrogator, Next, Schema};
+use dyn_clone::{clone_trait_object, DynClone};
+use parking_lot::Mutex;
 use serde_json::Value;
+
+pub trait ExecutorFnTrait:
+    DynClone + Fn(&Value, Evaluation, Next) -> Result<Evaluation, Error>
+{
+}
+
+impl<F> ExecutorFnTrait for F where
+    F: Clone + Fn(&Value, Evaluation, Next) -> Result<Evaluation, Error>
+{
+}
+
+clone_trait_object!(ExecutorFnTrait);
+
+pub type InitFn = dyn Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>;
 
 /// Annotates an [`Evaluation`] with relevant information pertinent to the
 /// [`Schema`] for the given [`OutputFmt`].
-pub type ExecutorFn =
-    dyn 'static + Send + Sync + Fn(&Value, Evaluation, Next) -> Result<Evaluation, Error>;
+pub type ExecutorFn = dyn 'static + Send + Sync + ExecutorFnTrait;
+
+pub trait SetupFnTrait:
+    DynClone + Fn(Interrogator, Schema) -> Result<Box<ExecutorFn>, Error>
+{
+}
+
+impl<F> SetupFnTrait for F where
+    F: Clone + Fn(Interrogator, Schema) -> Result<Box<ExecutorFn>, Error>
+{
+}
+
+clone_trait_object!(SetupFnTrait);
 
 /// Returned from [`Applicator::init`](Applicator::init) to setup the `Applicator` for use.
-pub type SetupFn =
-    dyn 'static + Send + Sync + Fn(Interrogator, Schema) -> Result<Option<Box<ExecutorFn>>, Error>;
+pub type SetupFn = dyn 'static + Send + Sync + SetupFnTrait;
 
 /// Annotates an [`Evaluation`] with relevant data and validation state for a
 /// given [`Value`] depending on the [`Schema`] and the specified
@@ -60,7 +88,8 @@ pub type SetupFn =
 /// ## Implementation
 /// Each stage MUST be deterministic. Failing to do so could result in the [`Interrogator`]
 ///
-pub trait Applicator {
+
+pub trait Applicator: DynClone {
     /// Initializes the `Applicator` with the [`Interrogator`] for the given [`Schema`].
     fn init(
         &self,
@@ -68,10 +97,15 @@ pub trait Applicator {
         schema: Schema,
     ) -> Result<Option<Box<SetupFn>>, Error>;
 }
+clone_trait_object!(Applicator);
 
 impl<F> Applicator for F
 where
-    F: 'static + Send + Sync + Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>,
+    F: 'static
+        + DynClone
+        + Send
+        + Sync
+        + Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>,
 {
     fn init(
         &self,
@@ -81,6 +115,48 @@ where
         self(interrogator, schema)
     }
 }
+
+#[derive(Clone)]
+pub(crate) struct Applicators {
+    current: Arc<Mutex<Vec<Box<dyn Applicator>>>>,
+    pending: Arc<Mutex<Vec<Box<dyn Applicator>>>>,
+}
+
+impl Applicators {
+    pub(crate) fn new() -> Self {
+        Applicators {
+            current: Arc::new(Mutex::new(Vec::new())),
+            pending: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+    pub(crate) fn all(&self) -> Vec<Box<dyn Applicator>> {
+        let current = self.current.lock();
+        let pending = self.pending.lock();
+        let mut res = Vec::with_capacity(current.len() + pending.len());
+        res.extend(current.iter().chain(pending.iter()).cloned());
+        res
+    }
+
+    pub(crate) fn push(&self, applicator: impl Applicator + 'static) {
+        let mut pending = self.pending.lock();
+        pending.push(Box::new(applicator));
+    }
+    pub(crate) fn extend(&self, iter: impl Iterator<Item = Box<dyn Applicator>>) {
+        let mut pending = self.pending.lock();
+        pending.extend(iter);
+    }
+    pub(crate) fn commit(&self) {
+        let mut pending = self.pending.lock();
+        let mut current = self.current.lock();
+        current.append(&mut pending);
+        pending.clear();
+    }
+    pub(crate) fn rollback(&self) {
+        let mut pending = self.pending.lock();
+        *pending = Vec::new();
+    }
+}
+
 #[cfg(test)]
 mod test {
     #[derive(Clone)]
