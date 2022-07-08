@@ -1,4 +1,7 @@
-use crate::{Error, Graph, Schema, UnidentifiedSchemaError, Vocabulary};
+use crate::{
+    draft::HYPER_SCHEMA_2020_12_URI, error::UnidentifiedSchemaError, Error, Graph, MetaSchema,
+    Schema, Vocabulary,
+};
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -12,17 +15,19 @@ use uniresid::{AbsoluteUri, Uri};
 #[derive(Clone)]
 pub struct Interrogator {
     schemas: Arc<RwLock<Schemas>>,
+    meta_schemas: Arc<RwLock<MetaSchemas>>,
     graph: Arc<RwLock<Graph>>,
     base_uri: Arc<RwLock<Option<Arc<AbsoluteUri>>>>,
     vocabularies: Arc<DashMap<String, Vocabulary>>,
     lock: Arc<Mutex<()>>,
+    default_meta_schema: Arc<RwLock<Uri>>,
 }
 
 impl Debug for Interrogator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let schemas = self.schemas.read();
         f.debug_struct("Interrogator")
-            .field("schemas", &schemas.schemas)
+            .field("schemas", &schemas.current)
             .field("graph", &self.graph)
             .finish_non_exhaustive()
     }
@@ -33,10 +38,12 @@ impl Interrogator {
     pub fn new() -> Self {
         Self {
             schemas: Arc::new(RwLock::new(Schemas::new())),
+            meta_schemas: Arc::new(RwLock::new(MetaSchemas::new())),
             graph: Arc::new(RwLock::new(Graph::new(&[]).unwrap())),
             base_uri: Arc::new(RwLock::new(None)),
             lock: Arc::new(Mutex::new(())),
             vocabularies: Arc::new(DashMap::new()),
+            default_meta_schema: Arc::new(RwLock::new(HYPER_SCHEMA_2020_12_URI.clone())),
         }
     }
 
@@ -45,6 +52,12 @@ impl Interrogator {
         let r = self.schemas.read();
         r.get(id)
     }
+
+    pub fn meta_schema(&self, id: &Uri) -> Option<MetaSchema> {
+        let r = self.meta_schemas.read();
+        r.get(id)
+    }
+
     /// Returns the [`AbsoluteUri`](uniresid::AbsoluteUri) which .
     pub fn base_uri(&self) -> Option<Arc<AbsoluteUri>> {
         self.base_uri.read().clone()
@@ -115,18 +128,16 @@ impl Interrogator {
                                 let mut schemas = self.schemas.write();
                                 schemas.rollback();
                                 return Err(err);
-                            } else {
-                                setup.insert(schema.clone());
                             }
+                            setup.insert(schema.clone());
                         }
                         if !setup.contains(&s) {
                             if let Err(err) = s.setup(self) {
                                 let mut schemas = self.schemas.write();
                                 schemas.rollback();
                                 return Err(err);
-                            } else {
-                                setup.insert(s.clone());
                             }
+                            setup.insert(s.clone());
                         }
                         continue;
                     }
@@ -270,27 +281,27 @@ impl Default for Interrogator {
 
 #[derive(Debug)]
 struct Schemas {
-    schemas: HashMap<Uri, Schema>,
+    current: HashMap<Uri, Schema>,
     pending: HashMap<Uri, Schema>,
 }
 
 impl Schemas {
     fn new() -> Self {
         Self {
-            schemas: HashMap::new(),
+            current: HashMap::new(),
             pending: HashMap::new(),
         }
     }
     fn get(&self, id: &Uri) -> Option<Schema> {
         self.pending
             .get(id)
-            .or_else(|| self.schemas.get(id))
+            .or_else(|| self.current.get(id))
             .cloned()
     }
 
     fn insert(&mut self, schema: Schema) -> Result<Option<Schema>, UnidentifiedSchemaError> {
         if let Some(id) = schema.id() {
-            let prev = self.schemas.get(&id);
+            let prev = self.current.get(&id);
             self.pending.insert(id.as_ref().clone(), schema);
             Ok(prev.cloned())
         } else {
@@ -302,7 +313,7 @@ impl Schemas {
         for s in self.pending.values() {
             set.insert(s.clone());
         }
-        for s in self.schemas.values() {
+        for s in self.current.values() {
             set.insert(s.clone());
         }
         set.iter().cloned().collect()
@@ -312,9 +323,9 @@ impl Schemas {
             let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
 
             // schema.commit();
-            self.schemas.insert(id, schema);
+            self.current.insert(id, schema);
         }
-        self.schemas.values().cloned().collect()
+        self.current.values().cloned().collect()
     }
 
     fn rollback(&mut self) {
@@ -326,6 +337,68 @@ impl Schemas {
     }
 }
 
+struct MetaSchemas {
+    current: HashMap<Uri, MetaSchema>,
+    pending: HashMap<Uri, MetaSchema>,
+}
+
+impl MetaSchemas {
+    fn new() -> Self {
+        Self {
+            current: HashMap::new(),
+            pending: HashMap::new(),
+        }
+    }
+    fn get(&self, id: &Uri) -> Option<MetaSchema> {
+        self.pending
+            .get(id)
+            .or_else(|| self.current.get(id))
+            .cloned()
+    }
+
+    fn insert(
+        &mut self,
+        meta_schema: MetaSchema,
+    ) -> Result<Option<MetaSchema>, UnidentifiedSchemaError> {
+        if let Some(id) = meta_schema.id() {
+            let prev = self.current.get(&id);
+            self.pending.insert(id.as_ref().clone(), meta_schema);
+            Ok(prev.cloned())
+        } else {
+            Err(UnidentifiedSchemaError {
+                schema: meta_schema.as_schema(),
+            })
+        }
+    }
+    fn values(&self) -> Vec<MetaSchema> {
+        let mut set = HashSet::new();
+        for s in self.pending.values() {
+            set.insert(s.clone());
+        }
+        for s in self.current.values() {
+            set.insert(s.clone());
+        }
+        set.iter().cloned().collect()
+    }
+
+    fn commit(&mut self) -> Vec<MetaSchema> {
+        for (_, schema) in self.pending.drain() {
+            let id = schema.id().expect("a top level schema was unidentified during finalization. This is a bug. Please report it to https://github.com/chanced/grill/issues.").as_ref().clone();
+
+            // schema.commit();
+            self.current.insert(id, schema);
+        }
+        self.current.values().cloned().collect()
+    }
+
+    fn rollback(&mut self) {
+        for s in self.pending.values() {
+            // TODO: LOOK INTO THIS
+            // s.rollback()
+        }
+        self.pending.clear()
+    }
+}
 // #[cfg(test)]
 // mod test {
 //     use crate::{applicator::SetupFn, Error, Interrogator, OutputFmt, Schema};

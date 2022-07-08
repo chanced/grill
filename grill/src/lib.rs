@@ -1,4 +1,6 @@
+#![recursion_limit = "256"]
 // #![warn(missing_docs)]
+#![warn(clippy::pedantic)]
 #![doc = include_str!("../../README.md")]
 /// Contains data structures pertaining to the response of the method `evaluate`
 /// of a [`Schema`](crate::Schema).
@@ -12,8 +14,8 @@ pub use evaluation::Evaluation;
 mod output_fmt;
 pub use output_fmt::OutputFmt;
 
-mod error;
-pub use error::*;
+pub mod error;
+pub use error::Error;
 /// Contains data structures pertaining to
 pub mod interrogator;
 pub use interrogator::Interrogator;
@@ -41,14 +43,14 @@ pub use uri::Uri;
 pub use jsonptr;
 pub use jsonptr::Pointer;
 
-mod draft;
-pub use draft::*;
-
+pub mod draft;
+pub use draft::{
+    create_hyper_schema_04, create_hyper_schema_07, create_hyper_schema_2019_09,
+    create_hyper_schema_2020_12, create_schema_04, create_schema_07, create_schema_2019_09,
+    create_schema_2020_12,
+};
 mod vocabulary;
 pub use vocabulary::*;
-
-mod keyword;
-pub use keyword::*;
 
 pub mod dialect;
 pub use dialect::Dialect;

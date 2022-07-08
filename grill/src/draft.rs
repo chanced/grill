@@ -1,18 +1,27 @@
-use once_cell::sync::Lazy;
-use uniresid::AbsoluteUri;
+mod draft_2020_12;
 
-/// The [AbsoluteUri] of Json Schema Draft 04.
-pub static DRAFT_04_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::parse("http://json-schema.org/draft-04/schema#").unwrap());
+pub use draft_2020_12::{
+    create_hyper_schema_2020_12, create_schema_2020_12, HYPER_SCHEMA_2020_12,
+    HYPER_SCHEMA_2020_12_URI, SCHEMA_2020_12, SCHEMA_2020_12_URI,
+};
 
-/// The [AbsoluteUri] of Json Schema Draft 07.
-pub static DRAFT_07_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::parse("http://json-schema.org/draft-07/schema#").unwrap());
+mod draft_2019_09;
 
-/// The [AbsoluteUri] of Json Schema Draft 2019-09.
-pub static DRAFT_2019_09: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::parse("https://json-schema.org/draft/2019-09/schema").unwrap());
+pub use draft_2019_09::{
+    create_hyper_schema_2019_09, create_schema_2019_09, HYPER_SCHEMA_2019_09,
+    HYPER_SCHEMA_2019_09_URI, SCHEMA_2019_09, SCHEMA_2019_09_URI,
+};
 
-/// The [AbsoluteUri] of Json Schema Draft 2020-12.
-pub static DRAFT_2020_12: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::parse("https://json-schema.org/draft/2020-12/schema").unwrap());
+mod draft_07;
+
+pub use draft_07::{
+    create_hyper_schema_07, create_schema_07, HYPER_SCHEMA_07, HYPER_SCHEMA_07_URI, SCHEMA_07,
+    SCHEMA_07_URI,
+};
+
+mod draft_04;
+
+pub use draft_04::{
+    create_hyper_schema_04, create_schema_04, HYPER_SCHEMA_04, HYPER_SCHEMA_04_URI, SCHEMA_04,
+    SCHEMA_04_URI,
+};

@@ -6,7 +6,7 @@ use std::{
 };
 use uniresid::AbsoluteUri;
 
-use crate::{Error, ExpectedStringError, OutputFmt};
+use crate::{error::ExpectedStringError, Error, OutputFmt};
 use jsonptr::Pointer;
 use serde::Serialize;
 use serde_json::{to_value, Map, Value};

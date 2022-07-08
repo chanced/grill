@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
-use crate::{Error, Evaluation, Interrogator, Next, Schema};
+use crate::{Error, Evaluation, Interrogator, MetaSchema, Next, Schema};
 use dyn_clone::{clone_trait_object, DynClone};
 use parking_lot::Mutex;
 use serde_json::Value;
+use std::sync::Arc;
+use uniresid::Uri;
 
 pub trait ExecutorFnTrait:
     DynClone + Fn(&Value, Evaluation, Next) -> Result<Evaluation, Error>
@@ -89,7 +89,7 @@ pub type SetupFn = dyn 'static + Send + Sync + SetupFnTrait;
 /// Each stage MUST be deterministic. Failing to do so could result in the [`Interrogator`]
 ///
 
-pub trait Applicator: DynClone {
+pub trait Applicator: DynClone + Send + Sync {
     /// Initializes the `Applicator` with the [`Interrogator`] for the given [`Schema`].
     fn init(
         &self,
@@ -136,6 +136,10 @@ impl Applicators {
         res.extend(current.iter().chain(pending.iter()).cloned());
         res
     }
+    pub(crate) fn push_to_current(&self, applicator: impl Applicator + 'static) {
+        let mut current = self.current.lock();
+        current.push(Box::new(applicator));
+    }
 
     pub(crate) fn push(&self, applicator: impl Applicator + 'static) {
         let mut pending = self.pending.lock();
@@ -155,6 +159,29 @@ impl Applicators {
         let mut pending = self.pending.lock();
         *pending = Vec::new();
     }
+}
+
+pub(crate) fn assign_default_id(id: Uri) -> Box<InitFn> {
+    // let id = Arc::new(id);
+    Box::new(move |_, schema| {
+        if schema.id().is_none() {
+            schema.set_id(id.clone());
+        }
+        Ok(Some(Box::new(move |_, _| {
+            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
+        })))
+    })
+}
+
+pub(crate) fn assign_default_meta_schema(meta_schema: MetaSchema) -> Box<InitFn> {
+    Box::new(move |_, schema| {
+        if schema.id().is_none() {
+            schema.set_meta_schema(meta_schema.clone());
+        }
+        Ok(Some(Box::new(move |i: Interrogator, s: Schema| {
+            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
+        })))
+    })
 }
 
 #[cfg(test)]

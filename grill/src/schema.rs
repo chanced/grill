@@ -18,6 +18,7 @@ struct Inner {
     source: Arc<ArcSwap<Value>>,
     sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
     functions: Functions,
+    applicators: Applicators,
 }
 
 impl Inner {
@@ -29,13 +30,15 @@ impl Inner {
             references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
             sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
             functions: Functions::new(),
+            applicators: Applicators::new(),
         })
     }
 }
 
 use crate::{
-    applicator::{ExecutorFn, SetupFn},
-    Error, Evaluation, Interrogator, InvalidSchemaError, Next, OutputFmt,
+    applicator::{Applicators, ExecutorFn, SetupFn},
+    error::{MetaSchemaError, UnknownMetaSchemaError},
+    Error, Evaluation, Interrogator, Next, OutputFmt,
 };
 use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
@@ -129,15 +132,29 @@ impl Schema {
         self.inner.sub_schemas.load().clone()
     }
 
-    fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
-        let mut fns = Vec::with_capacity(applicators.len());
-        for app in applicators {
-            if let Some(setup_fn) = app.init(interrogator.clone(), self.clone())? {
-                fns.push(setup_fn)
+    fn initialize(&self, interrogator: Interrogator) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn load_dialect(&self, interrogator: Interrogator) -> Result<MetaSchema, Error> {
+        if let Some(meta) = self.meta_schema() {
+            return Ok(meta);
+        }
+        let source = self.inner.source.load();
+        if let Some(obj) = source.as_object() {
+            if let Some(uri) = obj.get("$schema") {
+                if let Some(uri) = uri.as_str() {
+                    match Uri::parse(uri) {
+                        Ok(uri) => interrogator
+                            .meta_schema(&uri)
+                            .ok_or(UnknownMetaSchemaError { meta_schema: uri }.into()),
+                        Err(err) => Err(MetaSchemaError::InvalidUri(err).into()),
+                    }
+                } else {
+                    interrogator.default_meta_schema()
+                }
             }
         }
-        self.store_setup(fns);
-        Ok(())
     }
 
     fn store_setup(&self, fns: Vec<Box<SetupFn>>) {

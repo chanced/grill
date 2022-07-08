@@ -1,11 +1,12 @@
 use crate::evaluation::Field;
 use crate::{Evaluation, Schema};
+
 use jsonptr::{Error as PointerError, MalformedPointerError};
-use serde_json::Error as SerdeError;
+use serde_json::{Error as SerdeError, Value};
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
-use uniresid::Error as UriError;
+use uniresid::{Error as UriError, Uri};
 
 /// Represents all possible errors that can occur while initializing, setting up
 /// or using an [`Interrogator`] and [`Schema`].
@@ -21,12 +22,19 @@ pub enum Error {
     /// A top-level `Schema` was not identifiable.
     UnindentifiedSchema(UnidentifiedSchemaError),
     /// An error occurred parsing a JSON Pointer.
-    Pointer(PointerError),
+    InvalidPointer(PointerError),
     /// An `Evaluation` field required a String value but was provided something
     /// else.
     ExpectedString(ExpectedStringError),
     /// An error occurred parsing a URI.
-    Uri(UriError),
+    InvalidUri(UriError),
+    /// An unkown error occurred parsing the `"$schema" field.
+    MetaSchema(MetaSchemaError),
+    /// A [`MetaSchema`] required a `"$vocabulary"` which is not present in the [`Interrogator`].
+    MissingRequiredVocabulary(MissingRequiredVocabularyError),
+
+    /// Schema is not setup. Add it to the [`Interrogator`] before using it.
+    SchemaNotSetup(SchemaNotSetupError),
 }
 impl Error {
     /// Wraps a `std::error::Error` in an [`Error::Internal`](Error::Internal).
@@ -35,6 +43,7 @@ impl Error {
     pub fn new_internal(err: impl StdError + Send + Sync + 'static) -> Self {
         Error::Internal(Arc::new(err))
     }
+
     /// Returns `true` if the error is an `Internal` error.
     pub fn is_internal(&self) -> bool {
         matches!(self, Error::Internal(_))
@@ -44,10 +53,12 @@ impl Error {
     pub fn is_serde(&self) -> bool {
         matches!(self, Error::Serde(_))
     }
+
     /// Returns `true` if the error is an `InvalidSchema` error.
     pub fn is_invalid_schema(&self) -> bool {
         matches!(self, Error::InvalidSchema(_))
     }
+
     /// Returns `true` if the error is an `UnindentifiedSchema` error.
     pub fn is_unindentified_schema(&self) -> bool {
         matches!(self, Error::UnindentifiedSchema(_))
@@ -55,7 +66,7 @@ impl Error {
 
     /// Returns `true` if the error is a `MalformedPointer` error.
     pub fn is_malformed_pointer(&self) -> bool {
-        matches!(self, Error::Pointer(_))
+        matches!(self, Error::InvalidPointer(_))
     }
 
     /// Returns `true` if the error is an `ExpectedString` error.
@@ -63,9 +74,29 @@ impl Error {
         matches!(self, Error::ExpectedString(_))
     }
 
-    /// Returns `true` if the error is a `MalformedUri` error.
-    pub fn is_malformed_uri(&self) -> bool {
-        matches!(self, Error::Uri(_))
+    /// Returns `true` if the error is a `Pointer` error.
+    pub fn is_invalid_pointer(&self) -> bool {
+        matches!(self, Error::InvalidPointer(_))
+    }
+
+    /// Returns `true` if the error is an `Uri` error.
+    pub fn is_invalid_uri(&self) -> bool {
+        matches!(self, Error::InvalidUri(_))
+    }
+
+    /// Returns `true` if the error is a `MetaSchema` error.
+    pub fn is_meta_schema(&self) -> bool {
+        matches!(self, Error::MetaSchema(_))
+    }
+
+    /// Returns `true` if the error is a `MissingRequiredVocabulary` error.
+    pub fn is_missing_required_vocabulary(&self) -> bool {
+        matches!(self, Error::MissingRequiredVocabulary(_))
+    }
+
+    /// Returns `true` if the error is a `SchemaNotSetup` error.
+    pub fn is_schema_not_setup(&self) -> bool {
+        matches!(self, Error::SchemaNotSetup(_))
     }
 }
 
@@ -82,7 +113,13 @@ impl From<SerdeError> for Error {
 }
 impl From<UriError> for Error {
     fn from(err: UriError) -> Self {
-        Error::Uri(err)
+        Error::InvalidUri(err)
+    }
+}
+
+impl From<UnknownMetaSchemaError> for Error {
+    fn from(err: UnknownMetaSchemaError) -> Self {
+        Error::MetaSchema(MetaSchemaError::UnknownMetaSchema(err))
     }
 }
 
@@ -98,19 +135,37 @@ impl From<InvalidSchemaError> for Error {
 // }
 impl From<PointerError> for Error {
     fn from(err: PointerError) -> Self {
-        Error::Pointer(err)
+        Error::InvalidPointer(err)
     }
 }
 
 impl From<MalformedPointerError> for Error {
     fn from(err: MalformedPointerError) -> Self {
-        Error::Pointer(err.into())
+        Error::InvalidPointer(err.into())
     }
 }
 
 impl From<ExpectedStringError> for Error {
     fn from(err: ExpectedStringError) -> Self {
         Self::ExpectedString(err)
+    }
+}
+
+impl From<MetaSchemaError> for Error {
+    fn from(err: MetaSchemaError) -> Self {
+        Error::MetaSchema(err)
+    }
+}
+
+impl From<MissingRequiredVocabularyError> for Error {
+    fn from(err: MissingRequiredVocabularyError) -> Self {
+        Error::MissingRequiredVocabulary(err)
+    }
+}
+
+impl From<SchemaNotSetupError> for Error {
+    fn from(err: SchemaNotSetupError) -> Self {
+        Error::SchemaNotSetup(err)
     }
 }
 
@@ -121,9 +176,12 @@ impl Display for Error {
             Error::Serde(err) => Display::fmt(err, f),
             Error::InvalidSchema(err) => Display::fmt(err, f),
             Error::UnindentifiedSchema(err) => Display::fmt(err, f),
-            Error::Pointer(err) => Display::fmt(err, f),
+            Error::InvalidPointer(err) => Display::fmt(err, f),
             Error::ExpectedString(err) => Display::fmt(err, f),
-            Error::Uri(err) => Display::fmt(err, f),
+            Error::InvalidUri(err) => Display::fmt(err, f),
+            Error::MetaSchema(err) => Display::fmt(err, f),
+            Error::MissingRequiredVocabulary(err) => Display::fmt(err, f),
+            Error::SchemaNotSetup(err) => Display::fmt(err, f),
         }
     }
 }
@@ -135,10 +193,52 @@ impl StdError for Error {
             Error::Serde(err) => Some(err),
             Error::InvalidSchema(err) => Some(err),
             Error::UnindentifiedSchema(err) => Some(err),
-            Error::Pointer(err) => Some(err),
+            Error::InvalidPointer(err) => Some(err),
             Error::ExpectedString(err) => Some(err),
-            Error::Uri(err) => Some(err),
+            Error::InvalidUri(err) => Some(err),
+            Error::MetaSchema(err) => Some(err),
+            Error::MissingRequiredVocabulary(err) => Some(err),
+            Error::SchemaNotSetup(err) => Some(err),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MetaSchemaError {
+    /// The `$schema` is not known to the [`Interrogator`].
+    UnknownMetaSchema(UnknownMetaSchemaError),
+    /// Expected a String value for the `"$schema"` field.
+    InvalidValueForSchema(Value),
+    /// Expected a String in the format of a Uri for the `"$schema"` field.
+    InvalidUri(UriError),
+}
+impl StdError for MetaSchemaError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            MetaSchemaError::UnknownMetaSchema(err) => Some(err),
+            MetaSchemaError::InvalidValueForSchema(_) => None,
+            MetaSchemaError::InvalidUri(err) => Some(err),
+        }
+    }
+}
+impl Display for MetaSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetaSchemaError::UnknownMetaSchema(err) => Display::fmt(err, f),
+            MetaSchemaError::InvalidValueForSchema(err) => Display::fmt(err, f),
+            MetaSchemaError::InvalidUri(err) => Display::fmt(err, f),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnknownMetaSchemaError {
+    pub meta_schema: Uri,
+}
+impl StdError for UnknownMetaSchemaError {}
+impl Display for UnknownMetaSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "encountered unknown $schema: {}", self.meta_schema)
     }
 }
 
@@ -150,7 +250,7 @@ pub struct UnidentifiedSchemaError {
     pub schema: Schema,
 }
 
-impl std::fmt::Display for UnidentifiedSchemaError {
+impl Display for UnidentifiedSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "schema $id not set")
     }
@@ -167,7 +267,7 @@ pub struct InvalidSchemaError {
     pub evaluation: Evaluation,
 }
 
-impl std::fmt::Display for InvalidSchemaError {
+impl Display for InvalidSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -201,3 +301,39 @@ impl Display for ExpectedStringError {
 }
 
 impl StdError for ExpectedStringError {}
+
+#[derive(Debug, Clone)]
+pub struct SchemaNotSetupError {
+    pub schema: Schema,
+}
+impl Display for SchemaNotSetupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "schema{} is not setup; add it to an Interrogator before use",
+            format!(
+                "{}",
+                self.schema
+                    .id()
+                    .map_or("".to_string(), |v| format!(" [{}]", &v))
+            )
+        )
+    }
+}
+impl StdError for SchemaNotSetupError {}
+
+#[derive(Debug, Clone)]
+pub struct MissingRequiredVocabularyError {
+    pub schema_id: Uri,
+    pub vocabulary: String,
+}
+impl Display for MissingRequiredVocabularyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "missing required vocabulary [{}] for MetaSchema [{}]",
+            self.vocabulary, self.schema_id
+        )
+    }
+}
+impl StdError for MissingRequiredVocabularyError {}

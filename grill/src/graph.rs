@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Schema, UnidentifiedSchemaError};
+use crate::{error::UnidentifiedSchemaError, Schema};
 use petgraph::algo::has_path_connecting;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph as PetGraph;

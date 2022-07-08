@@ -18,6 +18,9 @@ impl MetaSchema {
     pub fn source(&self) -> Arc<Value> {
         self.schema.source()
     }
+    pub fn as_schema(&self) -> Schema {
+        self.schema.clone()
+    }
 }
 
 impl std::fmt::Debug for MetaSchema {
