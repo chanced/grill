@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde_json::Value;
 use uniresid::{AbsoluteUri, Uri};
 
@@ -21,9 +19,15 @@ impl SchemaBuilder {
             meta_schema: None,
         }
     }
-
+    #[must_use]
     pub fn default_meta_schema(mut self, meta_schema: MetaSchema) -> Self {
         self.meta_schema = Some(meta_schema);
+        self
+    }
+
+    #[must_use]
+    pub fn default_id(mut self, id: Uri) -> Self {
+        self.id = Some(id);
         self
     }
     /// Sets the base URI of of the [`Schema`]. This enables for a [`Schema`]
@@ -34,6 +38,7 @@ impl SchemaBuilder {
     ///
     /// If the [`Schema`] does not have an `id`, the `id` field will be left as
     /// `None`.
+    #[must_use]
     pub fn default_base_uri(mut self, base_uri: AbsoluteUri) -> Self {
         self.base_uri = Some(base_uri);
         self
@@ -49,7 +54,7 @@ impl SchemaBuilder {
                 }
             }
         }
-        if let Some(meta_schema) = self.meta_schema {
+        if let Some(ref meta_schema) = self.meta_schema {
             if schema.meta_schema(interrogator).is_none() {
                 schema.set_meta_schema(meta_schema);
             }

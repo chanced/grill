@@ -17,19 +17,19 @@ impl<F> ExecutorFnTrait for F where
 
 clone_trait_object!(ExecutorFnTrait);
 
-pub type InitFn = dyn Fn(Interrogator, Schema) -> Result<Option<Box<SetupFn>>, Error>;
+pub type InitFn = dyn Fn(&Interrogator, &Schema) -> Result<Option<Box<SetupFn>>, Error>;
 
 /// Annotates an [`Evaluation`] with relevant information pertinent to the
 /// [`Schema`] for the given [`OutputFmt`].
 pub type ExecutorFn = dyn 'static + Send + Sync + ExecutorFnTrait;
 
 pub trait SetupFnTrait:
-    DynClone + Fn(Interrogator, Schema) -> Result<Box<ExecutorFn>, Error>
+    DynClone + Fn(&Interrogator, &Schema) -> Result<Box<ExecutorFn>, Error>
 {
 }
 
 impl<F> SetupFnTrait for F where
-    F: Clone + Fn(Interrogator, Schema) -> Result<Box<ExecutorFn>, Error>
+    F: Clone + Fn(&Interrogator, &Schema) -> Result<Box<ExecutorFn>, Error>
 {
 }
 
@@ -203,9 +203,9 @@ pub(crate) fn assign_default_id(id: Uri) -> Box<InitFn> {
 pub(crate) fn assign_default_meta_schema(meta_schema: MetaSchema) -> Box<InitFn> {
     Box::new(move |_, schema| {
         if schema.id().is_none() {
-            schema.set_meta_schema(meta_schema.clone());
+            schema.set_meta_schema(&meta_schema);
         }
-        Ok(Some(Box::new(move |i: Interrogator, s: Schema| {
+        Ok(Some(Box::new(move |i: &Interrogator, s: &Schema| {
             Ok(Box::new(move |value, eval, next| next.call(value, eval)))
         })))
     })

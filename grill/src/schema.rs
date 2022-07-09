@@ -88,29 +88,26 @@ impl Schema {
         };
         let base_uri = interrogator.base_uri().as_deref().cloned();
 
-        let ss = match source {
-            Value::Array(arr) => {
-                let mut subs = Vec::with_capacity(arr.len());
-                for source in arr {
-                    let b = SchemaBuilder {
-                        id: None,
-                        source,
-                        meta_schema: meta_schema.clone(),
-                        base_uri: base_uri.clone(),
-                    };
-                    subs.push(b.build(interrogator)?);
-                }
-                SubSchema::Array(Arc::new(subs))
-            }
-            _ => {
+        let ss = if let Value::Array(arr) = source {
+            let mut subs = Vec::with_capacity(arr.len());
+            for source in arr {
                 let b = SchemaBuilder {
-                    source,
-                    base_uri,
-                    meta_schema,
                     id: None,
+                    source,
+                    meta_schema: meta_schema.clone(),
+                    base_uri: base_uri.clone(),
                 };
-                SubSchema::Single(b.build(interrogator)?)
+                subs.push(b.build(interrogator)?);
             }
+            SubSchema::Array(Arc::new(subs))
+        } else {
+            let b = SchemaBuilder {
+                source,
+                base_uri,
+                meta_schema,
+                id: None,
+            };
+            SubSchema::Single(b.build(interrogator)?)
         };
         let res = ss.clone();
         let mut sub_schemas = self.sub_schemas.write();
@@ -142,7 +139,7 @@ impl Schema {
     }
 
     fn load_meta_schema(&self, interrogator: &Interrogator) -> Result<MetaSchema, Error> {
-        if let Some(meta) = self.meta_schema(&interrogator) {
+        if let Some(meta) = self.meta_schema(interrogator) {
             return Ok(meta);
         }
         let source = self.source();
@@ -152,7 +149,7 @@ impl Schema {
                     return match Uri::parse(uri) {
                         Ok(uri) => interrogator
                             .meta_schema(&uri)
-                            .ok_or(UnknownMetaSchema { uri }.into()),
+                            .ok_or_else(|| UnknownMetaSchema { uri }.into()),
                         Err(err) => Err(MetaSchemaError::InvalidUri(err).into()),
                     };
                 }
@@ -168,17 +165,17 @@ impl Schema {
         self.functions.set_executors(fns);
     }
     /// Prepares the schema for use calling `setup` of all [Applicators](crate::Applicator)
-    /// attached to the [Interrogator]. Those which return an [ApplicatorFn] will be
+    /// attached to the [Interrogator]. Those which return an [`ApplicatorFn`] will be
     /// invoked upon calls to `evaluate`.
     ///
     pub(crate) fn setup(&self, interrogator: &Interrogator) -> Result<(), Error> {
         let setup_fns = self.setup_fns();
         let mut fns = Vec::with_capacity(setup_fns.len());
-        for f in setup_fns.iter() {
-            fns.push(f(interrogator.clone(), self.clone())?)
+        for f in &setup_fns {
+            fns.push(f(interrogator, self)?);
         }
         self.set_executors(fns);
-        for (_, sub) in self.sub_schemas().iter() {
+        for sub in self.sub_schemas().values() {
             sub.setup(interrogator)?;
         }
         Ok(())
@@ -193,7 +190,7 @@ impl Schema {
     /// [`String`](serde_json::Value). Returns `None` otherwise.
     pub fn as_str(&self) -> Option<Arc<str>> {
         let source = self.source();
-        source.as_str().map(|s| Arc::from(s))
+        source.as_str().map(Arc::from)
     }
 
     /// Creates and returns an `Arc<Vec<Value>>` if the `source` [`Value`] is an
@@ -305,7 +302,7 @@ impl Schema {
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.
-    pub fn set_meta_schema(&self, meta: MetaSchema) -> Option<Arc<Uri>> {
+    pub fn set_meta_schema(&self, meta: &MetaSchema) -> Option<Arc<Uri>> {
         let id = meta.id();
         let mut meta_schema_id = self.meta_schema_id.write();
         let old = meta_schema_id.clone();
@@ -313,7 +310,7 @@ impl Schema {
         old
     }
 
-    pub(crate) fn update(&self, from: Schema) {
+    pub(crate) fn update(&self, from: &Schema) {
         let new_setup_fns = from.setup_fns();
         let new_exec_fns = from.exec_fns();
         let new_id = from.id();
