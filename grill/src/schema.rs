@@ -37,7 +37,7 @@ impl Inner {
 
 use crate::{
     applicator::{Applicators, ExecutorFn, SetupFn},
-    error::{MetaSchemaError, UnknownMetaSchemaError},
+    error::{MetaSchemaError, UnknownMetaSchema},
     Error, Evaluation, Interrogator, Next, OutputFmt,
 };
 use arc_swap::{ArcSwap, ArcSwapOption};
@@ -60,7 +60,7 @@ impl Schema {
     pub fn new(source: Value, interrogator: &Interrogator) -> Result<Self, Error> {
         let inner = Inner::new(source);
         let schema = Self { inner };
-        schema.initialize(interrogator)?;
+        schema.initialize(interrogator.clone())?;
         Ok(schema)
     }
     /// Returns a [`SchemaBuilder`](crate::schema::SchemaBuilder) which can be used to construct a [`Schema`]
@@ -144,17 +144,16 @@ impl Schema {
         if let Some(obj) = source.as_object() {
             if let Some(uri) = obj.get("$schema") {
                 if let Some(uri) = uri.as_str() {
-                    match Uri::parse(uri) {
+                    return match Uri::parse(uri) {
                         Ok(uri) => interrogator
                             .meta_schema(&uri)
-                            .ok_or(UnknownMetaSchemaError { meta_schema: uri }.into()),
+                            .ok_or(UnknownMetaSchema { uri }.into()),
                         Err(err) => Err(MetaSchemaError::InvalidUri(err).into()),
-                    }
-                } else {
-                    interrogator.default_meta_schema()
+                    };
                 }
             }
         }
+        Ok(interrogator.default_meta_schema())
     }
 
     fn store_setup(&self, fns: Vec<Box<SetupFn>>) {
@@ -316,7 +315,7 @@ impl Schema {
     pub(crate) fn duplicate(&self, interrogator: &Interrogator) -> Result<Schema, Error> {
         let inner = Inner::new(self.source().as_ref().clone());
         let schema = Self { inner };
-        schema.initialize(interrogator)?;
+        schema.initialize(interrogator.clone())?;
         Ok(schema)
     }
 

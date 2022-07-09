@@ -1,6 +1,7 @@
 use crate::{
-    draft::HYPER_SCHEMA_2020_12_URI, error::UnidentifiedSchemaError, Error, Graph, MetaSchema,
-    Schema, Vocabulary,
+    draft::HYPER_SCHEMA_2020_12_URI,
+    error::{MetaSchemaError, UnidentifiedSchemaError, UnknownMetaSchema},
+    Error, Graph, MetaSchema, Schema, Vocabulary,
 };
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
@@ -20,7 +21,7 @@ pub struct Interrogator {
     base_uri: Arc<RwLock<Option<Arc<AbsoluteUri>>>>,
     vocabularies: Arc<DashMap<String, Vocabulary>>,
     lock: Arc<Mutex<()>>,
-    default_meta_schema: Arc<RwLock<Uri>>,
+    default_meta_schema_uri: Arc<RwLock<Uri>>,
 }
 
 impl Debug for Interrogator {
@@ -43,7 +44,7 @@ impl Interrogator {
             base_uri: Arc::new(RwLock::new(None)),
             lock: Arc::new(Mutex::new(())),
             vocabularies: Arc::new(DashMap::new()),
-            default_meta_schema: Arc::new(RwLock::new(HYPER_SCHEMA_2020_12_URI.clone())),
+            default_meta_schema_uri: Arc::new(RwLock::new(HYPER_SCHEMA_2020_12_URI.clone())),
         }
     }
 
@@ -68,6 +69,25 @@ impl Interrogator {
         // todo: reinitialize and setup all schemas
         let mut guard = self.base_uri.write();
         guard.replace(Arc::new(uri))
+    }
+    /// Sets the default meta schema to use when no meta schema is specified,
+    /// returning the previous default.
+    pub fn set_default_meta_schema(&self, uri: Uri) -> Result<Uri, UnknownMetaSchema> {
+        if self.meta_schema(&uri).is_none() {
+            return Err(UnknownMetaSchema { uri });
+        }
+        let mut guard = self.default_meta_schema_uri.write();
+        let old = guard.clone();
+        *guard = uri;
+        Ok(old)
+    }
+    /// Returns the default meta schema to use when no meta schema is specified.
+    ///
+    /// If not previously set, Draft 2020-12 will be the default.
+    pub fn default_meta_schema(&self) -> MetaSchema {
+        let r = self.default_meta_schema_uri.read();
+
+        self.meta_schema(&*r).unwrap()
     }
 
     /// Adds a top-level `Schema` to the `Interrogator`, associated by its `id`.

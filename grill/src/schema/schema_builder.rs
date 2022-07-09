@@ -61,26 +61,3 @@ impl SchemaBuilder {
         Ok(schema)
     }
 }
-
-fn assign_default_id(id: Uri) -> Box<InitFn> {
-    // let id = Arc::new(id);
-    Box::new(move |_, schema| {
-        if schema.id().is_none() {
-            schema.set_id(id.clone());
-        }
-        Ok(Some(Box::new(move |_, _| {
-            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
-        })))
-    })
-}
-
-fn assign_default_meta_schema(meta_schema: MetaSchema) -> Box<InitFn> {
-    Box::new(move |_, schema| {
-        if schema.id().is_none() {
-            schema.set_meta_schema(meta_schema.clone());
-        }
-        Ok(Some(Box::new(move |i: Interrogator, s: Schema| {
-            Ok(Box::new(move |value, eval, next| next.call(value, eval)))
-        })))
-    })
-}

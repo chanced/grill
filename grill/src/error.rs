@@ -117,8 +117,8 @@ impl From<UriError> for Error {
     }
 }
 
-impl From<UnknownMetaSchemaError> for Error {
-    fn from(err: UnknownMetaSchemaError) -> Self {
+impl From<UnknownMetaSchema> for Error {
+    fn from(err: UnknownMetaSchema) -> Self {
         Error::MetaSchema(MetaSchemaError::UnknownMetaSchema(err))
     }
 }
@@ -206,7 +206,7 @@ impl StdError for Error {
 #[derive(Debug, Clone)]
 pub enum MetaSchemaError {
     /// The `$schema` is not known to the [`Interrogator`].
-    UnknownMetaSchema(UnknownMetaSchemaError),
+    UnknownMetaSchema(UnknownMetaSchema),
     /// Expected a String value for the `"$schema"` field.
     InvalidValueForSchema(Value),
     /// Expected a String in the format of a Uri for the `"$schema"` field.
@@ -232,13 +232,13 @@ impl Display for MetaSchemaError {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnknownMetaSchemaError {
-    pub meta_schema: Uri,
+pub struct UnknownMetaSchema {
+    pub uri: Uri,
 }
-impl StdError for UnknownMetaSchemaError {}
-impl Display for UnknownMetaSchemaError {
+impl StdError for UnknownMetaSchema {}
+impl Display for UnknownMetaSchema {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "encountered unknown $schema: {}", self.meta_schema)
+        write!(f, "encountered unknown $schema: {}", self.uri)
     }
 }
 
@@ -311,7 +311,7 @@ impl Display for SchemaNotSetupError {
         write!(
             f,
             "schema{} is not setup; add it to an Interrogator before use",
-            format!(
+            format_args!(
                 "{}",
                 self.schema
                     .id()

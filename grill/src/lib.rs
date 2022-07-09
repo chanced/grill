@@ -1,7 +1,12 @@
 #![recursion_limit = "256"]
+// todo: turn this on
 // #![warn(missing_docs)]
+// todo: remove this
 #![warn(clippy::pedantic)]
 #![doc = include_str!("../../README.md")]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)]
 /// Contains data structures pertaining to the response of the method `evaluate`
 /// of a [`Schema`](crate::Schema).
 ///
@@ -19,8 +24,7 @@ pub use error::Error;
 /// Contains data structures pertaining to
 pub mod interrogator;
 pub use interrogator::Interrogator;
-/// Contains data structures pertaining to JSON Schemas, including
-/// [crate::Schema] and [crate::schema::Builder]
+
 pub mod schema;
 pub use schema::{MetaSchema, Schema, SubSchema};
 
