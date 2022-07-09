@@ -21,7 +21,6 @@ once_cell = { version = "1.10", features = ["parking_lot"] }
 paste = "1.0"
 jsonptr = "0.1.5"
 heck = "0.4.0"
-arc-swap = { version = "1.5", features = ["serde"] }
 uniresid = "0.1.4"
 dyn-clone = "1.0.6"
 # num-bigint = { version = "0.4", features = ["serde"], optional = true }

@@ -1,15 +1,14 @@
 use serde_json::Value;
 
 use crate::{applicator::ExecutorFn, Error, Evaluation};
-use std::sync::Arc;
 #[must_use]
 pub struct Next {
-    fns: Arc<Vec<Box<ExecutorFn>>>,
+    fns: Vec<Box<ExecutorFn>>,
     idx: usize,
 }
 
 impl Next {
-    pub(crate) fn new(fns: Arc<Vec<Box<ExecutorFn>>>) -> Self {
+    pub(crate) fn new(fns: Vec<Box<ExecutorFn>>) -> Self {
         Self { fns, idx: 0 }
     }
 }

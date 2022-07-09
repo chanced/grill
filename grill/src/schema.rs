@@ -5,42 +5,18 @@ mod meta_schema;
 
 pub use meta_schema::MetaSchema;
 mod schema_builder;
+use parking_lot::RwLock;
 pub use schema_builder::SchemaBuilder;
 
 mod sub_schema;
 pub use parking_lot::Mutex;
 pub use sub_schema::SubSchema;
 
-struct Inner {
-    id: ArcSwapOption<Uri>,
-    meta_schema: ArcSwapOption<MetaSchema>,
-    references: Arc<ArcSwap<HashSet<Uri>>>,
-    source: Arc<ArcSwap<Value>>,
-    sub_schemas: Arc<ArcSwap<HashMap<String, SubSchema>>>,
-    functions: Functions,
-    applicators: Applicators,
-}
-
-impl Inner {
-    pub(crate) fn new(source: Value) -> Arc<Self> {
-        Arc::new(Inner {
-            id: ArcSwapOption::default(),
-            meta_schema: ArcSwapOption::default(),
-            source: Arc::new(ArcSwap::from_pointee(source)),
-            references: Arc::new(ArcSwap::from_pointee(HashSet::new())),
-            sub_schemas: Arc::new(ArcSwap::new(Arc::new(HashMap::new()))),
-            functions: Functions::new(),
-            applicators: Applicators::new(),
-        })
-    }
-}
-
 use crate::{
     applicator::{Applicators, ExecutorFn, SetupFn},
     error::{MetaSchemaError, UnknownMetaSchema},
     Error, Evaluation, Interrogator, Next, OutputFmt,
 };
-use arc_swap::{ArcSwap, ArcSwapOption};
 use jsonptr::Pointer;
 use serde_json::{Map, Value};
 use std::{
@@ -52,57 +28,74 @@ use uniresid::Uri;
 /// Data structure representing a single [JSON Schema](https://json-schema.org/).
 #[derive(Clone)]
 pub struct Schema {
-    inner: Arc<Inner>,
+    id: Arc<RwLock<Option<Arc<Uri>>>>,
+    meta_schema_id: Arc<RwLock<Option<Arc<Uri>>>>,
+    references: Arc<RwLock<Arc<HashSet<Uri>>>>,
+    source: Arc<RwLock<Arc<Value>>>,
+    sub_schemas: Arc<RwLock<HashMap<String, SubSchema>>>,
+    functions: Functions,
+    applicators: Applicators,
 }
 
 impl Schema {
     /// Creates and returns a new `Schema`.
     pub fn new(source: Value, interrogator: &Interrogator) -> Result<Self, Error> {
-        let inner = Inner::new(source);
-        let schema = Self { inner };
-        schema.initialize(interrogator.clone())?;
+        let schema = Schema {
+            id: Arc::new(RwLock::new(None)),
+            meta_schema_id: Arc::new(RwLock::new(None)),
+            references: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
+            source: Arc::new(RwLock::new(Arc::new(source))),
+            sub_schemas: Arc::new(RwLock::new(HashMap::new())),
+            functions: Functions::new(),
+            applicators: Applicators::new(),
+        };
+        schema.initialize(interrogator)?;
         Ok(schema)
     }
     /// Returns a [`SchemaBuilder`](crate::schema::SchemaBuilder) which can be used to construct a [`Schema`]
     pub fn builder(source: Value) -> SchemaBuilder {
         SchemaBuilder::new(source)
     }
-    fn executors(&self) -> Arc<Vec<Box<ExecutorFn>>> {
-        self.inner.functions.executor_fns()
+    fn exec_fns(&self) -> Vec<Box<ExecutorFn>> {
+        self.functions.executor_fns()
     }
-    fn setup_fns(&self) -> Arc<Vec<Box<SetupFn>>> {
-        self.inner.functions.setup_fns()
+    fn setup_fns(&self) -> Vec<Box<SetupFn>> {
+        self.functions.setup_fns()
     }
-    pub fn meta_schema(&self) -> Option<MetaSchema> {
-        let meta = self.inner.meta_schema.load();
-        meta.as_deref().cloned()
+    pub fn meta_schema_id(&self) -> Option<Arc<Uri>> {
+        let id = self.meta_schema_id.read();
+        id.clone()
     }
 
     /// Evaluates `value` against this `Schema`.
     pub fn evaluate(&self, value: &Value, output: OutputFmt) -> Result<Evaluation, Error> {
-        let next = Next::new(self.executors());
+        let next = Next::new(self.exec_fns());
         let eval = Evaluation::new(Pointer::default(), Pointer::default(), output);
         next.call(value, eval)
     }
 
     /// Creates and returns a new [`SubSchema`] that is nested within this `Schema`.
-    pub fn new_sub_schema(
+    pub fn add_sub_schema(
         &self,
         key: &str,
         source: Value,
         interrogator: &Interrogator,
     ) -> Result<SubSchema, Error> {
-        let mut sub_schemas = HashMap::new();
-        Ok(match source {
+        let meta_schema_id = self.meta_schema_id();
+        let meta_schema = match meta_schema_id {
+            Some(ref id) => interrogator.meta_schema(id),
+            None => None,
+        };
+        let base_uri = interrogator.base_uri().as_deref().cloned();
+
+        let ss = match source {
             Value::Array(arr) => {
-                let base_uri = interrogator.base_uri().as_deref().cloned();
-                let dialect = self.meta_schema();
                 let mut subs = Vec::with_capacity(arr.len());
-                for v in arr {
+                for source in arr {
                     let b = SchemaBuilder {
                         id: None,
-                        source: v.clone(),
-                        meta_schema: self.meta_schema(),
+                        source,
+                        meta_schema: meta_schema.clone(),
                         base_uri: base_uri.clone(),
                     };
                     subs.push(b.build(interrogator)?);
@@ -111,36 +104,48 @@ impl Schema {
             }
             _ => {
                 let b = SchemaBuilder {
-                    source: source.clone(),
-                    base_uri: interrogator.base_uri().as_deref().cloned(),
-                    meta_schema: self.meta_schema(),
+                    source,
+                    base_uri,
+                    meta_schema,
                     id: None,
                 };
-                let new = b.build(interrogator)?;
-                sub_schemas.insert(key.to_string(), new.clone());
-                SubSchema::Single(new)
+                SubSchema::Single(b.build(interrogator)?)
             }
-        })
+        };
+        let res = ss.clone();
+        let mut sub_schemas = self.sub_schemas.write();
+        sub_schemas.insert(key.to_string(), ss);
+        Ok(res)
+    }
+    pub fn meta_schema(&self, interrogator: &Interrogator) -> Option<MetaSchema> {
+        let id = self.meta_schema_id.read();
+        match id.as_ref() {
+            Some(id) => interrogator.meta_schema(id),
+            None => None,
+        }
     }
 
     /// Returns the [`SubSchema`](crate::schema::SubSchema) associated with the given `field`.
     pub fn sub_schema(&self, field: &str) -> Option<SubSchema> {
-        self.inner.sub_schemas.load().get(field).cloned()
+        let sub_schemas = self.sub_schemas.read();
+        sub_schemas.get(field).cloned()
     }
     /// Returns a [`HashMap`] of associated [`SubSchema`](crate::schema::SubSchema).
-    pub fn sub_schemas(&self) -> Arc<HashMap<String, SubSchema>> {
-        self.inner.sub_schemas.load().clone()
+    pub fn sub_schemas(&self) -> HashMap<String, SubSchema> {
+        let guard = self.sub_schemas.read();
+        guard.clone()
     }
 
-    fn initialize(&self, interrogator: Interrogator) -> Result<(), Error> {
+    fn initialize(&self, interrogator: &Interrogator) -> Result<(), Error> {
+        let meta_schema = self.load_meta_schema(interrogator);
         todo!()
     }
 
-    fn load_dialect(&self, interrogator: Interrogator) -> Result<MetaSchema, Error> {
-        if let Some(meta) = self.meta_schema() {
+    fn load_meta_schema(&self, interrogator: &Interrogator) -> Result<MetaSchema, Error> {
+        if let Some(meta) = self.meta_schema(&interrogator) {
             return Ok(meta);
         }
-        let source = self.inner.source.load();
+        let source = self.source();
         if let Some(obj) = source.as_object() {
             if let Some(uri) = obj.get("$schema") {
                 if let Some(uri) = uri.as_str() {
@@ -156,11 +161,11 @@ impl Schema {
         Ok(interrogator.default_meta_schema())
     }
 
-    fn store_setup(&self, fns: Vec<Box<SetupFn>>) {
-        self.inner.functions.store_setup(fns);
+    fn set_setup(&self, fns: Vec<Box<SetupFn>>) {
+        self.functions.set_setup(fns);
     }
-    fn store_executors(&self, fns: Vec<Box<ExecutorFn>>) {
-        self.inner.functions.store_executors(fns);
+    fn set_executors(&self, fns: Vec<Box<ExecutorFn>>) {
+        self.functions.set_executors(fns);
     }
     /// Prepares the schema for use calling `setup` of all [Applicators](crate::Applicator)
     /// attached to the [Interrogator]. Those which return an [ApplicatorFn] will be
@@ -172,41 +177,36 @@ impl Schema {
         for f in setup_fns.iter() {
             fns.push(f(interrogator.clone(), self.clone())?)
         }
-        self.inner.functions.store_executors(fns);
+        self.set_executors(fns);
         for (_, sub) in self.sub_schemas().iter() {
             sub.setup(interrogator)?;
         }
         Ok(())
     }
 
-    pub(crate) fn publish(&self, src: Schema) {
-        self.inner.id.swap(src.id());
-        self.inner.functions.publish_from(&src.inner.functions)
-    }
-
     pub fn source(&self) -> Arc<Value> {
-        let source = self.inner.source.load();
+        let source = self.source.read();
         source.clone()
     }
 
-    /// Returns the associated `&str` if the source [Value] is a
-    /// `String`. Returns `None` otherwise.
-    pub fn as_str(&self) -> Option<String> {
-        let source = self.inner.source.load();
-        source.as_str().map(|s| s.to_string())
+    /// Creates and returns an `Arc<str>` if the `source` [`Value`] is a
+    /// [`String`](serde_json::Value). Returns `None` otherwise.
+    pub fn as_str(&self) -> Option<Arc<str>> {
+        let source = self.source();
+        source.as_str().map(|s| Arc::from(s))
     }
 
-    /// Returns the associated `` if the source
-    /// [Value] is an `Object`. Returns `None` otherwise.
-    pub fn as_array(&self) -> Option<Vec<Value>> {
-        self.source().as_array().cloned()
+    /// Creates and returns an `Arc<Vec<Value>>` if the `source` [`Value`] is an
+    /// [`Array`](serde_json::Value). Returns `None` otherwise.
+    pub fn as_array(&self) -> Option<Arc<Vec<Value>>> {
+        self.source().as_array().cloned().map(Arc::new)
     }
     /// Returns the associated [`Map`](serde_json::Map) if the source
-    /// [Value] is an `Object`. Returns `None` otherwise.
-    pub fn as_object(&self) -> Option<Map<String, Value>> {
-        self.source().as_object().cloned()
+    /// [`Value`] is an `Object`. Returns `None` otherwise.
+    pub fn as_object(&self) -> Option<Arc<Map<String, Value>>> {
+        self.source().as_object().cloned().map(Arc::new)
     }
-    /// Returns the associated `bool` if the source [Value] is a
+    /// Returns the associated `bool` if the source [`Value`] is a
     /// `Boolean`. Returns `None` otherwise
     pub fn as_bool(&self) -> Option<bool> {
         self.source().as_bool()
@@ -216,55 +216,55 @@ impl Schema {
     pub fn as_null(&self) -> Option<()> {
         self.source().as_null()
     }
-    /// If the source [Value] is a number, represent it as an `i64` if possible.
+    /// If the source [`Value`] is a number, represent it as an `i64` if possible.
     /// Returns `None` otherwise.
     pub fn as_i64(&self) -> Option<i64> {
         self.source().as_i64()
     }
-    /// If the source [Value] is a number, represent it as an `f64` if possible.
+    /// If the source [`Value`] is a number, represent it as an `f64` if possible.
     /// Returns `None` otherwise.
     pub fn as_f64(&self) -> Option<f64> {
         self.source().as_f64()
     }
-    /// If the source [Value] is a number, represent it as an `u64`
+    /// If the source [`Value`] is a number, represent it as an `u64`
     /// if possible. Returns `None` otherwise.
     pub fn as_u64(&self) -> Option<u64> {
         self.source().as_u64()
     }
-    /// Returns `true` if the source [Value] is a `Number`. Returns
+    /// Returns `true` if the source [`Value`] is a `Number`. Returns
     /// `false` otherwise.
     pub fn is_number(&self) -> bool {
         self.source().is_number()
     }
-    /// Returns `true` if the source [Value] is an `Object`. Returns
+    /// Returns `true` if the source [`Value`] is an `Object`. Returns
     /// `None` otherwise.
     pub fn is_object(&self) -> bool {
         self.source().is_object()
     }
 
-    /// Returns `true` if the source [Value] is a `Boolean`. Returns
+    /// Returns `true` if the source [`Value`] is a `Boolean`. Returns
     /// `None` otherwise.
     pub fn is_boolean(&self) -> bool {
         self.source().is_boolean()
     }
 
-    /// Returns `true` if the source [Value] is an integer between
+    /// Returns `true` if the source [`Value`] is an integer between
     /// `i64::MIN` and `i64::MAX`.
     pub fn is_i64(&self) -> bool {
         self.source().is_i64()
     }
-    /// Returns `true` if the source [Value] can be represented as
+    /// Returns `true` if the source [`Value`] can be represented as
     /// an `f64`.
     pub fn is_f64(&self) -> bool {
         self.source().is_f64()
     }
-    /// Returns `true` if the source [Value] can be represented as an `u64`.
+    /// Returns `true` if the source [`Value`] can be represented as an `u64`.
     /// Returns `false` otherwise.
     pub fn is_u64(&self) -> bool {
         self.source().is_u64()
     }
 
-    /// Returns `true` if the source [Value] is a `Null`. Returns
+    /// Returns `true` if the source [`Value`] is a `Null`. Returns
     /// `false` otherwise.
     pub fn is_null(&self) -> bool {
         self.source().is_null()
@@ -272,75 +272,79 @@ impl Schema {
 
     /// Returns the associated id if set. Otherwise returns `None`.
     pub fn id(&self) -> Option<Arc<Uri>> {
-        self.inner.id.load().as_ref().cloned()
+        let guard = self.id.read();
+        guard.clone()
     }
 
     /// Sets the id of the schema, returning the previous value if it exists.
-    pub fn set_id(&self, val: Uri) -> Option<Uri> {
-        self.inner
-            .id
-            .swap(Some(Arc::new(val)))
-            .map(|v| v.as_ref().clone())
+    pub fn set_id(&self, id: Uri) -> Option<Arc<Uri>> {
+        let mut guard = self.id.write();
+        let old = guard.clone();
+        *guard = Some(Arc::new(id));
+        old
     }
 
     /// Adds a reference to the schema. Returns `true` if the reference was not
     /// already present.
     pub fn add_reference(&self, reference: Uri) -> bool {
-        let g = self.inner.references.load();
-        if g.contains(&reference) {
-            return false;
+        let mut guard = self.references.write();
+        let mut references = guard.as_ref().clone();
+        if references.contains(&reference) {
+            false
+        } else {
+            references.insert(reference);
+            *guard = Arc::new(references);
+            true
         }
-        let mut set = HashSet::new();
-        for u in g.iter() {
-            set.insert(u.clone());
-        }
-        self.inner.references.store(Arc::new(set));
-        true
     }
 
     /// Returns the associated `
     pub fn references(&self) -> Arc<HashSet<Uri>> {
-        self.inner.references.load().clone()
+        let references = self.references.read();
+        references.clone()
     }
 
     /// sets schema's `dialect`, returning the previous value if it exists.
-    pub fn set_meta_schema(&self, meta: MetaSchema) -> Option<MetaSchema> {
-        self.inner
-            .meta_schema
-            .swap(Some(Arc::new(meta)))
-            .map(|v| v.as_ref().clone())
-    }
-
-    /// Clones the value and nothing else
-    pub(crate) fn duplicate(&self, interrogator: &Interrogator) -> Result<Schema, Error> {
-        let inner = Inner::new(self.source().as_ref().clone());
-        let schema = Self { inner };
-        schema.initialize(interrogator.clone())?;
-        Ok(schema)
+    pub fn set_meta_schema(&self, meta: MetaSchema) -> Option<Arc<Uri>> {
+        let id = meta.id();
+        let mut meta_schema_id = self.meta_schema_id.write();
+        let old = meta_schema_id.clone();
+        *meta_schema_id = id;
+        old
     }
 
     pub(crate) fn update(&self, from: Schema) {
-        self.inner.id.swap(from.id());
-        self.inner.functions.update(from.inner.functions.clone());
-        self.inner
-            .references
-            .swap(from.inner.references.load_full());
-        self.inner
-            .meta_schema
-            .swap(from.inner.meta_schema.load_full());
-        self.inner
-            .sub_schemas
-            .swap(from.inner.sub_schemas.load_full());
+        let new_setup_fns = from.setup_fns();
+        let new_exec_fns = from.exec_fns();
+        let new_id = from.id();
+        let new_meta_schema_id = from.meta_schema_id();
+        let new_references = from.references();
+        let new_source = from.source();
+        let (new_current, new_pending) = from.applicators.clone_functions();
+
+        let mut functions = self.functions.write();
+        let mut id = self.id.write();
+        let mut meta_schema_id = self.meta_schema_id.write();
+        let mut references = self.references.write();
+        let mut source = self.source.write();
+        let mut applicators = self.applicators.lock();
+
+        *id = new_id;
+        *meta_schema_id = new_meta_schema_id;
+        *references = new_references;
+        *source = new_source;
+        applicators.update(new_current, new_pending);
+        functions.update(new_setup_fns, new_exec_fns);
     }
 }
 
 impl std::fmt::Debug for Schema {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Schema")
-            .field("id", &self.inner.id)
-            .field("dialect", &self.inner.meta_schema)
-            .field("references", &self.inner.references)
-            .field("source", &self.inner.source)
+            .field("id", &self.id())
+            .field("meta_schema_id", &self.meta_schema_id())
+            .field("references", &self.references())
+            .field("source", &self.source())
             .finish_non_exhaustive()
     }
 }

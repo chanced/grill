@@ -3,10 +3,7 @@ use std::sync::Arc;
 use serde_json::Value;
 use uniresid::{AbsoluteUri, Uri};
 
-use crate::{
-    applicator::{InitFn, SetupFn},
-    Error, Interrogator, MetaSchema, Schema,
-};
+use crate::{Error, Interrogator, MetaSchema, Schema};
 /// Used to construct a [`Schema`] with default values.
 pub struct SchemaBuilder {
     pub(crate) source: Value,
@@ -24,8 +21,7 @@ impl SchemaBuilder {
             meta_schema: None,
         }
     }
-    /// Sets the default [`MetaSchema`] for the [`Schema`]. If the [`Schema`] has a
-    /// `$schema` field defined, that will be used instead.
+
     pub fn default_meta_schema(mut self, meta_schema: MetaSchema) -> Self {
         self.meta_schema = Some(meta_schema);
         self
@@ -54,7 +50,7 @@ impl SchemaBuilder {
             }
         }
         if let Some(meta_schema) = self.meta_schema {
-            if schema.meta_schema().is_none() {
+            if schema.meta_schema(interrogator).is_none() {
                 schema.set_meta_schema(meta_schema);
             }
         }

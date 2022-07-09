@@ -1,6 +1,6 @@
 use crate::{
     draft::HYPER_SCHEMA_2020_12_URI,
-    error::{MetaSchemaError, UnidentifiedSchemaError, UnknownMetaSchema},
+    error::{UnidentifiedSchemaError, UnknownMetaSchema},
     Error, Graph, MetaSchema, Schema, Vocabulary,
 };
 use dashmap::DashMap;

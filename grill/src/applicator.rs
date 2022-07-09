@@ -1,6 +1,6 @@
 use crate::{Error, Evaluation, Interrogator, MetaSchema, Next, Schema};
 use dyn_clone::{clone_trait_object, DynClone};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use serde_json::Value;
 use std::sync::Arc;
 use uniresid::Uri;
@@ -116,12 +116,26 @@ where
     }
 }
 
+pub(crate) struct GuardedApplicators<'a> {
+    current: MutexGuard<'a, Vec<Box<dyn Applicator>>>,
+    pending: MutexGuard<'a, Vec<Box<dyn Applicator>>>,
+}
+impl GuardedApplicators<'_> {
+    pub(crate) fn update(
+        &mut self,
+        current: Vec<Box<dyn Applicator>>,
+        pending: Vec<Box<dyn Applicator>>,
+    ) {
+        *self.current = current;
+        *self.pending = pending;
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Applicators {
     current: Arc<Mutex<Vec<Box<dyn Applicator>>>>,
     pending: Arc<Mutex<Vec<Box<dyn Applicator>>>>,
 }
-
 impl Applicators {
     pub(crate) fn new() -> Self {
         Applicators {
@@ -129,6 +143,19 @@ impl Applicators {
             pending: Arc::new(Mutex::new(Vec::new())),
         }
     }
+    /// Returns a cloned tuple of `(current, pending)` Applicators.
+    pub(crate) fn clone_functions(&self) -> (Vec<Box<dyn Applicator>>, Vec<Box<dyn Applicator>>) {
+        let current = self.current.lock();
+        let pending = self.pending.lock();
+        (current.clone(), pending.clone())
+    }
+    pub(crate) fn lock(&self) -> GuardedApplicators {
+        GuardedApplicators {
+            current: self.current.lock(),
+            pending: self.pending.lock(),
+        }
+    }
+
     pub(crate) fn all(&self) -> Vec<Box<dyn Applicator>> {
         let current = self.current.lock();
         let pending = self.pending.lock();

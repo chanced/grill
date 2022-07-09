@@ -1,4 +1,4 @@
-use arc_swap::ArcSwap;
+use parking_lot::RwLock;
 use serde_json::Value;
 use uniresid::Uri;
 
@@ -8,7 +8,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct MetaSchema {
     schema: Schema,
-    dialect: Arc<ArcSwap<Dialect>>,
+    dialect: Arc<RwLock<Dialect>>,
 }
 
 impl MetaSchema {

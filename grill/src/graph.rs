@@ -68,20 +68,22 @@ impl Graph {
 
     /// Returns `true` if `reference` is referenced by `source`.
     pub fn is_referenced(&self, reference: &Schema, source: &Schema) -> bool {
-        let rid = reference.id();
-        let sid = source.id();
+        let ref_id = reference.id();
+        let src_id = source.id();
 
-        if rid.is_none() || sid.is_none() {
+        if ref_id.is_none() || src_id.is_none() {
             return false;
         }
-        let rid = rid.unwrap();
-        let sid = sid.unwrap();
 
-        let outer = match self.index.get(&rid) {
+        let ref_id = ref_id.unwrap();
+        let src_id = src_id.unwrap();
+
+        let outer = match self.index.get(&ref_id) {
             Some(outer) => *outer,
             None => return false,
         };
-        let inner = match self.index.get(&sid) {
+        
+        let inner = match self.index.get(&src_id) {
             Some(inner) => *inner,
             None => return false,
         };
