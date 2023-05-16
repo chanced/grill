@@ -33,7 +33,9 @@ pub mod draft;
 mod source;
 pub use source::Source;
 
-mod schema;
+/// JSON Schema and supporting types.
+pub mod schema;
+/// A JSON Schema.
 pub use schema::Schema;
 
 mod scope;
@@ -51,9 +53,6 @@ pub use handler::Handler;
 ///
 /// Validation errors are defined within their respective keyword's module.
 pub mod error;
-
-mod types;
-pub use types::{Type, Types};
 
 /// Output formats, annotations, and errors
 pub mod output;

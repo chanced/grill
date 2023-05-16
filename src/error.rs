@@ -1,4 +1,4 @@
-use crate::{value_type_name, Location, Types, Uri};
+use crate::{value_type_name, Location, schema::Types, Uri};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
