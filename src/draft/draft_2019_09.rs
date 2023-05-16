@@ -2,29 +2,42 @@ use crate::Uri;
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+/// Returns the [Uri] of Schema Draft 2019-09.
 pub fn schema_2019_09_uri() -> &'static Uri {
     Lazy::get(&SCHEMA_2019_09_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Schema Draft 04.
+/// Returns `true` if the given [Uri] is the [Uri] of Schema Draft 2019-09.
+#[must_use]
 pub fn is_schema_2019_09_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == schema_2019_09_uri()
 }
 
-/// Returns the [Uri] of Hyper Schema Draft 04.
+/// Returns the [Uri] of Hyper Schema Draft 2019-09.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn hyper_schema_2019_09_uri() -> &'static Uri {
     Lazy::get(&HYPER_SCHEMA_2019_09_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Hyper Schema Draft 04.
+/// Returns `true` if the given [Uri] is the [Uri] of Hyper Schema Draft 2019-09.
+#[must_use]
 pub fn is_hyper_schema_2019_09_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == hyper_schema_2019_09_uri()
 }
 
+/// Returns Meta Schemas for Draft 2019-09.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn schema_2019_09() -> &'static Vec<Value> {
     Lazy::get(&SCHEMA_2019_09).unwrap()
 }
 
+/// Returns Meta Schemas for Hyper Schema Draft 2019-09.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn hyper_schema_2019_09() -> &'static Vec<Value> {
     Lazy::get(&HYPER_SCHEMA_2019_09).unwrap()
 }

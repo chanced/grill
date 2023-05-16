@@ -7,20 +7,32 @@ name        = "grill"
 repository  = "https://github.com/chanced/grill"
 version     = "0.0.0"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 async-trait     = { version = "0.1" }
 async_fn_traits = { version = "0.1.1" }
 dyn-clone       = { version = "1.0.11" }
 either          = { version = "1.8" }
 heck            = { version = "0.4" }
-jsonptr         = { version = "0.3.3", features = ["uniresid", "url"] }
+jsonptr         = { version = "0.3.5", features = ["std", "uniresid", "url"] }
 once_cell       = { version = "1.10" }
 petgraph        = { version = "0.6" }
+reqwest         = { version = "0.11", optional = true }
 serde           = { version = "1", features = ["derive"] }
 serde_json      = { version = "1.0" }
-thiserror       = { version = "1.0" }
+snafu           = { version = "0.7.4" }
+toml            = { version = "0.7.3", optional = true }
 uniresid        = { version = "0.1.4" }
 url             = { version = "2.2.2" }
+yaml            = { version = "0.9.21", optional = true, package = "serde_yaml" }
 
 [dev-dependencies]
 tokio = { version = "1.28", features = ["full"] }
+
+[features]
+
+default = ["http", "toml", "yaml"]
+http    = ["reqwest"]

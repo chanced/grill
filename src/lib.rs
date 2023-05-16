@@ -1,5 +1,19 @@
+#![doc = include_str!("../README.md")]
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
 #![recursion_limit = "256"]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(clippy::all, clippy::pedantic)]
+#![deny(missing_docs)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::result_large_err,
+    clippy::large_enum_variant,
+    clippy::enum_glob_use,
+    clippy::implicit_hasher
+)]
 
+#[allow(clippy::wildcard_imports)]
 mod location;
 pub use location::Location;
 
@@ -9,11 +23,17 @@ pub use interrogator::Interrogator;
 
 pub use uniresid as uri;
 pub use uniresid::Uri;
-
+/// A dialect represents the set of keywords and semantics that can be used to
+/// evaluate a schema. Each JSON Schema release is a new dialect of JSON Schema.
 pub mod dialect;
+
+///
 pub mod draft;
 
-pub mod schema;
+mod source;
+pub use source::Source;
+
+mod schema;
 pub use schema::Schema;
 
 mod scope;
@@ -24,14 +44,23 @@ pub use vocabulary::Vocabulary;
 
 mod handler;
 
-pub mod errors;
-pub use errors::SetupError;
+pub use handler::Handler;
+
+/// Logical errors that can occur during setup, compilation, and evaluation of a
+/// schema.
+///
+/// Validation errors are defined within their respective keyword's module.
+pub mod error;
 
 mod types;
 pub use types::{Type, Types};
 
-pub mod annotation;
-pub use annotation::{Annotation, Detail, Error};
+/// Annotation
+pub mod output;
+
+/// Traits and implementations for loading JSON Schema source definitions.
+pub mod resolve;
+pub use resolve::Resolve;
 
 pub(crate) fn value_type_name(value: &serde_json::Value) -> &'static str {
     use serde_json::Value::*;

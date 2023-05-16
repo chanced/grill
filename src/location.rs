@@ -11,6 +11,7 @@ pub struct Location {
 }
 
 impl Location {
+    #[must_use]
     pub fn new(
         keyword_location: jsonptr::Pointer,
         absolute_location: Uri,

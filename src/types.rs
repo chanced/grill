@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Display, str::FromStr};
 
-use heck::ToLowerCamelCase;
+// use heck::ToLowerCamelCase;
 use serde::{Deserialize, Serialize};
 
 const ARRAY: &str = "array";
@@ -9,16 +9,54 @@ const INTEGER: &str = "integer";
 const NULL: &str = "null";
 const OBJECT: &str = "object";
 const STRING: &str = "string";
+const NUMBER: &str = "number";
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(from = "&str", into = "String")]
+/// Possible values for the `"type"` keyword, represented as [`Types`].
+///
+/// <https://json-schema.org/understanding-json-schema/reference/type.html>
 pub enum Type {
+    /// Arrays are used for ordered elements. In JSON, each element in an array
+    /// may be of a different type.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/array.html#array>
     Array,
+    /// The boolean type matches only two special values: `true` and `false`. Note
+    /// that values that evaluate to true or false, such as `1` and `0`, are not
+    /// accepted by the schema.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/boolean.html#boolean>
     Boolean,
+    /// The integer type is used for integral numbers. JSON does not have
+    /// distinct types for integers and floating-point values. Therefore, the
+    /// presence or absence of a decimal point is not enough to distinguish
+    /// between integers and non-integers. For example, `1` and `1.0` are two ways
+    /// to represent the same value in JSON. JSON Schema considers that value an
+    /// integer no matter which representation was used.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/numeric.html#integer>
     Integer,
+    /// When a schema specifies a type of null, it has only one acceptable value: `null`.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/null.html#null>
     Null,
+    /// Number used for any numeric type, either integers or floating point
+    /// numbers.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/numeric.html#number>
+    Number,
+    /// Objects are the mapping type in JSON. They map “keys” to “values”. In
+    /// JSON, the “keys” must always be strings. Each of these pairs is
+    /// conventionally referred to as a “property”.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/object.html#object>
     Object,
+    /// The string type is used for strings of text. It may contain Unicode characters.
+    ///
+    /// - <https://json-schema.org/understanding-json-schema/reference/string.html#string>
     String,
+    /// Non-core types
     Other(String),
 }
 
@@ -41,18 +79,10 @@ impl PartialEq<str> for Type {
             Type::Boolean => other == BOOLEAN,
             Type::Integer => other == INTEGER,
             Type::Null => other == NULL,
+            Type::Number => other == NUMBER,
             Type::Object => other == OBJECT,
             Type::String => other == STRING,
-            Type::Other(s) => other
-                .chars()
-                .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_')
-                .flat_map(|c| c.to_lowercase())
-                .zip(
-                    s.chars()
-                        .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_')
-                        .flat_map(|c| c.to_lowercase()),
-                )
-                .all(|(v1, v2)| v1 == v2),
+            Type::Other(s) => other == s.as_str(),
         }
     }
 }
@@ -63,12 +93,15 @@ impl PartialEq<String> for Type {
 }
 
 impl Type {
+    #[must_use]
+    /// Returns the [`&str`] representation of the `Type`.
     pub fn as_str(&self) -> &str {
         match self {
             Type::Array => ARRAY,
             Type::Boolean => BOOLEAN,
             Type::Integer => INTEGER,
             Type::Null => NULL,
+            Type::Number => NUMBER,
             Type::Object => OBJECT,
             Type::String => STRING,
             Type::Other(s) => s.as_str(),
@@ -139,6 +172,7 @@ impl Display for Type {
             Type::Boolean => write!(f, "{BOOLEAN}"),
             Type::Integer => write!(f, "{INTEGER}"),
             Type::Null => write!(f, "{NULL}"),
+            Type::Number => write!(f, "{NUMBER}"),
             Type::Object => write!(f, "{OBJECT}"),
             Type::String => write!(f, "{STRING}"),
             Type::Other(other) => write!(f, "{other}"),
@@ -167,9 +201,9 @@ impl From<&str> for Type {
             OBJECT => Type::Object,
             STRING => Type::String,
             _ => {
-                let t = s.to_lower_camel_case();
+                let t = s.to_lowercase();
                 if t == s {
-                    Type::Other(t)
+                    Type::Other(s.to_string())
                 } else {
                     match t.as_str() {
                         ARRAY => Type::Array,
@@ -192,29 +226,25 @@ impl FromStr for Type {
         Ok(Self::from(s))
     }
 }
-impl From<Type> for Types {
-    fn from(t: Type) -> Self {
-        Types::Single(t)
-    }
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
+/// The `"type"` keyword is fundamental to JSON Schema. It specifies the data
+/// type for a schema.
+///
+/// The type keyword may either be a string or an array:
+///
+/// If it’s a string, it is the name of one of the basic types above.
+///
+///If it is an array, it must be an array of strings, where each string is the
+///name of one of the basic types, and each element is unique. In this case, the
+///JSON snippet is valid if it matches any of the given types.
 pub enum Types {
+    /// A single [`Type`], represented as a string.
     Single(Type),
-    Multiple(HashSet<Type>),
+    /// A set of [`Type`]s, represented as an array of strings.
+    Set(HashSet<Type>),
 }
-
-impl PartialEq for Types {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Single(s), Self::Single(o)) => s == o,
-            (Self::Multiple(s), Self::Multiple(o)) => s.iter().all(|i| o.contains(i)),
-            _ => false,
-        }
-    }
-}
-impl Eq for Types {}
 
 impl Types {
     /// Returns `true` if the types is [`Single`].
@@ -224,140 +254,141 @@ impl Types {
     pub fn is_single(&self) -> bool {
         matches!(self, Self::Single(..))
     }
-
-    /// Returns `true` if the types is [`Multiple`].
-    ///
-    /// [`Multiple`]: Types::Multiple
+    /// Returns `true` if `value` is present
     #[must_use]
-    pub fn is_multiple(&self) -> bool {
-        matches!(self, Self::Multiple(..))
-    }
     pub fn contains(&self, value: &Type) -> bool {
         match self {
             Types::Single(s) => s == value,
-            Types::Multiple(s) => s.contains(value),
+            Types::Set(s) => s.contains(value),
         }
     }
+    /// Inserts `value` into the [`Types`].
+    ///
+    /// If the [`Types`] is [`Single`](`Types::Single`), it will be converted to [`Set`](`Types::Set`).
     pub fn insert(&mut self, value: Type) {
         match self {
             Types::Single(s) => {
                 if s != &value {
-                    *self = Types::Multiple(HashSet::from([s.clone(), value]));
+                    *self = Types::Set(HashSet::from([s.clone(), value]));
                 }
             }
-            Types::Multiple(s) => {
+            Types::Set(s) => {
                 if !s.contains(&value) {
                     s.insert(value);
                 }
             }
         }
     }
-
+    /// Returns an [`Iterator`] of [`Type`] within the [`Types`].
+    #[must_use]
     pub fn iter(&self) -> Box<dyn '_ + Iterator<Item = &'_ Type>> {
         match self {
             Types::Single(s) => Box::new(std::iter::once(s)),
-            Types::Multiple(m) => Box::new(m.iter()),
+            Types::Set(m) => Box::new(m.iter()),
         }
     }
 
-    pub fn as_single(&self) -> Option<&Type> {
+    /// Returns `true` if the types is [`Set`].
+    ///
+    /// [`Set`]: Types::Set
+    #[must_use]
+    pub fn is_set(&self) -> bool {
+        matches!(self, Self::Set(..))
+    }
+}
+
+impl Display for Types {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Single(s) => Some(s),
-            _ => None,
+            Types::Single(t) => Display::fmt(t, f),
+            Types::Set(s) => match s.len() {
+                0 => write!(f, "[]"),
+                1 => write!(f, "[{}]", s.iter().next().unwrap()),
+                _ => {
+                    let result =
+                        serde_json::to_string(&s).expect("Types HashSet to json should not fail");
+                    write!(f, "{result}")
+                }
+            },
         }
     }
-    pub fn as_multiple(&self) -> Option<&HashSet<Type>> {
-        match self {
-            Self::Multiple(s) => Some(s),
-            _ => None,
+}
+impl From<Type> for Types {
+    fn from(t: Type) -> Self {
+        Types::Single(t)
+    }
+}
+
+impl PartialEq for Types {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Single(s), Self::Single(o)) => s == o,
+            (Self::Set(s), Self::Set(o)) => s.iter().all(|i| o.contains(i)),
+            _ => false,
         }
     }
-    pub fn try_into_single(self) -> Result<Type, Self> {
-        if let Self::Single(v) = self {
-            Ok(v)
-        } else {
-            Err(self)
+}
+impl Eq for Types {}
+
+impl From<Vec<Type>> for Types {
+    fn from(mut ts: Vec<Type>) -> Self {
+        match ts.len() {
+            1 => Types::Single(ts.remove(0)),
+            _ => Types::Set(ts.into_iter().collect()),
         }
     }
 }
 
-impl TryFrom<Vec<Type>> for Types {
-    type Error = Vec<Type>;
-    fn try_from(mut ts: Vec<Type>) -> Result<Self, Self::Error> {
-        if ts.is_empty() {
-            return Err(ts);
+impl From<HashSet<Type>> for Types {
+    fn from(ts: HashSet<Type>) -> Self {
+        match ts.len() {
+            1 => Types::Single(ts.into_iter().next().unwrap()),
+            _ => Types::Set(ts),
         }
-        if ts.len() == 1 {
-            return Ok(Types::Single(ts.remove(0)));
-        }
-        Ok(Types::Multiple(HashSet::from_iter(ts.into_iter())))
     }
 }
 
-impl TryFrom<HashSet<Type>> for Types {
-    type Error = HashSet<Type>;
-    fn try_from(ts: HashSet<Type>) -> Result<Self, Self::Error> {
-        if ts.is_empty() {
-            return Err(ts);
-        }
-        if ts.len() == 1 {
-            return Ok(Types::Single(ts.into_iter().next().unwrap()));
-        }
-        Ok(Types::Multiple(ts))
-    }
-}
-
-impl<'a> TryFrom<&'a [Type]> for Types {
-    type Error = &'a [Type];
-    fn try_from(ts: &'a [Type]) -> Result<Self, Self::Error> {
-        let mut hs = HashSet::from_iter(ts.iter().cloned());
+impl From<&[Type]> for Types {
+    fn from(ts: &[Type]) -> Self {
+        let mut hs = ts.iter().cloned().collect::<HashSet<_>>();
         match hs.len() {
-            0 => Err(ts),
-            1 => Ok(Types::Single(hs.drain().next().unwrap())),
-            _ => Ok(Types::Multiple(hs)),
+            1 => Types::Single(hs.drain().next().unwrap()),
+            _ => Types::Set(hs),
         }
     }
 }
 
-impl<'a, 'b> TryFrom<&'a [&'b str]> for Types {
-    type Error = &'a [&'b str];
-    fn try_from(ts: &'a [&'b str]) -> Result<Self, Self::Error> {
-        let mut hs = HashSet::from_iter(ts.iter().map(|s| Type::from(*s)));
+impl From<&[&str]> for Types {
+    fn from(ts: &[&str]) -> Self {
+        let mut hs: HashSet<Type> = ts.iter().map(|s| Type::from(*s)).collect();
         match hs.len() {
-            0 => Err(ts),
-            1 => Ok(Types::Single(hs.drain().next().unwrap())),
-            _ => Ok(Types::Multiple(hs)),
+            1 => Types::Single(hs.drain().next().unwrap()),
+            _ => Types::Set(hs),
         }
     }
 }
-impl<'a> TryFrom<Vec<&'a str>> for Types {
-    type Error = Vec<&'a str>;
-    fn try_from(ts: Vec<&'a str>) -> Result<Self, Self::Error> {
+impl From<Vec<&str>> for Types {
+    fn from(ts: Vec<&str>) -> Self {
         match ts.len() {
-            0 => Err(ts),
-            1 => Ok(Types::Single(Type::from(ts[0]))),
-            _ => Ok(Types::Multiple(ts.iter().map(|s| Type::from(*s)).collect())),
+            1 => Types::Single(Type::from(ts[0])),
+            _ => Types::Set(ts.iter().map(|s| Type::from(*s)).collect()),
         }
     }
 }
-impl TryFrom<Vec<String>> for Types {
-    type Error = Vec<String>;
-    fn try_from(ts: Vec<String>) -> Result<Self, Self::Error> {
+impl From<Vec<String>> for Types {
+    fn from(ts: Vec<String>) -> Self {
         match ts.len() {
-            0 => Err(ts),
-            1 => Ok(Types::Single(Type::from(ts[0].as_str()))),
-            _ => Ok(Types::Multiple(ts.iter().map(Type::from).collect())),
+            1 => Types::Single(Type::from(ts[0].as_str())),
+            _ => Types::Set(ts.iter().map(Type::from).collect()),
         }
     }
 }
 
-impl<'a> TryFrom<&'a [String]> for Types {
-    type Error = &'a [String];
-    fn try_from(ts: &'a [String]) -> Result<Self, Self::Error> {
+impl From<&[String]> for Types {
+    fn from(ts: &[String]) -> Self {
         match ts.len() {
-            0 => Err(ts),
-            1 => Ok(Types::Single(Type::from(ts[0].as_str()))),
-            _ => Ok(Types::Multiple(ts.iter().map(Type::from).collect())),
+            1 => Types::Single(Type::from(ts[0].as_str())),
+            _ => Types::Set(ts.iter().map(Type::from).collect()),
         }
     }
 }
@@ -365,8 +396,12 @@ impl<'a> TryFrom<&'a [String]> for Types {
 impl From<Types> for HashSet<Type> {
     fn from(value: Types) -> Self {
         match value {
-            Types::Single(t) => HashSet::from_iter(std::iter::once(t)),
-            Types::Multiple(ts) => ts,
+            Types::Single(t) => {
+                let mut hs: HashSet<Type> = HashSet::with_capacity(1);
+                hs.insert(t);
+                hs
+            }
+            Types::Set(ts) => ts,
         }
     }
 }
@@ -375,7 +410,7 @@ impl From<Types> for Vec<Type> {
     fn from(t: Types) -> Self {
         match t {
             Types::Single(t) => vec![t],
-            Types::Multiple(ts) => ts.into_iter().collect(),
+            Types::Set(ts) => ts.into_iter().collect(),
         }
     }
 }
@@ -394,7 +429,18 @@ impl IntoIterator for Types {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             Types::Single(t) => Box::new(std::iter::once(t)),
-            Types::Multiple(ts) => Box::new(ts.into_iter()),
+            Types::Set(ts) => Box::new(ts.into_iter()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fmt() {
+        let t = Types::Single(Type::from("test"));
+        println!("{t}");
     }
 }
