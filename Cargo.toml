@@ -20,7 +20,7 @@ jsonptr      = { version = "0.3.5", features = ["std", "uniresid", "url"] }
 once_cell    = { version = "1.10" }
 petgraph     = { version = "0.6" }
 reqwest      = { version = "0.11", optional = true }
-serde        = { version = "1", features = ["derive"] }
+serde        = { version = "1.0.163", features = ["derive"] }
 serde_json   = { version = "1.0" }
 snafu        = { version = "0.7.4" }
 strum        = { version = "0.24", features = ["derive"] }

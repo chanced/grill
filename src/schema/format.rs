@@ -34,7 +34,7 @@
 ///
 /// - [Draft 2020-12 # 7. Vocabularies for Semantic Content With "format" ](https://json-schema.org/draft/2020-12/json-schema-validation.html#name-vocabularies-for-semantic-c)
 /// - [Understanding Json Schema # string Built-in Formats](https://json-schema.org/understanding-json-schema/reference/string.html#id7)
-
+/// - [OpenAPI 3.1 Specification # 4.2 Foramt](https://spec.openapis.org/oas/v3.1.0#format)
 #[derive(
     Debug,
     Clone,
@@ -122,6 +122,6 @@ pub enum Format {
     /// floating point
     Double,
 
-	/// A custom format
-	Other(String)
+    /// A custom format
+    Other(String),
 }
