@@ -1,4 +1,4 @@
-/// A JSON Schema compiler. It manages state, handlers, and schema data as well as compiled schemas.
+/// A JSON Schema compiler and store.
 pub struct Interrogator {}
 
 impl Interrogator {

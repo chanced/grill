@@ -1,18 +1,17 @@
 use std::{borrow::Cow, fmt, mem};
 
+use crate::Location;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use crate::Location;
-
 /// A trait which represents a validation error to be used as the `"error"` field in output
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait Error: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
-dyn_clone::clone_trait_object!(Error);
+pub trait ValidationError: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
+dyn_clone::clone_trait_object!(ValidationError);
 
-impl Error for String {}
+impl ValidationError for String {}
 
 /// Detail contains the information about the keyword that was evaluated
 /// and the result of the evaluation.
@@ -23,7 +22,7 @@ pub struct Detail {
     /// Additional properties
     pub additional_props: Map<String, Value>,
     /// A validation error
-    pub error: Option<Box<dyn Error>>,
+    pub error: Option<Box<dyn ValidationError>>,
     annotations: Vec<Annotation>,
     errors: Vec<Annotation>,
 }
@@ -46,8 +45,8 @@ impl Detail {
         &self.annotations
     }
 
-    /// Adds a nested Annotation
-    pub fn add(&mut self, detail: Detail) {
+    /// Adds a nested [`Annotation`]
+    pub fn add_nested(&mut self, detail: Detail) {
         if detail.is_error() {
             self.errors.push(Annotation::Invalid(detail));
         } else {
@@ -66,7 +65,7 @@ impl From<SerializedDetail<'_>> for Detail {
             errors,
         } = value;
 
-        let error: Option<Box<dyn Error>> = if let Some(err) = error {
+        let error: Option<Box<dyn ValidationError>> = if let Some(err) = error {
             Some(Box::new(err))
         } else {
             None
@@ -134,7 +133,7 @@ impl<'a> From<&'a Detail> for SerializedDetail<'a> {
 pub enum Annotation {
     /// Valid annotation
     Valid(Detail),
-    /// Invalid annotation, meaning that the [`Detail`] either contains an [`Error`] or
+    /// Invalid annotation, meaning that the [`Detail`] either contains an [`ValidationError`] or
     /// has nested invalid annotations.
     Invalid(Detail),
 }

@@ -1,30 +1,58 @@
 use crate::Uri;
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
+
+/// Returns the [`Uri`] for Schema Draft 2020-12.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn schema_2020_12_uri() -> &'static Uri {
     Lazy::get(&SCHEMA_2020_12_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Schema Draft 04.
+/// Returns `true` if the given [`Uri`] equals Schema Draft 2020-12.
+///
+/// # Returns
+/// - `true` if the [`Uri`] `meta_schema_id` equals `"https://json-schema.org/draft/2020-12/schema"`
+/// - `false` otherwise
+#[must_use]
 pub fn is_schema_2020_12_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == schema_2020_12_uri()
 }
 
-/// Returns the [Uri] of Hyper Schema Draft 04.
+/// Returns the [`Uri`] of Hyper Schema Draft 2020-12.
+///
+/// # Returns
+/// - A [`Uri`] equal to `"https://json-schema.org/draft/2020-12/hyper-schema"`
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn hyper_schema_2020_12_uri() -> &'static Uri {
     Lazy::get(&HYPER_SCHEMA_2020_12_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Hyper Schema Draft 04.
+/// Returns `true` if the given [`Uri`] equals Hyper Schema draft
+/// 2020-12.
+///
+/// # Returns
+/// - `true` if the [`Uri`] `meta_schema_id` equals `"https://json-schema.org/draft/2020-12/hyper-schema`
+#[must_use]
 pub fn is_hyper_schema_2020_12_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == hyper_schema_2020_12_uri()
 }
-
-pub fn schema_2020_12() -> &'static Vec<Value> {
+/// Returns Meta Schemas for Schema Draft 2020-12.
+/// # Returns
+/// - `&[Value]` containing each meta-schema in Schema Draft 2020-12.
+#[allow(clippy::missing_panics_doc)]
+#[must_use]
+pub fn schema_2020_12() -> &'static [Value] {
     Lazy::get(&SCHEMA_2020_12).unwrap()
 }
 
-pub fn hyper_schema_2020_12() -> &'static Vec<Value> {
+/// Returns Meta Schemas for Hyper Schema Draft 2020-12.
+/// # Returns
+/// - `&[Value]` containing each meta-schema in Hyper Schema Draft 2020-12.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn hyper_schema_2020_12() -> &'static [Value] {
     Lazy::get(&HYPER_SCHEMA_2020_12).unwrap()
 }
 
@@ -443,10 +471,12 @@ pub static HYPER_SCHEMA_2020_12: Lazy<Vec<Value>> = Lazy::new(|| {
     ]
 });
 
-/// [Uri] of Schema Draft 2020-12.
+/// [`Uri`] of Schema Draft 2020-12: <https://json-schema.org/draft/2020-12/schema>
 pub static SCHEMA_2020_12_URI: Lazy<Uri> =
     Lazy::new(|| Uri::parse("https://json-schema.org/draft/2020-12/schema").unwrap());
 
-/// [Uri] of Hyper Schema Draft 2020-12.
+/// [`Uri`] of Hyper Schema Draft 2020-12.
+///
+/// <https://json-schema.org/draft/2020-12/hyper-schema>
 pub static HYPER_SCHEMA_2020_12_URI: Lazy<Uri> =
     Lazy::new(|| Uri::parse("https://json-schema.org/draft/2020-12/hyper-schema").unwrap());

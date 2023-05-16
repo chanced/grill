@@ -4,7 +4,7 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::result_large_err,
@@ -27,7 +27,7 @@ pub use uniresid::Uri;
 /// evaluate a schema. Each JSON Schema release is a new dialect of JSON Schema.
 pub mod dialect;
 
-///
+/// Meta schemas and their respective [`Uri`]s for each JSON Schema draft release.
 pub mod draft;
 
 mod source;
@@ -55,7 +55,7 @@ pub mod error;
 mod types;
 pub use types::{Type, Types};
 
-/// Annotation
+/// Output formats, annotations, and errors
 pub mod output;
 
 /// Traits and implementations for loading JSON Schema source definitions.

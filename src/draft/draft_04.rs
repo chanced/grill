@@ -2,27 +2,40 @@ use crate::Uri;
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
-/// Returns the [Uri] of Schema Draft 04.
+/// Returns the [`Uri`] of Schema Draft 04.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn schema_04_uri() -> &'static Uri {
     Lazy::get(&SCHEMA_04_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Schema Draft 04.
+/// Returns `true` if the given [`Uri`] equals Schema Draft 04.
+///
+/// # Returns
+/// - `true` if the [`Uri`] `meta_schema_id` is equal to `"http://json-schema.org/draft-04/schema#"`
+/// - `true` if the [`Uri`] `meta_schema_id` is equal to `"https://json-schema.org/draft-04/schema"`
+/// - `false` otherwise
 #[must_use]
 pub fn is_schema_04_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == schema_04_uri()
 }
 
-/// Returns the [Uri] of Hyper Schema Draft 04.
+/// Returns the [`Uri`] of Hyper Schema Draft 04.
+///
+/// # Returns
+/// - A [`Uri`] equal to `"http://json-schema.org/draft-04/hyper-schema#"`
 #[allow(clippy::missing_panics_doc)]
 #[must_use]
 pub fn hyper_schema_04_uri() -> &'static Uri {
     Lazy::get(&HYPER_SCHEMA_04_URI).unwrap()
 }
 
-/// Returns `true` if the given [Uri] is the [Uri] of Hyper Schema Draft 04.
+/// Returns `true` if the given [`Uri`] equals Hyper Schema Draft 04.
+///
+/// # Returns
+/// - `true` if [`Uri`] `meta_schema_id` equals `"http://json-schema.org/draft-04/hyper-schema#"`
+/// - `true` if [`Uri`] `meta_schema_id` equals `"https://json-schema.org/draft-04/hyper-schema"`
+/// - `false` otherwise
 #[must_use]
 pub fn is_hyper_schema_04_uri(meta_schema_id: &Uri) -> bool {
     meta_schema_id == hyper_schema_04_uri()
@@ -30,21 +43,27 @@ pub fn is_hyper_schema_04_uri(meta_schema_id: &Uri) -> bool {
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 /// Returns a slice of the JSON Schema Draft 04 meta-schemas.
+///
+/// # Returns
+/// - `&[Value]` containing the JSON Schema Draft 04 meta-schemas
 pub fn schema_04() -> &'static [Value] {
     Lazy::get(&SCHEMA_04).unwrap()
 }
 /// Returns a slice of the JSON Hyper Schema Draft 04 meta-schemas.
+///
+/// # Returns
+/// - `&[Value]` containing the JSON Hyper Schema Draft 04 meta-schemas
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn hyper_schema_04() -> &'static Vec<Value> {
+pub fn hyper_schema_04() -> &'static [Value] {
     Lazy::get(&HYPER_SCHEMA_04).unwrap()
 }
 
-/// [Uri] of Schema Draft 04.
+/// [`Uri`] of Schema Draft 04.
 pub static SCHEMA_04_URI: Lazy<Uri> =
     Lazy::new(|| Uri::parse("http://json-schema.org/draft-04/schema#").unwrap());
 
-/// [Uri] of Hyper Schema Draft 04.
+/// [`Uri`] of Hyper Schema Draft 04.
 pub static HYPER_SCHEMA_04_URI: Lazy<Uri> =
     Lazy::new(|| Uri::parse("http://json-schema.org/draft-04/hyper-schema#").unwrap());
 
@@ -201,7 +220,6 @@ pub static SCHEMA_04: Lazy<Vec<Value>> = Lazy::new(|| {
     }
     )]
 });
-
 
 /// JSON Hyper Schema Draft 04 meta-schemas.
 pub static HYPER_SCHEMA_04: Lazy<Vec<Value>> = Lazy::new(|| {

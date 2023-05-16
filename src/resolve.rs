@@ -4,7 +4,7 @@ use serde_json::Value;
 use snafu::ResultExt;
 
 use crate::{
-    error::{DeserializeError, DeserializeSnafu, ReqwestSnafu, ResolveError},
+    error::{resolve_error, DeserializeError, ResolveError},
     Schema,
 };
 
@@ -15,7 +15,7 @@ pub trait Resolve: DynClone + Send + Sync + 'static {
         match self.resolve(uri).await? {
             Some(value) => match serde_json::from_value(value) {
                 Ok(schema) => Ok(Some(schema)),
-                Err(err) => Err(DeserializeError::from(err)).context(DeserializeSnafu {
+                Err(err) => Err(DeserializeError::from(err)).context(resolve_error::Deserialize {
                     schema_id: uri.clone(),
                 }),
             },
@@ -38,6 +38,7 @@ pub struct HttpResolver {
 // #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 /// A [`Resolve`] implementation that uses HTTP(S) to resolve schemas.
 impl HttpResolver {
+    #[must_use]
     pub fn new(client: reqwest::Client) -> Self {
         Self { client }
     }
@@ -82,6 +83,7 @@ impl Resolve for HttpResolver {
 /// Returns a [`DeserializeError`] containing errors for each format attempted in
 /// the event all formats fail.
 pub fn deserialize_str_value(text: &str) -> Result<Value, DeserializeError> {
+    #[allow(unused)]
     let mut de_err: DeserializeError;
     match serde_json::from_str::<Value>(text) {
         Ok(schema) => return Ok(schema),
@@ -110,6 +112,7 @@ pub fn deserialize_str_value(text: &str) -> Result<Value, DeserializeError> {
             Err(err) => de_err.toml = err.into(),
         }
     }
+    #[allow(unused)]
     Err(de_err)
 }
 
@@ -121,13 +124,17 @@ pub fn deserialize_str_value(text: &str) -> Result<Value, DeserializeError> {
 /// Returns a [`DeserializeError`] containing errors for each format attempted in
 /// the event all formats fail.
 pub fn deserialize_slice_value(slice: &[u8]) -> Result<Value, DeserializeError> {
+    #[cfg(any(feature = "yaml", feature = "toml"))]
     let mut de_err: DeserializeError;
     match serde_json::from_slice::<Value>(slice) {
+        #[cfg(any(feature = "yaml", feature = "toml"))]
         Ok(schema) => return Ok(schema),
+        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
+        Ok(schema) => Ok(schema),
         Err(err) => {
             #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
             {
-                return Err(DeserializeError { json: err });
+                Err(DeserializeError { json: err })
             }
             #[cfg(any(feature = "yaml", feature = "toml"))]
             {
@@ -150,5 +157,6 @@ pub fn deserialize_slice_value(slice: &[u8]) -> Result<Value, DeserializeError> 
             Err(err) => de_err.toml = err.into(),
         }
     }
+    #[cfg(any(feature = "yaml", feature = "toml"))]
     Err(de_err)
 }
