@@ -24,7 +24,7 @@ pub use interrogator::Interrogator;
 pub use uniresid as uri;
 pub use uniresid::Uri;
 /// A dialect represents the set of keywords and semantics that can be used to
-/// evaluate a schema. Each JSON Schema release is a new dialect of JSON Schema.
+/// evaluate a schema.
 pub mod dialect;
 
 /// Meta schemas and their respective [`Uri`]s for each JSON Schema draft release.
@@ -40,9 +40,6 @@ pub use schema::Schema;
 
 mod scope;
 pub use scope::Scope;
-
-mod vocabulary;
-pub use vocabulary::Vocabulary;
 
 mod handler;
 

@@ -1,15 +1,25 @@
+mod bool_or_number;
 mod discriminator;
 mod format;
 mod types;
 
+pub use bool_or_number::BoolOrNumber;
+
 pub use discriminator::Discriminator;
 pub use format::Format;
-use serde_json::Value;
+use serde_json::{Number, Value};
 pub use types::{Type, Types};
 
 use crate::Uri;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SchemaOrSchemaArray {
+    Schema(Box<Schema>),
+    Array(Vec<Schema>),
+}
 
 /// A raw JSON Schema object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -19,16 +29,9 @@ pub struct Object {
     /// against the Retrieval URI. The resulting URI is the base URI for the
     /// schema.
     ///
-    /// Note: In JSON Schema Draft 4, field was `id` rather than `$id`.
-    ///
     /// - [JSON Schema Core 2020-12 # 8.2.1. The `"$id"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#name-the-id-keyword)
     /// - [Understanding JSON Schema # Structuring a complex schema: `$id`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=id#id)
-    #[serde(
-        rename = "$id",
-        alias = "id",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "$id", default, skip_serializing_if = "Option::is_none")]
     pub id: Option<Uri>,
 
     /// ## `$schema`
@@ -39,7 +42,6 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
-    /// - [Draft 4 # 6. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-zyp-json-schema-04#section-6)
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
     pub schema: Option<Uri>,
 
@@ -287,23 +289,33 @@ pub struct Object {
     #[serde(rename = "const", default, skip_serializing_if = "Option::is_none")]
     pub constant: Option<serde_json::Value>,
 
-    /// ## `$defs` (alias: `definitions`)
+    /// ## `$defs`
     /// The "$defs" keyword reserves a location for schema authors to inline
     /// re-usable JSON Schemas into a more general schema. The keyword does not
     /// directly affect the validation result.
     ///
     /// This keyword's value MUST be an object. Each member value of this object
-    /// MUST be a valid JSON *SchemaObj.
+    /// MUST be a valid JSON Schema.
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.4. Schema Re-Use With `"$defs"`](https://json-schema.org/draft/2020-12/json-schema-core.html#defs)
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
+    #[serde(rename = "$defs", default, skip_serializing_if = "Option::is_none")]
+    pub definitions: Option<HashMap<String, Schema>>,
+
+    /// ## `definitions`
+    /// Legacy from Draft 07. See [`definitions`](`Object::definitions`).
+    ///
+    /// ## Note
+    /// If using JSON Schema 07, use this field instead of [`definitions`](`Object::definitions`).
+    ///
+    /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
     #[serde(
-        rename = "$defs",
-        alias = "definitions",
+        rename = "definitions",
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub definitions: Option<HashMap<String, Schema>>,
+    #[deprecated]
+    pub definitions_legacy: Option<HashMap<String, Schema>>,
 
     /// ## `allOf`
     /// The `"allOf"` keyword acts as an `AND` where each subschema must be
@@ -426,9 +438,21 @@ pub struct Object {
     /// "items" in prior drafts. When "prefixItems" is present, the behavior of
     /// "items" is identical to the former "additionalItems" keyword.
     ///
+    /// ## For Draft 2019, 07:
+    /// If "items" is a schema, validation succeeds if all elements in the
+    /// array successfully validate against that schema.
+    ///
+    /// If "items" is an array of schemas, validation succeeds if each
+    /// element of the instance validates against the schema at the same
+    /// position, if any.
+
     /// - [JSON Schema Core 2020-12 # 10.3.1.2. `items`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-items)
+    /// - [JSON Schema Validation 07 # 6.4.1 `items`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.1)
     #[serde(rename = "items", default, skip_serializing_if = "Option::is_none")]
-    pub items: Option<Box<Schema>>,
+    pub items: Option<SchemaOrSchemaArray>,
+
+    /// - [JSON Schema Core 2019-09 # 9.3.1.2.  `additionalItems`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-9.3.1.2)
+    pub additional_items: Option<Box<Schema>>,
 
     /// ## `contains`
     /// An array instance is valid against `"contains"` if at least one of its
@@ -635,7 +659,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.1. `multipleOf`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-multipleof)
     #[serde(rename = "multipleOf", skip_serializing_if = "Option::is_none")]
-    pub multiple_of: Option<serde_json::Number>,
+    pub multiple_of: Option<Number>,
 
     /// #`maximum`
     /// The value of `"maximum"` MUST be a number, representing an inclusive upper
@@ -645,17 +669,19 @@ pub struct Object {
     /// instance is less than or exactly equal to `"maximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.2. `maximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maximum)
     #[serde(rename = "maximum", skip_serializing_if = "Option::is_none")]
-    pub maximum: Option<serde_json::Number>,
+    pub maximum: Option<Number>,
 
     /// ## `exclusiveMaximum`
-    /// The value of `"exclusiveMaximum"` MUST be a number, representing an
-    /// exclusive upper limit for a numeric instance.
+    /// For JSON Schema drafts 7 and higher, the value of `"exclusiveMaximum"` MUST be a number, representing an
+    /// exclusive upper limit for a numeric instance. For JSON Schema Draft 4, the value of `"exclusiveMaximum"` MUST
+    /// be a boolean.
+    ///
     ///
     /// If the instance is a number, then the instance is valid only if it has a
     /// value strictly less than (not equal to) `"exclusiveMaximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.3. `exclusiveMaximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusivemaximum)
     #[serde(rename = "exclusiveMaximum", skip_serializing_if = "Option::is_none")]
-    pub exclusive_maximum: Option<serde_json::Number>,
+    pub exclusive_maximum: Option<BoolOrNumber>,
 
     /// ## `minimum`
     /// The value of `"minimum"` MUST be a number, representing an inclusive
@@ -665,10 +691,11 @@ pub struct Object {
     /// instance is greater than or exactly equal to `"minimum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.4. `minimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minimum)
     #[serde(rename = "minimum", skip_serializing_if = "Option::is_none")]
-    pub minimum: Option<serde_json::Number>,
+    pub minimum: Option<Number>,
 
     /// ## `exclusiveMinimum`
-    /// The value of `"exclusiveMinimum"` MUST be a number, representing an
+    ///
+    /// For JSON Schema drafts 7 and higher, the value of `"exclusiveMinimum"` MUST be a number, representing an
     /// exclusive lower limit for a numeric instance.
     ///
     /// If the instance is a number, then the instance is valid only if it has a
@@ -676,7 +703,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.5. `exclusiveMinimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusiveminimum)
     #[serde(rename = "exclusiveMinimum", skip_serializing_if = "Option::is_none")]
-    pub exclusive_minimum: Option<serde_json::Number>,
+    pub exclusive_minimum: Option<BoolOrNumber>,
 
     /// ## `maxLength`
     /// The value of `"maxLength"` MUST be a non-negative integer.
@@ -817,7 +844,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as an empty array.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.3 `required`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-required)
-    #[serde(rename = "required", skip_serializing_if = "HashSet::is_empty")]
+    #[serde(
+        rename = "required",
+        default,
+        skip_serializing_if = "HashSet::is_empty"
+    )]
     pub required: HashSet<String>,
 
     /// ## `dependentRequired`
@@ -838,6 +869,7 @@ pub struct Object {
     /// - [JSON Schema Validation 2020-12 # 6.5.4 `dependentRequired`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-dependentrequired)
     #[serde(
         rename = "dependentRequired",
+        default,
         skip_serializing_if = "HashMap::is_empty"
     )]
     pub dependent_required: HashMap<String, HashSet<String>>,
@@ -1021,6 +1053,9 @@ pub struct Object {
     /// - [JSON Schema Validation 2020-12 # 9.5 `"examples"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-examples)
     #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
     pub examples: Option<Vec<Value>>,
+
+    #[serde(flatten, default)]
+    pub additional_keywords: HashMap<String, Value>,
 }
 
 /// A raw JSON Schema document.
@@ -1029,4 +1064,29 @@ pub struct Object {
 pub enum Schema {
     Bool(bool),
     Object(Object),
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_serde() {
+        let schema = json!(
+            {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://example.com/product.schema.json",
+                    "title": "Product",
+                    "description": "A product in the catalog",
+                    "type": "object"
+            }
+        );
+        let obj: Object = serde_json::from_str("{}").unwrap();
+        let obj: Object = serde_json::from_value(schema.clone()).unwrap();
+
+        let schema: Schema = serde_json::from_value(schema).unwrap();
+    }
 }

@@ -12,7 +12,7 @@ const STRING: &str = "string";
 const NUMBER: &str = "number";
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(from = "&str", into = "String")]
+#[serde(from = "String", into = "String")]
 /// Possible values for the `"type"` keyword, represented as [`Types`].
 ///
 /// <https://json-schema.org/understanding-json-schema/reference/type.html>
@@ -348,6 +348,16 @@ impl From<HashSet<Type>> for Types {
     }
 }
 
+impl From<&str> for Types {
+    fn from(value: &str) -> Self {
+        Types::Single(Type::from(value))
+    }
+}
+impl From<String> for Types {
+    fn from(value: String) -> Self {
+        Types::Single(Type::from(value))
+    }
+}
 impl From<&[Type]> for Types {
     fn from(ts: &[Type]) -> Self {
         let mut hs = ts.iter().cloned().collect::<HashSet<_>>();
@@ -436,11 +446,40 @@ impl IntoIterator for Types {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_eq;
+
+    use serde_json::json;
+
+    use crate::schema::Object;
+
     use super::*;
+    #[derive(Serialize, Deserialize, Debug)]
+    struct Obj {
+        #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+        pub types: Option<Types>,
+    }
 
     #[test]
     fn test_fmt() {
         let t = Types::Single(Type::from("test"));
-        println!("{t}");
+        assert_eq!(t.to_string(), "test");
+    }
+
+    #[test]
+    fn test_serde() {
+        let t = Types::Single(Type::from("test"));
+        let s = serde_json::to_string(&t).expect("Types to json should not fail");
+        assert_eq!(s, "\"test\"");
+        let t2: Types = serde_json::from_str(&s).expect("Types from json should not fail");
+        assert_eq!(t, t2);
+
+        let obj_json = json!(
+            {
+                "type": "object"
+            }
+        );
+        let Obj { types } =
+            serde_json::from_value(obj_json).expect("Obj from json should not fail");
+        assert_eq!(types.unwrap(), Types::Single(Type::Object));
     }
 }

@@ -13,10 +13,138 @@ dyn_clone::clone_trait_object!(ValidationError);
 
 impl ValidationError for String {}
 
-/// Detail contains the information about the keyword that was evaluated
-/// and the result of the evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Structure {
+    Flag,
+    /// The "Basic" structure is a flat list of output units.
+    /// ```json
+    /// {
+    ///   "valid": false,
+    ///   "errors": [
+    ///     {
+    ///       "keywordLocation": "",
+    ///       "instanceLocation": "",
+    ///       "error": "A subschema had errors."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point",
+    ///       "instanceLocation": "/1",
+    ///       "error": "A subschema had errors."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref/required",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point/required",
+    ///       "instanceLocation": "/1",
+    ///       "error": "Required property 'y' not found."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref/additionalProperties",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///       "instanceLocation": "/1/z",
+    ///       "error": "Additional property 'z' found but was invalid."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/minItems",
+    ///       "instanceLocation": "",
+    ///       "error": "Expected at least 3 items but found 2"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    Basic,
+    /// The "Detailed" structure is based on the schema and can be more readable for both humans and machines. Having the structure organized this way makes associations between the errors more apparent. For example, the fact that the missing "y" property and the extra "z" property both stem from the same location in the instance is not immediately obvious in the "Basic" structure. In a hierarchy, the correlation is more easily identified.
+    ///
+    /// The following rules govern the construction of the results object:
+    ///
+    /// - All applicator keywords (`"*Of"`, `"$ref"`, `"if"`/`"then"`/`"else"`, etc.) require a node.
+    /// - Nodes that have no children are removed.
+    /// - Nodes that have a single child are replaced by the child.
+    /// - Branch nodes do not require an error message or an annotation.
+    ///
+    /// # Example
+    ///
+    /// ## Schema:
+    /// ```json
+    /// {
+    ///   "$id": "https://example.com/polygon",
+    ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
+    ///   "$defs": {
+    ///     "point": {
+    ///       "type": "object",
+    ///       "properties": {
+    ///         "x": { "type": "number" },
+    ///         "y": { "type": "number" }
+    ///       },
+    ///       "additionalProperties": false,
+    ///       "required": [ "x", "y" ]
+    ///     }
+    ///   },
+    ///   "type": "array",
+    ///   "items": { "$ref": "#/$defs/point" },
+    ///   "minItems": 3
+    /// }
+    /// ```
+    /// ## Instance:
+    /// ```json
+    /// [ { "x": 2.5, "y": 1.3 }, { "x": 1, "z": 6.7 } ]
+    /// ```
+    /// ## `Detailed` Output:
+    ///
+    /// ```json
+    /// {
+    ///   "valid": false,
+    ///   "keywordLocation": "",
+    ///   "instanceLocation": "",
+    ///   "errors": [
+    ///     {
+    ///       "valid": false,
+    ///       "keywordLocation": "/items/$ref",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point",
+    ///       "instanceLocation": "/1",
+    ///       "errors": [
+    ///         {
+    ///           "valid": false,
+    ///           "keywordLocation": "/items/$ref/required",
+    ///           "absoluteKeywordLocation":
+    ///             "https://example.com/polygon#/$defs/point/required",
+    ///           "instanceLocation": "/1",
+    ///           "error": "Required property 'y' not found."
+    ///         },
+    ///         {
+    ///           "valid": false,
+    ///           "keywordLocation": "/items/$ref/additionalProperties",
+    ///           "absoluteKeywordLocation":
+    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///           "instanceLocation": "/1/z",
+    ///           "error": "Additional property 'z' found but was invalid."
+    ///         }
+    ///       ]
+    ///     },
+    ///     {
+    ///       "valid": false,
+    ///       "keywordLocation": "/minItems",
+    ///       "instanceLocation": "",
+    ///       "error": "Expected at least 3 items but found 2"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    Detailed,
+    Verbose,
+    Complete,
+}
+
+/// An output unit for a given keyword. Contains the keyword's location, sub
+/// annotations and errors, possibly a [`ValidationError`] and any additional fields pertinent to the
+/// keyword and output [`Structure`].
 #[derive(Debug, Clone, Default)]
-pub struct Detail {
+pub struct Unit {
     /// Location of the keyword
     pub location: Location,
     /// Additional properties
@@ -27,7 +155,7 @@ pub struct Detail {
     errors: Vec<Annotation>,
 }
 
-impl Detail {
+impl Unit {
     /// Returns `true` if there is an `error` or sub-annotations which are errors.
     #[must_use]
     pub fn is_error(&self) -> bool {
@@ -46,7 +174,7 @@ impl Detail {
     }
 
     /// Adds a nested [`Annotation`]
-    pub fn add_nested(&mut self, detail: Detail) {
+    pub fn add_nested(&mut self, detail: Unit) {
         if detail.is_error() {
             self.errors.push(Annotation::Invalid(detail));
         } else {
@@ -55,7 +183,7 @@ impl Detail {
     }
 }
 
-impl From<SerializedDetail<'_>> for Detail {
+impl From<SerializedDetail<'_>> for Unit {
     fn from(value: SerializedDetail) -> Self {
         let SerializedDetail {
             location,
@@ -81,7 +209,7 @@ impl From<SerializedDetail<'_>> for Detail {
     }
 }
 
-impl Serialize for Detail {
+impl Serialize for Unit {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -91,8 +219,8 @@ impl Serialize for Detail {
     }
 }
 
-impl<'de> Deserialize<'de> for Detail {
-    fn deserialize<D>(deserializer: D) -> Result<Detail, D::Error>
+impl<'de> Deserialize<'de> for Unit {
+    fn deserialize<D>(deserializer: D) -> Result<Unit, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -115,8 +243,8 @@ struct SerializedDetail<'a> {
     errors: Cow<'a, [Annotation]>,
 }
 
-impl<'a> From<&'a Detail> for SerializedDetail<'a> {
-    fn from(v: &'a Detail) -> Self {
+impl<'a> From<&'a Unit> for SerializedDetail<'a> {
+    fn from(v: &'a Unit) -> Self {
         Self {
             location: Cow::Borrowed(&v.location),
             additional_props: Cow::Borrowed(&v.additional_props),
@@ -132,10 +260,10 @@ impl<'a> From<&'a Detail> for SerializedDetail<'a> {
 #[serde(untagged)]
 pub enum Annotation {
     /// Valid annotation
-    Valid(Detail),
+    Valid(Unit),
     /// Invalid annotation, meaning that the [`Detail`] either contains an [`ValidationError`] or
     /// has nested invalid annotations.
-    Invalid(Detail),
+    Invalid(Unit),
 }
 
 impl<'de> Deserialize<'de> for Annotation {
@@ -143,7 +271,7 @@ impl<'de> Deserialize<'de> for Annotation {
     where
         D: serde::Deserializer<'de>,
     {
-        let d: Detail = Deserialize::deserialize(deserializer)?;
+        let d: Unit = Deserialize::deserialize(deserializer)?;
         if d.is_error() {
             Ok(Annotation::Valid(d))
         } else {
@@ -195,7 +323,7 @@ impl Annotation {
 
     /// Returns the [`Detail`] of this annotation.
     #[must_use]
-    pub fn detail(&self) -> &Detail {
+    pub fn detail(&self) -> &Unit {
         match self {
             Annotation::Invalid(detail) | Annotation::Valid(detail) => detail,
         }
@@ -215,7 +343,7 @@ mod tests {
         let mut additional_props = Map::new();
         additional_props.insert("example".into(), 34.into());
 
-        let a = Annotation::Invalid(Detail {
+        let a = Annotation::Invalid(Unit {
             additional_props,
             location: Location {
                 keyword_location: "/".try_into().unwrap(),
@@ -224,7 +352,7 @@ mod tests {
                 absolute_keyword_location: None,
             },
             error: None,
-            annotations: vec![Annotation::Valid(Detail {
+            annotations: vec![Annotation::Valid(Unit {
                 annotations: vec![],
                 errors: vec![],
                 location: Location {
@@ -236,7 +364,7 @@ mod tests {
                 error: Some(Box::new(String::from("bad data"))),
                 ..Default::default()
             })],
-            errors: vec![Annotation::Invalid(Detail {
+            errors: vec![Annotation::Invalid(Unit {
                 annotations: vec![],
                 errors: vec![],
                 error: Some(Box::new(String::from("nested error"))),
