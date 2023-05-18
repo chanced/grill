@@ -14,7 +14,7 @@ pub struct Vocabulary {
     /// The URI of the vocabulary.
     pub id: AbsoluteUri,
     /// Set of handlers for keywords defined by the vocabulary.
-    pub handlers: Vec<Box<dyn Handler>>,
+    pub handlers: Vec<Box<Handler>>,
 }
 
 /// A composition of [`Vocabulary`].
@@ -54,7 +54,7 @@ impl Dialect {
     /// Creates a new [`Dialect`].
     ///
     /// # Errors
-    ///Returns a [`NewDialectError`] if:
+    /// Returns a [`NewDialectError`] if:
     /// - A schema [`Object`] in `meta_schemas` does not have an [`id`](crate::schema::Object::id).
     /// - A schema [`Object`] in `meta_schemas` has a non-absolute [`id`](crate::schema::Object::id).
     /// - A schema [`Object`] in `meta_schemas` has a required vocabulary that is not defined in `vocabularies`.
@@ -169,6 +169,9 @@ mod tests {
         assert!(dialect.is_err());
         let err = dialect.unwrap_err();
 
-        assert!(matches!(err, super::DialectError::MissingRequiredVocabulary { .. }));
+        assert!(matches!(
+            err,
+            super::DialectError::MissingRequiredVocabulary { .. }
+        ));
     }
 }

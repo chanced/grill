@@ -23,7 +23,7 @@ mod interrogator;
 pub use interrogator::Interrogator;
 
 pub use uniresid as uri;
-pub use uniresid::Uri;
+pub use uniresid::{AbsoluteUri, Uri};
 /// A dialect represents the set of keywords and semantics that can be used to
 /// evaluate a schema.
 pub mod dialect;
@@ -51,6 +51,7 @@ pub mod error;
 
 /// Output formats, annotations, and errors
 pub mod output;
+pub use output::{Output, Structure};
 
 /// Traits and implementations for loading JSON Schema source definitions.
 pub mod resolve;

@@ -13,6 +13,24 @@ dyn_clone::clone_trait_object!(ValidationError);
 
 impl ValidationError for String {}
 
+pub struct Flag {}
+
+pub struct Basic {}
+
+pub struct Detailed {}
+
+pub struct Verbose {}
+
+pub struct Complete(pub Annotation);
+
+pub enum Output {
+    Flag(Flag),
+    Basic(Basic),
+    Detailed(Detailed),
+    Verbose(Verbose),
+    Complete(Complete),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Structure {
