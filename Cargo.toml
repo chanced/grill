@@ -26,7 +26,7 @@ snafu        = { version = "0.7.4" }
 strum        = { version = "0.24", features = ["derive"] }
 strum_macros = { version = "0.24" }
 toml         = { version = "0.7.3", optional = true }
-uniresid     = { version = "0.1.4" }
+uniresid     = { version = "0.1.5", features = ["serde"] }
 url          = { version = "2.2.2" }
 yaml         = { version = "0.9.21", optional = true, package = "serde_yaml" }
 # async_fn_traits = { version = "0.1.1" }

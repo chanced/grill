@@ -12,6 +12,7 @@
     clippy::enum_glob_use,
     clippy::implicit_hasher
 )]
+#![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
 #[allow(clippy::wildcard_imports)]
 mod location;
@@ -26,9 +27,6 @@ pub use uniresid::Uri;
 /// A dialect represents the set of keywords and semantics that can be used to
 /// evaluate a schema.
 pub mod dialect;
-
-/// Meta schemas and their respective [`Uri`]s for each JSON Schema draft release.
-pub mod draft;
 
 mod source;
 pub use source::Source;
@@ -69,3 +67,6 @@ pub(crate) fn value_type_name(value: &serde_json::Value) -> &'static str {
         Object(_) => "object",
     }
 }
+
+mod compiler;
+pub use compiler::Compiler;

@@ -1,17 +1,19 @@
 mod bool_or_number;
 mod discriminator;
 mod format;
+mod subschema;
 mod types;
 
 pub use bool_or_number::BoolOrNumber;
-
 pub use discriminator::Discriminator;
 pub use format::Format;
-use serde_json::{Number, Value};
+pub use subschema::{CompiledSubschema, Subschema};
 pub use types::{Type, Types};
+use uniresid::AbsoluteUri;
 
 use crate::Uri;
 use serde::{Deserialize, Serialize};
+use serde_json::{Number, Value};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -22,7 +24,7 @@ pub enum SchemaOrSchemaArray {
 }
 
 /// A raw JSON Schema object.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Object {
     /// ## `$id`
     /// The value of `$id` is a URI-reference without a fragment that resolves
@@ -43,7 +45,7 @@ pub struct Object {
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<Uri>,
+    pub schema: Option<AbsoluteUri>,
 
     /// ## `$comment`
     /// The `"$comment"` keyword is strictly intended for adding comments to a
@@ -113,7 +115,7 @@ pub struct Object {
         default,
         skip_serializing_if = "HashMap::is_empty"
     )]
-    pub vocabulary: HashMap<Uri, bool>,
+    pub vocabulary: HashMap<AbsoluteUri, bool>,
 
     /// ## `$anchor`
     /// Using JSON Pointer fragments requires knowledge of the structure of the
@@ -424,7 +426,7 @@ pub struct Object {
     ///
     /// Omitting this keyword has the same assertion behavior as an empty array.
     ///
-    /// - [JSON Schema Core 2020-12 # 10.3.1.1. `prefixItems`]https://json-schema.org/draft/2020-12/json-schema-core.html#name-prefixitems
+    /// - [JSON Schema Core 2020-12 # 10.3.1.1. `prefixItems`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-prefixitems)
     #[serde(rename = "prefixItems", default, skip_serializing_if = "Vec::is_empty")]
     pub prefix_items: Vec<Schema>,
 
@@ -1064,6 +1066,11 @@ pub struct Object {
 pub enum Schema {
     Bool(bool),
     Object(Object),
+}
+impl Default for Schema {
+    fn default() -> Self {
+        Schema::Bool(true)
+    }
 }
 
 #[cfg(test)]

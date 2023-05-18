@@ -1,4 +1,5 @@
-use crate::{value_type_name, Location, schema::Types, Uri};
+use crate::schema::Object;
+use crate::{schema::Types, value_type_name, Location, Uri};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
@@ -8,8 +9,49 @@ use std::{
     error::Error,
     fmt::{self, Display},
 };
+use uniresid::AbsoluteUri;
 
 pub use crate::output::ValidationError;
+
+#[derive(Debug)]
+pub enum DialectError {
+    MissingSchemaId {
+        schema: Object,
+    },
+    MissingRequiredVocabulary {
+        vocabulary_id: AbsoluteUri,
+        meta_schema_id: AbsoluteUri,
+    },
+    SchemaIdNotAbsolute {
+        err: uniresid::Error,
+        id: Uri,
+    },
+}
+
+impl Display for DialectError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use DialectError::*;
+        match self {
+            MissingSchemaId { .. } => {
+                write!(f, "Schema is not identified")
+            }
+            MissingRequiredVocabulary { vocabulary_id, .. } => {
+                write!(f, "Vocabulary \"{vocabulary_id}\" is required")
+            }
+            SchemaIdNotAbsolute { id, err } => {
+                write!(f, "Schema ID \"{id}\" is not absolute: {err}")
+            }
+        }
+    }
+}
+impl std::error::Error for DialectError {
+    fn source(&self) -> Option<&(dyn snafu::Error + 'static)> {
+        match self {
+            Self::SchemaIdNotAbsolute { err, .. } => Some(err),
+            _ => None,
+        }
+    }
+}
 
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug)]
