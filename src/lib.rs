@@ -10,7 +10,8 @@
     clippy::result_large_err,
     clippy::large_enum_variant,
     clippy::enum_glob_use,
-    clippy::implicit_hasher
+    clippy::implicit_hasher,
+    clippy::needless_pass_by_value
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
@@ -22,8 +23,9 @@ mod interrogator;
 
 pub use interrogator::Interrogator;
 
-pub use uniresid as uri;
-pub use uniresid::{AbsoluteUri, Uri};
+// pub use uniresid as uri;
+// pub use uniresid::{AbsoluteUri, Uri};
+
 /// A dialect represents the set of keywords and semantics that can be used to
 /// evaluate a schema.
 pub mod dialect;

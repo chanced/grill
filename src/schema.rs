@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub use subschema::{CompiledSubschema, Subschema};
 pub use types::{Type, Types};
 
-use crate::{output::Annotation, Output};
+use crate::{output::Annotation, Handler, Output};
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,7 +31,40 @@ impl Default for Schema {
 }
 
 #[derive(Debug, Clone)]
-pub struct CompiledSchema {}
+pub struct CompiledSchema {
+    /// The absolute, dereferenced  location of the validating keyword. The
+    /// value MUST be expressed as a full URI using the canonical URI of the
+    /// relevant schema resource with a JSON Pointer fragment, and it MUST NOT
+    /// include by-reference applicators such as `"$ref"` or `"$dynamicRef"` as
+    /// non-terminal path components. It MAY end in such keywords if the error
+    /// or annotation is for that keyword, such as an unresolvable reference.
+    ///
+    /// Note that "absolute" here is in the sense of "absolute filesystem path"
+    /// (meaning the complete location) rather than the `"absolute-URI"
+    /// terminology from RFC 3986 (meaning with scheme but without fragment).
+    /// Keyword absolute locations will have a fragment in order to identify the
+    /// keyword.
+    pub absolute_keyword_location: Option<String>,
+
+    /// The relative location of the validating keyword that follows the
+    /// validation path. The value MUST be expressed as a JSON Pointer, and it
+    /// MUST include any by-reference applicators such as `"$ref"` or
+    /// `"$dynamicRef"`.
+    ///
+    /// # Example
+    /// ```plaintext
+    /// /properties/width/$ref/minimum
+    /// ```
+    ///
+    /// Note that this pointer may not be resolvable by the normal JSON Pointer
+    /// process due to the inclusion of these by-reference applicator keywords.
+    ///
+    /// The JSON key for this information is `"keywordLocation"`.
+    pub keyword_location: jsonptr::Pointer,
+
+    field_handlers: Vec<(String, Handler)>,
+}
+
 impl CompiledSchema {
     #[allow(clippy::missing_panics_doc)]
     /// # Errors
@@ -40,14 +73,17 @@ impl CompiledSchema {
         value: &serde_json::Value,
         output_structure: crate::output::Structure,
     ) -> Result<Output, Box<dyn std::error::Error>> {
-        todo!()
     }
+
     async fn evaluate_internal(
         &self,
         scope: &crate::Scope,
         value: &serde_json::Value,
         output_structure: crate::output::Structure,
     ) -> Result<Option<Annotation>, Box<dyn std::error::Error>> {
+        // for (field, handler) in self.field_handlers {
+        //     let scope = scope.nested(field);
+        // }
         todo!()
     }
 }

@@ -28,7 +28,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// be called for the given [`Schema`].
     async fn setup<'h, 'c, 's, 'p>(
         &mut self,
-        compiler: &'c mut Compiler<'s>,
+        compiler: &'c mut Compiler,
         schema: &'s Schema,
         ptr: &'p Pointer,
     ) -> Result<bool, SetupError>;

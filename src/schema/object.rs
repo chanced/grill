@@ -1,7 +1,10 @@
-use super::*;
-use crate::{AbsoluteUri, Uri};
+use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::collections::{HashMap, HashSet};
+
+use crate::Schema;
+
+use super::{BoolOrNumber, Format, Items, Types};
 
 /// A raw JSON Schema object.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -14,7 +17,7 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.1. The `"$id"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#name-the-id-keyword)
     /// - [Understanding JSON Schema # Structuring a complex schema: `$id`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=id#id)
     #[serde(rename = "$id", default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<Uri>,
+    pub id: Option<String>,
 
     /// ## `$schema`
     /// The `$schema` keyword is both used as a JSON Schema dialect identifier
@@ -25,7 +28,7 @@ pub struct Object {
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<AbsoluteUri>,
+    pub schema: Option<String>,
 
     /// ## `$comment`
     /// The `"$comment"` keyword is strictly intended for adding comments to a
@@ -95,7 +98,7 @@ pub struct Object {
         default,
         skip_serializing_if = "HashMap::is_empty"
     )]
-    pub vocabulary: HashMap<AbsoluteUri, bool>,
+    pub vocabulary: HashMap<String, bool>,
 
     /// ## `$anchor`
     /// Using JSON Pointer fragments requires knowledge of the structure of the
@@ -188,7 +191,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub dynamic_reference: Option<Uri>,
+    pub dynamic_reference: Option<String>,
 
     /// ## `$ref`
     /// The `"$ref"` keyword is an applicator that is used to reference a
@@ -204,7 +207,7 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.3.1. Direct References with `"$ref"`](https://json-schema.org/draft/2020-12/json-schema-core.html#ref)
     /// - [Understanding JSON Schema # Structuring a complex schema `$ref`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=ref#ref)
     #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
-    pub reference: Option<Uri>,
+    pub reference: Option<String>,
 
     /// ##`$recursiveAnchor` `"$recursiveAnchor"` is used to dynamically
     /// identify a base URI at runtime for `"$recursiveRef"` by marking where
@@ -233,7 +236,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub recursive_reference: Option<Uri>,
+    pub recursive_reference: Option<String>,
     /// ## `type`
     /// The `"type"` keyword is fundamental to JSON Schema. It specifies the
     /// data type for a schema.
@@ -1039,3 +1042,20 @@ pub struct Object {
     #[serde(flatten, default)]
     pub additional_keywords: HashMap<String, Value>,
 }
+
+// fn non_fragmented_uri<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let mut s: Option<String> = Option::deserialize(deserializer)?;
+//     if let Some(v) = s.as_ref() {
+//         if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
+//             let v = v.trim();
+//             if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
+//                 return Err(serde::de::Error::custom("URI must not contain a fragment"));
+//             }
+//             s = Some(v.to_string());
+//         }
+//     }
+//     Ok(s)
+// }

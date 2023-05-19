@@ -7,5 +7,7 @@ pub struct Scope {
 }
 
 impl Scope {
-    
+    // pub(super) fn property(field_name: &str) -> Self {
+    //     todo!()
+    // }
 }

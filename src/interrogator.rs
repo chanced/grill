@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
-use uniresid::Uri;
-
 use crate::dialect::Dialect;
 
 /// A JSON Schema compiler and store.
 pub struct Interrogator {
-    dialects: HashMap<Uri, Dialect>,
+    dialects: HashMap<String, Dialect>,
 }
 
 impl Interrogator {

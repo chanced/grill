@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use serde_json::Value;
-use uniresid::Uri;
 
 use crate::{
     output::{Annotation, Structure},
@@ -12,7 +11,7 @@ use super::CompiledSchema;
 
 #[derive(Debug, Clone)]
 pub enum Subschema<'s> {
-    Reference(&'s Uri),
+    Reference(&'s str),
     Inline(Cow<'s, Schema>),
 }
 

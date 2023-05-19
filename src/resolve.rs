@@ -10,13 +10,13 @@ use crate::{
 
 #[async_trait]
 pub trait Resolve: DynClone + Send + Sync + 'static {
-    async fn resolve(&self, uri: &crate::Uri) -> Result<Option<Value>, ResolveError>;
-    async fn resolve_schema(&self, uri: &crate::Uri) -> Result<Option<Schema>, ResolveError> {
+    async fn resolve(&self, uri: &str) -> Result<Option<Value>, ResolveError>;
+    async fn resolve_schema(&self, uri: &str) -> Result<Option<Schema>, ResolveError> {
         match self.resolve(uri).await? {
             Some(value) => match serde_json::from_value(value) {
                 Ok(schema) => Ok(Some(schema)),
                 Err(err) => Err(DeserializeError::from(err)).context(resolve_error::Deserialize {
-                    schema_id: uri.clone(),
+                    schema_id: uri.to_string(),
                 }),
             },
             None => Ok(None),
@@ -47,10 +47,9 @@ impl HttpResolver {
 #[cfg(feature = "http")]
 #[async_trait]
 impl Resolve for HttpResolver {
-    async fn resolve(&self, uri: &crate::Uri) -> Result<Option<Value>, ResolveError> {
-        match uri.scheme() {
-            Some("http" | "https") => {}
-            _ => return Ok(None),
+    async fn resolve(&self, uri: &str) -> Result<Option<Value>, ResolveError> {
+        if !uri.starts_with("http://") && uri.starts_with("https://") {
+            return Ok(None);
         }
         let req_uri = uri.to_string();
         let resp = self.client.get(&req_uri).send().await;
@@ -59,18 +58,18 @@ impl Resolve for HttpResolver {
                 return Ok(None);
             }
             return Err(ResolveError::Reqwest {
-                schema_id: uri.clone(),
+                schema_id: uri.to_string(),
                 source: err,
             });
         }
         let resp = resp.unwrap();
 
-        let text = resp.text().await.context(ReqwestSnafu {
-            schema_id: uri.clone(),
+        let text = resp.text().await.context(resolve_error::Reqwest {
+            schema_id: uri.to_string(),
         })?;
         Ok(Some(deserialize_str_value(&text).context(
-            DeserializeSnafu {
-                schema_id: uri.clone(),
+            resolve_error::Deserialize {
+                schema_id: uri.to_string(),
             },
         )?))
     }

@@ -365,7 +365,6 @@ mod tests {
             additional_props,
             location: Location {
                 keyword_location: "/".try_into().unwrap(),
-                absolute_location: "http://example.com".try_into().unwrap(),
                 instance_location: "/".try_into().unwrap(),
                 absolute_keyword_location: None,
             },
@@ -376,7 +375,6 @@ mod tests {
                 location: Location {
                     instance_location: Pointer::new(&["baddata"]),
                     keyword_location: Pointer::new(&["error-keyword"]),
-                    absolute_location: "http://example.com#error-keyword".try_into().unwrap(),
                     ..Default::default()
                 },
                 error: Some(Box::new(String::from("bad data"))),

@@ -1,18 +1,13 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::collections::HashMap;
 
-use uniresid::{AbsoluteUri, Uri};
-
-use crate::{error::DialectError, schema::Object, Handler, Schema};
+use crate::{error::DialectError, schema::Object, Handler};
 
 /// Defines a set of keywords and semantics that can be used to evaluate a
 /// JSON Schema document.
 #[derive(Clone, Debug)]
 pub struct Vocabulary {
     /// The URI of the vocabulary.
-    pub id: AbsoluteUri,
+    pub id: String,
     /// Set of handlers for keywords defined by the vocabulary.
     pub handlers: Vec<Box<Handler>>,
 }
@@ -21,29 +16,23 @@ pub struct Vocabulary {
 #[derive(Debug, Clone)]
 pub struct Dialect {
     /// The URI of the dialect, used as [`"$schema"`](`crate::schema::Object::schema`).
-    pub id: AbsoluteUri,
+    pub id: String,
 
     /// Set of vocabularies defined by the dialect.
-    pub vocabularies: HashMap<AbsoluteUri, Vocabulary>,
+    pub vocabularies: HashMap<String, Vocabulary>,
 
     /// Set of meta schemas which make up the dialect.
-    pub meta_schemas: HashMap<AbsoluteUri, Object>,
+    pub meta_schemas: HashMap<String, Object>,
 }
 
-fn collect_meta_schemas(
-    meta_schemas: &[Object],
-) -> Result<HashMap<AbsoluteUri, Object>, DialectError> {
+fn collect_meta_schemas(meta_schemas: &[Object]) -> Result<HashMap<String, Object>, DialectError> {
     meta_schemas
         .iter()
         .map(|s| {
             if s.id.is_none() {
                 Err(DialectError::MissingSchemaId { schema: s.clone() })
             } else {
-                let id: Uri = s.id.clone().unwrap();
-                let id: AbsoluteUri = id
-                    .clone()
-                    .try_into()
-                    .map_err(|err| DialectError::SchemaIdNotAbsolute { err, id })?;
+                let id = s.id.clone().unwrap();
                 Ok((id, s.clone()))
             }
         })
@@ -59,7 +48,7 @@ impl Dialect {
     /// - A schema [`Object`] in `meta_schemas` has a non-absolute [`id`](crate::schema::Object::id).
     /// - A schema [`Object`] in `meta_schemas` has a required vocabulary that is not defined in `vocabularies`.
     pub fn new(
-        id: AbsoluteUri,
+        id: impl ToString,
         meta_schemas: &[Object],
         vocabularies: &[Vocabulary],
     ) -> Result<Self, DialectError> {
@@ -70,7 +59,7 @@ impl Dialect {
         let meta_schemas = collect_meta_schemas(meta_schemas)?;
         confirm_required_vocabulary(meta_schemas.iter(), &vocabularies)?;
         Ok(Self {
-            id,
+            id: id.to_string(),
             vocabularies,
             meta_schemas,
         })
@@ -90,15 +79,15 @@ impl Dialect {
     /// - The [`Schema`] has a required vocabulary that is not defined in the [`Dialect`].
     pub fn insert_meta_schema(&mut self, schema: Object) -> Result<Option<Object>, DialectError> {
         if let Some(id) = schema.id.as_ref() {
-            let id: AbsoluteUri =
-                id.clone()
-                    .try_into()
-                    .map_err(|err| DialectError::SchemaIdNotAbsolute {
-                        err,
-                        id: id.clone(),
-                    })?;
-            confirm_required_vocabulary(std::iter::once((&id, &schema)), &self.vocabularies)?;
-            Ok(self.meta_schemas.insert(id, schema))
+            // let id: AbsoluteUri =
+            //     id.clone()
+            //         .try_into()
+            //         .map_err(|err| DialectError::SchemaIdNotAbsolute {
+            //             err,
+            //             id: id.clone(),
+            //         })?;
+            confirm_required_vocabulary(std::iter::once((id, &schema)), &self.vocabularies)?;
+            Ok(self.meta_schemas.insert(id.to_string(), schema))
         } else {
             Err(DialectError::MissingSchemaId { schema })
         }
@@ -106,8 +95,8 @@ impl Dialect {
 }
 
 fn confirm_required_vocabulary<'a>(
-    meta_schemas: impl Iterator<Item = (&'a AbsoluteUri, &'a Object)>,
-    vocabularies: &HashMap<AbsoluteUri, Vocabulary>,
+    meta_schemas: impl Iterator<Item = (&'a String, &'a Object)>,
+    vocabularies: &HashMap<String, Vocabulary>,
 ) -> Result<(), DialectError> {
     for (id, obj) in meta_schemas {
         for (vocab_id, _) in obj.vocabulary.iter().filter(|(_, required)| **required) {
@@ -124,44 +113,47 @@ fn confirm_required_vocabulary<'a>(
 
 #[cfg(test)]
 mod tests {
-    use uniresid::AbsoluteUri;
 
     use crate::{dialect::Vocabulary, schema::Object};
 
     use super::Dialect;
-    fn valid_dialect_id() -> AbsoluteUri {
-        "https://example.com/dialect".try_into().unwrap()
-    }
 
     #[test]
-    fn test_new_dialect() {
-        let dialect = Dialect::new(valid_dialect_id(), &[], &[]);
+    fn test_new_empty_dialect() {
+        let dialect = Dialect::new("http://example.com/dialect", &[], &[]);
         assert!(dialect.is_ok());
-
-        let vocab_id = AbsoluteUri::parse("https://example.com/vocab").unwrap();
+    }
+    #[test]
+    fn test_new_dialect() {
         let dialect = Dialect::new(
-            valid_dialect_id(),
+            "http://example.com/dialect",
             &[Object {
-                id: Some("https://example/meta-schema".try_into().unwrap()),
-                vocabulary: [(vocab_id.clone(), true)].iter().cloned().collect(),
+                id: Some("https://example/meta-schema".into()),
+                vocabulary: [("https://example.com/vocab".to_string(), true)]
+                    .into_iter()
+                    .collect(),
                 ..Default::default()
             }],
             &[Vocabulary {
-                id: vocab_id.clone(),
+                id: "https://example.com/vocab".into(),
                 handlers: vec![],
             }],
         );
         assert!(dialect.is_ok());
         let dialect = dialect.unwrap();
-
-        assert_eq!(dialect.id, valid_dialect_id());
+        assert_eq!(dialect.id, "http://example.com/dialect");
         assert_eq!(dialect.vocabularies.len(), 1);
         assert_eq!(dialect.meta_schemas.len(), 1);
+    }
+    #[test]
+    fn test_new_dialect_missing_schema_id() {
         let dialect = Dialect::new(
-            valid_dialect_id(),
+            "https://example.com/dialect",
             &[Object {
                 id: Some("https://example/meta-schema".try_into().unwrap()),
-                vocabulary: [(vocab_id.clone(), true)].iter().cloned().collect(),
+                vocabulary: [("https://example.com/vocab1".to_string(), true)]
+                    .into_iter()
+                    .collect(),
                 ..Default::default()
             }],
             &[],

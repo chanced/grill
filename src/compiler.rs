@@ -1,8 +1,6 @@
-use std::collections::VecDeque;
-
-use crate::schema::Subschema;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
 pub struct Compiler<'s> {
-    compilation_queue: VecDeque<Subschema<'s>>,
+	marker: PhantomData<&'s str>
 }

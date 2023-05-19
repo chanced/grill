@@ -1,5 +1,5 @@
 use crate::schema::Object;
-use crate::{schema::Types, value_type_name, Location, Uri};
+use crate::{schema::Types, value_type_name, Location};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
@@ -9,7 +9,6 @@ use std::{
     error::Error,
     fmt::{self, Display},
 };
-use uniresid::AbsoluteUri;
 
 pub use crate::output::ValidationError;
 
@@ -19,12 +18,11 @@ pub enum DialectError {
         schema: Object,
     },
     MissingRequiredVocabulary {
-        vocabulary_id: AbsoluteUri,
-        meta_schema_id: AbsoluteUri,
+        vocabulary_id: String,
+        meta_schema_id: String,
     },
     SchemaIdNotAbsolute {
-        err: uniresid::Error,
-        id: Uri,
+        id: String,
     },
 }
 
@@ -38,20 +36,13 @@ impl Display for DialectError {
             MissingRequiredVocabulary { vocabulary_id, .. } => {
                 write!(f, "Vocabulary \"{vocabulary_id}\" is required")
             }
-            SchemaIdNotAbsolute { id, err } => {
-                write!(f, "Schema ID \"{id}\" is not absolute: {err}")
+            SchemaIdNotAbsolute { id } => {
+                write!(f, "Schema ID is not absolute: \"{id}\"")
             }
         }
     }
 }
-impl std::error::Error for DialectError {
-    fn source(&self) -> Option<&(dyn snafu::Error + 'static)> {
-        match self {
-            Self::SchemaIdNotAbsolute { err, .. } => Some(err),
-            _ => None,
-        }
-    }
-}
+impl std::error::Error for DialectError {}
 
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug)]
@@ -174,7 +165,7 @@ pub enum ResolveError {
     #[snafu(display(r#"schema "{schema_id}" not found"#))]
     NotFound {
         /// The URI of the schema which was not found
-        schema_id: Uri,
+        schema_id: String,
         /// The Location of the referring keyword (e.g. `"$ref"`, `"$recursiveRef"`, `"$dynamicRef"` etc.)
         referering_location: Location,
     },
@@ -182,7 +173,7 @@ pub enum ResolveError {
     #[snafu(display(r#"error reading schema "{schema_id}": {source}"#))]
     Io {
         /// The URI of the schema which was not able to be resolved
-        schema_id: Uri,
+        schema_id: String,
         /// The [`std::io::Error`] which occurred
         source: std::io::Error,
     },
@@ -190,7 +181,7 @@ pub enum ResolveError {
     #[snafu(display(r#"error deserialzing schema "{schema_id}": {source}"#))]
     Deserialize {
         /// The URI of the schema which was not able to be resolved
-        schema_id: Uri,
+        schema_id: String,
         /// The [`DeserializeError`] which occurred
         source: DeserializeError,
     },
@@ -199,7 +190,7 @@ pub enum ResolveError {
     #[snafu(display(r#"error resolving pointer "{pointer}" in schema "{schema_id}": {source}"#))]
     Pointer {
         /// The URI of the schema which was not able to be resolved
-        schema_id: Uri,
+        schema_id: String,
         /// The JSON Pointer which was not able to be resolved
         pointer: jsonptr::Pointer,
         /// The [`jsonptr::Error`] which occurred
@@ -210,27 +201,27 @@ pub enum ResolveError {
     #[snafu(display(r#"error resolving "{schema_id}": {source}"#))]
     Custom {
         /// The URI of the schema which was not able to be resolved
-        schema_id: Uri,
+        schema_id: String,
         /// The custom error which occurred
         source: Box<dyn StdError>,
     },
     #[cfg(feature = "reqwest")]
     #[snafu(display(r#"error fetching "{schema_id}": {source}"#))]
     Reqwest {
-        schema_id: Uri,
+        schema_id: String,
         source: reqwest::Error,
     },
 }
 
 impl ResolveError {
     #[must_use]
-    pub fn not_found(schema_id: Uri, referering_location: Location) -> Self {
+    pub fn not_found(schema_id: String, referering_location: Location) -> Self {
         Self::NotFound {
             schema_id,
             referering_location,
         }
     }
-    pub fn custom(schema_id: Uri, source: impl 'static + Error + Send + Sync) -> Self {
+    pub fn custom(schema_id: String, source: impl 'static + Error + Send + Sync) -> Self {
         Self::Custom {
             schema_id,
             source: Box::new(source),
@@ -270,16 +261,9 @@ pub enum SetupError {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     MetaSchema {
         /// The [`Uri`] of meta schema which encountered an error
-        schema_id: crate::uri::Uri,
+        schema_id: String,
         /// The error which occurred when parsing the meta schema
         source: MetaSchemaError,
-    },
-    /// An error occurred parsing a [`Uri`]
-    Uri {
-        /// The [`Uri`] of the schema which encountered an error
-        schema_id: crate::uri::Uri,
-        /// The error which occurred when parsing the [`Uri`]
-        source: UriError,
     },
     /// A schema was not able to be resolved.
     SchemaNotFound {
@@ -297,7 +281,7 @@ pub enum SetupError {
 #[derive(Debug, Clone)]
 
 pub struct SchemaNotFoundError {
-    pub schema_id: Uri,
+    pub schema_id: String,
     pub path: Pointer,
 }
 
@@ -310,7 +294,7 @@ impl StdError for SchemaNotFoundError {}
 
 #[derive(Debug, Clone)]
 pub struct UnexpectedValueError {
-    pub schema_id: Option<Uri>,
+    pub schema_id: Option<String>,
     pub pointer: Pointer,
     pub property: Cow<'static, str>,
     pub expected_types: Types,
@@ -337,13 +321,11 @@ pub enum MetaSchemaError {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     #[snafu(display("{}", source), context(false))]
     Unknown { source: UnkownMetaSchemaError },
-    #[snafu(display(r#"error parsing "$schema": {source}"#))]
-    MetaSchemaUri { source: UriError },
 }
 
 #[derive(Debug, Clone)]
 pub struct UnkownMetaSchemaError {
-    pub schema_id: Uri,
+    pub schema_id: String,
 }
 impl Display for UnkownMetaSchemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -352,58 +334,8 @@ impl Display for UnkownMetaSchemaError {
 }
 impl StdError for UnkownMetaSchemaError {}
 
-#[derive(Debug, Clone, Snafu)]
-#[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum UriError {
-    #[snafu(display(
-        r#"expected a string in URI format for "{property}", found {}"#,
-        value_type_name(found)
-    ))]
-    Invalid {
-        property: Cow<'static, str>,
-        found: Box<Value>,
-    },
-    #[snafu(display(r#"malformed URI for "{property}": {source}"#))]
-    Malformed {
-        property: Cow<'static, str>,
-        source: crate::uri::Error,
-        value: Box<Value>,
-    },
-}
-
-impl UriError {
-    #[must_use]
-    pub fn property(&self) -> Cow<'static, str> {
-        match self {
-            UriError::Invalid { property, .. } | UriError::Malformed { property, .. } => {
-                property.clone()
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::println;
-
-    use snafu::ResultExt;
-
     use super::*;
-
-    fn setup_error_uri() -> Result<(), SetupError> {
-        Err(UriError::Invalid {
-            property: "$schema".into(),
-            found: Value::Bool(true).into(),
-        })
-        .context(setup_error::Uri {
-            schema_id: crate::uri::Uri::default(),
-        })
-    }
-
-    #[test]
-    fn test_uri_error() {
-        let err = setup_error_uri().unwrap_err();
-
-        println!("{err}");
-    }
+    use std::println;
 }
