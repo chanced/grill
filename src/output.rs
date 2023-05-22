@@ -148,7 +148,7 @@ struct SerializedDetail<'v, 'n> {
 }
 
 impl<'v, 'n> From<&'n Node<'v>> for SerializedDetail<'v, 'n> {
-    fn from(node: &'n Node) -> Self {
+    fn from(node: &'n Node<'v>) -> Self {
         Self {
             location: Cow::Borrowed(&node.location),
             additional_props: Cow::Borrowed(&node.additional_props),
