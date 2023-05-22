@@ -1,4 +1,8 @@
+mod enum_handler;
 mod type_handler;
 pub mod handler {
-    pub use super::type_handler::{TypeHandler, TypeInvalid};
+    pub use super::{
+        enum_handler::{EnumHandler, EnumInvalid},
+        type_handler::{TypeHandler, TypeInvalid},
+    };
 }
