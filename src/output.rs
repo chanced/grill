@@ -14,6 +14,12 @@ use std::{borrow::Cow, fmt, mem};
 pub trait ValidationError<'v>: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
 dyn_clone::clone_trait_object!(<'v> ValidationError<'v>);
 
+impl Serialize for dyn ValidationError<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
 impl ValidationError<'_> for String {}
 
 pub struct Flag<'v>(Annotation<'v>);
@@ -87,39 +93,32 @@ impl<'v> Node<'v> {
     }
 }
 
-impl<'v> From<SerializedDetail<'v, '_>> for Node<'v> {
-    fn from(value: SerializedDetail<'v, '_>) -> Self {
-        let SerializedDetail {
-            location,
-            additional_props,
-            error,
-            annotations,
-            errors,
-        } = value;
-
-        let error: Option<Box<dyn ValidationError>> = if let Some(err) = error {
-            Some(Box::new(err))
-        } else {
-            None
-        };
-
-        Self {
-            location: location.into_owned(),
-            additional_props: additional_props.into_owned(),
-            error,
-            annotations: annotations.into_owned(),
-            errors: errors.into_owned(),
-        }
-    }
-}
-
-impl Serialize for Node<'_> {
+impl<'n> Serialize for Node<'n> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let s: SerializedDetail = self.into();
-        s.serialize(serializer)
+        #[derive(Serialize)]
+        struct Data<'x, 'n> {
+            #[serde(flatten)]
+            pub location: &'x Location,
+            #[serde(flatten)]
+            pub additional_props: &'x Map<String, Value>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            pub error: &'x Option<Box<dyn ValidationError<'n>>>,
+            #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+            annotations: &'x [Annotation<'n>],
+            #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+            errors: &'x [Annotation<'n>],
+        }
+        let data = Data {
+            location: &self.location,
+            additional_props: &self.additional_props,
+            error: &self.error,
+            annotations: &self.annotations,
+            errors: &self.errors,
+        };
+        data.serialize(serializer)
     }
 }
 
@@ -128,34 +127,34 @@ impl<'de> Deserialize<'de> for Node<'static> {
     where
         D: serde::Deserializer<'de>,
     {
-        let s: SerializedDetail = Deserialize::deserialize(deserializer)?;
-        Ok(s.into())
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct SerializedDetail<'v, 'n> {
-    #[serde(flatten)]
-    pub location: Cow<'v, Location>,
-    #[serde(flatten)]
-    pub additional_props: Cow<'n, Map<String, Value>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
-    annotations: Cow<'n, [Annotation<'v>]>,
-    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
-    errors: Cow<'n, [Annotation<'v>]>,
-}
-
-impl<'v, 'n> From<&'n Node<'v>> for SerializedDetail<'v, 'n> {
-    fn from(node: &'n Node<'v>) -> Self {
-        Self {
-            location: Cow::Borrowed(&node.location),
-            additional_props: Cow::Borrowed(&node.additional_props),
-            error: node.error.as_ref().map(std::string::ToString::to_string),
-            annotations: (&node.annotations).into(),
-            errors: (&node.errors).into(),
+        #[derive(Deserialize)]
+        struct Data {
+            #[serde(flatten)]
+            pub location: Location,
+            #[serde(flatten)]
+            pub additional_props: Map<String, Value>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            pub error: Option<String>,
+            #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+            annotations: Vec<Annotation<'static>>,
+            #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+            errors: Vec<Annotation<'static>>,
         }
+        let Data {
+            additional_props,
+            annotations,
+            errors,
+            error,
+            location,
+        } = Data::deserialize(deserializer)?;
+
+        Ok(Self {
+            location,
+            additional_props,
+            error: error.map(|e| Box::new(e) as Box<dyn ValidationError<'static>>),
+            annotations,
+            errors,
+        })
     }
 }
 
@@ -190,6 +189,7 @@ impl<'v> Default for Annotation<'v> {
     }
 }
 impl<'v> Annotation<'v> {
+    #[must_use]
     pub fn new(location: Location) -> Self {
         Self::Valid(Node {
             location,

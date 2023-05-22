@@ -3,24 +3,24 @@ mod discriminator;
 mod format;
 mod items;
 mod object;
-mod subschema;
 mod types;
 
 pub use bool_or_number::BoolOrNumber;
 pub use discriminator::Discriminator;
 pub use format::Format;
 pub use items::Items;
+use jsonptr::Pointer;
 pub use object::Object;
 pub use types::{Type, Types};
 
 use crate::{
     output::{Annotation, Structure},
-    Handler, Output, Scope,
+    Handler, Location, Output, Scope,
 };
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -43,14 +43,23 @@ pub struct CompiledSchema {
 }
 
 impl CompiledSchema {
-    #[allow(clippy::missing_panics_doc)]
     /// # Errors
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
     pub async fn evaluate<'v>(
         &self,
         value: &'v Value,
         structure: Structure,
     ) -> Result<Output<'v>, Box<dyn std::error::Error>> {
-        todo!()
+        let mut dynamic_anchors = HashMap::new();
+        let location = Location {
+            absolute_keyword_location: self.absolute_location.clone(),
+            keyword_location: Pointer::default(),
+            instance_location: Pointer::default(),
+        };
+        let mut scope = Scope::new(location, &mut dynamic_anchors);
+        let annotation = self.annotate("", "", &mut scope, value, structure).await?;
+        Ok(Output::new(structure, annotation))
     }
 
     pub fn schema(&self) -> &Schema {
@@ -59,11 +68,11 @@ impl CompiledSchema {
 
     /// # Errors
     /// if a custom [`Handler`](`crate::Handler`) returns a [`Box<dyn Error`](`std::error::Error`)
-    async fn annotate<'v, 's>(
+    async fn annotate<'v, 's, 'a>(
         &self,
         instance_location: &'v str,
         keyword_location: &'s str,
-        scope: &'s mut Scope,
+        scope: &'s mut Scope<'a>,
         value: &'v Value,
         structure: Structure,
     ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
@@ -82,17 +91,17 @@ impl CompiledSchema {
     }
 }
 
-struct Annotate<'v, 's, 'h> {
+struct Annotate<'v, 's, 'h, 'a> {
     instance_location: &'v str,
     keyword_location: &'s str,
     absolute_keyword_location: Option<String>,
     value: &'v Value,
     structure: Structure,
-    scope: &'s mut Scope,
+    scope: &'s mut Scope<'a>,
     handlers: &'h [Handler],
 }
 
-impl<'v, 's, 'h> Annotate<'v, 's, 'h> {
+impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
     async fn exec(self) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
         let Annotate {
             instance_location,
@@ -131,8 +140,11 @@ impl<'v, 's, 'h> Annotate<'v, 's, 'h> {
 
 #[derive(Debug, Clone)]
 pub enum Subschema<'s> {
-    Reference(&'s str),
+    Anchor(&'s str),
+    DynamicAnchor(&'s str),
     Inline(Cow<'s, Schema>),
+    RecursiveAnchor,
+    Reference(&'s str),
 }
 
 pub struct CompiledSubschema {

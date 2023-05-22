@@ -1,21 +1,27 @@
-use std::sync::Arc;
+use std::collections::HashMap;
 
-use dashmap::DashMap;
 use jsonptr::Pointer;
+use once_cell::sync::OnceCell;
 
-use crate::{
-    schema::{CompiledSchema, CompiledSubschema},
-    Location,
-};
+use crate::{schema::CompiledSubschema, Location};
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
-pub struct Scope {
+pub struct Scope<'a> {
     location: Location,
-    pub anchors: Arc<DashMap<String, CompiledSubschema>>,
-    pub dynamic_anchors: Arc<DashMap<String, CompiledSchema>>,
+    pub dynamic_anchors: &'a mut HashMap<String, OnceCell<CompiledSubschema>>,
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
+    pub fn new(
+        location: Location,
+        dynamic_anchors: &'a mut HashMap<String, OnceCell<CompiledSubschema>>,
+    ) -> Self {
+        Self {
+            location,
+            dynamic_anchors,
+        }
+    }
+
     /// Returns the location of the keyword.
     #[must_use]
     pub fn location(&self) -> &Location {
@@ -42,7 +48,7 @@ impl Scope {
     /// Returns a [`jsonptr::Error`](`jsonptr::Error`) if the
     /// `absolute_keyword_location`'s pointer is malformed.
     pub fn nested(
-        &self,
+        &mut self,
         instance: &str,
         keyword: &str,
         absolute_keyword_location: Option<String>,
@@ -50,7 +56,7 @@ impl Scope {
         let mut keyword_location = self.keyword_location().clone();
         keyword_location.push_back(keyword.into());
         let absolute_keyword_location = match absolute_keyword_location {
-            Some(absolute_keyword_location) => Some(absolute_keyword_location.to_owned()),
+            Some(absolute_keyword_location) => Some(absolute_keyword_location),
             None => {
                 if let Some(v) = self.absolute_keyword_lcoation().map(String::from) {
                     let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
@@ -70,8 +76,7 @@ impl Scope {
                 absolute_keyword_location,
                 instance_location,
             },
-            anchors: self.anchors.clone(),
-            dynamic_anchors: self.dynamic_anchors.clone(),
+            dynamic_anchors: self.dynamic_anchors,
         })
     }
 }
