@@ -1,8 +1,12 @@
-use std::fmt::Display;
+use std::{error::Error, fmt::Display};
 
 use itertools::Itertools;
 
-use crate::{handler::SyncHandler, output::ValidationError, type_of, Schema};
+use crate::{
+    handler::SyncHandler,
+    output::{Annotation, ValidationError},
+    type_of, Schema,
+};
 
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
@@ -64,7 +68,7 @@ impl SyncHandler for EnumHandler {
         scope: &mut crate::Scope,
         value: &'v serde_json::Value,
         _output_structure: crate::Structure,
-    ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
+    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>> {
         let mut annotation = scope.annotate("enum", value);
         if !self.expected.contains(value) {
             annotation.error(EnumInvalid {
