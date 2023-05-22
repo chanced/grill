@@ -2,7 +2,10 @@ use crate::Location;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt, mem};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt, mem,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -231,7 +234,7 @@ pub struct Node<'v> {
     /// Location of the keyword
     pub location: Location,
     /// Additional properties
-    pub additional_props: HashMap<String, Value>,
+    pub additional_props: BTreeMap<String, Value>,
     /// A validation error
     pub error: Option<Box<dyn ValidationError<'v>>>,
     annotations: Vec<Annotation<'v>>,
@@ -276,7 +279,7 @@ impl<'n> Serialize for Node<'n> {
             #[serde(flatten)]
             pub location: &'x Location,
             #[serde(flatten)]
-            pub additional_props: &'x HashMap<String, Value>,
+            pub additional_props: &'x BTreeMap<String, Value>,
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub error: &'x Option<Box<dyn ValidationError<'n>>>,
             #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
@@ -305,7 +308,7 @@ impl<'de> Deserialize<'de> for Node<'static> {
             #[serde(flatten)]
             pub location: Location,
             #[serde(flatten)]
-            pub additional_props: HashMap<String, Value>,
+            pub additional_props: BTreeMap<String, Value>,
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub error: Option<String>,
             #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
@@ -456,7 +459,7 @@ mod tests {
 
     #[test]
     fn test_annotiation_serde() {
-        let mut additional_props = HashMap::new();
+        let mut additional_props = BTreeMap::new();
         additional_props.insert("example".into(), 34.into());
 
         let a = Annotation::Invalid(Node {

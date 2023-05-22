@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::Schema;
 
@@ -96,9 +96,9 @@ pub struct Object {
     #[serde(
         rename = "$vocabulary",
         default,
-        skip_serializing_if = "HashMap::is_empty"
+        skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub vocabulary: HashMap<String, bool>,
+    pub vocabulary: BTreeMap<String, bool>,
 
     /// ## `$anchor`
     /// Using JSON Pointer fragments requires knowledge of the structure of the
@@ -285,7 +285,7 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.4. Schema Re-Use With `"$defs"`](https://json-schema.org/draft/2020-12/json-schema-core.html#defs)
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
     #[serde(rename = "$defs", default, skip_serializing_if = "Option::is_none")]
-    pub definitions: Option<HashMap<String, Schema>>,
+    pub definitions: Option<BTreeMap<String, Schema>>,
 
     /// ## `definitions`
     /// Legacy from Draft 07. See [`definitions`](`Object::definitions`).
@@ -300,7 +300,7 @@ pub struct Object {
         skip_serializing_if = "Option::is_none"
     )]
     #[deprecated]
-    pub definitions_legacy: Option<HashMap<String, Schema>>,
+    pub definitions_legacy: Option<BTreeMap<String, Schema>>,
 
     /// ## `allOf`
     /// The `"allOf"` keyword acts as an `AND` where each subschema must be
@@ -391,9 +391,9 @@ pub struct Object {
     #[serde(
         rename = "dependentSchemas",
         default,
-        skip_serializing_if = "HashMap::is_empty"
+        skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub dependent_schemas: HashMap<String, Schema>,
+    pub dependent_schemas: BTreeMap<String, Schema>,
 
     /// ## `prefixItems`
     /// Validation succeeds if each element of the instance validates against
@@ -483,9 +483,9 @@ pub struct Object {
     #[serde(
         rename = "properties",
         default,
-        skip_serializing_if = "HashMap::is_empty"
+        skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub properties: HashMap<String, Schema>,
+    pub properties: BTreeMap<String, Schema>,
 
     /// ## `patternProperties`
     /// Each property name of this object SHOULD be a valid regular expression,
@@ -509,9 +509,9 @@ pub struct Object {
     #[serde(
         rename = "patternProperties",
         default,
-        skip_serializing_if = "HashMap::is_empty"
+        skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub pattern_properties: HashMap<String, String>,
+    pub pattern_properties: BTreeMap<String, String>,
 
     /// ## `additionalProperties`
     /// The value of "additionalProperties" MUST be a valid JSON Schema.
@@ -855,9 +855,9 @@ pub struct Object {
     #[serde(
         rename = "dependentRequired",
         default,
-        skip_serializing_if = "HashMap::is_empty"
+        skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub dependent_required: HashMap<String, HashSet<String>>,
+    pub dependent_required: BTreeMap<String, HashSet<String>>,
 
     /// ## `contentEncoding`
     /// If the instance value is a string, this property defines that the string
@@ -1040,7 +1040,7 @@ pub struct Object {
     pub examples: Option<Vec<Value>>,
 
     #[serde(flatten, default)]
-    pub additional_keywords: HashMap<String, Value>,
+    pub additional_keywords: BTreeMap<String, Value>,
 }
 
 // fn non_fragmented_uri<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
