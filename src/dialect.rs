@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::{error::DialectError, schema::Object, Handler};
 
+pub mod draft_07;
+
 /// Defines a set of keywords and semantics that can be used to evaluate a
 /// JSON Schema document.
 #[derive(Clone, Debug)]

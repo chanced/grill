@@ -16,6 +16,7 @@ async-trait  = { version = "0.1" }
 dashmap      = { version = "5.4" }
 dyn-clone    = { version = "1.0.11" }
 either       = { version = "1.8" }
+itertools    = { version = "0.10" }
 jsonptr      = { version = "0.3.5", features = ["std", "url"] }
 once_cell    = { version = "1.10" }
 petgraph     = { version = "0.6" }

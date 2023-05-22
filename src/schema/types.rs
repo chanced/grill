@@ -1,7 +1,10 @@
-use std::{collections::HashSet, fmt::Display, str::FromStr};
+use std::{collections::HashSet, fmt::Display, ops::Deref, str::FromStr};
 
 // use heck::ToLowerCamelCase;
 use serde::{Deserialize, Serialize};
+use serde_json::{Number, Value};
+
+use crate::type_of;
 
 const ARRAY: &str = "array";
 const BOOLEAN: &str = "boolean";
@@ -71,7 +74,11 @@ impl AsRef<str> for Type {
         self.as_str()
     }
 }
-
+impl PartialEq<Type> for str {
+    fn eq(&self, other: &Type) -> bool {
+        other.as_str() == self
+    }
+}
 impl PartialEq<str> for Type {
     fn eq(&self, other: &str) -> bool {
         match self {
@@ -177,6 +184,17 @@ impl Display for Type {
             Type::String => write!(f, "{STRING}"),
             Type::Other(other) => write!(f, "{other}"),
         }
+    }
+}
+
+impl PartialEq<Type> for &str {
+    fn eq(&self, other: &Type) -> bool {
+        *self == other.as_str()
+    }
+}
+impl PartialEq<Type> for String {
+    fn eq(&self, other: &Type) -> bool {
+        self.as_str() == other.as_str()
     }
 }
 
@@ -294,6 +312,34 @@ impl Types {
     #[must_use]
     pub fn is_set(&self) -> bool {
         matches!(self, Self::Set(..))
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Types::Single(_) => false,
+            Types::Set(s) => s.is_empty(),
+        }
+    }
+
+    #[must_use]
+    pub fn includes(&self, value: &Value) -> bool {
+        match self {
+            Types::Single(s) => {
+                if type_of(value) == s {
+                    true
+                } else if s == "integer" {
+                    match value {
+                        // TODO: support big numbers
+                        Value::Number(n) => n.is_i64(),
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            }
+            Types::Set(s) => s.iter().any(|t| type_of(value) == t),
+        }
     }
 }
 
@@ -449,8 +495,6 @@ mod tests {
     use std::assert_eq;
 
     use serde_json::json;
-
-    use crate::schema::Object;
 
     use super::*;
     #[derive(Serialize, Deserialize, Debug)]

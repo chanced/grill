@@ -3,8 +3,10 @@ use std::{error::Error, fmt};
 use crate::{
     error::SetupError,
     output::{Annotation, Structure},
+    schema::Object,
     Compiler, Schema, Scope,
 };
+
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
@@ -45,7 +47,7 @@ clone_trait_object!(AsyncHandler);
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 
 pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
-    /// For each `Schema` compiled by the [`Interrogator`], this `Handler` is
+    /// For each [`Schema`] compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
     /// If the handler is applicable to the given [`Schema`], it must return
@@ -57,7 +59,9 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
         schema: &'s Schema,
     ) -> Result<bool, SetupError>;
 
-    /// Executes the handler logic for the given [`Schema`] and [`Value`].
+    /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
+    ///
+    /// Handlers should fail fast if the `output_structure` is [`Structure::Flag`](`crate::output::Structure::Flag`)
     fn evaluate<'v>(
         &self,
         scope: &mut Scope,

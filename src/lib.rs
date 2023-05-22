@@ -59,7 +59,7 @@ pub use output::{Output, Structure};
 pub mod resolve;
 pub use resolve::Resolve;
 
-pub(crate) fn value_type_name(value: &serde_json::Value) -> &'static str {
+pub(crate) fn type_of(value: &serde_json::Value) -> &'static str {
     use serde_json::Value::*;
     match value {
         Null => "null",

@@ -1,5 +1,5 @@
 use crate::schema::Object;
-use crate::{schema::Types, value_type_name, Location};
+use crate::{schema::Types, type_of, Location};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
@@ -309,7 +309,7 @@ impl fmt::Display for UnexpectedValueError {
             r#"expected {} for "{}", found {}"#,
             self.expected_types,
             self.property,
-            value_type_name(&self.found)
+            type_of(&self.found)
         )
     }
 }
@@ -337,5 +337,4 @@ impl StdError for UnkownMetaSchemaError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::println;
 }

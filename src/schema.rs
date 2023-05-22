@@ -22,12 +22,72 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, collections::HashMap};
 
+#[derive(Debug, Clone)]
+pub enum Anchor<'v> {
+    Recursive,
+    Dynamic(&'v str),
+    Static(&'v str),
+}
+
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Schema {
     Bool(bool),
     Object(Box<Object>),
+}
+
+impl Schema {
+    /// Returns `true` if the schema is [`Bool`].
+    ///
+    /// [`Bool`]: Schema::Bool
+    #[must_use]
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Self::Bool(..))
+    }
+
+    #[must_use]
+    pub fn as_bool(&self) -> Option<&bool> {
+        if let Self::Bool(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+    /// # Errors
+    /// Returns `self` if the schema is not [`Bool`].
+    pub fn try_into_bool(self) -> Result<bool, Self> {
+        if let Self::Bool(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
+    /// Returns `true` if the schema is [`Object`].
+    ///
+    /// [`Object`]: Schema::Object
+    #[must_use]
+    pub fn is_object(&self) -> bool {
+        matches!(self, Self::Object(..))
+    }
+    #[must_use]
+    pub fn as_object(&self) -> Option<&Object> {
+        if let Self::Object(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+    /// # Errors
+    /// Returns `self` if the schema is not [`Object`].
+    pub fn try_into_object(self) -> Result<Box<Object>, Self> {
+        if let Self::Object(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
 }
 impl Default for Schema {
     fn default() -> Self {
@@ -37,7 +97,7 @@ impl Default for Schema {
 
 #[derive(Debug, Clone)]
 pub struct CompiledSchema {
-    pub absolute_location: Option<String>,
+    pub absolute_location: String,
     handlers: Box<[Handler]>,
     schema: Schema,
 }
@@ -77,7 +137,7 @@ impl CompiledSchema {
         structure: Structure,
     ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
         let annotation = Annotate {
-            absolute_keyword_location: self.absolute_location.clone(),
+            absolute_keyword_location: &self.absolute_location,
             handlers: &self.handlers,
             instance_location,
             keyword_location,
@@ -94,7 +154,7 @@ impl CompiledSchema {
 struct Annotate<'v, 's, 'h, 'a> {
     instance_location: &'v str,
     keyword_location: &'s str,
-    absolute_keyword_location: Option<String>,
+    absolute_keyword_location: &'s str,
     value: &'v Value,
     structure: Structure,
     scope: &'s mut Scope<'a>,
@@ -116,10 +176,10 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
         let mut nested = scope.nested(
             instance_location,
             keyword_location,
-            absolute_keyword_location,
+            Some(absolute_keyword_location.to_string()),
         )?;
 
-        let mut result = Annotation::new(nested.location().clone());
+        let mut result = Annotation::new(nested.location().clone(), value);
         for handler in handlers.iter() {
             let annotation = match handler {
                 Handler::Sync(h) => h.evaluate(&mut nested, value, structure)?,
@@ -140,10 +200,7 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
 
 #[derive(Debug, Clone)]
 pub enum Subschema<'s> {
-    Anchor(&'s str),
-    DynamicAnchor(&'s str),
     Inline(Cow<'s, Schema>),
-    RecursiveAnchor,
     Reference(&'s str),
 }
 
@@ -153,8 +210,8 @@ pub struct CompiledSubschema {
 }
 
 impl CompiledSubschema {
-    pub fn absolute_location(&self) -> Option<&str> {
-        self.schema().absolute_location.as_deref()
+    pub fn absolute_location(&self) -> &str {
+        &self.schema().absolute_location
     }
     pub fn schema(&self) -> &CompiledSchema {
         self.schema

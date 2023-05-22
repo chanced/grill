@@ -2,8 +2,14 @@ use std::collections::HashMap;
 
 use jsonptr::Pointer;
 use once_cell::sync::OnceCell;
+use serde_json::Value;
+use strum::additional_attributes;
 
-use crate::{schema::CompiledSubschema, Location};
+use crate::{
+    output::{Annotation, Node, ValidationError},
+    schema::CompiledSubschema,
+    Location,
+};
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
 pub struct Scope<'a> {
@@ -21,6 +27,12 @@ impl<'a> Scope<'a> {
             dynamic_anchors,
         }
     }
+    #[must_use]
+    pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Annotation<'v> {
+        let mut location = self.location.clone();
+        location.push_keyword_location(keyword);
+        Annotation::new(location, value)
+    }
 
     /// Returns the location of the keyword.
     #[must_use]
@@ -29,8 +41,8 @@ impl<'a> Scope<'a> {
     }
 
     #[must_use]
-    pub fn absolute_keyword_lcoation(&self) -> Option<&str> {
-        self.location.absolute_keyword_location.as_deref()
+    pub fn absolute_keyword_lcoation(&self) -> &str {
+        &self.location.absolute_keyword_location
     }
     #[must_use]
     pub fn keyword_location(&self) -> &Pointer {
@@ -55,19 +67,16 @@ impl<'a> Scope<'a> {
     ) -> Result<Scope, jsonptr::Error> {
         let mut keyword_location = self.keyword_location().clone();
         keyword_location.push_back(keyword.into());
-        let absolute_keyword_location = match absolute_keyword_location {
-            Some(absolute_keyword_location) => Some(absolute_keyword_location),
-            None => {
-                if let Some(v) = self.absolute_keyword_lcoation().map(String::from) {
-                    let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
-                    let mut ptr: Pointer = ptr.try_into()?;
-                    ptr.push_back(keyword.into());
-                    Some(format!("{uri}#{ptr}"))
-                } else {
-                    None
-                }
-            }
-        };
+        let absolute_keyword_location =
+            if let Some(absolute_keyword_location) = absolute_keyword_location {
+                absolute_keyword_location
+            } else {
+                let v = self.location.absolute_keyword_location.clone();
+                let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
+                let mut ptr: Pointer = ptr.try_into()?;
+                ptr.push_back(keyword.into());
+                format!("{uri}#{ptr}")
+            };
         let mut instance_location = self.instance_location().clone();
         instance_location.push_back(instance.into());
         Ok(Scope {
