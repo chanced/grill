@@ -45,7 +45,6 @@ pub struct CompiledSchema {
 impl CompiledSchema {
     /// # Errors
     #[allow(clippy::missing_panics_doc)]
-    #[must_use]
     pub async fn evaluate<'v>(
         &self,
         value: &'v Value,
@@ -62,6 +61,7 @@ impl CompiledSchema {
         Ok(Output::new(structure, annotation))
     }
 
+    #[must_use]
     pub fn schema(&self) -> &Schema {
         &self.schema
     }
