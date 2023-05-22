@@ -1,179 +1,65 @@
-use std::{borrow::Cow, fmt, mem};
+mod structure;
+
+pub use structure::Structure;
 
 use crate::Location;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::{borrow::Cow, fmt, mem};
 
 /// A trait which represents a validation error to be used as the `"error"` field in output
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait ValidationError: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
-dyn_clone::clone_trait_object!(ValidationError);
+pub trait ValidationError<'v>: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
+dyn_clone::clone_trait_object!(<'v> ValidationError<'v>);
 
-impl ValidationError for String {}
+impl ValidationError<'_> for String {}
 
-pub struct Flag {}
+pub struct Flag<'v>(Annotation<'v>);
 
-pub struct Basic {}
+pub struct Basic<'v>(Annotation<'v>);
 
-pub struct Detailed {}
+pub struct Detailed<'v>(Annotation<'v>);
+pub struct Verbose<'v>(Annotation<'v>);
 
-pub struct Verbose {}
+pub struct Complete<'v>(pub Annotation<'v>);
 
-pub struct Complete(pub Annotation);
-
-pub enum Output {
-    Flag(Flag),
-    Basic(Basic),
-    Detailed(Detailed),
-    Verbose(Verbose),
-    Complete(Complete),
+pub enum Output<'v> {
+    Flag(Flag<'v>),
+    Basic(Basic<'v>),
+    Detailed(Detailed<'v>),
+    Verbose(Verbose<'v>),
+    Complete(Complete<'v>),
+}
+impl<'v> Output<'v> {
+    pub(crate) fn new(structure: Structure, annotation: Annotation<'v>) -> Output {
+        match structure {
+            Structure::Flag => Output::Flag(Flag(annotation)), // TODO
+            Structure::Basic => Output::Basic(Basic(annotation)), // TODO
+            Structure::Detailed => Output::Detailed(Detailed(annotation)), // TODO
+            Structure::Verbose => Output::Verbose(Verbose(annotation)), // TODO
+            Structure::Complete => Output::Complete(Complete(annotation)),
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Structure {
-    Flag,
-    /// The "Basic" structure is a flat list of output units.
-    /// ```json
-    /// {
-    ///   "valid": false,
-    ///   "errors": [
-    ///     {
-    ///       "keywordLocation": "",
-    ///       "instanceLocation": "",
-    ///       "error": "A subschema had errors."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
-    ///       "instanceLocation": "/1",
-    ///       "error": "A subschema had errors."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref/required",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/required",
-    ///       "instanceLocation": "/1",
-    ///       "error": "Required property 'y' not found."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref/additionalProperties",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/additionalProperties",
-    ///       "instanceLocation": "/1/z",
-    ///       "error": "Additional property 'z' found but was invalid."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/minItems",
-    ///       "instanceLocation": "",
-    ///       "error": "Expected at least 3 items but found 2"
-    ///     }
-    ///   ]
-    /// }
-    /// ```
-    Basic,
-    /// The "Detailed" structure is based on the schema and can be more readable for both humans and machines. Having the structure organized this way makes associations between the errors more apparent. For example, the fact that the missing "y" property and the extra "z" property both stem from the same location in the instance is not immediately obvious in the "Basic" structure. In a hierarchy, the correlation is more easily identified.
-    ///
-    /// The following rules govern the construction of the results object:
-    ///
-    /// - All applicator keywords (`"*Of"`, `"$ref"`, `"if"`/`"then"`/`"else"`, etc.) require a node.
-    /// - Nodes that have no children are removed.
-    /// - Nodes that have a single child are replaced by the child.
-    /// - Branch nodes do not require an error message or an annotation.
-    ///
-    /// # Example
-    ///
-    /// ## Schema:
-    /// ```json
-    /// {
-    ///   "$id": "https://example.com/polygon",
-    ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
-    ///   "$defs": {
-    ///     "point": {
-    ///       "type": "object",
-    ///       "properties": {
-    ///         "x": { "type": "number" },
-    ///         "y": { "type": "number" }
-    ///       },
-    ///       "additionalProperties": false,
-    ///       "required": [ "x", "y" ]
-    ///     }
-    ///   },
-    ///   "type": "array",
-    ///   "items": { "$ref": "#/$defs/point" },
-    ///   "minItems": 3
-    /// }
-    /// ```
-    /// ## Instance:
-    /// ```json
-    /// [ { "x": 2.5, "y": 1.3 }, { "x": 1, "z": 6.7 } ]
-    /// ```
-    /// ## `Detailed` Output:
-    ///
-    /// ```json
-    /// {
-    ///   "valid": false,
-    ///   "keywordLocation": "",
-    ///   "instanceLocation": "",
-    ///   "errors": [
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/items/$ref",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
-    ///       "instanceLocation": "/1",
-    ///       "errors": [
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/required",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/required",
-    ///           "instanceLocation": "/1",
-    ///           "error": "Required property 'y' not found."
-    ///         },
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/additionalProperties",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
-    ///           "instanceLocation": "/1/z",
-    ///           "error": "Additional property 'z' found but was invalid."
-    ///         }
-    ///       ]
-    ///     },
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/minItems",
-    ///       "instanceLocation": "",
-    ///       "error": "Expected at least 3 items but found 2"
-    ///     }
-    ///   ]
-    /// }
-    /// ```
-    Detailed,
-    Verbose,
-    Complete,
-}
-
-/// An output unit for a given keyword. Contains the keyword's location, sub
-/// annotations and errors, possibly a [`ValidationError`] and any additional fields pertinent to the
-/// keyword and output [`Structure`].
+/// An output node for a given keyword. Contains the keyword's location, sub
+/// annotations and errors, possibly a [`ValidationError`] and any additional
+/// fields pertinent to the keyword and output [`Structure`].
 #[derive(Debug, Clone, Default)]
-pub struct Unit {
+pub struct Node<'v> {
     /// Location of the keyword
     pub location: Location,
     /// Additional properties
     pub additional_props: Map<String, Value>,
     /// A validation error
-    pub error: Option<Box<dyn ValidationError>>,
-    annotations: Vec<Annotation>,
-    errors: Vec<Annotation>,
+    pub error: Option<Box<dyn ValidationError<'v>>>,
+    annotations: Vec<Annotation<'v>>,
+    errors: Vec<Annotation<'v>>,
 }
 
-impl Unit {
+impl<'v> Node<'v> {
     /// Returns `true` if there is an `error` or sub-annotations which are errors.
     #[must_use]
     pub fn is_error(&self) -> bool {
@@ -181,18 +67,18 @@ impl Unit {
     }
     /// Nested invalid `Annotation`s
     #[must_use]
-    pub fn errors(&self) -> &[Annotation] {
+    pub fn errors(&self) -> &[Annotation<'v>] {
         &self.errors
     }
 
     /// Nested valid `Annotation`s
     #[must_use]
-    pub fn annotations(&self) -> &[Annotation] {
+    pub fn annotations(&self) -> &[Annotation<'v>] {
         &self.annotations
     }
 
     /// Adds a nested [`Annotation`]
-    pub fn add_nested(&mut self, detail: Unit) {
+    pub fn add(&mut self, detail: Node<'v>) {
         if detail.is_error() {
             self.errors.push(Annotation::Invalid(detail));
         } else {
@@ -201,8 +87,8 @@ impl Unit {
     }
 }
 
-impl From<SerializedDetail<'_>> for Unit {
-    fn from(value: SerializedDetail) -> Self {
+impl<'v> From<SerializedDetail<'v, '_>> for Node<'v> {
+    fn from(value: SerializedDetail<'v, '_>) -> Self {
         let SerializedDetail {
             location,
             additional_props,
@@ -227,7 +113,7 @@ impl From<SerializedDetail<'_>> for Unit {
     }
 }
 
-impl Serialize for Unit {
+impl Serialize for Node<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -237,8 +123,8 @@ impl Serialize for Unit {
     }
 }
 
-impl<'de> Deserialize<'de> for Unit {
-    fn deserialize<D>(deserializer: D) -> Result<Unit, D::Error>
+impl<'de> Deserialize<'de> for Node<'static> {
+    fn deserialize<D>(deserializer: D) -> Result<Node<'static>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -248,27 +134,27 @@ impl<'de> Deserialize<'de> for Unit {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerializedDetail<'a> {
+struct SerializedDetail<'v, 'n> {
     #[serde(flatten)]
-    pub location: Cow<'a, Location>,
+    pub location: Cow<'v, Location>,
     #[serde(flatten)]
-    pub additional_props: Cow<'a, Map<String, Value>>,
+    pub additional_props: Cow<'n, Map<String, Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
-    annotations: Cow<'a, [Annotation]>,
+    annotations: Cow<'n, [Annotation<'v>]>,
     #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
-    errors: Cow<'a, [Annotation]>,
+    errors: Cow<'n, [Annotation<'v>]>,
 }
 
-impl<'a> From<&'a Unit> for SerializedDetail<'a> {
-    fn from(v: &'a Unit) -> Self {
+impl<'v, 'n> From<&'n Node<'v>> for SerializedDetail<'v, 'n> {
+    fn from(node: &'n Node) -> Self {
         Self {
-            location: Cow::Borrowed(&v.location),
-            additional_props: Cow::Borrowed(&v.additional_props),
-            error: v.error.as_ref().map(std::string::ToString::to_string),
-            annotations: (&v.annotations).into(),
-            errors: (&v.errors).into(),
+            location: Cow::Borrowed(&node.location),
+            additional_props: Cow::Borrowed(&node.additional_props),
+            error: node.error.as_ref().map(std::string::ToString::to_string),
+            annotations: (&node.annotations).into(),
+            errors: (&node.errors).into(),
         }
     }
 }
@@ -276,20 +162,20 @@ impl<'a> From<&'a Unit> for SerializedDetail<'a> {
 /// Represents a valid or invalid (error) annotation
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
-pub enum Annotation {
+pub enum Annotation<'v> {
     /// Valid annotation
-    Valid(Unit),
+    Valid(Node<'v>),
     /// Invalid annotation, meaning that the [`Detail`] either contains an [`ValidationError`] or
     /// has nested invalid annotations.
-    Invalid(Unit),
+    Invalid(Node<'v>),
 }
 
-impl<'de> Deserialize<'de> for Annotation {
-    fn deserialize<D>(deserializer: D) -> Result<Annotation, D::Error>
+impl<'de> Deserialize<'de> for Annotation<'static> {
+    fn deserialize<D>(deserializer: D) -> Result<Annotation<'static>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let d: Unit = Deserialize::deserialize(deserializer)?;
+        let d: Node = Deserialize::deserialize(deserializer)?;
         if d.is_error() {
             Ok(Annotation::Valid(d))
         } else {
@@ -298,9 +184,21 @@ impl<'de> Deserialize<'de> for Annotation {
     }
 }
 
-impl Annotation {
+impl<'v> Default for Annotation<'v> {
+    fn default() -> Self {
+        Self::Valid(Node::default())
+    }
+}
+impl<'v> Annotation<'v> {
+    pub fn new(location: Location) -> Self {
+        Self::Valid(Node {
+            location,
+            ..Default::default()
+        })
+    }
+
     /// Adds a nested annotation
-    pub fn add(&mut self, annotation: Annotation) {
+    pub fn add(&mut self, annotation: Annotation<'v>) {
         match self {
             Annotation::Valid(detail) => match annotation {
                 Annotation::Valid(_) => {
@@ -341,9 +239,16 @@ impl Annotation {
 
     /// Returns the [`Detail`] of this annotation.
     #[must_use]
-    pub fn detail(&self) -> &Unit {
+    pub fn detail(&self) -> &Node<'v> {
         match self {
             Annotation::Invalid(detail) | Annotation::Valid(detail) => detail,
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            Annotation::Valid(v) => v.annotations.is_empty(),
+            Annotation::Invalid(i) => i.annotations.is_empty(),
         }
     }
 }
@@ -361,7 +266,7 @@ mod tests {
         let mut additional_props = Map::new();
         additional_props.insert("example".into(), 34.into());
 
-        let a = Annotation::Invalid(Unit {
+        let a = Annotation::Invalid(Node {
             additional_props,
             location: Location {
                 keyword_location: "/".try_into().unwrap(),
@@ -369,7 +274,7 @@ mod tests {
                 absolute_keyword_location: None,
             },
             error: None,
-            annotations: vec![Annotation::Valid(Unit {
+            annotations: vec![Annotation::Valid(Node {
                 annotations: vec![],
                 errors: vec![],
                 location: Location {
@@ -380,7 +285,7 @@ mod tests {
                 error: Some(Box::new(String::from("bad data"))),
                 ..Default::default()
             })],
-            errors: vec![Annotation::Invalid(Unit {
+            errors: vec![Annotation::Invalid(Node {
                 annotations: vec![],
                 errors: vec![],
                 error: Some(Box::new(String::from("nested error"))),

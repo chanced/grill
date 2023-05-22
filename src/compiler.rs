@@ -1,6 +1,7 @@
-use std::marker::PhantomData;
+use crate::schema::Subschema;
 
 #[derive(Debug, Clone)]
 pub struct Compiler<'s> {
-	marker: PhantomData<&'s str>
+    location: jsonptr::Pointer,
+    schemas: Vec<(String, &'s Subschema<'s>)>,
 }

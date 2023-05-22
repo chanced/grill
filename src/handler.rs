@@ -7,7 +7,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
-use jsonptr::Pointer;
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
@@ -17,6 +16,7 @@ pub enum Handler {
     /// An asynchronous handler.
     Async(Box<dyn AsyncHandler>),
 }
+
 #[async_trait]
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
@@ -28,9 +28,8 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// be called for the given [`Schema`].
     async fn setup<'h, 'c, 's, 'p>(
         &mut self,
-        compiler: &'c mut Compiler,
+        compiler: &'c mut Compiler<'s>,
         schema: &'s Schema,
-        ptr: &'p Pointer,
     ) -> Result<bool, SetupError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
@@ -39,7 +38,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
         scope: &'s mut Scope,
         value: &'v Value,
         output_structure: Structure,
-    ) -> Result<Option<Annotation>, Box<dyn Error>>;
+    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
 }
 
 clone_trait_object!(AsyncHandler);
@@ -56,15 +55,14 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
         &mut self,
         compiler: &mut Compiler<'s>,
         schema: &'s Schema,
-        ptr: &Pointer,
     ) -> Result<bool, SetupError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
-    fn evaluate(
+    fn evaluate<'v>(
         &self,
         scope: &mut Scope,
-        value: &Value,
+        value: &'v Value,
         output_structure: Structure,
-    ) -> Result<Option<Annotation>, Box<dyn Error>>;
+    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
 }
 clone_trait_object!(SyncHandler);

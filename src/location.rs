@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Location {
+    /// The relative location of the validating keyword that follows the validation
+    /// path. The value MUST be expressed as a JSON Pointer, and it MUST include any
+    /// by-reference applicators such as "$ref" or "$dynamicRef".
+    /// ```plaintext
+    /// properties/width/$ref/minimum
+    /// ```
+    ///
+    /// Note that this pointer may not be resolvable by the normal JSON Pointer
+    /// process due to the inclusion of these by-reference applicator keywords.
+    ///
+    /// The JSON key for this information is "keywordLocation".
     ///
     /// - [JSON Schema Core 2020-12 #12.3.1. Keyword Relative Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-relative-location)
     #[serde(rename = "keywordLocation")]
@@ -27,8 +38,7 @@ pub struct Location {
     /// pass over a reference or if the schema does not declare an absolute URI
     /// as its "$id".
     ///
-    /// - [12.3.2. Keyword Absolute
-    ///   Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-absolute-location)
+    /// - [JSON Schema Core 2020-12 # 12.3.2. Keyword Absolute Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-absolute-location)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub absolute_keyword_location: Option<String>,
 

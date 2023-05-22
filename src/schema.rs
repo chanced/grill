@@ -11,11 +11,16 @@ pub use discriminator::Discriminator;
 pub use format::Format;
 pub use items::Items;
 pub use object::Object;
-use serde::{Deserialize, Serialize};
-pub use subschema::{CompiledSubschema, Subschema};
 pub use types::{Type, Types};
 
-use crate::{output::Annotation, Handler, Output};
+use crate::{
+    output::{Annotation, Structure},
+    Handler, Output, Scope,
+};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::borrow::Cow;
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,59 +37,121 @@ impl Default for Schema {
 
 #[derive(Debug, Clone)]
 pub struct CompiledSchema {
-    /// The absolute, dereferenced  location of the validating keyword. The
-    /// value MUST be expressed as a full URI using the canonical URI of the
-    /// relevant schema resource with a JSON Pointer fragment, and it MUST NOT
-    /// include by-reference applicators such as `"$ref"` or `"$dynamicRef"` as
-    /// non-terminal path components. It MAY end in such keywords if the error
-    /// or annotation is for that keyword, such as an unresolvable reference.
-    ///
-    /// Note that "absolute" here is in the sense of "absolute filesystem path"
-    /// (meaning the complete location) rather than the `"absolute-URI"
-    /// terminology from RFC 3986 (meaning with scheme but without fragment).
-    /// Keyword absolute locations will have a fragment in order to identify the
-    /// keyword.
-    pub absolute_keyword_location: Option<String>,
-
-    /// The relative location of the validating keyword that follows the
-    /// validation path. The value MUST be expressed as a JSON Pointer, and it
-    /// MUST include any by-reference applicators such as `"$ref"` or
-    /// `"$dynamicRef"`.
-    ///
-    /// # Example
-    /// ```plaintext
-    /// /properties/width/$ref/minimum
-    /// ```
-    ///
-    /// Note that this pointer may not be resolvable by the normal JSON Pointer
-    /// process due to the inclusion of these by-reference applicator keywords.
-    ///
-    /// The JSON key for this information is `"keywordLocation"`.
-    pub keyword_location: jsonptr::Pointer,
-
-    field_handlers: Vec<(String, Handler)>,
+    pub absolute_location: Option<String>,
+    handlers: Box<[Handler]>,
+    schema: Schema,
 }
 
 impl CompiledSchema {
     #[allow(clippy::missing_panics_doc)]
     /// # Errors
-    pub async fn evaluate(
+    pub async fn evaluate<'v>(
         &self,
-        value: &serde_json::Value,
-        output_structure: crate::output::Structure,
-    ) -> Result<Output, Box<dyn std::error::Error>> {
+        value: &'v Value,
+        structure: Structure,
+    ) -> Result<Output<'v>, Box<dyn std::error::Error>> {
+        todo!()
     }
 
-    async fn evaluate_internal(
+    pub fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    /// # Errors
+    /// if a custom [`Handler`](`crate::Handler`) returns a [`Box<dyn Error`](`std::error::Error`)
+    async fn annotate<'v, 's>(
         &self,
-        scope: &crate::Scope,
-        value: &serde_json::Value,
-        output_structure: crate::output::Structure,
-    ) -> Result<Option<Annotation>, Box<dyn std::error::Error>> {
-        // for (field, handler) in self.field_handlers {
-        //     let scope = scope.nested(field);
-        // }
-        todo!()
+        instance_location: &'v str,
+        keyword_location: &'s str,
+        scope: &'s mut Scope,
+        value: &'v Value,
+        structure: Structure,
+    ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
+        let annotation = Annotate {
+            absolute_keyword_location: self.absolute_location.clone(),
+            handlers: &self.handlers,
+            instance_location,
+            keyword_location,
+            scope,
+            structure,
+            value,
+        }
+        .exec()
+        .await?;
+        Ok(annotation)
+    }
+}
+
+struct Annotate<'v, 's, 'h> {
+    instance_location: &'v str,
+    keyword_location: &'s str,
+    absolute_keyword_location: Option<String>,
+    value: &'v Value,
+    structure: Structure,
+    scope: &'s mut Scope,
+    handlers: &'h [Handler],
+}
+
+impl<'v, 's, 'h> Annotate<'v, 's, 'h> {
+    async fn exec(self) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
+        let Annotate {
+            instance_location,
+            keyword_location,
+            absolute_keyword_location,
+            value,
+            structure,
+            scope,
+            handlers,
+        } = self;
+
+        let mut nested = scope.nested(
+            instance_location,
+            keyword_location,
+            absolute_keyword_location,
+        )?;
+
+        let mut result = Annotation::new(nested.location().clone());
+        for handler in handlers.iter() {
+            let annotation = match handler {
+                Handler::Sync(h) => h.evaluate(&mut nested, value, structure)?,
+                Handler::Async(h) => h.evaluate(&mut nested, value, structure).await?,
+            };
+            if let Some(annotation) = annotation {
+                result.add(annotation);
+                // return early if the annotation is invalid and the output
+                // structure is Flag
+                if structure.is_flag() && result.is_invalid() {
+                    return Ok(result);
+                }
+            }
+        }
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Subschema<'s> {
+    Reference(&'s str),
+    Inline(Cow<'s, Schema>),
+}
+
+pub struct CompiledSubschema {
+    keyword_location: String,
+    schema: OnceCell<CompiledSchema>,
+}
+
+impl CompiledSubschema {
+    pub fn absolute_location(&self) -> Option<&str> {
+        self.schema().absolute_location.as_deref()
+    }
+    pub fn schema(&self) -> &CompiledSchema {
+        self.schema
+            .get()
+            .expect("Schema not compiled: this is a bug")
+    }
+
+    pub fn keyword_location(&self) -> &str {
+        &self.keyword_location
     }
 }
 
