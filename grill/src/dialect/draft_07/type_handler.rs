@@ -27,12 +27,13 @@ pub struct TypeHandler {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeInvalid {
+pub struct TypeInvalid<'v> {
     expected: Types,
+    value: &'v serde_json::Value,
     actual: Type,
 }
 
-impl std::fmt::Display for TypeInvalid {
+impl std::fmt::Display for TypeInvalid<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.expected {
             Types::Single(t) => write!(f, r#"expected type "{}", got "{}""#, t, self.actual),
@@ -52,7 +53,7 @@ impl std::fmt::Display for TypeInvalid {
     }
 }
 
-impl ValidationError<'_> for TypeInvalid {}
+impl<'v> ValidationError<'v> for TypeInvalid<'v> {}
 
 impl SyncHandler for TypeHandler {
     fn setup<'s>(
@@ -80,6 +81,7 @@ impl SyncHandler for TypeHandler {
         if !types.includes(value) {
             annotation.error(TypeInvalid {
                 actual: Type::from_str(type_of(value)).unwrap(),
+                value,
                 expected: types.clone(),
             });
         }

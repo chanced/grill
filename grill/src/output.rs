@@ -353,8 +353,8 @@ impl<'v> Annotation<'v> {
             ..Default::default()
         })
     }
-    pub fn error(&mut self, error: impl ValidationError<'v>) {
-        let error = Some(Box::new(error) as Box<dyn ValidationError<'v>>);
+    pub fn error(&mut self, error: impl 'static + ValidationError<'v>) {
+        let error = Some(Box::new(error) as Box<dyn 'static + ValidationError<'v>>);
         match self {
             Annotation::Valid(n) => {
                 n.error = error;

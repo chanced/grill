@@ -70,8 +70,9 @@ impl SyncHandler for EnumHandler {
             annotation.error(EnumInvalid {
                 actual: value,
                 expected: self.expected.clone(),
-            })
+            });
         }
+
         Ok(Some(annotation))
     }
 }
