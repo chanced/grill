@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     handler::SyncHandler,
-    output::ValidationError,
+    output::{Annotation, ValidationError},
     schema::{Type, Types},
     type_of,
 };
@@ -75,7 +75,7 @@ impl SyncHandler for TypeHandler {
         scope: &mut crate::Scope,
         value: &'v serde_json::Value,
         _output_structure: crate::Structure,
-    ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
+    ) -> Result<Option<Annotation<'v>>, Box<dyn snafu::Error>> {
         let types = self.types.as_ref().expect("types must be set in setup");
         let mut annotation = scope.annotate("type", value);
         if !types.includes(value) {
