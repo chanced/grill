@@ -332,7 +332,7 @@ pub struct Object {
     ///
     /// - [Understanding JSON Schema # Schema Composition `not`](https://json-schema.org/understanding-json-schema/reference/combining.html?#id8)
     #[serde(rename = "not", default, skip_serializing_if = "Option::is_none")]
-    pub not: Option<Box<Schema>>,
+    pub not: Option<Schema>,
 
     /// ## `if`
     /// This validation outcome of this keyword's subschema has no direct effect
@@ -347,7 +347,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.1. `if`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.1)
     #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
-    pub cond_if: Option<Box<Schema>>,
+    pub cond_if: Option<Schema>,
 
     /// ## `then`
     /// When `"if"` is present, and the instance successfully validates against
@@ -361,7 +361,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.2. `then`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.2)
     #[serde(rename = "then", default, skip_serializing_if = "Option::is_none")]
-    pub cond_then: Option<Box<Schema>>,
+    pub cond_then: Option<Schema>,
 
     /// ## `else`
     /// When `"if"` is present, and the instance fails to validate against its
@@ -375,7 +375,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.3. `else`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-else)
     #[serde(rename = "else", default, skip_serializing_if = "Option::is_none")]
-    pub cond_else: Option<Box<Schema>>,
+    pub cond_else: Option<Schema>,
 
     /// ## `dependentSchemas`
     /// This keyword specifies subschemas that are evaluated if the instance is
@@ -437,7 +437,7 @@ pub struct Object {
     pub items: Option<Items>,
 
     /// - [JSON Schema Core 2019-09 # 9.3.1.2.  `additionalItems`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-9.3.1.2)
-    pub additional_items: Option<Box<Schema>>,
+    pub additional_items: Option<Schema>,
 
     /// ## `contains`
     /// An array instance is valid against `"contains"` if at least one of its
@@ -465,7 +465,7 @@ pub struct Object {
     ///
     ///  - [JSON Schema Core 2020-12 # 10.3.1.3. `contains`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-contains)
     #[serde(rename = "contains", default, skip_serializing_if = "Option::is_none")]
-    pub contains: Option<Box<Schema>>,
+    pub contains: Option<Schema>,
 
     /// ## `properties`
     /// Validation succeeds if, for each name that appears in both the instance
@@ -537,7 +537,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub additional_properties: Option<Box<Schema>>,
+    pub additional_properties: Option<Schema>,
 
     /// ## `propertyNames`
     /// If the instance is an object, this keyword validates if every property
@@ -550,7 +550,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub property_names: Option<Box<Schema>>,
+    pub property_names: Option<Schema>,
 
     /// ## `unevaluatedItems`
     /// The behavior of this keyword depends on the annotation results of
@@ -588,7 +588,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub unevaluated_items: Option<Box<Schema>>,
+    pub unevaluated_items: Option<Schema>,
     /// ## `unevaluatedProperties`
     /// The behavior of this keyword depends on the annotation results of adjacent
     /// keywords that apply to the instance location being validated. Specifically,
@@ -624,7 +624,7 @@ pub struct Object {
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub unevaluated_properties: Option<Box<Schema>>,
+    pub unevaluated_properties: Option<Schema>,
 
     /// ## `enum`
     /// An instance validates successfully against this keyword if its value is
@@ -940,7 +940,7 @@ pub struct Object {
     ///
     /// - [JSON Schema Validation 2020-12 # 8.5. `contentSchema`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentschema)
     #[serde(rename = "contentSchema", skip_serializing_if = "Option::is_none")]
-    pub content_schema: Option<Box<Schema>>,
+    pub content_schema: Option<Schema>,
 
     /// ## `title`
     /// A title can be used to decorate a user interface with information about

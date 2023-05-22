@@ -27,7 +27,7 @@ use std::{borrow::Cow, collections::HashMap};
 #[serde(untagged)]
 pub enum Schema {
     Bool(bool),
-    Object(Object),
+    Object(Box<Object>),
 }
 impl Default for Schema {
     fn default() -> Self {
