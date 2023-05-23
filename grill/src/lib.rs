@@ -31,6 +31,7 @@ pub use interrogator::Interrogator;
 pub mod dialect;
 
 mod source;
+use schema::Types;
 pub use source::Source;
 
 /// JSON Schema and supporting types.
@@ -58,18 +59,6 @@ pub use output::{Output, Structure};
 /// Traits and implementations for loading JSON Schema source definitions.
 pub mod resolve;
 pub use resolve::Resolve;
-
-pub(crate) fn type_of(value: &serde_json::Value) -> &'static str {
-    use serde_json::Value::*;
-    match value {
-        Null => "null",
-        Bool(_) => "boolean",
-        Number(_) => "number",
-        String(_) => "string",
-        Array(_) => "array",
-        Object(_) => "object",
-    }
-}
 
 mod compiler;
 pub use compiler::Compiler;

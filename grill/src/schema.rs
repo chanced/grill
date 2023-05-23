@@ -205,8 +205,8 @@ pub enum Subschema<'s> {
 }
 
 pub struct CompiledSubschema {
-    keyword_location: String,
-    schema: OnceCell<CompiledSchema>,
+    pub keyword_location: Pointer,
+    pub schema: OnceCell<CompiledSchema>,
 }
 
 impl CompiledSubschema {
@@ -244,7 +244,7 @@ mod tests {
         );
         let obj: Object = serde_json::from_str("{}").unwrap();
         let obj: Object = serde_json::from_value(schema.clone()).unwrap();
-
         let schema: Schema = serde_json::from_value(schema).unwrap();
+        println!("{schema:#?}");
     }
 }

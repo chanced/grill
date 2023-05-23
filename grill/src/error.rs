@@ -1,5 +1,5 @@
 use crate::schema::Object;
-use crate::{schema::Types, type_of, Location};
+use crate::{schema::Types, Location};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
@@ -309,7 +309,7 @@ impl fmt::Display for UnexpectedValueError {
             r#"expected {} for "{}", found {}"#,
             self.expected_types,
             self.property,
-            type_of(&self.found)
+            Types::of_value(&self.found)
         )
     }
 }

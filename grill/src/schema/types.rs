@@ -1,10 +1,9 @@
-use std::{collections::HashSet, fmt::Display, ops::Deref, str::FromStr};
+use std::{collections::HashSet, fmt::Display, str::FromStr};
 
+use itertools::Itertools;
 // use heck::ToLowerCamelCase;
 use serde::{Deserialize, Serialize};
-use serde_json::{Number, Value};
-
-use crate::type_of;
+use serde_json::Value;
 
 const ARRAY: &str = "array";
 const BOOLEAN: &str = "boolean";
@@ -218,6 +217,7 @@ impl From<&str> for Type {
             NULL => Type::Null,
             OBJECT => Type::Object,
             STRING => Type::String,
+            NUMBER => Type::Number,
             _ => {
                 let t = s.to_lowercase();
                 if t == s {
@@ -254,17 +254,38 @@ impl FromStr for Type {
 ///
 /// If it’s a string, it is the name of one of the basic types above.
 ///
-///If it is an array, it must be an array of strings, where each string is the
-///name of one of the basic types, and each element is unique. In this case, the
-///JSON snippet is valid if it matches any of the given types.
+/// If it is an array, it must be an array of strings, where each string is the
+/// name of one of the basic types, and each element is unique. In this case, the
+/// JSON snippet is valid if it matches any of the given types.
 pub enum Types {
     /// A single [`Type`], represented as a string.
     Single(Type),
     /// A set of [`Type`]s, represented as an array of strings.
-    Set(HashSet<Type>),
+    Set(Vec<Type>),
 }
 
 impl Types {
+    /// Returns the [`Types`](crate::Types) of a [`serde_json::Value`].
+    #[must_use]
+    pub fn of_value(value: &Value) -> Self {
+        use serde_json::Value::*;
+        match value {
+            Null => Types::Single(Type::Null),
+            Bool(_) => Types::Single(Type::Boolean),
+            Number(n) => {
+                // TODO: handle large numbers
+                if n.is_i64() {
+                    Types::Set(vec![Type::Number, Type::Integer])
+                } else {
+                    Types::Single(Type::Number)
+                }
+            }
+            String(_) => Types::Single(Type::String),
+            Array(_) => Types::Single(Type::Array),
+            Object(_) => Types::Single(Type::Object),
+        }
+    }
+
     /// Returns `true` if the types is [`Single`].
     ///
     /// [`Single`]: Types::Single
@@ -272,14 +293,23 @@ impl Types {
     pub fn is_single(&self) -> bool {
         matches!(self, Self::Single(..))
     }
-    /// Returns `true` if `value` is present
+    /// Returns `true` if the [`Type`] `typ` is present
     #[must_use]
-    pub fn contains(&self, value: &Type) -> bool {
+    pub fn contains(&self, typ: &Type) -> bool {
         match self {
-            Types::Single(s) => s == value,
-            Types::Set(s) => s.contains(value),
+            Types::Single(s) => s == typ,
+            Types::Set(s) => s.contains(typ),
         }
     }
+
+    #[must_use]
+    pub fn contains_any(&self, types: &Types) -> bool {
+        match self {
+            Types::Single(s) => types.contains(s),
+            Types::Set(s) => s.iter().any(|t| types.contains(t)),
+        }
+    }
+
     /// Inserts `value` into the [`Types`].
     ///
     /// If the [`Types`] is [`Single`](`Types::Single`), it will be converted to [`Set`](`Types::Set`).
@@ -287,12 +317,12 @@ impl Types {
         match self {
             Types::Single(s) => {
                 if s != &value {
-                    *self = Types::Set(HashSet::from([s.clone(), value]));
+                    *self = Types::Set(vec![s.clone(), value]);
                 }
             }
             Types::Set(s) => {
                 if !s.contains(&value) {
-                    s.insert(value);
+                    s.push(value);
                 }
             }
         }
@@ -315,30 +345,18 @@ impl Types {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn len(&self) -> usize {
         match self {
-            Types::Single(_) => false,
-            Types::Set(s) => s.is_empty(),
+            Types::Single(_) => 1,
+            Types::Set(s) => s.len(),
         }
     }
 
     #[must_use]
-    pub fn includes(&self, value: &Value) -> bool {
+    pub fn is_empty(&self) -> bool {
         match self {
-            Types::Single(s) => {
-                if type_of(value) == s {
-                    true
-                } else if s == "integer" {
-                    match value {
-                        // TODO: support big numbers
-                        Value::Number(n) => n.is_i64(),
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            Types::Set(s) => s.iter().any(|t| type_of(value) == t),
+            Types::Single(_) => false,
+            Types::Set(s) => s.is_empty(),
         }
     }
 }
@@ -389,7 +407,7 @@ impl From<HashSet<Type>> for Types {
     fn from(ts: HashSet<Type>) -> Self {
         match ts.len() {
             1 => Types::Single(ts.into_iter().next().unwrap()),
-            _ => Types::Set(ts),
+            _ => Types::Set(ts.into_iter().collect_vec()),
         }
     }
 }
@@ -409,7 +427,7 @@ impl From<&[Type]> for Types {
         let mut hs = ts.iter().cloned().collect::<HashSet<_>>();
         match hs.len() {
             1 => Types::Single(hs.drain().next().unwrap()),
-            _ => Types::Set(hs),
+            _ => Types::Set(hs.into_iter().collect()),
         }
     }
 }
@@ -419,16 +437,13 @@ impl From<&[&str]> for Types {
         let mut hs: HashSet<Type> = ts.iter().map(|s| Type::from(*s)).collect();
         match hs.len() {
             1 => Types::Single(hs.drain().next().unwrap()),
-            _ => Types::Set(hs),
+            _ => Types::Set(hs.into_iter().collect()),
         }
     }
 }
 impl From<Vec<&str>> for Types {
     fn from(ts: Vec<&str>) -> Self {
-        match ts.len() {
-            1 => Types::Single(Type::from(ts[0])),
-            _ => Types::Set(ts.iter().map(|s| Type::from(*s)).collect()),
-        }
+        Self::from(ts.as_slice())
     }
 }
 impl From<Vec<String>> for Types {
@@ -457,7 +472,7 @@ impl From<Types> for HashSet<Type> {
                 hs.insert(t);
                 hs
             }
-            Types::Set(ts) => ts,
+            Types::Set(ts) => ts.into_iter().collect(),
         }
     }
 }

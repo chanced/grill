@@ -5,7 +5,8 @@ use itertools::Itertools;
 use crate::{
     handler::SyncHandler,
     output::{Annotation, ValidationError},
-    type_of, Schema,
+    schema::Types,
+    Schema,
 };
 
 #[derive(Debug, Clone)]
@@ -21,24 +22,26 @@ impl Display for EnumInvalid<'_> {
                 f,
                 "expected value to be a {}, found {}",
                 self.expected[0],
-                type_of(self.actual)
+                Types::of_value(self.actual)
             ),
             _ => write!(
                 f,
                 "expected value to be one of [{:?}], found {}",
                 self.expected.iter().join(", "),
-                type_of(self.actual)
+                Types::of_value(self.actual)
             ),
         }
     }
 }
+
 impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
+
 /// The value of this keyword MUST be an array.  This array SHOULD have
 /// at least one element.  Elements in the array SHOULD be unique.
 ///
 /// An instance validates successfully against this keyword if its value
 /// is equal to one of the elements in this keyword's array value.
-
+///
 /// Elements in the array might be of any value, including null.
 ///
 /// - [JSON Schema Validation 07 # 6.1.2. `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
@@ -78,5 +81,44 @@ impl SyncHandler for EnumHandler {
         }
 
         Ok(Some(annotation))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::Scope;
+
+    use super::*;
+
+    #[test]
+    fn test_setup_succeeds() {
+        let mut handler = EnumHandler::default();
+        let mut compiler = crate::Compiler::default();
+        let schema = serde_json::json!({"enum": [1, 2, 3]});
+        let schema: Schema = serde_json::from_value(schema).unwrap();
+        let result = handler.setup(&mut compiler, &schema);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+        assert_eq!(handler.expected, vec![1, 2, 3]);
+    }
+    #[test]
+    fn test_evaluate() {
+        let mut handler = EnumHandler::default();
+        let mut compiler = crate::Compiler::default();
+        let schema = serde_json::json!({"enum": [1, 2, 3]});
+        let schema: Schema = serde_json::from_value(schema).unwrap();
+        handler.setup(&mut compiler, &schema).unwrap();
+        let mut dynamic_anchors = HashMap::new();
+        let mut scope = Scope::new(crate::Location::default(), &mut dynamic_anchors);
+        let one = serde_json::json!(1);
+        let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert!(annotation.is_some());
+        let annotation = annotation.unwrap();
+        assert!(annotation.nested_errors().is_empty());
+        println!("{annotation:#?}");
     }
 }

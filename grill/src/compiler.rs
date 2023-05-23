@@ -1,23 +1,28 @@
+use once_cell::sync::OnceCell;
+
 use crate::{
-    schema::{Anchor, Subschema},
+    schema::{Anchor, CompiledSubschema, Subschema},
     Location,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Compiler<'s> {
     location: Location,
-    // TODO:       ↓ these could probably be &str
     schemas: Vec<(String, Subschema<'s>)>,
-    //             ↓
     anchors: Vec<(String, Anchor<'s>)>,
 }
+
 impl<'s> Compiler<'s> {
     pub fn anchor(&mut self, anchor: Anchor<'s>) {
-        let (base, _) = self
-            .location
-            .absolute_keyword_location
-            .split_once('#')
-            .unwrap_or((&self.location.absolute_keyword_location, ""));
-        self.anchors.push((base.to_string(), anchor));
+        self.anchors
+            .push((self.location.absolute_keyword_location.clone(), anchor));
+    }
+    pub fn schema(&mut self, keyword: &str, schema: Subschema<'s>) -> CompiledSubschema {
+        self.schemas
+            .push((self.location.absolute_keyword_location.clone(), schema));
+        CompiledSubschema {
+            keyword_location: self.location.keyword_location.clone(),
+            schema: OnceCell::default(),
+        }
     }
 }
