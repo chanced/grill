@@ -9,6 +9,7 @@ use crate::{
     Schema,
 };
 
+/// [`ValidationError`] for the `"enum"` keyword, produced by [`EnumHandler`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
     expected: Vec<serde_json::Value>,
@@ -35,16 +36,21 @@ impl Display for EnumInvalid<'_> {
 }
 
 impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
-
-/// The value of this keyword MUST be an array.  This array SHOULD have
-/// at least one element.  Elements in the array SHOULD be unique.
+/// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.
 ///
-/// An instance validates successfully against this keyword if its value
-/// is equal to one of the elements in this keyword's array value.
+/// An instance validates successfully against this keyword if its value is
+/// equal to one of the elements in this keyword's array value.
+///
+/// The value of this keyword MUST be an array.  This array SHOULD have at least
+/// one element.  Elements in the array SHOULD be unique.
+///
+/// An instance validates successfully against this keyword if its value is
+/// equal to one of the elements in this keyword's array value.
 ///
 /// Elements in the array might be of any value, including null.
 ///
-/// - [JSON Schema Validation 07 # 6.1.2. `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
+/// - [JSON Schema Validation 07 # 6.1.2.
+///   `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
 #[derive(Debug, Clone, Default)]
 pub struct EnumHandler {
     expected: Vec<serde_json::Value>,

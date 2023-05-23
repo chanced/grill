@@ -5,19 +5,23 @@ use crate::{
     output::{Annotation, ValidationError},
     schema::Types,
 };
-
-/// The value of this keyword MUST be either a string or an array.  If it
-/// is an array, elements of the array MUST be strings and MUST be
-/// unique.
+/// [`Handler`](`crate::handler::Handler`) for the `"type"` keyword.
 ///
-/// String values MUST be one of the six primitive types ("null",
-/// "boolean", "object", "array", "number", or "string"), or "integer"
-/// which matches any number with a zero fractional part.
+/// `"type"`  is fundamental to JSON Schema. It specifies the data type for a
+/// schema.
 ///
-/// An instance validates if and only if the instance is in any of the
-/// sets listed for this keyword.
+/// The value of this keyword MUST be either a string or an array.  If it is an
+/// array, elements of the array MUST be strings and MUST be unique.
 ///
-/// - [Schema Validation 07 # 6.1.1. `type`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.1)
+/// String values MUST be one of the six primitive types ("null", "boolean",
+/// "object", "array", "number", or "string"), or "integer" which matches any
+/// number with a zero fractional part.
+///
+/// An instance validates if and only if the instance is in any of the sets
+/// listed for this keyword.
+///
+/// - [Schema Validation 07 # 6.1.1.
+///   `type`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.1)
 #[derive(Clone)]
 pub struct TypeHandler<F> {
     get_types: F,
@@ -41,6 +45,7 @@ impl<F> std::fmt::Debug for TypeHandler<F> {
     }
 }
 
+/// [`ValidationError`] for the `"type"` keyword, produced by [`TypeHandler`].
 #[derive(Debug, Clone)]
 pub struct TypeInvalid<'v> {
     pub expected: Types,
