@@ -1,6 +1,6 @@
-use std::{error::Error, fmt::Display};
-
+use crate::ISSUES_URL;
 use itertools::Itertools;
+use std::{error::Error, fmt::Display};
 
 use crate::{
     handler::SyncHandler,
@@ -8,32 +8,6 @@ use crate::{
     schema::Types,
     Schema,
 };
-
-/// [`ValidationError`] for the `"enum"` keyword, produced by [`EnumHandler`].
-#[derive(Debug, Clone)]
-pub struct EnumInvalid<'v> {
-    expected: Vec<serde_json::Value>,
-    actual: &'v serde_json::Value,
-}
-impl Display for EnumInvalid<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.expected.len() {
-            0 => panic!("expected is empty"),
-            1 => write!(
-                f,
-                "expected value to be a {}, found {}",
-                self.expected[0],
-                Types::of_value(self.actual)
-            ),
-            _ => write!(
-                f,
-                "expected value to be one of [{:?}], found {}",
-                self.expected.iter().join(", "),
-                Types::of_value(self.actual)
-            ),
-        }
-    }
-}
 
 impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
 /// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.
@@ -87,6 +61,35 @@ impl SyncHandler for EnumHandler {
         }
 
         Ok(Some(annotation))
+    }
+}
+
+/// [`ValidationError`] for the `"enum"` keyword, produced by [`EnumHandler`].
+#[derive(Debug, Clone)]
+pub struct EnumInvalid<'v> {
+    expected: Vec<serde_json::Value>,
+    actual: &'v serde_json::Value,
+}
+
+impl Display for EnumInvalid<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.expected.len() {
+            0 => panic!(
+                "EnumInvalid: expected is empty. This is a bug. Please report it to {ISSUES_URL}"
+            ),
+            1 => write!(
+                f,
+                "expected value to be a {}, found {}",
+                self.expected[0],
+                Types::of_value(self.actual)
+            ),
+            _ => write!(
+                f,
+                "expected value to be one of [{:?}], found {}",
+                self.expected.iter().join(", "),
+                Types::of_value(self.actual)
+            ),
+        }
     }
 }
 
