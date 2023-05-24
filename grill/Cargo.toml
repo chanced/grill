@@ -12,23 +12,23 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-async-trait  = { version = "0.1" }
-dashmap      = { version = "5.4" }
-dyn-clone    = { version = "1.0.11" }
-either       = { version = "1.8" }
-itertools    = { version = "0.10" }
-jsonptr      = { version = "0.3.6", features = ["std", "url"] }
-once_cell    = { version = "1.10" }
-petgraph     = { version = "0.6" }
+anymap       = { workspace = true }
+async-trait  = { workspace = true }
+dashmap      = { workspace = true }
+dyn-clone    = { workspace = true }
+either       = { workspace = true }
+itertools    = { workspace = true }
+jsonptr      = { workspace = true }
+once_cell    = { workspace = true }
+petgraph     = { workspace = true }
 reqwest      = { version = "0.11", optional = true }
-serde        = { version = "1.0.163", features = ["derive"] }
-serde_json   = { version = "1.0" }
-snafu        = { version = "0.7.4" }
-strum        = { version = "0.24", features = ["derive"] }
-strum_macros = { version = "0.24" }
-toml         = { version = "0.7.3", optional = true }
-url          = { version = "2.2.2" }
-yaml         = { version = "0.9.21", optional = true, package = "serde_yaml" }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+snafu        = { workspace = true }
+strum        = { workspace = true }
+strum_macros = { workspace = true }
+url          = { workspace = true }
+
 # async_fn_traits = { version = "0.1.1" }
 # regex        = { version = "1.8" }
 

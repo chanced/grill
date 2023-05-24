@@ -65,5 +65,7 @@ pub use compiler::Compiler;
 
 pub(crate) const ISSUES_URL: &str = "https://github.com/chanced/grill/issues/new";
 
-#[cfg(test)]
-pub mod test;
+pub mod state;
+pub use state::State;
+
+mod integration;

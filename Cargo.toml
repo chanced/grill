@@ -1,2 +1,23 @@
 [workspace]
-members = ["grill"]
+members = ["grill", "tests"]
+
+[workspace.dependencies]
+grill = { path = "grill" }
+
+anymap       = { version = "1.0.0-beta.2" }
+async-trait  = { version = "0.1" }
+dashmap      = { version = "5.4" }
+dyn-clone    = { version = "1.0.11" }
+either       = { version = "1.8" }
+erased-serde = { version = "0.3.25" }
+itertools    = { version = "0.10" }
+jsonptr      = { version = "0.3.6", features = ["std", "url"] }
+once_cell    = { version = "1.10" }
+petgraph     = { version = "0.6" }
+reqwest      = { version = "0.11" }
+serde        = { version = "1.0.163", features = ["derive"] }
+serde_json   = { version = "1.0" }
+snafu        = { version = "0.7.4" }
+strum        = { version = "0.24", features = ["derive"] }
+strum_macros = { version = "0.24" }
+url          = { version = "2.2.2" }

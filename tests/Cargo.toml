@@ -1,0 +1,9 @@
+[package]
+edition = "2021"
+name    = "tests"
+version = "0.1.0"
+
+[dependencies]
+grill      = { workspace = true }
+serde      = { worksspace = true }
+serde_json = { workspace = true }

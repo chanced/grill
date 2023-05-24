@@ -4,7 +4,6 @@ use crate::{
     handler::SyncHandler,
     output::{Annotation, ValidationError},
     schema::Types,
-    test::{TestCase, TestCases},
 };
 /// [`Handler`](`crate::handler::Handler`) for the `"type"` keyword.
 ///
@@ -178,34 +177,3 @@ mod tests {
         assert!(annotation.is_invalid());
     }
 }
-
-#[test]
-fn test_suite() {
-    let test_cases = serde_json::from_slice::<TestCases>(include_bytes!(
-        "../../../../tests/json-schema-test-suite/tests/draft7/type.json"
-    ))
-    .unwrap();
-
-    for case in test_cases {
-        let mut compiler = crate::Compiler::default();
-        let mut handler = TypeHandler::default();
-        let schema = case.schema.clone();
-        handler.setup(&mut compiler, &schema).unwrap();
-    }
-}
-
-/*
-let schema = serde_json::json!({"type": ["null", "string"]});
-    let schema: Schema = serde_json::from_value(schema).unwrap();
-    let mut dynamic_anchors = HashMap::new();
-    let mut scope = Scope::new(crate::Location::default(), &mut dynamic_anchors);
-    let one = serde_json::json!(1.1);
-    let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
-    assert!(result.is_ok());
-    let annotation = result.unwrap();
-    assert!(annotation.is_some());
-    let annotation = annotation.unwrap();
-    assert!(annotation.nested_errors().is_empty());
-    assert!(annotation.is_invalid());
-
- */

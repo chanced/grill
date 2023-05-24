@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::Schema;
+use grill::Schema;
 
 pub type TestCases = Vec<TestCase>;
 

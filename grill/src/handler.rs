@@ -3,7 +3,6 @@ use std::{error::Error, fmt};
 use crate::{
     error::SetupError,
     output::{Annotation, Structure},
-    schema::Object,
     Compiler, Schema, Scope,
 };
 
