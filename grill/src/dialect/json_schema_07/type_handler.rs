@@ -5,9 +5,9 @@ use crate::{
     output::{Annotation, ValidationError},
     schema::Types,
 };
-/// [`Handler`](`crate::handler::Handler`) for the `"type"` keyword.
+/// [`Handler`](`crate::handler::Handler`) for the `type` keyword.
 ///
-/// `"type"`  is fundamental to JSON Schema. It specifies the data type for a
+/// `type` is fundamental to JSON Schema. It specifies the data type for a
 /// schema.
 ///
 /// The value of this keyword MUST be either a string or an array.  If it is an
@@ -45,7 +45,7 @@ impl<F> std::fmt::Debug for TypeHandler<F> {
     }
 }
 
-/// [`ValidationError`] for the `"type"` keyword, produced by [`TypeHandler`].
+/// [`ValidationError`] for the `type` keyword, produced by [`TypeHandler`].
 #[derive(Debug, Clone)]
 pub struct TypeInvalid<'v> {
     pub expected: Types,
@@ -72,7 +72,6 @@ impl std::fmt::Display for TypeInvalid<'_> {
         }
     }
 }
-
 impl<'v> ValidationError<'v> for TypeInvalid<'v> {}
 
 impl<F> SyncHandler for TypeHandler<F>
@@ -100,7 +99,7 @@ where
         &self,
         scope: &mut crate::Scope,
         value: &'v serde_json::Value,
-        _output_structure: crate::Structure,
+        _structure: crate::Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn snafu::Error>> {
         let expected = self.expected.as_ref().expect("types must be set in setup");
         let mut annotation = scope.annotate("type", value);
@@ -118,9 +117,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
-    use crate::{Schema, Scope};
+    use crate::{Schema, Scope, State};
 
     use super::*;
 
@@ -146,8 +144,8 @@ mod tests {
         let schema = serde_json::json!({"type": ["null", "number"]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
         handler.setup(&mut compiler, &schema).unwrap();
-        let mut dynamic_anchors = HashMap::new();
-        let mut scope = Scope::new(crate::Location::default(), &mut dynamic_anchors);
+        let mut state = State::new();
+        let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1.1);
         let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
         assert!(result.is_ok());
@@ -165,8 +163,8 @@ mod tests {
         let schema = serde_json::json!({"type": ["null", "string"]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
         handler.setup(&mut compiler, &schema).unwrap();
-        let mut dynamic_anchors = HashMap::new();
-        let mut scope = Scope::new(crate::Location::default(), &mut dynamic_anchors);
+        let mut state = State::new();
+        let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1.1);
         let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
         assert!(result.is_ok());

@@ -1,5 +1,13 @@
-use crate::{handler::SyncHandler, Schema};
+use std::fmt::Display;
 
+use crate::{handler::SyncHandler, output::ValidationError, Schema};
+
+/// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
+///
+/// The value of this keyword MAY be of any type, including null.
+///
+/// An instance validates successfully against this keyword if its value is
+/// equal to the value of the keyword.
 #[derive(Default, Clone, Debug)]
 pub struct ConstHandler {
     pub expected: Option<serde_json::Value>,
@@ -8,7 +16,7 @@ pub struct ConstHandler {
 impl SyncHandler for ConstHandler {
     fn setup<'s>(
         &mut self,
-        compiler: &mut crate::Compiler<'s>,
+        _compiler: &mut crate::Compiler<'s>,
         schema: &'s Schema,
     ) -> Result<bool, crate::error::SetupError> {
         match schema {
@@ -19,18 +27,97 @@ impl SyncHandler for ConstHandler {
             _ => Ok(false),
         }
     }
-
     fn evaluate<'v>(
         &self,
         scope: &mut crate::Scope,
         value: &'v serde_json::Value,
-        output_structure: crate::Structure,
+        _structure: crate::Structure,
     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
-        todo!()
+        let expected = self.expected.as_ref().unwrap();
+        let mut annotation = scope.annotate("const", value);
+        if value != expected {
+            annotation.error(ConstInvalid {
+                actual: value,
+                expected: expected.clone(),
+            });
+        }
+        Ok(Some(annotation))
     }
 }
 
+/// [`ValidationError`] for the `enum` keyword, produced by [`ConstHandler`].
+#[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
     pub expected: serde_json::Value,
     pub actual: &'v serde_json::Value,
+}
+impl Display for ConstInvalid<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "expected {}, found {}", self.actual, self.expected)
+    }
+}
+impl<'v> ValidationError<'v> for ConstInvalid<'v> {}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::{Location, State, Structure};
+
+    use super::*;
+
+    #[test]
+    fn test_const_setup() {
+        let mut compiler = crate::Compiler::default();
+        let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
+        let mut handler = ConstHandler::default();
+        assert!(handler.setup(&mut compiler, &schema).unwrap());
+        assert_eq!(handler.expected, Some(serde_json::json!(1)));
+
+        let schema: Schema = serde_json::from_value(json!({})).unwrap();
+        let mut handler = ConstHandler::default();
+        assert!(!handler.setup(&mut compiler, &schema).unwrap());
+    }
+
+    #[test]
+    fn test_const_evaluate() {
+        let mut compiler = crate::Compiler::default();
+        let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
+        let mut handler = ConstHandler::default();
+        handler.setup(&mut compiler, &schema).unwrap();
+        let mut state = State::new();
+        let mut scope = crate::Scope::new(Location::default(), &mut state);
+        let value = serde_json::json!(1);
+        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert!(result.is_valid());
+        let value = serde_json::json!(2);
+        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert!(result.is_invalid());
+    }
+    #[test]
+    fn test_const_obj() {
+        let mut compiler = crate::Compiler::default();
+        let schema: Schema =
+            serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
+        let mut handler = ConstHandler::default();
+        handler.setup(&mut compiler, &schema).unwrap();
+        let mut state = State::new();
+        let mut scope = crate::Scope::new(Location::default(), &mut state);
+
+        let value = serde_json::json!({"b": "b", "a":"a"});
+        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert!(result.is_valid());
+    }
 }

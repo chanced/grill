@@ -1,10 +1,11 @@
+use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::collections::{BTreeMap, HashSet};
 
 use crate::Schema;
 
-use super::{BoolOrNumber, Format, Items, Types};
+use super::{BoolOrNumber, CompiledBoolOrNumber, CompiledSchema, Format, Items, Types};
 
 /// A raw JSON Schema object.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -1041,6 +1042,91 @@ pub struct Object {
 
     #[serde(flatten, default)]
     pub additional_keywords: BTreeMap<String, Value>,
+}
+
+pub(super) struct CompiledObject {
+    id: Option<String>,
+    schema: Option<String>,
+    comment: Option<String>,
+    vocabulary: BTreeMap<String, bool>,
+    anchor: Option<String>,
+    dynamic_anchor: Option<String>,
+    dynamic_reference: Option<String>,
+    reference: Option<String>,
+    recursive_anchor: Option<bool>,
+    recursive_reference: Option<String>,
+    types: Option<Types>,
+    format: Option<Format>,
+    constant: Option<serde_json::Value>,
+    definitions: Option<BTreeMap<String, CompiledSchema>>,
+    definitions_legacy: Option<BTreeMap<String, CompiledSchema>>,
+    all_of: Vec<CompiledSchema>,
+    any_of: Vec<CompiledSchema>,
+    one_of: Vec<CompiledSchema>,
+    not: Option<CompiledSchema>,
+    cond_if: Option<CompiledSchema>,
+    cond_then: Option<CompiledSchema>,
+    cond_else: Option<CompiledSchema>,
+    dependent_schemas: BTreeMap<String, CompiledSchema>,
+    prefix_items: Vec<CompiledSchema>,
+    items: Option<Items>,
+    additional_items: Option<CompiledSchema>,
+    contains: Option<CompiledSchema>,
+    properties: BTreeMap<String, CompiledSchema>,
+    pattern_properties: BTreeMap<String, String>,
+    additional_properties: Option<CompiledSchema>,
+    property_names: Option<CompiledSchema>,
+    unevaluated_items: Option<CompiledSchema>,
+    unevaluated_properties: Option<CompiledSchema>,
+    enumeration: Vec<Value>,
+    multiple_of: Option<BigRational>,
+    maximum: Option<BigRational>,
+    exclusive_maximum: Option<CompiledBoolOrNumber>,
+    minimum: Option<BigRational>,
+    exclusive_minimum: Option<CompiledBoolOrNumber>,
+    max_length: Option<usize>,
+    min_length: Option<usize>,
+    pattern: Option<String>,
+    max_items: Option<usize>,
+    min_items: Option<usize>,
+    unique_items: Option<bool>,
+    max_contains: Option<usize>,
+    min_contains: Option<usize>,
+    max_properties: Option<usize>,
+    min_properties: Option<usize>,
+    required: HashSet<String>,
+    dependent_required: BTreeMap<String, HashSet<String>>,
+    content_encoding: Option<String>,
+    content_media_type: Option<String>,
+    content_schema: Option<CompiledSchema>,
+    title: Option<String>,
+    description: Option<String>,
+    deprecated: Option<bool>,
+    read_only: Option<bool>,
+    write_only: Option<bool>,
+    examples: Option<Vec<Value>>,
+    additional_keywords: BTreeMap<String, Value>,
+    additional_numbers: BTreeMap<String, BigRational>,
+    additional_compiled_schemas: BTreeMap<String, CompiledSchema>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use fraction::BigFraction;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_object_de() {
+        let r = big_rational_str::str_to_big_rational("34.34").unwrap();
+
+        // let schema = json!({"multipleOf": "34.34"});
+        // let schema: Object = serde_json::from_value(schema).unwrap();
+        // println!("{schema:?}");
+    }
 }
 
 // fn non_fragmented_uri<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>

@@ -38,7 +38,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
         &'h self,
         scope: &'s mut Scope,
         value: &'v Value,
-        output_structure: Structure,
+        _structure: Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
 }
 
@@ -60,12 +60,12 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
 
     /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
     ///
-    /// Handlers should fail fast if the `output_structure` is [`Structure::Flag`](`crate::output::Structure::Flag`)
+    /// Handlers should fail fast if the `structure` is [`Structure::Flag`](`crate::output::Structure::Flag`)
     fn evaluate<'v>(
         &self,
         scope: &mut Scope,
         value: &'v Value,
-        output_structure: Structure,
+        _structure: Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
 }
 clone_trait_object!(SyncHandler);

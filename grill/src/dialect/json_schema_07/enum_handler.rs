@@ -50,7 +50,7 @@ impl SyncHandler for EnumHandler {
         &self,
         scope: &mut crate::Scope,
         value: &'v serde_json::Value,
-        _output_structure: crate::Structure,
+        _structure: crate::Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>> {
         let mut annotation = scope.annotate("enum", value);
         if !self.expected.contains(value) {
@@ -64,7 +64,7 @@ impl SyncHandler for EnumHandler {
     }
 }
 
-/// [`ValidationError`] for the `"enum"` keyword, produced by [`EnumHandler`].
+/// [`ValidationError`] for the `enum` keyword, produced by [`EnumHandler`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
     expected: Vec<serde_json::Value>,
@@ -95,9 +95,8 @@ impl Display for EnumInvalid<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
-    use crate::Scope;
+    use crate::{Scope, State};
 
     use super::*;
 
@@ -119,8 +118,8 @@ mod tests {
         let schema = serde_json::json!({"enum": [1, 2, 3]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
         handler.setup(&mut compiler, &schema).unwrap();
-        let mut dynamic_anchors = HashMap::new();
-        let mut scope = Scope::new(crate::Location::default(), &mut dynamic_anchors);
+        let mut state = State::new();
+        let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1);
         let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
         assert!(result.is_ok());
@@ -128,6 +127,5 @@ mod tests {
         assert!(annotation.is_some());
         let annotation = annotation.unwrap();
         assert!(annotation.nested_errors().is_empty());
-        println!("{annotation:#?}");
     }
 }

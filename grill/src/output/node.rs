@@ -9,7 +9,7 @@ use super::{Annotation, ValidationError};
 
 /// An output node for a given keyword. Contains the keyword's location, sub
 /// annotations and errors, possibly a [`ValidationError`] and any additional
-/// fields pertinent to the keyword and output [`Structure`].
+/// fields pertinent to the keyword and output [`Structure`](`crate::output::Structure`).
 #[derive(Debug, Clone, Default)]
 pub struct Node<'v> {
     /// Location of the keyword

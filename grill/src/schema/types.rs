@@ -273,7 +273,6 @@ impl Types {
             Null => Types::Single(Type::Null),
             Bool(_) => Types::Single(Type::Boolean),
             Number(n) => {
-                // TODO: handle large numbers
                 if n.is_i64() {
                     Types::Set(vec![Type::Number, Type::Integer])
                 } else {

@@ -8,24 +8,18 @@ use strum::additional_attributes;
 use crate::{
     output::{Annotation, Node, ValidationError},
     schema::CompiledSubschema,
-    Location,
+    Location, State,
 };
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
 pub struct Scope<'a> {
     location: Location,
-    pub dynamic_anchors: &'a mut HashMap<String, OnceCell<CompiledSubschema>>,
+    pub state: &'a mut State,
 }
 
 impl<'a> Scope<'a> {
-    pub fn new(
-        location: Location,
-        dynamic_anchors: &'a mut HashMap<String, OnceCell<CompiledSubschema>>,
-    ) -> Self {
-        Self {
-            location,
-            dynamic_anchors,
-        }
+    pub fn new(location: Location, state: &'a mut State) -> Self {
+        Self { location, state }
     }
     #[must_use]
     pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Annotation<'v> {
@@ -85,7 +79,7 @@ impl<'a> Scope<'a> {
                 absolute_keyword_location,
                 instance_location,
             },
-            dynamic_anchors: self.dynamic_anchors,
+            state: self.state,
         })
     }
 }

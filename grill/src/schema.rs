@@ -1,3 +1,4 @@
+mod anchor;
 mod bool_or_number;
 mod discriminator;
 mod format;
@@ -5,29 +6,23 @@ mod items;
 mod object;
 mod types;
 
-pub use bool_or_number::BoolOrNumber;
+pub use anchor::Anchor;
+pub use bool_or_number::{BoolOrNumber, CompiledBoolOrNumber};
 pub use discriminator::Discriminator;
 pub use format::Format;
 pub use items::Items;
-use jsonptr::Pointer;
 pub use object::Object;
 pub use types::{Type, Types};
 
 use crate::{
     output::{Annotation, Structure},
-    Handler, Location, Output, Scope,
+    Handler, Location, Output, Scope, State,
 };
+use jsonptr::Pointer;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, collections::HashMap};
-
-#[derive(Debug, Clone)]
-pub enum Anchor<'v> {
-    Recursive,
-    Dynamic(&'v str),
-    Static(&'v str),
-}
+use std::borrow::Cow;
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -110,13 +105,13 @@ impl CompiledSchema {
         value: &'v Value,
         structure: Structure,
     ) -> Result<Output<'v>, Box<dyn std::error::Error>> {
-        let mut dynamic_anchors = HashMap::new();
+        let mut state = State::new();
         let location = Location {
             absolute_keyword_location: self.absolute_location.clone(),
             keyword_location: Pointer::default(),
             instance_location: Pointer::default(),
         };
-        let mut scope = Scope::new(location, &mut dynamic_anchors);
+        let mut scope = Scope::new(location, &mut state);
         let annotation = self.annotate("", "", &mut scope, value, structure).await?;
         Ok(Output::new(structure, annotation))
     }
@@ -242,9 +237,22 @@ mod tests {
                     "type": "object"
             }
         );
-        let obj: Object = serde_json::from_str("{}").unwrap();
         let obj: Object = serde_json::from_value(schema.clone()).unwrap();
+        assert_eq!(
+            obj.description,
+            Some("A product in the catalog".to_string())
+        );
+        assert_eq!(obj.title, Some("Product".to_string()));
+        assert_eq!(
+            obj.id,
+            Some("https://example.com/product.schema.json".to_string())
+        );
+        assert_eq!(
+            obj.schema,
+            Some("https://json-schema.org/draft/2020-12/schema".to_string())
+        );
+
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        println!("{schema:#?}");
+        assert!(matches!(schema, Schema::Object(..)));
     }
 }

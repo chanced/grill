@@ -110,10 +110,47 @@ impl<'v> Annotation<'v> {
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Annotation::Valid(v) => v.annotations.is_empty(),
-            Annotation::Invalid(i) => i.annotations.is_empty(),
+    // pub(crate) fn is_empty(&self) -> bool {
+    //     match self {
+    //         Annotation::Valid(v) => v.annotations.is_empty(),
+    //         Annotation::Invalid(i) => i.annotations.is_empty(),
+    //     }
+    // }
+
+    #[must_use]
+    pub fn as_valid(&self) -> Option<&Node<'v>> {
+        if let Self::Valid(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// # Errors
+    /// Returns `Err(self)` if the annotation is [`Invalid`].
+    pub fn try_into_valid(self) -> Result<Node<'v>, Self> {
+        if let Self::Valid(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
+    #[must_use]
+    pub fn as_invalid(&self) -> Option<&Node<'v>> {
+        if let Self::Invalid(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+    /// # Errors
+    /// Returns `Err(self)` if the annotation is [`Valid`].
+    pub fn try_into_invalid(self) -> Result<Node<'v>, Self> {
+        if let Self::Invalid(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
         }
     }
 }
