@@ -1,17 +1,15 @@
 use std::fmt::Display;
 
-use crate::{handler::SyncHandler, output::ValidationError, Schema};
+use crate::{handler::SyncHandler, output::ValidationError, schema::CompiledSchema, Schema};
 use num::{FromPrimitive, Zero};
 use num_rational::BigRational;
 use serde_json::Number;
 
 #[derive(Debug, Clone, Default)]
-pub struct MultipleOfHandler {
-    pub expected_multiple_of: Option<BigRational>,
-}
+pub struct MultipleOfHandler {}
 
 impl SyncHandler for MultipleOfHandler {
-    fn setup<'s>(
+    fn compile<'s>(
         &mut self,
         _compiler: &mut crate::Compiler<'s>,
         schema: &'s Schema,
@@ -29,6 +27,7 @@ impl SyncHandler for MultipleOfHandler {
     fn evaluate<'v>(
         &self,
         scope: &mut crate::Scope,
+        schema: &CompiledSchema,
         value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {

@@ -3,6 +3,7 @@ use std::{error::Error, fmt};
 use crate::{
     error::SetupError,
     output::{Annotation, Structure},
+    schema::CompiledSchema,
     Compiler, Schema, Scope,
 };
 
@@ -27,7 +28,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// If the handler is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
-    async fn setup<'h, 'c, 's, 'p>(
+    async fn compile<'h, 'c, 's, 'p>(
         &mut self,
         compiler: &'c mut Compiler<'s>,
         schema: &'s Schema,
@@ -37,6 +38,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     async fn evaluate<'h, 's, 'v>(
         &'h self,
         scope: &'s mut Scope,
+        schema: &'s CompiledSchema,
         value: &'v Value,
         _structure: Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
@@ -52,7 +54,7 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// If the handler is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
-    fn setup<'s>(
+    fn compile<'s>(
         &mut self,
         compiler: &mut Compiler<'s>,
         schema: &'s Schema,
@@ -64,6 +66,7 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
     fn evaluate<'v>(
         &self,
         scope: &mut Scope,
+        schema: &CompiledSchema,
         value: &'v Value,
         _structure: Structure,
     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;

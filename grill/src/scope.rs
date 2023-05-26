@@ -1,25 +1,23 @@
-use std::collections::HashMap;
-
 use jsonptr::Pointer;
-use once_cell::sync::OnceCell;
-use serde_json::Value;
-use strum::additional_attributes;
+use num_rational::BigRational;
+use serde_json::{Number, Value};
 
-use crate::{
-    output::{Annotation, Node, ValidationError},
-    schema::CompiledSubschema,
-    Location, State,
-};
+use crate::{output::Annotation, Location, State};
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
 pub struct Scope<'a> {
-    location: Location,
     pub state: &'a mut State,
+    location: Location,
+    number: Option<BigRational>,
 }
 
 impl<'a> Scope<'a> {
     pub fn new(location: Location, state: &'a mut State) -> Self {
-        Self { location, state }
+        Self {
+            state,
+            location,
+            number: None,
+        }
     }
     #[must_use]
     pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Annotation<'v> {
@@ -32,6 +30,13 @@ impl<'a> Scope<'a> {
     #[must_use]
     pub fn location(&self) -> &Location {
         &self.location
+    }
+
+    pub fn number(&mut self, number: &Number) -> &BigRational {
+        self.number.get_or_insert_with(|| {
+            big_rational_str::str_to_big_rational(&number.to_string())
+                .expect("serde_json::Number should always parse into a num_rational::BigRational")
+        })
     }
 
     #[must_use]
@@ -80,6 +85,7 @@ impl<'a> Scope<'a> {
                 instance_location,
             },
             state: self.state,
+            number: None,
         })
     }
 }

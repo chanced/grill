@@ -78,7 +78,7 @@ impl<F> SyncHandler for TypeHandler<F>
 where
     F: 'static + Send + Sync + Clone + Fn(&serde_json::Value) -> Types,
 {
-    fn setup<'s>(
+    fn compile<'s>(
         &mut self,
         _compiler: &mut crate::Compiler<'s>,
         schema: &'s crate::Schema,
@@ -128,7 +128,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema = serde_json::json!({"type": ["string", "number"]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        let result = handler.setup(&mut compiler, &schema);
+        let result = handler.compile(&mut compiler, &schema);
         assert!(result.is_ok());
         assert!(result.unwrap());
         assert_eq!(
@@ -143,7 +143,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema = serde_json::json!({"type": ["null", "number"]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        handler.setup(&mut compiler, &schema).unwrap();
+        handler.compile(&mut compiler, &schema).unwrap();
         let mut state = State::new();
         let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1.1);
@@ -162,7 +162,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema = serde_json::json!({"type": ["null", "string"]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        handler.setup(&mut compiler, &schema).unwrap();
+        handler.compile(&mut compiler, &schema).unwrap();
         let mut state = State::new();
         let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1.1);

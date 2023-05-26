@@ -11,6 +11,7 @@ pub use bool_or_number::{BoolOrNumber, CompiledBoolOrNumber};
 pub use discriminator::Discriminator;
 pub use format::Format;
 pub use items::Items;
+use num_rational::BigRational;
 pub use object::Object;
 pub use types::{Type, Types};
 
@@ -19,10 +20,9 @@ use crate::{
     Handler, Location, Output, Scope, State,
 };
 use jsonptr::Pointer;
-use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,9 +90,12 @@ impl Default for Schema {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CompiledSchema {
     pub absolute_location: String,
+    meta_schema: String,
+    numbers: HashMap<&'static str, BigRational>,
+    schemas: HashMap<&'static str, CompiledSchema>,
     handlers: Box<[Handler]>,
     schema: Schema,
 }
@@ -121,6 +124,17 @@ impl CompiledSchema {
         &self.schema
     }
 
+    pub fn number<'a>(&'a self, keyword: &str) -> Option<&'a BigRational> {
+        self.numbers.get(keyword)
+    }
+
+    pub fn subschema<'a>(&'a self, keyword: &str) -> Option<CompiledSubschema<'a>> {
+        self.schemas.get(keyword).map(|schema| CompiledSubschema {
+            keyword,
+            schema,
+        })
+    }
+
     /// # Errors
     /// if a custom [`Handler`](`crate::Handler`) returns a [`Box<dyn Error`](`std::error::Error`)
     async fn annotate<'v, 's, 'a>(
@@ -133,12 +147,12 @@ impl CompiledSchema {
     ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
         let annotation = Annotate {
             absolute_keyword_location: &self.absolute_location,
-            handlers: &self.handlers,
             instance_location,
             keyword_location,
             scope,
             structure,
             value,
+            schema: self,
         }
         .exec()
         .await?;
@@ -146,14 +160,14 @@ impl CompiledSchema {
     }
 }
 
-struct Annotate<'v, 's, 'h, 'a> {
+struct Annotate<'v, 's, 'c, 'a> {
     instance_location: &'v str,
     keyword_location: &'s str,
     absolute_keyword_location: &'s str,
     value: &'v Value,
     structure: Structure,
     scope: &'s mut Scope<'a>,
-    handlers: &'h [Handler],
+    schema: &'c CompiledSchema,
 }
 
 impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
@@ -165,7 +179,7 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
             value,
             structure,
             scope,
-            handlers,
+            schema,
         } = self;
 
         let mut nested = scope.nested(
@@ -175,10 +189,10 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
         )?;
 
         let mut result = Annotation::new(nested.location().clone(), value);
-        for handler in handlers.iter() {
+        for handler in schema.handlers.iter() {
             let annotation = match handler {
-                Handler::Sync(h) => h.evaluate(&mut nested, value, structure)?,
-                Handler::Async(h) => h.evaluate(&mut nested, value, structure).await?,
+                Handler::Sync(h) => h.evaluate(&mut nested, schema, value, structure)?,
+                Handler::Async(h) => h.evaluate(&mut nested, schema, value, structure).await?,
             };
             if let Some(annotation) = annotation {
                 result.add(annotation);
@@ -199,23 +213,21 @@ pub enum Subschema<'s> {
     Reference(&'s str),
 }
 
-pub struct CompiledSubschema {
-    pub keyword_location: Pointer,
-    pub schema: OnceCell<CompiledSchema>,
+#[derive(Debug, Clone)]
+pub struct CompiledSubschema<'s> {
+    keyword: &'s str,
+    schema: &'s CompiledSchema,
 }
 
-impl CompiledSubschema {
+impl CompiledSubschema<'_> {
     pub fn absolute_location(&self) -> &str {
-        &self.schema().absolute_location
+        &self.schema.absolute_location
     }
-    pub fn schema(&self) -> &CompiledSchema {
-        self.schema
-            .get()
-            .expect("Schema not compiled: this is a bug")
+    pub fn schema(&self) -> &Schema {
+        &self.schema.schema
     }
-
     pub fn keyword_location(&self) -> &str {
-        &self.keyword_location
+        &self.keyword
     }
 }
 

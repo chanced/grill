@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{handler::SyncHandler, output::ValidationError, Schema};
+use crate::{handler::SyncHandler, output::ValidationError, schema::CompiledSchema, Schema};
 
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
 ///
@@ -14,7 +14,7 @@ pub struct ConstHandler {
 }
 
 impl SyncHandler for ConstHandler {
-    fn setup<'s>(
+    fn compile<'s>(
         &mut self,
         _compiler: &mut crate::Compiler<'s>,
         schema: &'s Schema,
@@ -30,6 +30,7 @@ impl SyncHandler for ConstHandler {
     fn evaluate<'v>(
         &self,
         scope: &mut crate::Scope,
+        schema: &CompiledSchema,
         value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
@@ -71,12 +72,12 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
         let mut handler = ConstHandler::default();
-        assert!(handler.setup(&mut compiler, &schema).unwrap());
+        assert!(handler.compile(&mut compiler, &schema).unwrap());
         assert_eq!(handler.expected, Some(serde_json::json!(1)));
 
         let schema: Schema = serde_json::from_value(json!({})).unwrap();
         let mut handler = ConstHandler::default();
-        assert!(!handler.setup(&mut compiler, &schema).unwrap());
+        assert!(!handler.compile(&mut compiler, &schema).unwrap());
     }
 
     #[test]
@@ -84,7 +85,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
         let mut handler = ConstHandler::default();
-        handler.setup(&mut compiler, &schema).unwrap();
+        handler.compile(&mut compiler, &schema).unwrap();
         let mut state = State::new();
         let mut scope = crate::Scope::new(Location::default(), &mut state);
         let value = serde_json::json!(1);
@@ -108,7 +109,7 @@ mod tests {
         let schema: Schema =
             serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
         let mut handler = ConstHandler::default();
-        handler.setup(&mut compiler, &schema).unwrap();
+        handler.compile(&mut compiler, &schema).unwrap();
         let mut state = State::new();
         let mut scope = crate::Scope::new(Location::default(), &mut state);
 

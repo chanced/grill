@@ -31,7 +31,7 @@ pub struct EnumHandler {
 }
 
 impl SyncHandler for EnumHandler {
-    fn setup<'s>(
+    fn compile<'s>(
         &mut self,
         _compiler: &mut crate::Compiler<'s>,
         schema: &'s Schema,
@@ -106,7 +106,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema = serde_json::json!({"enum": [1, 2, 3]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        let result = handler.setup(&mut compiler, &schema);
+        let result = handler.compile(&mut compiler, &schema);
         assert!(result.is_ok());
         assert!(result.unwrap());
         assert_eq!(handler.expected, vec![1, 2, 3]);
@@ -117,7 +117,7 @@ mod tests {
         let mut compiler = crate::Compiler::default();
         let schema = serde_json::json!({"enum": [1, 2, 3]});
         let schema: Schema = serde_json::from_value(schema).unwrap();
-        handler.setup(&mut compiler, &schema).unwrap();
+        handler.compile(&mut compiler, &schema).unwrap();
         let mut state = State::new();
         let mut scope = Scope::new(crate::Location::default(), &mut state);
         let one = serde_json::json!(1);
