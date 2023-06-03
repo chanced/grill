@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::Schema;
 
-use super::CompiledSchema;
+
 
 #[derive(Debug, Clone)]
 pub enum Subschema<'s> {

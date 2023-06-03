@@ -1,12 +1,10 @@
-use crate::ISSUES_URL;
+
 use itertools::Itertools;
 use std::{error::Error, fmt::Display};
 
 use crate::{
     handler::SyncHandler,
-    output::{Annotation, ValidationError},
-    schema::Types,
-    Schema,
+    output::{ValidationError},
 };
 
 /// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.

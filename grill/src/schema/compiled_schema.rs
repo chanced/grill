@@ -1,12 +1,10 @@
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
-    sync::Arc,
 };
 
 use super::{CompiledBoolOrNumber, Format, Items, SchemaRef, Types};
 use crate::{
-    error::EvaluateError, output::Annotation, AbsoluteUri, Compile, Handler, Keyword, Schema,
+    error::EvaluateError, output::Annotation, AbsoluteUri, Compile, Handler, Keyword,
     Scope, Uri,
 };
 use fancy_regex::Regex;
@@ -93,7 +91,7 @@ pub struct CompiledSchema {
 
 impl CompiledSchema {
     #[must_use]
-    pub fn new(c: Compile) -> Self {
+    pub fn new(_c: Compile) -> Self {
         todo!()
         // let obj = schema
         //     .as_object()
@@ -462,7 +460,7 @@ impl CompiledSchema {
     /// - [Understanding JSON Schema # Structuring a complex schema `$ref`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=ref#ref)
     #[must_use]
     #[inline]
-    pub fn reference<'s>(&self, scope: &Scope) -> Option<SchemaRef> {
+    pub fn reference<'s>(&self, _scope: &Scope) -> Option<SchemaRef> {
         self.reference
     }
 
@@ -614,8 +612,8 @@ impl CompiledSchema {
     #[inline]
     pub fn cond_if<'s, 'v>(
         &self,
-        scope: &Scope<'s>,
-        value: &'v Value,
+        _scope: &Scope<'s>,
+        _value: &'v Value,
     ) -> Option<Result<Option<Annotation<'v>>, EvaluateError>> {
         // self.cond_if.as_ref()
         todo!()
@@ -1406,7 +1404,7 @@ impl CompiledSchema {
         self.set_subschema_lists(schema_lists);
         self.set_subschema_maps(schema_maps);
     }
-    fn set_single_schemas(&mut self, schemas: HashMap<Keyword<'_>, SchemaRef>) {}
+    fn set_single_schemas(&mut self, _schemas: HashMap<Keyword<'_>, SchemaRef>) {}
     fn set_subschema_maps(
         &mut self,
         schema_maps: HashMap<Keyword<'_>, HashMap<Keyword<'_>, SchemaRef>>,

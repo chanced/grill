@@ -1,8 +1,8 @@
 use url::Url;
 
-use crate::{AbsoluteUri, Schema, Uri};
+use crate::{AbsoluteUri, Uri};
 
-use super::Dialect;
+
 
 use once_cell::sync::Lazy;
 mod const_handler;

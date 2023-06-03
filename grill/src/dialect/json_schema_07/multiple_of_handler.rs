@@ -1,14 +1,14 @@
 use std::fmt::Display;
 
 use crate::{
-    error::{CompileError, EvaluateError},
+    error::{CompileError},
     handler::SyncHandler,
     output::ValidationError,
     schema::CompiledSchema,
     Compile, Handler, Keyword, Schema,
 };
-use num::Zero;
-use serde_json::{Number, Value};
+
+use serde_json::{Number};
 
 #[derive(Debug, Clone, Default)]
 pub struct MultipleOfHandler {}
@@ -34,9 +34,9 @@ impl SyncHandler for MultipleOfHandler {
 
     fn evaluate<'v>(
         &self,
-        scope: &mut crate::Scope,
-        schema: &CompiledSchema,
-        value: &'v serde_json::Value,
+        _scope: &mut crate::Scope,
+        _schema: &CompiledSchema,
+        _value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn std::error::Error>> {
         // TODO: fix this

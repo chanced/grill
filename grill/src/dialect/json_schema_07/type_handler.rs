@@ -2,8 +2,8 @@ use itertools::Itertools;
 
 use crate::{
     handler::SyncHandler,
-    output::{Annotation, ValidationError},
-    schema::{CompiledSchema, Types},
+    output::{ValidationError},
+    schema::{Types},
 };
 /// [`Handler`](`crate::handler::Handler`) for the `type` keyword.
 ///

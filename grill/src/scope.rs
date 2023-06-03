@@ -1,5 +1,5 @@
 use big_rational_str::ParseError;
-use dashmap::DashMap;
+
 use jsonptr::Pointer;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
@@ -22,7 +22,7 @@ impl<'a> Scope<'a> {
     pub fn new(
         location: Location,
         state: &'a mut State,
-        schemas: &SlotMap<SchemaRef, CompiledSchema>
+        _schemas: &SlotMap<SchemaRef, CompiledSchema>
     ) -> Self {
         Self {
             state,

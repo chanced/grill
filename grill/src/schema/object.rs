@@ -1,12 +1,12 @@
-use fancy_regex::Regex;
-use num_rational::BigRational;
+
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::collections::{BTreeMap, HashSet};
 
 use crate::Schema;
 
-use super::{BoolOrNumber, CompiledBoolOrNumber, Format, Items, Types};
+use super::{BoolOrNumber, Format, Items, Types};
 
 /// A raw JSON Schema object.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
