@@ -9,7 +9,6 @@ use crate::{
     Schema,
 };
 
-impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
 /// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.
 ///
 /// An instance validates successfully against this keyword if its value is
@@ -30,39 +29,39 @@ pub struct EnumHandler {
     expected: Vec<serde_json::Value>,
 }
 
-impl SyncHandler for EnumHandler {
-    fn compile<'s>(
-        &mut self,
-        _compiler: &mut crate::Compiler<'s>,
-        schema: &'s Schema,
-    ) -> Result<bool, crate::error::SetupError> {
-        match schema {
-            Schema::Bool(_) => Ok(false),
-            Schema::Object(obj) if obj.enumeration.is_empty() => Ok(false),
-            Schema::Object(obj) => {
-                self.expected = obj.enumeration.clone();
-                Ok(true)
-            }
-        }
-    }
+// impl SyncHandler for EnumHandler {
+//     fn compile<'s>(
+//         &mut self,
+//         _compiler: &mut crate::Compiler<'s>,
+//         schema: &'s Schema,
+//     ) -> Result<bool, crate::error::SetupError> {
+//         match schema {
+//             Schema::Bool(_) => Ok(false),
+//             Schema::Object(obj) if obj.enumeration.is_empty() => Ok(false),
+//             Schema::Object(obj) => {
+//                 self.expected = obj.enumeration.clone();
+//                 Ok(true)
+//             }
+//         }
+//     }
 
-    fn evaluate<'v>(
-        &self,
-        scope: &mut crate::Scope,
-        value: &'v serde_json::Value,
-        _structure: crate::Structure,
-    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>> {
-        let mut annotation = scope.annotate("enum", value);
-        if !self.expected.contains(value) {
-            annotation.error(EnumInvalid {
-                actual: value,
-                expected: self.expected.clone(),
-            });
-        }
+//     fn evaluate<'v>(
+//         &self,
+//         scope: &mut crate::Scope,
+//         value: &'v serde_json::Value,
+//         _structure: crate::Structure,
+//     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>> {
+//         let mut annotation = scope.annotate("enum", value);
+//         if !self.expected.contains(value) {
+//             annotation.error(EnumInvalid {
+//                 actual: value,
+//                 expected: self.expected.clone(),
+//             });
+//         }
 
-        Ok(Some(annotation))
-    }
-}
+//         Ok(Some(annotation))
+//     }
+// }
 
 /// [`ValidationError`] for the `enum` keyword, produced by [`EnumHandler`].
 #[derive(Debug, Clone)]
@@ -71,61 +70,63 @@ pub struct EnumInvalid<'v> {
     actual: &'v serde_json::Value,
 }
 
-impl Display for EnumInvalid<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.expected.len() {
-            0 => panic!(
-                "EnumInvalid: expected is empty. This is a bug. Please report it to {ISSUES_URL}"
-            ),
-            1 => write!(
-                f,
-                "expected value to be a {}, found {}",
-                self.expected[0],
-                Types::of_value(self.actual)
-            ),
-            _ => write!(
-                f,
-                "expected value to be one of [{:?}], found {}",
-                self.expected.iter().join(", "),
-                Types::of_value(self.actual)
-            ),
-        }
-    }
-}
+// impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
 
-#[cfg(test)]
-mod tests {
+// impl Display for EnumInvalid<'_> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self.expected.len() {
+//             0 => panic!(
+//                 "EnumInvalid: expected is empty. This is a bug. Please report it to {ISSUES_URL}"
+//             ),
+//             1 => write!(
+//                 f,
+//                 "expected value to be a {}, found {}",
+//                 self.expected[0],
+//                 Types::of_value(self.actual)
+//             ),
+//             _ => write!(
+//                 f,
+//                 "expected value to be one of [{:?}], found {}",
+//                 self.expected.iter().join(", "),
+//                 Types::of_value(self.actual)
+//             ),
+//         }
+//     }
+// }
 
-    use crate::{Scope, State};
+// #[cfg(test)]
+// mod tests {
 
-    use super::*;
+//     use crate::{Scope, State};
 
-    #[test]
-    fn test_setup_succeeds() {
-        let mut handler = EnumHandler::default();
-        let mut compiler = crate::Compiler::default();
-        let schema = serde_json::json!({"enum": [1, 2, 3]});
-        let schema: Schema = serde_json::from_value(schema).unwrap();
-        let result = handler.compile(&mut compiler, &schema);
-        assert!(result.is_ok());
-        assert!(result.unwrap());
-        assert_eq!(handler.expected, vec![1, 2, 3]);
-    }
-    #[test]
-    fn test_evaluate() {
-        let mut handler = EnumHandler::default();
-        let mut compiler = crate::Compiler::default();
-        let schema = serde_json::json!({"enum": [1, 2, 3]});
-        let schema: Schema = serde_json::from_value(schema).unwrap();
-        handler.compile(&mut compiler, &schema).unwrap();
-        let mut state = State::new();
-        let mut scope = Scope::new(crate::Location::default(), &mut state);
-        let one = serde_json::json!(1);
-        let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
-        assert!(result.is_ok());
-        let annotation = result.unwrap();
-        assert!(annotation.is_some());
-        let annotation = annotation.unwrap();
-        assert!(annotation.nested_errors().is_empty());
-    }
-}
+//     use super::*;
+
+//     #[test]
+//     fn test_setup_succeeds() {
+//         let mut handler = EnumHandler::default();
+//         let mut compiler = crate::Compiler::default();
+//         let schema = serde_json::json!({"enum": [1, 2, 3]});
+//         let schema: Schema = serde_json::from_value(schema).unwrap();
+//         let result = handler.compile(&mut compiler, &schema);
+//         assert!(result.is_ok());
+//         assert!(result.unwrap());
+//         assert_eq!(handler.expected, vec![1, 2, 3]);
+//     }
+//     #[test]
+//     fn test_evaluate() {
+//         let mut handler = EnumHandler::default();
+//         let mut compiler = crate::Compiler::default();
+//         let schema = serde_json::json!({"enum": [1, 2, 3]});
+//         let schema: Schema = serde_json::from_value(schema).unwrap();
+//         handler.compile(&mut compiler, &schema).unwrap();
+//         let mut state = State::new();
+//         let mut scope = Scope::new(crate::Location::default(), &mut state);
+//         let one = serde_json::json!(1);
+//         let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
+//         assert!(result.is_ok());
+//         let annotation = result.unwrap();
+//         assert!(annotation.is_some());
+//         let annotation = annotation.unwrap();
+//         assert!(annotation.nested_errors().is_empty());
+//     }
+// }

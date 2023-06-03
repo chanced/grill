@@ -1,28 +1,35 @@
 mod anchor;
 mod bool_or_number;
+mod compiled_schema;
 mod discriminator;
 mod format;
 mod items;
 mod object;
+mod subschema;
 mod types;
 
 pub use anchor::Anchor;
 pub use bool_or_number::{BoolOrNumber, CompiledBoolOrNumber};
+pub use compiled_schema::CompiledSchema;
 pub use discriminator::Discriminator;
 pub use format::Format;
 pub use items::Items;
-use num_rational::BigRational;
 pub use object::Object;
+use slotmap::new_key_type;
+pub use subschema::Subschema;
 pub use types::{Type, Types};
 
 use crate::{
     output::{Annotation, Structure},
-    Handler, Location, Output, Scope, State,
+    Handler, Scope,
 };
-use jsonptr::Pointer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, collections::HashMap};
+
+new_key_type! {
+    /// Reference to a [`CompiledSchema`]
+    pub struct SchemaRef;
+}
 
 /// A JSON Schema document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,15 +56,6 @@ impl Schema {
             None
         }
     }
-    /// # Errors
-    /// Returns `self` if the schema is not [`Bool`].
-    pub fn try_into_bool(self) -> Result<bool, Self> {
-        if let Self::Bool(v) = self {
-            Ok(v)
-        } else {
-            Err(self)
-        }
-    }
 
     /// Returns `true` if the schema is [`Object`].
     ///
@@ -74,89 +72,10 @@ impl Schema {
             None
         }
     }
-    /// # Errors
-    /// Returns `self` if the schema is not [`Object`].
-    pub fn try_into_object(self) -> Result<Box<Object>, Self> {
-        if let Self::Object(v) = self {
-            Ok(v)
-        } else {
-            Err(self)
-        }
-    }
 }
 impl Default for Schema {
     fn default() -> Self {
         Schema::Bool(true)
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct CompiledSchema {
-    pub absolute_location: String,
-    meta_schema: String,
-    numbers: HashMap<&'static str, BigRational>,
-    schemas: HashMap<&'static str, CompiledSchema>,
-    handlers: Box<[Handler]>,
-    schema: Schema,
-}
-
-impl CompiledSchema {
-    /// # Errors
-    #[allow(clippy::missing_panics_doc)]
-    pub async fn evaluate<'v>(
-        &self,
-        value: &'v Value,
-        structure: Structure,
-    ) -> Result<Output<'v>, Box<dyn std::error::Error>> {
-        let mut state = State::new();
-        let location = Location {
-            absolute_keyword_location: self.absolute_location.clone(),
-            keyword_location: Pointer::default(),
-            instance_location: Pointer::default(),
-        };
-        let mut scope = Scope::new(location, &mut state);
-        let annotation = self.annotate("", "", &mut scope, value, structure).await?;
-        Ok(Output::new(structure, annotation))
-    }
-
-    #[must_use]
-    pub fn schema(&self) -> &Schema {
-        &self.schema
-    }
-
-    pub fn number<'a>(&'a self, keyword: &str) -> Option<&'a BigRational> {
-        self.numbers.get(keyword)
-    }
-
-    pub fn subschema<'a>(&'a self, keyword: &str) -> Option<CompiledSubschema<'a>> {
-        self.schemas.get(keyword).map(|schema| CompiledSubschema {
-            keyword,
-            schema,
-        })
-    }
-
-    /// # Errors
-    /// if a custom [`Handler`](`crate::Handler`) returns a [`Box<dyn Error`](`std::error::Error`)
-    async fn annotate<'v, 's, 'a>(
-        &self,
-        instance_location: &'v str,
-        keyword_location: &'s str,
-        scope: &'s mut Scope<'a>,
-        value: &'v Value,
-        structure: Structure,
-    ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
-        let annotation = Annotate {
-            absolute_keyword_location: &self.absolute_location,
-            instance_location,
-            keyword_location,
-            scope,
-            structure,
-            value,
-            schema: self,
-        }
-        .exec()
-        .await?;
-        Ok(annotation)
     }
 }
 
@@ -170,7 +89,7 @@ struct Annotate<'v, 's, 'c, 'a> {
     schema: &'c CompiledSchema,
 }
 
-impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
+impl<'v, 's, 'c, 'a> Annotate<'v, 's, 'c, 'a> {
     async fn exec(self) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
         let Annotate {
             instance_location,
@@ -189,7 +108,7 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
         )?;
 
         let mut result = Annotation::new(nested.location().clone(), value);
-        for handler in schema.handlers.iter() {
+        for handler in schema.handlers().iter() {
             let annotation = match handler {
                 Handler::Sync(h) => h.evaluate(&mut nested, schema, value, structure)?,
                 Handler::Async(h) => h.evaluate(&mut nested, schema, value, structure).await?,
@@ -204,30 +123,6 @@ impl<'v, 's, 'h, 'a> Annotate<'v, 's, 'h, 'a> {
             }
         }
         Ok(result)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Subschema<'s> {
-    Inline(Cow<'s, Schema>),
-    Reference(&'s str),
-}
-
-#[derive(Debug, Clone)]
-pub struct CompiledSubschema<'s> {
-    keyword: &'s str,
-    schema: &'s CompiledSchema,
-}
-
-impl CompiledSubschema<'_> {
-    pub fn absolute_location(&self) -> &str {
-        &self.schema.absolute_location
-    }
-    pub fn schema(&self) -> &Schema {
-        &self.schema.schema
-    }
-    pub fn keyword_location(&self) -> &str {
-        &self.keyword
     }
 }
 

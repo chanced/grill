@@ -1,27 +1,35 @@
 use std::fmt::Display;
 
-use crate::{handler::SyncHandler, output::ValidationError, schema::CompiledSchema, Schema};
-use num::{FromPrimitive, Zero};
-use num_rational::BigRational;
-use serde_json::Number;
+use crate::{
+    error::{CompileError, EvaluateError},
+    handler::SyncHandler,
+    output::ValidationError,
+    schema::CompiledSchema,
+    Compile, Handler, Keyword, Schema,
+};
+use num::Zero;
+use serde_json::{Number, Value};
 
 #[derive(Debug, Clone, Default)]
 pub struct MultipleOfHandler {}
-
+impl From<MultipleOfHandler> for Handler {
+    fn from(handler: MultipleOfHandler) -> Self {
+        Self::Sync(Box::new(handler))
+    }
+}
 impl SyncHandler for MultipleOfHandler {
     fn compile<'s>(
         &mut self,
-        _compiler: &mut crate::Compiler<'s>,
+        compiler: &mut Compile<'s>,
         schema: &'s Schema,
-    ) -> Result<bool, crate::error::SetupError> {
-        match schema {
-            Schema::Object(obj) if obj.multiple_of.is_some() => {
-                // self.expected_multiple_of = obj.multiple_of.clone();
-                let multiple_of = obj.multiple_of.as_ref().unwrap();
-                Ok(true)
+    ) -> Result<bool, CompileError> {
+        if let Schema::Object(obj) = schema {
+            if let Some(multiple_of) = obj.multiple_of.as_ref() {
+                compiler.number(Keyword::MULTIPLE_OF, multiple_of);
+                return Ok(true);
             }
-            _ => Ok(false),
         }
+        Ok(false)
     }
 
     fn evaluate<'v>(
@@ -30,65 +38,29 @@ impl SyncHandler for MultipleOfHandler {
         schema: &CompiledSchema,
         value: &'v serde_json::Value,
         _structure: crate::Structure,
-    ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
-        // match value {
-        //     serde_json::Value::Number(number) => {
-        //         let expected_multiple_of = self.expected_multiple_of.clone().unwrap();
-        //         let mut annotation = scope.annotate("multipleOf", value);
-
-        //         if let Some(multiple_of) = self.expected_multiple_of.as_ref() {
-        //             if let Some(instance) = number.as_u64() {
-        //             } else if let Some(instance) = number.as_i64() {
-        //                 if instance.unsigned_abs() {
-        //                     return Ok(Some(annotation));
-        //                 }
-        //             } else if let Some(instance) = number.as_f64() {
-        //                 if let Some(instance_fraction) = BigRational::from_f64(instance) {
-        //                     if instance_fraction % multiple_of == BigRational::zero() {
-        //                         return Ok(Some(annotation));
-        //                     }
-        //                 }
-        //             }
-        //             annotation.error(MultipleOfInvalid {
-        //                 expected_multiple_of,
-        //                 actual: number,
-        //             });
-        //             Ok(Some(annotation))
-        //         } else if let Some(multiple_of) = expected_multiple_of.as_u64() {
-        //             if let Some(instance) = number.as_u64() {
-        //                 if instance % multiple_of == 0 {
-        //                     return Ok(Some(annotation));
-        //                 }
-        //             } else if let Some(instance) = number.as_i64() {
-        //                 if instance.unsigned_abs() % multiple_of == 0 {
-        //                     return Ok(Some(annotation));
-        //                 }
-        //             }
-        //             annotation.error(MultipleOfInvalid {
-        //                 expected_multiple_of,
-        //                 actual: number,
-        //             });
-        //             Ok(Some(annotation))
-        //         } else if let Some(multiple_of) = expected_multiple_of.as_i64() {
-        //             if let Some(instance) = number.as_i64() {
-        //                 if instance % multiple_of == 0 {
-        //                     return Ok(Some(annotation));
-        //                 }
-        //             } else if let Some(instance) = number.as_u64() {
-        //                 if instance % multiple_of.unsigned_abs() == 0 {
-        //                     return Ok(Some(annotation));
-        //                 }
-        //             }
-        //             annotation.error(MultipleOfInvalid {
-        //                 expected_multiple_of,
-        //                 actual: number,
-        //             });
-        //             return Ok(Some(annotation));
-        //         } else {
-        //             Ok(None)
-        //         }
+    ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn std::error::Error>> {
+        // TODO: fix this
+        // let multiple_of = schema.number("multipleOf").unwrap();
+        // if let Value::Number(n) = value {
+        //     let mut annotation = scope.annotate("multipleOf", value);
+        //     let rat = scope.number(n)?;
+        //     if rat % multiple_of == Zero::zero() {
+        //         Ok(Some(annotation))
+        //     } else {
+        //         annotation.error(MultipleOfInvalid {
+        //             actual: n,
+        //             expected_multiple_of: schema
+        //                 .schema()
+        //                 .as_object()
+        //                 .unwrap()
+        //                 .multiple_of
+        //                 .clone()
+        //                 .unwrap(), // TODO: Fix this
+        //         });
+        //         Ok(Some(annotation))
         //     }
-        //     _ => Ok(None),
+        // } else {
+        //     Ok(None)
         // }
         todo!()
     }
@@ -120,7 +92,7 @@ mod tests {
     use num_rational::BigRational;
     use serde_json::{json, Value};
 
-    use crate::{Compiler, Location, Scope, State, Structure};
+    use crate::{test, Compile, Handler, Location, Scope, State, Structure};
 
     use super::*;
 
@@ -183,30 +155,25 @@ mod tests {
 
     #[test]
     fn test_multiple_of_evaluate_float() {
-        // let mut handler = MultipleOfHandler::default();
-        // let mut compiler = Compiler::default();
-        // let mut state = State::default();
-        // let mut scope = Scope::new(Location::default(), &mut state);
-
-        // let schema = serde_json::json!({"multipleOf": 3.3});
-        // let schema: Schema = serde_json::from_value(schema).unwrap();
-        // let result = handler.setup(&mut compiler, &schema);
-        // assert!(result.is_ok());
-        // assert_eq!(
-        //     handler.expected_multiple_of,
-        //     serde_json::Number::from_f64(3.3)
-        // );
-        // let value = serde_json::json!(9.9);
-        // let result = handler.evaluate(&mut scope, &value, Structure::Complete);
-        // assert!(result.is_ok());
-        // let result = result.unwrap();
-        // assert!(result.is_some());
-        // let result = result.unwrap();
-        // println!(
-        //     "RESULT:{}",
-        //     result.as_invalid().unwrap().error.as_ref().unwrap()
-        // );
-        // assert!(result.is_valid());
+        let schema = serde_json::json!({"multipleOf": 3.3});
+        test::sync_handler(
+            schema,
+            MultipleOfHandler::default(),
+            |handler, scope, schema| {
+                let value = serde_json::json!(9.9);
+                let result = handler.evaluate(scope, schema, &value, Structure::Complete)?;
+                assert!(result.is_some());
+                let result = result.unwrap();
+                assert!(result.is_valid());
+                let value = serde_json::json!(10.0);
+                let result = handler.evaluate(scope, schema, &value, Structure::Complete)?;
+                assert!(result.is_some());
+                let result = result.unwrap();
+                assert!(result.is_invalid());
+                Ok(())
+            },
+        )
+        .unwrap();
     }
 
     #[test]

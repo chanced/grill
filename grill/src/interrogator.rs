@@ -1,28 +1,33 @@
 use std::collections::HashMap;
 
-use crate::dialect::Dialect;
+use serde_json::Value;
+
+use crate::{dialect::Dialect, graph::DependencyGraph, AbsoluteUri};
 
 /// A JSON Schema compiler and store.
 pub struct Interrogator {
-    dialects: HashMap<String, Dialect>,
+    dialects: HashMap<AbsoluteUri, Dialect>,
+    graph: DependencyGraph,
+    base_uri: Option<String>,
+    sources: HashMap<String, Value>,
 }
 
-impl Interrogator {
-    /// Creates a new [`Interrogator`].
-    #[must_use]
-    #[allow(clippy::missing_panics_doc)]
-    pub fn new() -> Self {
-        let mut this = Self {
-            dialects: HashMap::new(),
-        };
-        todo!()
-    }
-
-    // pub fn add_post_processor(&mut self, )
-}
+impl Interrogator {}
 
 impl Default for Interrogator {
     fn default() -> Self {
-        Self::new()
+        todo!()
+    }
+}
+/// Constructs an [`Interrogator`].
+pub struct InterrogatorBuilder {
+    dialects: HashMap<AbsoluteUri, Dialect>,
+    base_uri: Option<AbsoluteUri>,
+    sources: HashMap<AbsoluteUri, Value>,
+}
+impl Default for InterrogatorBuilder {
+    fn default() -> Self {
+        // Self::new()
+        todo!()
     }
 }

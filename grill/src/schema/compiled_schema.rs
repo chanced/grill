@@ -1,16 +1,258 @@
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+use super::{CompiledBoolOrNumber, Format, Items, SchemaRef, Types};
+use crate::{
+    error::EvaluateError, output::Annotation, AbsoluteUri, Compile, Handler, Keyword, Schema,
+    Scope, Uri,
+};
 use fancy_regex::Regex;
 use num_rational::BigRational;
-use serde::{Deserialize, Serialize};
-use serde_json::{Number, Value};
-use std::collections::{BTreeMap, HashSet};
+use serde_json::Value;
 
-use crate::Schema;
+#[derive(Debug, Clone)]
+pub struct CompiledSchema {
+    absolute_location: Uri,
+    /// $schema, inherrited or defaulted
+    meta_schema: AbsoluteUri,
+    handlers: Box<[Handler]>,
+    subschemas: HashMap<String, SchemaRef>,
+    subschema_lists: HashMap<String, Vec<SchemaRef>>,
+    subschema_maps: HashMap<String, HashMap<String, SchemaRef>>,
+    numbers: HashMap<String, BigRational>,
+    regexes: HashMap<String, Regex>,
 
-use super::{BoolOrNumber, CompiledBoolOrNumber, Format, Items, Types};
+    /// In the event that the schema is a bool or empty obj, this should be set.
+    always: Option<bool>,
 
-/// A raw JSON Schema object.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct Object {
+    id: Option<String>,
+    schema: Option<String>,
+    comment: Option<String>,
+    vocabulary: HashMap<String, bool>,
+    anchor: Option<String>,
+    dynamic_anchor: Option<String>,
+    dynamic_reference: Option<String>,
+    reference: Option<SchemaRef>,
+    recursive_anchor: Option<bool>,
+    recursive_reference: Option<SchemaRef>,
+    types: Option<Types>,
+    format: Option<Format>,
+    constant: Option<serde_json::Value>,
+    definitions: HashMap<String, SchemaRef>,
+    definitions_legacy: HashMap<String, SchemaRef>,
+    all_of: Vec<SchemaRef>,
+    any_of: Vec<SchemaRef>,
+    one_of: Vec<SchemaRef>,
+    not: Option<SchemaRef>,
+    cond_if: Option<SchemaRef>,
+    cond_then: Option<SchemaRef>,
+    cond_else: Option<SchemaRef>,
+    dependent_schemas: HashMap<String, SchemaRef>,
+    prefix_items: Vec<SchemaRef>,
+    items: Option<Items>,
+    additional_items: Option<SchemaRef>,
+    contains: Option<SchemaRef>,
+    properties: HashMap<String, SchemaRef>,
+    pattern_properties: HashMap<String, Regex>,
+    additional_properties: Option<SchemaRef>,
+    property_names: Option<SchemaRef>,
+    unevaluated_items: Option<SchemaRef>,
+    unevaluated_properties: Option<SchemaRef>,
+    enumeration: Vec<Value>,
+    multiple_of: Option<BigRational>,
+    maximum: Option<BigRational>,
+    exclusive_maximum: Option<CompiledBoolOrNumber>,
+    minimum: Option<BigRational>,
+    exclusive_minimum: Option<CompiledBoolOrNumber>,
+    max_length: Option<usize>,
+    min_length: Option<usize>,
+    pattern: Option<Regex>,
+    max_items: Option<usize>,
+    min_items: Option<usize>,
+    unique_items: Option<bool>,
+    max_contains: Option<usize>,
+    min_contains: Option<usize>,
+    max_properties: Option<usize>,
+    min_properties: Option<usize>,
+    required: HashSet<String>,
+    dependent_required: HashMap<String, HashSet<String>>,
+    content_encoding: Option<String>,
+    content_media_type: Option<String>,
+    content_schema: Option<SchemaRef>,
+    title: Option<String>,
+    description: Option<String>,
+    deprecated: Option<bool>,
+    read_only: Option<bool>,
+    write_only: Option<bool>,
+    examples: Option<Vec<Value>>,
+    additional_keywords: HashMap<String, Value>,
+}
+
+impl CompiledSchema {
+    #[must_use]
+    pub fn new(c: Compile) -> Self {
+        todo!()
+        // let obj = schema
+        //     .as_object()
+        //     .map(|v| Cow::Borrowed(v))
+        //     .unwrap_or_default();
+        // Self {
+        //     absolute_location,
+        //     meta_schema,
+        //     handlers,
+        //     anchor: obj.anchor.clone(),
+        //     constant: obj.constant.clone(),
+        //     comment: obj.comment.clone(),
+        //     content_encoding: obj.content_encoding.clone(),
+        //     content_media_type: obj.content_media_type.clone(),
+        //     description: obj.description.clone(),
+        //     dynamic_anchor: obj.dynamic_anchor.clone(),
+        //     dynamic_reference: obj.dynamic_reference.clone(),
+        //     enumeration: obj.enumeration.clone(),
+        //     deprecated: obj.deprecated,
+        //     examples: obj.examples.clone(),
+        //     exclusive_maximum: obj
+        //         .exclusive_maximum
+        //         .as_ref()
+        //         .and_then(|v| v.as_bool().map(|v| CompiledBoolOrNumber::Bool(*v))),
+        //     exclusive_minimum: obj
+        //         .exclusive_minimum
+        //         .as_ref()
+        //         .and_then(|v| v.as_bool().map(|v| CompiledBoolOrNumber::Bool(*v))),
+        //     format: obj.format.clone(),
+        //     id: obj.id.clone(),
+        //     max_contains: obj.max_contains,
+        //     max_items: obj.max_items,
+        //     max_length: obj.max_length,
+        //     max_properties: obj.max_properties,
+        //     min_contains: obj.min_contains,
+        //     min_items: obj.min_items,
+        //     min_length: obj.min_length,
+        //     min_properties: obj.min_properties,
+        //     read_only: obj.read_only,
+        //     write_only: obj.write_only,
+        //     recursive_anchor: obj.recursive_anchor,
+        //     schema: obj.schema.clone(),
+        //     title: obj.title.clone(),
+        //     types: obj.types.clone(),
+        //     vocabulary: obj
+        //         .vocabulary
+        //         .iter()
+        //         .map(|(k, v)| (k.clone(), v.clone()))
+        //         .collect(),
+        //     unique_items: obj.unique_items.clone(),
+        //     ..Default::default()
+        // }
+    }
+
+    // /// # Errors
+    // #[allow(clippy::missing_panics_doc)]
+    // pub async fn evaluate<'v>(
+    //     &self,
+    //     value: &'v Value,
+    //     structure: Structure,
+    // ) -> Result<Output<'v>, Box<dyn std::error::Error>> {
+    //     let mut state = State::new();
+    //     let location = Location {
+    //         absolute_keyword_location: self.absolute_location.clone(),
+    //         keyword_location: Pointer::default(),
+    //         instance_location: Pointer::default(),
+    //     };
+    //     let mut scope = Scope::new(location, &mut state);
+    //     let annotation = self.annotate("", "", &mut scope, value, structure).await?;
+    //     Ok(Output::new(structure, annotation))
+    // }
+
+    // #[must_use]
+    // pub fn schema(&self) -> &Schema {
+    //     self.schema
+    // }
+
+    // #[must_use]
+    // pub fn number<'a>(&'a self, keyword: &'static str) -> Option<&'a BigRational> {
+    //     self.numbers.get(keyword)
+    // }
+
+    // #[must_use]
+    // pub fn subschema<'a>(&'a self, keyword: &'static str) -> Option<CompiledSubschema<'a>> {
+    //     self.schemas
+    //         .get(keyword)
+    //         .map(|schema| CompiledSubschema { keyword, schema })
+    // }
+
+    // /// # Errors
+    // /// if a custom [`Handler`](`crate::Handler`) returns a [`Box<dyn Error`](`std::error::Error`)
+    // async fn annotate<'v, 'a>(
+    //     &self,
+    //     instance_location: &'v str,
+    //     keyword_location: &'s str,
+    //     scope: &'s mut Scope<'a>,
+    //     value: &'v Value,
+    //     structure: Structure,
+    // ) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
+    //     let annotation = Annotate {
+    //         absolute_keyword_location: &self.absolute_location,
+    //         instance_location,
+    //         keyword_location,
+    //         scope,
+    //         structure,
+    //         value,
+    //         schema: self,
+    //     }
+    //     .exec()
+    //     .await?;
+    //     Ok(annotation)
+    // }
+
+    // /// ##`$recursiveRef` The `"$recursiveRef"` and `"$recursiveAnchor"`
+    // /// keywords are used to construct extensible recursive schemas.  A
+    // /// recursive schema is one that has a reference to its own root, identified
+    // /// by the empty fragment URI reference `'#'`.
+    // ///
+    // /// - [Draft 2019-09 Core # 8.2.4.2.  Recursive References with `"$recursiveRef"`
+    // ///   and
+    // ///   `"$recursiveAnchor"`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-8.2.4.2)
+    // #[must_use]
+    // #[inline]
+    // pub fn recursive_reference(&self) -> Option<&str> {
+    //     self.recursive_reference.as_deref()
+    // }
+
+    /// Absolute location of this `CompiledSchema`
+    #[must_use]
+    #[inline]
+    pub fn absolute_location(&self) -> &str {
+        &self.absolute_location
+    }
+
+    /// [`Handler`](`crate::Handler`)s associated with this `CompiledSchema`
+    #[must_use]
+    #[inline]
+    pub fn handlers(&self) -> &[Handler] {
+        &self.handlers
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn subschema(&self, keyword: Keyword<'_>) -> Option<SchemaRef> {
+        self.subschemas.get(&keyword.to_string()).cloned()
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn additional_keywords(&self) -> &HashMap<String, Value> {
+        &self.additional_keywords
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn additional_regexes(&self) -> &HashMap<String, Regex> {
+        &self.regexes
+    }
+
     /// ## `$id`
     /// The value of `$id` is a URI-reference without a fragment that resolves
     /// against the Retrieval URI. The resulting URI is the base URI for the
@@ -18,8 +260,11 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.1. The `"$id"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#name-the-id-keyword)
     /// - [Understanding JSON Schema # Structuring a complex schema: `$id`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=id#id)
-    #[serde(rename = "$id", default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
 
     /// ## `$schema`
     /// The `$schema` keyword is both used as a JSON Schema dialect identifier
@@ -29,8 +274,11 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
-    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn schema(&self) -> Option<&str> {
+        self.schema.as_deref()
+    }
 
     /// ## `$comment`
     /// The `"$comment"` keyword is strictly intended for adding comments to a
@@ -43,8 +291,11 @@ pub struct Object {
     ///
     /// - [Understanding JSON Schema # Generic keywords:
     ///   Comments](https://json-schema.org/understanding-json-schema/reference/generic.html?highlight=const#comments)
-    #[serde(rename = "$comment", default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn comment(&self) -> Option<&str> {
+        self.comment.as_deref()
+    }
 
     /// ## `$vocabulary`
     /// The `"$vocabulary"` keyword is used in meta-schemas to identify the
@@ -96,95 +347,11 @@ pub struct Object {
     /// validator to understand the vocabularies declared by M.
     ///
     /// - [JSON Schema Core 2020-12 # 8.1.2. The `"$vocabulary"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.2)
-    #[serde(
-        rename = "$vocabulary",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    pub vocabulary: BTreeMap<String, bool>,
-    /// ## `title`
-    /// A title can be used to decorate a user interface with information about
-    /// the data produced by this user interface.
-    ///
-    /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
-    #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-
-    /// ## `description`
-    /// A `description` can provide explanation about the purpose of the
-    /// instance described by this schema.
-    ///
-    /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and
-    ///   "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
-    #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-
-    /// ## `deprecated`
-    /// The value of this keyword MUST be a boolean. When multiple occurrences
-    /// of this keyword are applicable to a single sub-instance, applications
-    /// SHOULD consider the instance location to be deprecated if any occurrence
-    /// specifies a true value.
-    ///
-    /// If "deprecated" has a value of boolean true, it indicates that
-    /// applications SHOULD refrain from usage of the declared property. It MAY
-    /// mean the property is going to be removed in the future.
-    ///
-    /// A root schema containing "deprecated" with a value of true indicates
-    /// that the entire resource being described MAY be removed in the future.
-    ///
-    /// The "deprecated" keyword applies to each instance location to which the
-    /// schema object containing the keyword successfully applies. This can
-    /// result in scenarios where every array item or object property is
-    /// deprecated even though the containing array or object is not.
-    ///
-    /// Omitting this keyword has the same behavior as a value of false.
-    ///
-    /// - [JSON Schema Validation 2020-12 # 9.3 `"deprecated"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-deprecated)
-    #[serde(rename = "deprecated", skip_serializing_if = "Option::is_none")]
-    pub deprecated: Option<bool>,
-
-    /// ## `readOnly`
-    ///  When multiple occurrences of these keywords are applicable to a single
-    ///  sub-instance, the resulting behavior SHOULD be as for a `true` value if
-    ///  any occurrence specifies a `true` value, and SHOULD be as for a `false`
-    ///  value otherwise.
-    ///
-    /// If `"readOnly"` has a value of boolean `true`, it indicates that the value
-    /// of the instance is managed exclusively by the owning authority, and
-    /// attempts by an application to modify the value of this property are
-    /// expected to be ignored or rejected by that owning authority.
-    ///
-    /// An instance document that is marked as "readOnly" for the entire
-    /// document MAY be ignored if sent to the owning authority, or MAY result
-    /// in an error, at the authority's discretion.
-    ///
-    /// This keyword can be used to assist in user interface instance
-    /// generation.  The "readOnly" keyword does not imply how a server handles
-    /// writes to a value in the case of a conflict - e.g., whether it rejects
-    /// them or whether it attempts to resolve the conflict in some manner.
-    ///
-    /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)
-    #[serde(rename = "readOnly", skip_serializing_if = "Option::is_none")]
-    pub read_only: Option<bool>,
-    /// ## `writeOnly`
-    /// When multiple occurrences of these keywords are applicable to a single
-    /// sub-instance, the resulting behavior SHOULD be as for a `true` value if
-    /// any occurrence specifies a `true` value, and SHOULD be as for a `false`
-    /// value otherwise.
-    ///
-    /// If `"writeOnly"` has a value of boolean true, it indicates that the value
-    /// is never present when the instance is retrieved from the owning
-    /// authority. It can be present when sent to the owning authority to update
-    /// or create the document (or the resource it represents), but it will not
-    /// be included in any updated or newly created version of the instance.
-    ///
-    /// An instance document that is marked as `"writeOnly"` for the entire
-    /// document MAY be returned as a blank document of some sort, or MAY
-    /// produce an error upon retrieval, or have the retrieval request ignored,
-    /// at the authority's discretion.
-    /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)
-    #[serde(rename = "writeOnly", skip_serializing_if = "Option::is_none")]
-    pub write_only: Option<bool>,
+    #[must_use]
+    #[inline]
+    pub fn vocabulary(&self) -> &HashMap<String, bool> {
+        &self.vocabulary
+    }
 
     /// ## `$anchor`
     /// Using JSON Pointer fragments requires knowledge of the structure of the
@@ -221,8 +388,8 @@ pub struct Object {
     /// If present, the value of this keyword MUST be a string and MUST start
     /// with a letter (`[A-Za-z]`) or underscore `'_'`, followed by any number
     /// of letters, digits (`[0-9]`), hyphens `'-'`, underscores `'_'`, and
-    /// periods `'.'`. This matches the US-ASCII part of XML's NCName production
-    /// [xml-names]. Note that the anchor string does not include the `'#'`
+    /// periods `'.'`. This matches the US-ASCII part of XML's `NCName` production
+    /// xml-names. Note that the anchor string does not include the `'#'`
     /// character, as it is not a URI-reference. An `"$anchor": "foo"` becomes
     /// the fragment `"#foo"` when used in a URI. See below for full examples.
     ///
@@ -231,8 +398,11 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [Draft 2019-09 Core # 8.2.3. Defining location-independent identifiers with `"$anchor"`](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.2.3)
     /// - [Understanding JSON Schema # `$anchor`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=anchor#anchor)
-    #[serde(rename = "$anchor", default, skip_serializing_if = "Option::is_none")]
-    pub anchor: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn anchor(&self) -> Option<&str> {
+        self.anchor.as_deref()
+    }
 
     /// ## `$dynamicAnchor`
     /// A `"$dynamicAnchor"` can be thought of like a normal $anchor except that
@@ -245,12 +415,11 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [JSON Schema Core 2020-12 # 8.2.2. Defining location-independent identifiers](https://json-schema.org/draft/2020-12/json-schema-core.html#name-defining-location-independe)
     /// - [JSON Schema Core 2020-12 Release Notes # `$dynamicRef` and `$dynamicAnchor`](https://json-schema.org/draft/2020-12/release-notes.html#dynamicref-and-dynamicanchor)
-    #[serde(
-        rename = "$dynamicAnchor",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub dynamic_anchor: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn dynamic_anchor(&self) -> Option<&str> {
+        self.dynamic_anchor.as_deref()
+    }
 
     /// ## `$dynamicRef`
     /// The `"$dynamicRef"` keyword is an applicator that allows for deferring the
@@ -272,12 +441,11 @@ pub struct Object {
     /// - [Draft
     ///   2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [JSON Schema Core 2020-12 Release Notes # `$dynamicRef` and `$dynamicAnchor`](https://json-schema.org/draft/2020-12/release-notes.html#dynamicref-and-dynamicanchor)
-    #[serde(
-        rename = "$dynamicRef",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub dynamic_reference: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn dynamic_reference(&self) -> Option<&str> {
+        self.dynamic_reference.as_deref()
+    }
 
     /// ## `$ref`
     /// The `"$ref"` keyword is an applicator that is used to reference a
@@ -292,8 +460,11 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.3.1. Direct References with `"$ref"`](https://json-schema.org/draft/2020-12/json-schema-core.html#ref)
     /// - [Understanding JSON Schema # Structuring a complex schema `$ref`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=ref#ref)
-    #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
-    pub reference: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn reference<'s>(&self, scope: &Scope) -> Option<SchemaRef> {
+        self.reference
+    }
 
     /// ##`$recursiveAnchor` `"$recursiveAnchor"` is used to dynamically
     /// identify a base URI at runtime for `"$recursiveRef"` by marking where
@@ -302,27 +473,11 @@ pub struct Object {
     /// defined to rely on it.
     ///
     /// - [Draft 2019-09 Core # 8.2.4.2.2.  Enabling Recursion with `"$recursiveAnchor"`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-8.2.4.2.2)
-    #[serde(
-        rename = "$recursiveAnchor",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub recursive_anchor: Option<bool>,
-
-    /// ##`$recursiveRef` The `"$recursiveRef"` and `"$recursiveAnchor"`
-    /// keywords are used to construct extensible recursive schemas.  A
-    /// recursive schema is one that has a reference to its own root, identified
-    /// by the empty fragment URI reference `'#'`.
-    ///
-    /// - [Draft 2019-09 Core # 8.2.4.2.  Recursive References with `"$recursiveRef"`
-    ///   and
-    ///   `"$recursiveAnchor"`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-8.2.4.2)
-    #[serde(
-        rename = "$recursiveRef",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub recursive_reference: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn recursive_anchor(&self) -> Option<bool> {
+        self.recursive_anchor
+    }
 
     /// ## `type`
     /// The `"type"` keyword is fundamental to JSON Schema. It specifies the
@@ -337,29 +492,38 @@ pub struct Object {
     /// case, the JSON snippet is valid if it matches any of the given types.
     ///
     /// - [Understanding JSON Schema # Type-specific keywords](https://json-schema.org/understanding-json-schema/reference/type.html)
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub types: Option<Types>,
+    #[must_use]
+    #[inline]
+    pub fn types(&self) -> Option<&Types> {
+        self.types.as_ref()
+    }
 
     /// The format keyword allows for basic semantic identification of certain
     /// kinds of string values that are commonly used. For example, because JSON
     /// doesn’t have a `DateTime` type, dates need to be encoded as strings.
     /// format allows the schema author to indicate that the string value should
-    /// be interpreted as a date. By default, format is just an annotation and
+    /// be interpreted as a date. By format is just an annotation and
     /// does not effect validation.
     ///
     /// - [JSON Schema Core 2020-12 # 7. Vocabularies for Semantic Content With `"format"`](https://json-schema.org/draft/2020-12/json-schema-validation.html#name-vocabularies-for-semantic-c)
     /// - [Understanding Json Schema # string Built-in Formats](https://json-schema.org/understanding-json-schema/reference/string.html#id7)
     /// - [OpenAPI 3.1 Specification # 4.2 Format](https://spec.openapis.org/oas/v3.1.0#format)
-    #[serde(rename = "format", default, skip_serializing_if = "Option::is_none")]
-    pub format: Option<Format>,
+    #[must_use]
+    #[inline]
+    pub fn format(&self) -> Option<&Format> {
+        self.format.as_ref()
+    }
 
     /// ## `const`
     /// The `"const"` keyword is used to restrict a value to a single value.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.1.3. `const`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-const)
     /// - [Understanding JSON Schema - Constant values](https://json-schema.org/understanding-json-schema/reference/generic.html?highlight=const#constant-values)
-    #[serde(rename = "const", default, skip_serializing_if = "Option::is_none")]
-    pub constant: Option<serde_json::Value>,
+    #[must_use]
+    #[inline]
+    pub fn constant(&self) -> Option<&serde_json::Value> {
+        self.constant.as_ref()
+    }
 
     /// ## `$defs`
     /// The "$defs" keyword reserves a location for schema authors to inline
@@ -371,8 +535,11 @@ pub struct Object {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.4. Schema Re-Use With `"$defs"`](https://json-schema.org/draft/2020-12/json-schema-core.html#defs)
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
-    #[serde(rename = "$defs", default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub definitions: BTreeMap<String, Schema>,
+    #[must_use]
+    #[inline]
+    pub fn definitions(&self) -> &HashMap<String, SchemaRef> {
+        &self.definitions
+    }
 
     /// ## `definitions`
     /// Legacy from Draft 07. See [`definitions`](`Object::definitions`).
@@ -381,55 +548,55 @@ pub struct Object {
     /// If using JSON Schema 07, use this field instead of [`definitions`](`Object::definitions`).
     ///
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
-    #[serde(
-        rename = "definitions",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    #[deprecated]
-    pub definitions_legacy: BTreeMap<String, Schema>,
-
-    /// ## `enum`
-    /// An instance validates successfully against this keyword if its value is
-    /// equal to one of the elements in this keyword's array value.
-    ///
-    /// Elements in the array might be of any type, including null.
-    ///
-    /// - [JSON Schema Validation 2020-12 # 6.1.2. `enum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-enum)
-    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
-    pub enumeration: Vec<Value>,
+    #[must_use]
+    #[inline]
+    pub fn definitions_legacy(&self) -> &HashMap<String, SchemaRef> {
+        &self.definitions_legacy
+    }
 
     /// ## `allOf`
     /// The `"allOf"` keyword acts as an `AND` where each subschema must be
     /// valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `allOf`](https://json-schema.org/understanding-json-schema/reference/combining.html?highlight=allOf#allOf)
-    #[serde(rename = "allOf", default, skip_serializing_if = "Vec::is_empty")]
-    pub all_of: Vec<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn all_of(&self) -> &[SchemaRef] {
+        &self.all_of
+    }
 
     /// ## `anyOf`
     /// The `"anyOf"` keyword acts as an `OR` where at least one of the
     /// subschemas must be valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `anyOf`](https://json-schema.org/understanding-json-schema/reference/combining.html?highlight=anyof#anyOf)
-    #[serde(rename = "anyOf", default, skip_serializing_if = "Vec::is_empty")]
-    pub any_of: Vec<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn any_of(&self) -> &[SchemaRef] {
+        &self.any_of
+    }
 
     /// ## `oneOf`
     /// The `"oneOf"` keyword acts as an `XOR` where exactly one of the
     /// subschemas must be valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `oneOf`](https://json-schema.org/understanding-json-schema/reference/combining.html#oneof)
-    #[serde(rename = "oneOf", default, skip_serializing_if = "Vec::is_empty")]
-    pub one_of: Vec<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn one_of(&self) -> &[SchemaRef] {
+        &self.one_of
+    }
 
     /// ## `not`
     /// The not keyword declares that an instance validates if it doesn’t
     /// validate against the given subschema.
     ///
     /// - [Understanding JSON Schema # Schema Composition `not`](https://json-schema.org/understanding-json-schema/reference/combining.html?#id8)
-    #[serde(rename = "not", default, skip_serializing_if = "Option::is_none")]
-    pub not: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn not(&self) -> Option<SchemaRef> {
+        self.not
+    }
 
     /// ## `if`
     /// This validation outcome of this keyword's subschema has no direct effect
@@ -443,8 +610,16 @@ pub struct Object {
     /// present.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.1. `if`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.1)
-    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
-    pub cond_if: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn cond_if<'s, 'v>(
+        &self,
+        scope: &Scope<'s>,
+        value: &'v Value,
+    ) -> Option<Result<Option<Annotation<'v>>, EvaluateError>> {
+        // self.cond_if.as_ref()
+        todo!()
+    }
 
     /// ## `then`
     /// When `"if"` is present, and the instance successfully validates against
@@ -457,8 +632,11 @@ pub struct Object {
     /// annotation collection purposes, in such cases.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.2. `then`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.2)
-    #[serde(rename = "then", default, skip_serializing_if = "Option::is_none")]
-    pub cond_then: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn cond_then(&self) -> Option<SchemaRef> {
+        self.cond_then
+    }
 
     /// ## `else`
     /// When `"if"` is present, and the instance fails to validate against its
@@ -471,8 +649,11 @@ pub struct Object {
     /// annotation collection purposes, in such cases.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.3. `else`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-else)
-    #[serde(rename = "else", default, skip_serializing_if = "Option::is_none")]
-    pub cond_else: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn cond_else(&self) -> Option<SchemaRef> {
+        self.cond_else()
+    }
 
     /// ## `dependentSchemas`
     /// This keyword specifies subschemas that are evaluated if the instance is
@@ -485,12 +666,11 @@ pub struct Object {
     /// must validate against the subschema. Its use is dependent on the
     /// presence of the property.
     /// - [JSON Schema Core 2020-12 # 10.2.2.4. `dependentSchemas`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dependentschemas)
-    #[serde(
-        rename = "dependentSchemas",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    pub dependent_schemas: BTreeMap<String, Schema>,
+    #[must_use]
+    #[inline]
+    pub fn dependent_schemas(&self) -> &HashMap<String, SchemaRef> {
+        &self.dependent_schemas
+    }
 
     /// ## `prefixItems`
     /// Validation succeeds if each element of the instance validates against
@@ -507,8 +687,11 @@ pub struct Object {
     /// Omitting this keyword has the same assertion behavior as an empty array.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.1.1. `prefixItems`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-prefixitems)
-    #[serde(rename = "prefixItems", default, skip_serializing_if = "Vec::is_empty")]
-    pub prefix_items: Vec<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn prefix_items(&self) -> &[SchemaRef] {
+        &self.prefix_items
+    }
 
     /// ## `items`
     /// This keyword applies its subschema to all instance elements at indexes
@@ -530,11 +713,18 @@ pub struct Object {
 
     /// - [JSON Schema Core 2020-12 # 10.3.1.2. `items`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-items)
     /// - [JSON Schema Validation 07 # 6.4.1 `items`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.1)
-    #[serde(rename = "items", default, skip_serializing_if = "Option::is_none")]
-    pub items: Option<Items>,
+    #[must_use]
+    #[inline]
+    pub fn items(&self) -> Option<&Items> {
+        self.items.as_ref()
+    }
 
     /// - [JSON Schema Core 2019-09 # 9.3.1.2.  `additionalItems`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-9.3.1.2)
-    pub additional_items: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn additional_items(&self) -> Option<SchemaRef> {
+        self.additional_items
+    }
 
     /// ## `contains`
     /// An array instance is valid against `"contains"` if at least one of its
@@ -561,8 +751,11 @@ pub struct Object {
     /// collected.
     ///
     ///  - [JSON Schema Core 2020-12 # 10.3.1.3. `contains`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-contains)
-    #[serde(rename = "contains", default, skip_serializing_if = "Option::is_none")]
-    pub contains: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn contains(&self) -> Option<SchemaRef> {
+        self.contains
+    }
 
     /// ## `properties`
     /// Validation succeeds if, for each name that appears in both the instance
@@ -577,12 +770,11 @@ pub struct Object {
     /// Omitting this keyword has the same assertion behavior as an empty
     /// object.
     /// - [JSON Schema Core 2020-12 # 10.3.2.1. properties](https://json-schema.org/draft/2020-12/json-schema-core.html#name-properties)
-    #[serde(
-        rename = "properties",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    pub properties: BTreeMap<String, Schema>,
+    #[must_use]
+    #[inline]
+    pub fn properties(&self) -> &HashMap<String, SchemaRef> {
+        &self.properties
+    }
 
     /// ## `patternProperties`
     /// Each property name of this object SHOULD be a valid regular expression,
@@ -603,12 +795,11 @@ pub struct Object {
     /// object.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.2. `patternProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-patternproperties)
-    #[serde(
-        rename = "patternProperties",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    pub pattern_properties: BTreeMap<String, String>,
+    #[must_use]
+    #[inline]
+    pub fn pattern_properties(&self) -> &HashMap<String, Regex> {
+        &self.pattern_properties
+    }
 
     /// ## `additionalProperties`
     /// The value of "additionalProperties" MUST be a valid JSON Schema.
@@ -629,12 +820,11 @@ pub struct Object {
     /// Omitting this keyword has the same assertion behavior as an empty schema.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.3.`additionalProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-additionalproperties)
-    #[serde(
-        rename = "additionalProperties",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub additional_properties: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn additional_properties(&self) -> Option<SchemaRef> {
+        self.additional_properties
+    }
 
     /// ## `propertyNames`
     /// If the instance is an object, this keyword validates if every property
@@ -642,12 +832,11 @@ pub struct Object {
     /// property name that the schema is testing will always be a string.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.4.`propertyNames`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-propertynames)
-    #[serde(
-        rename = "propertyNames",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub property_names: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn property_names(&self) -> Option<SchemaRef> {
+        self.property_names
+    }
 
     /// ## `unevaluatedItems`
     /// The behavior of this keyword depends on the annotation results of
@@ -680,13 +869,11 @@ pub struct Object {
     /// schema.
     ///
     /// - [JSON Schema Core 2020-12 # 11.2. `unevaluatedItems`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-unevaluateditems)
-    #[serde(
-        rename = "unevaluatedItems",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub unevaluated_items: Option<Schema>,
-
+    #[must_use]
+    #[inline]
+    pub fn unevaluated_items(&self) -> Option<SchemaRef> {
+        self.unevaluated_items
+    }
     /// ## `unevaluatedProperties`
     /// The behavior of this keyword depends on the annotation results of adjacent
     /// keywords that apply to the instance location being validated. Specifically,
@@ -717,12 +904,24 @@ pub struct Object {
     /// Omitting this keyword has the same assertion behavior as an empty schema.
     ///
     /// - [JSON Schema Core 2020-12 # 11.3. `unevaluatedProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-unevaluatedproperties)
-    #[serde(
-        rename = "unevaluatedProperties",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub unevaluated_properties: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn unevaluated_properties(&self) -> Option<SchemaRef> {
+        self.unevaluated_properties
+    }
+
+    /// ## `enum`
+    /// An instance validates successfully against this keyword if its value is
+    /// equal to one of the elements in this keyword's array value.
+    ///
+    /// Elements in the array might be of any type, including null.
+    ///
+    /// - [JSON Schema Validation 2020-12 # 6.1.2. `enum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-enum)
+    #[must_use]
+    #[inline]
+    pub fn enumeration(&self) -> &[Value] {
+        &self.enumeration
+    }
 
     /// ## `multipleOf`
     /// The value of `"multipleOf"` MUST be a number, strictly greater than 0.
@@ -731,8 +930,11 @@ pub struct Object {
     /// results in an integer.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.1. `multipleOf`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-multipleof)
-    #[serde(rename = "multipleOf", skip_serializing_if = "Option::is_none")]
-    pub multiple_of: Option<Number>,
+    #[must_use]
+    #[inline]
+    pub fn multiple_of(&self) -> Option<&BigRational> {
+        self.multiple_of.as_ref()
+    }
 
     /// #`maximum`
     /// The value of `"maximum"` MUST be a number, representing an inclusive upper
@@ -741,8 +943,11 @@ pub struct Object {
     /// If the instance is a number, then this keyword validates only if the
     /// instance is less than or exactly equal to `"maximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.2. `maximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maximum)
-    #[serde(rename = "maximum", skip_serializing_if = "Option::is_none")]
-    pub maximum: Option<Number>,
+    #[must_use]
+    #[inline]
+    pub fn maximum(&self) -> Option<&BigRational> {
+        self.maximum.as_ref()
+    }
 
     /// ## `exclusiveMaximum`
     /// For JSON Schema drafts 7 and higher, the value of `"exclusiveMaximum"` MUST be a number, representing an
@@ -753,8 +958,11 @@ pub struct Object {
     /// If the instance is a number, then the instance is valid only if it has a
     /// value strictly less than (not equal to) `"exclusiveMaximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.3. `exclusiveMaximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusivemaximum)
-    #[serde(rename = "exclusiveMaximum", skip_serializing_if = "Option::is_none")]
-    pub exclusive_maximum: Option<BoolOrNumber>,
+    #[must_use]
+    #[inline]
+    pub fn exclusive_maximum(&self) -> Option<&CompiledBoolOrNumber> {
+        self.exclusive_maximum.as_ref()
+    }
 
     /// ## `minimum`
     /// The value of `"minimum"` MUST be a number, representing an inclusive
@@ -763,8 +971,12 @@ pub struct Object {
     /// If the instance is a number, then this keyword validates only if the
     /// instance is greater than or exactly equal to `"minimum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.4. `minimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minimum)
-    #[serde(rename = "minimum", skip_serializing_if = "Option::is_none")]
-    pub minimum: Option<Number>,
+
+    #[must_use]
+    #[inline]
+    pub fn minimum(&self) -> Option<&BigRational> {
+        self.minimum.as_ref()
+    }
 
     /// ## `exclusiveMinimum`
     ///
@@ -775,8 +987,11 @@ pub struct Object {
     /// value strictly greater than (not equal to) `"exclusiveMinimum"`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.5. `exclusiveMinimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusiveminimum)
-    #[serde(rename = "exclusiveMinimum", skip_serializing_if = "Option::is_none")]
-    pub exclusive_minimum: Option<BoolOrNumber>,
+    #[must_use]
+    #[inline]
+    pub fn exclusive_minimum(&self) -> Option<&CompiledBoolOrNumber> {
+        self.exclusive_minimum.as_ref()
+    }
 
     /// ## `maxLength`
     /// The value of `"maxLength"` MUST be a non-negative integer.
@@ -785,8 +1000,11 @@ pub struct Object {
     /// than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.1. `maxLength`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxlength)
-    #[serde(rename = "maxLength", skip_serializing_if = "Option::is_none")]
-    pub max_length: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn max_length(&self) -> Option<usize> {
+        self.max_length
+    }
 
     /// ## `minLength`
     /// The value of this keyword MUST be a non-negative integer.
@@ -795,8 +1013,11 @@ pub struct Object {
     /// than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.2. `minLength`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minlength)
-    #[serde(rename = "minLength", skip_serializing_if = "Option::is_none")]
-    pub min_length: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn min_length(&self) -> Option<usize> {
+        self.min_length
+    }
 
     /// ## `pattern`
     /// The value of this keyword MUST be a string. This string SHOULD be a
@@ -809,8 +1030,11 @@ pub struct Object {
     /// Regular expressions are not implicitly anchored.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `pattern`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-pattern)
-    #[serde(rename = "pattern", skip_serializing_if = "Option::is_none")]
-    pub pattern: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn pattern(&self) -> Option<&Regex> {
+        self.pattern.as_ref()
+    }
 
     /// ## `maxItems`
     /// The value of this keyword MUST be a non-negative integer.
@@ -818,8 +1042,11 @@ pub struct Object {
     /// An array instance is valid against "maxItems" if its size is less than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `maxItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxitems)
-    #[serde(rename = "maxItems", skip_serializing_if = "Option::is_none")]
-    pub max_items: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn max_items(&self) -> Option<usize> {
+        self.max_items
+    }
 
     /// ## `minItems`
     /// The value of this keyword MUST be a non-negative integer.
@@ -829,8 +1056,11 @@ pub struct Object {
     ///
     /// Omitting this keyword has the same behavior as a value of 0.
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `minItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minitems)
-    #[serde(rename = "minItems", skip_serializing_if = "Option::is_none")]
-    pub min_items: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn min_items(&self) -> Option<usize> {
+        self.min_items
+    }
 
     /// ## `uniqueItems`
     /// The value of this keyword MUST be a boolean.
@@ -842,8 +1072,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as a value of false.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.3. `uniqueItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-uniqueitems)
-    #[serde(rename = "uniqueItems", skip_serializing_if = "Option::is_none")]
-    pub unique_items: Option<bool>,
+    #[must_use]
+    #[inline]
+    pub fn unique_items(&self) -> Option<bool> {
+        self.unique_items
+    }
 
     /// ## `maxContains`
     /// The value of this keyword MUST be a non-negative integer.
@@ -859,8 +1092,11 @@ pub struct Object {
     /// array length is less than or equal to the "maxContains" value.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.4. `maxContains`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxcontains)
-    #[serde(rename = "maxContains", skip_serializing_if = "Option::is_none")]
-    pub max_contains: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn max_contains(&self) -> Option<usize> {
+        self.max_contains
+    }
 
     /// ## `minContains`
     /// The value of this keyword MUST be a non-negative integer.
@@ -883,8 +1119,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as a value of `1`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.4. `minContains`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-mincontains)
-    #[serde(rename = "minContains", skip_serializing_if = "Option::is_none")]
-    pub min_contains: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn min_contains(&self) -> Option<usize> {
+        self.min_contains
+    }
 
     /// ## `maxProperties`
     /// The value of this keyword MUST be a non-negative integer.
@@ -892,8 +1131,11 @@ pub struct Object {
     /// An object instance is valid against "maxProperties" if its number of properties is less than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.1 `maxProperties`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxproperties)
-    #[serde(rename = "maxProperties", skip_serializing_if = "Option::is_none")]
-    pub max_properties: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn max_properties(&self) -> Option<usize> {
+        self.max_properties
+    }
 
     /// ## `minProperties`
     /// The value of this keyword MUST be a non-negative integer.
@@ -904,8 +1146,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as a value of `0`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.2 `minProperties`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minproperties)
-    #[serde(rename = "minProperties", skip_serializing_if = "Option::is_none")]
-    pub min_properties: Option<usize>,
+    #[must_use]
+    #[inline]
+    pub fn min_properties(&self) -> Option<usize> {
+        self.min_properties
+    }
 
     /// ## `required`
     /// The value of this keyword MUST be an array. Elements of this array, if
@@ -917,12 +1162,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as an empty array.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.3 `required`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-required)
-    #[serde(
-        rename = "required",
-        default,
-        skip_serializing_if = "HashSet::is_empty"
-    )]
-    pub required: HashSet<String>,
+    #[must_use]
+    #[inline]
+    pub fn required(&self) -> &HashSet<String> {
+        &self.required
+    }
 
     /// ## `dependentRequired`
     /// The value of this keyword MUST be an object. Properties in this object,
@@ -940,12 +1184,11 @@ pub struct Object {
     /// Omitting this keyword has the same behavior as an empty object.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.4 `dependentRequired`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-dependentrequired)
-    #[serde(
-        rename = "dependentRequired",
-        default,
-        skip_serializing_if = "BTreeMap::is_empty"
-    )]
-    pub dependent_required: BTreeMap<String, HashSet<String>>,
+    #[must_use]
+    #[inline]
+    pub fn dependent_required(&self) -> &HashMap<String, HashSet<String>> {
+        &self.dependent_required
+    }
 
     /// ## `contentEncoding`
     /// If the instance value is a string, this property defines that the string
@@ -974,11 +1217,13 @@ pub struct Object {
     /// string.
     ///
     /// The value of this property MUST be a string.
-
     /// - [JSON Schema Validation 2020-12 # 8.3. `contentEncoding`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentencoding)
     /// - [Understanding JSON Schema # Media: string-encoding non-JSON data - `contentEncoding`](https://json-schema.org/understanding-json-schema/reference/non_json_data.html#id2)
-    #[serde(rename = "contentEncoding", skip_serializing_if = "Option::is_none")]
-    pub content_encoding: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn content_encoding(&self) -> Option<&str> {
+        self.content_encoding.as_deref()
+    }
 
     /// ## `contentMediaType`
     /// If the instance is a string, this property indicates the media type of
@@ -988,8 +1233,11 @@ pub struct Object {
     /// The value of this property MUST be a string, which MUST be a media type, as defined by [RFC 2046]().
     ///
     /// - [JSON Schema Validation 2020-12 # 8.4. `contentMediaType`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentmediatype)
-    #[serde(rename = "contentMediaType", skip_serializing_if = "Option::is_none")]
-    pub content_media_type: Option<String>,
+    #[must_use]
+    #[inline]
+    pub fn content_media_type(&self) -> Option<&str> {
+        self.content_media_type.as_deref()
+    }
 
     /// ## `contentSchema`
     /// If the instance is a string, and if "contentMediaType" is present, this property contains a schema which describes the structure of the string.
@@ -1027,8 +1275,109 @@ pub struct Object {
     /// ```
     ///
     /// - [JSON Schema Validation 2020-12 # 8.5. `contentSchema`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentschema)
-    #[serde(rename = "contentSchema", skip_serializing_if = "Option::is_none")]
-    pub content_schema: Option<Schema>,
+    #[must_use]
+    #[inline]
+    pub fn content_schema(&self) -> Option<SchemaRef> {
+        self.content_schema
+    }
+
+    /// ## `title`
+    /// A title can be used to decorate a user interface with information about
+    /// the data produced by this user interface.
+    ///
+    /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
+    #[must_use]
+    #[inline]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// ## `description`
+    /// A `description` can provide explanation about the purpose of the
+    /// instance described by this schema.
+    ///
+    /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and
+    ///   "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
+    #[must_use]
+    #[inline]
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// ## `deprecated`
+    /// The value of this keyword MUST be a boolean. When multiple occurrences
+    /// of this keyword are applicable to a single sub-instance, applications
+    /// SHOULD consider the instance location to be deprecated if any occurrence
+    /// specifies a true value.
+    ///
+    /// If "deprecated" has a value of boolean true, it indicates that
+    /// applications SHOULD refrain from usage of the declared property. It MAY
+    /// mean the property is going to be removed in the future.
+    ///
+    /// A root schema containing "deprecated" with a value of true indicates
+    /// that the entire resource being described MAY be removed in the future.
+    ///
+    /// The "deprecated" keyword applies to each instance location to which the
+    /// schema object containing the keyword successfully applies. This can
+    /// result in scenarios where every array item or object property is
+    /// deprecated even though the containing array or object is not.
+    ///
+    /// Omitting this keyword has the same behavior as a value of false.
+    ///
+    /// - [JSON Schema Validation 2020-12 # 9.3 `"deprecated"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-deprecated)    
+    #[must_use]
+    #[inline]
+    pub fn deprecated(&self) -> Option<bool> {
+        self.deprecated
+    }
+
+    /// ## `readOnly`
+    ///  When multiple occurrences of these keywords are applicable to a single
+    ///  sub-instance, the resulting behavior SHOULD be as for a `true` value if
+    ///  any occurrence specifies a `true` value, and SHOULD be as for a `false`
+    ///  value otherwise.
+    ///
+    /// If `"readOnly"` has a value of boolean `true`, it indicates that the value
+    /// of the instance is managed exclusively by the owning authority, and
+    /// attempts by an application to modify the value of this property are
+    /// expected to be ignored or rejected by that owning authority.
+    ///
+    /// An instance document that is marked as "readOnly" for the entire
+    /// document MAY be ignored if sent to the owning authority, or MAY result
+    /// in an error, at the authority's discretion.
+    ///
+    /// This keyword can be used to assist in user interface instance
+    /// generation.  The "readOnly" keyword does not imply how a server handles
+    /// writes to a value in the case of a conflict - e.g., whether it rejects
+    /// them or whether it attempts to resolve the conflict in some manner.
+    ///
+    /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)    
+
+    pub fn read_only(&self) -> Option<bool> {
+        self.read_only
+    }
+    /// ## `writeOnly`
+    /// When multiple occurrences of these keywords are applicable to a single
+    /// sub-instance, the resulting behavior SHOULD be as for a `true` value if
+    /// any occurrence specifies a `true` value, and SHOULD be as for a `false`
+    /// value otherwise.
+    ///
+    /// If `"writeOnly"` has a value of boolean true, it indicates that the value
+    /// is never present when the instance is retrieved from the owning
+    /// authority. It can be present when sent to the owning authority to update
+    /// or create the document (or the resource it represents), but it will not
+    /// be included in any updated or newly created version of the instance.
+    ///
+    /// An instance document that is marked as `"writeOnly"` for the entire
+    /// document MAY be returned as a blank document of some sort, or MAY
+    /// produce an error upon retrieval, or have the retrieval request ignored,
+    /// at the authority's discretion.
+    /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)    
+    #[must_use]
+    #[inline]
+    pub fn write_only(&self) -> Option<bool> {
+        self.write_only
+    }
 
     /// ## `examples`
     /// The value of this keyword MUST be an array. There are no restrictions placed on the values within the array. When multiple occurrences of this keyword are applicable to a single sub-instance, implementations MUST provide a flat array of all values rather than an array of arrays.
@@ -1040,39 +1389,75 @@ pub struct Object {
     /// in this manner.
     ///
     /// - [JSON Schema Validation 2020-12 # 9.5 `"examples"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-examples)
-    #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
-    pub examples: Option<Vec<Value>>,
-
-    #[serde(flatten, default)]
-    pub additional_keywords: BTreeMap<String, Value>,
+    #[must_use]
+    #[inline]
+    pub fn examples(&self) -> Option<&Vec<Value>> {
+        self.examples.as_ref()
+    }
 }
+impl CompiledSchema {
+    fn set_subschemas(
+        &mut self,
+        schemas: HashMap<Keyword<'_>, SchemaRef>,
+        schema_lists: HashMap<Keyword<'_>, Vec<SchemaRef>>,
+        schema_maps: HashMap<Keyword<'_>, HashMap<Keyword<'_>, SchemaRef>>,
+    ) {
+        self.set_single_schemas(schemas);
+        self.set_subschema_lists(schema_lists);
+        self.set_subschema_maps(schema_maps);
+    }
+    fn set_single_schemas(&mut self, schemas: HashMap<Keyword<'_>, SchemaRef>) {}
+    fn set_subschema_maps(
+        &mut self,
+        schema_maps: HashMap<Keyword<'_>, HashMap<Keyword<'_>, SchemaRef>>,
+    ) {
+        self.subschema_maps = HashMap::new();
+        for (k, v) in schema_maps {
+            let m = self
+                .subschema_maps
+                .entry(k.to_string())
+                .or_insert(HashMap::new());
+            for (i, s) in &v {
+                m.insert(i.to_string(), s.clone());
+                let key = format!("{k}/{i}");
+                self.subschemas.insert(key, s.clone());
+            }
+            match k {
+                Keyword::DEFS => self.definitions = collect_schemas_from_map(v),
+                Keyword::DEFINITIONS_LEGACY => {
+                    self.definitions_legacy = collect_schemas_from_map(v)
+                }
+                Keyword::PROPERTIES => self.properties = collect_schemas_from_map(v),
+                Keyword::DEPENDENT_SCHEMAS => self.dependent_schemas = collect_schemas_from_map(v),
+                _ => {}
+            }
+        }
+    }
+    fn set_subschema_lists(&mut self, schema_lists: HashMap<Keyword<'_>, Vec<SchemaRef>>) {
+        self.subschema_lists = HashMap::new();
 
-#[cfg(test)]
-mod tests {
+        for (k, v) in schema_lists {
+            self.subschema_lists.insert(k.to_string(), v.clone());
+            for (i, s) in v.iter().enumerate() {
+                let key = format!("{k}/{i}");
+                self.subschemas.insert(key, s.clone());
+            }
+            match k {
+                Keyword::ALL_OF => self.all_of = v,
+                Keyword::ANY_OF => self.any_of = v,
+                Keyword::ONE_OF => self.one_of = v,
+                Keyword::PREFIX_ITEMS => self.prefix_items = v,
+                _ => {}
+            }
+        }
 
-    #[test]
-    fn test_object_de() {
-        let r = big_rational_str::str_to_big_rational("34.34").unwrap();
-
-        // let schema = json!({"multipleOf": "34.34"});
-        // let schema: Object = serde_json::from_value(schema).unwrap();
-        // println!("{schema:?}");
+        // self.all_of = schema_lists.get("allOf").cloned().unwrap_or_default();
+        // self.any_of = schema_lists.get("anyOf").cloned().unwrap_or_default();
+        // self.one_of = schema_lists.get("oneOf").cloned().unwrap_or_default();
+        // self.prefix_items = schema_lists.get("prefixItems").cloned().unwrap_or_default();
     }
 }
 
-// fn non_fragmented_uri<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let mut s: Option<String> = Option::deserialize(deserializer)?;
-//     if let Some(v) = s.as_ref() {
-//         if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
-//             let v = v.trim();
-//             if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
-//                 return Err(serde::de::Error::custom("URI must not contain a fragment"));
-//             }
-//             s = Some(v.to_string());
-//         }
-//     }
-//     Ok(s)
-// }
+fn collect_schemas_from_map(v: HashMap<Keyword<'_>, SchemaRef>) -> HashMap<String, SchemaRef> {
+    v.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+}

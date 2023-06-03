@@ -1,8 +1,15 @@
+use big_rational_str::ParseError;
+use dashmap::DashMap;
 use jsonptr::Pointer;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
+use slotmap::SlotMap;
 
-use crate::{output::Annotation, Location, State};
+use crate::{
+    output::Annotation,
+    schema::{CompiledSchema, SchemaRef},
+    Location, State,
+};
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
 pub struct Scope<'a> {
@@ -12,7 +19,11 @@ pub struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-    pub fn new(location: Location, state: &'a mut State) -> Self {
+    pub fn new(
+        location: Location,
+        state: &'a mut State,
+        schemas: &SlotMap<SchemaRef, CompiledSchema>
+    ) -> Self {
         Self {
             state,
             location,
@@ -31,12 +42,18 @@ impl<'a> Scope<'a> {
     pub fn location(&self) -> &Location {
         &self.location
     }
-
-    pub fn number(&mut self, number: &Number) -> &BigRational {
-        self.number.get_or_insert_with(|| {
-            big_rational_str::str_to_big_rational(&number.to_string())
-                .expect("serde_json::Number should always parse into a num_rational::BigRational")
-        })
+    /// # Errors
+    /// Returns a [`ParseError`](`big_rational_str::ParseError`) if `number` cannot be parsed as a [`BigRational`].
+    #[allow(clippy::missing_panics_doc)]
+    pub fn number(&mut self, number: &Number) -> Result<&BigRational, ParseError> {
+        let n = &mut self.number;
+        if let Some(number) = n {
+            Ok(number)
+        } else {
+            let number = big_rational_str::str_to_big_rational(&number.to_string())?;
+            n.replace(number);
+            Ok(n.as_ref().unwrap())
+        }
     }
 
     #[must_use]
@@ -63,7 +80,7 @@ impl<'a> Scope<'a> {
         instance: &str,
         keyword: &str,
         absolute_keyword_location: Option<String>,
-    ) -> Result<Scope, jsonptr::Error> {
+    ) -> Result<Scope, jsonptr::MalformedPointerError> {
         let mut keyword_location = self.keyword_location().clone();
         keyword_location.push_back(keyword.into());
         let absolute_keyword_location =
@@ -72,7 +89,7 @@ impl<'a> Scope<'a> {
             } else {
                 let v = self.location.absolute_keyword_location.clone();
                 let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
-                let mut ptr: Pointer = ptr.try_into()?;
+                let mut ptr: Pointer = Pointer::try_from(ptr)?;
                 ptr.push_back(keyword.into());
                 format!("{uri}#{ptr}")
             };

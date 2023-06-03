@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{error::DialectError, schema::Object, Handler};
+use crate::{error::DialectError, schema::Object, AbsoluteUri, Handler};
 
 pub mod json_schema_07;
 
@@ -18,7 +18,7 @@ pub struct Vocabulary {
 #[derive(Debug, Clone)]
 pub struct Dialect {
     /// The URI of the dialect, used as [`"$schema"`](`crate::schema::Object::schema`).
-    pub id: String,
+    pub id: AbsoluteUri,
 
     /// Set of vocabularies defined by the dialect.
     pub vocabularies: HashMap<String, Vocabulary>,
@@ -50,7 +50,7 @@ impl Dialect {
     /// - A schema [`Object`] in `meta_schemas` has a non-absolute [`id`](crate::schema::Object::id).
     /// - A schema [`Object`] in `meta_schemas` has a required vocabulary that is not defined in `vocabularies`.
     pub fn new(
-        id: impl ToString,
+        id: AbsoluteUri,
         meta_schemas: &[Object],
         vocabularies: &[Vocabulary],
     ) -> Result<Self, DialectError> {
@@ -61,7 +61,7 @@ impl Dialect {
         let meta_schemas = collect_meta_schemas(meta_schemas)?;
         confirm_required_vocabulary(meta_schemas.iter(), &vocabularies)?;
         Ok(Self {
-            id: id.to_string(),
+            id,
             vocabularies,
             meta_schemas,
         })
@@ -122,13 +122,13 @@ mod tests {
 
     #[test]
     fn test_new_empty_dialect() {
-        let dialect = Dialect::new("http://example.com/dialect", &[], &[]);
+        let dialect = Dialect::new("http://example.com/dialect".try_into().unwrap(), &[], &[]);
         assert!(dialect.is_ok());
     }
     #[test]
     fn test_new_dialect() {
         let dialect = Dialect::new(
-            "http://example.com/dialect",
+            "http://example.com/dialect".try_into().unwrap(),
             &[Object {
                 id: Some("https://example/meta-schema".into()),
                 vocabulary: [("https://example.com/vocab".to_string(), true)]
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_new_dialect_missing_schema_id() {
         let dialect = Dialect::new(
-            "https://example.com/dialect",
+            "https://example.com/dialect".try_into().unwrap(),
             &[Object {
                 id: Some("https://example/meta-schema".try_into().unwrap()),
                 vocabulary: [("https://example.com/vocab1".to_string(), true)]

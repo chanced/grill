@@ -3,7 +3,6 @@ use crate::{schema::Types, Location};
 use jsonptr::Pointer;
 use serde_json::Value;
 use snafu::Snafu;
-use std::error::Error as StdError;
 use std::{
     borrow::Cow,
     error::Error,
@@ -11,6 +10,29 @@ use std::{
 };
 
 pub use crate::output::ValidationError;
+
+#[derive(Debug, Snafu)]
+pub enum StoreError {
+    #[snafu(display("failed to resolve schema: {uri}\ncaused by:\n\t{source}"))]
+    Resolve { uri: String, source: ResolveError },
+    #[snafu(display("failed to compile schema: {uri}\ncaused by:\n\t{source}"))]
+    Compile { uri: String, source: CompileError },
+}
+
+// TODO: Finish EvaluateError
+
+#[derive(Debug)]
+pub enum EvaluateError {
+    Any,
+}
+impl Display for EvaluateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EvaluateError::Any => write!(f, "Any"),
+        }
+    }
+}
+impl Error for EvaluateError {}
 
 #[derive(Debug)]
 pub enum DialectError {
@@ -203,7 +225,7 @@ pub enum ResolveError {
         /// The URI of the schema which was not able to be resolved
         schema_id: String,
         /// The custom error which occurred
-        source: Box<dyn StdError>,
+        source: Box<dyn Error>,
     },
     #[cfg(feature = "reqwest")]
     #[snafu(display(r#"error fetching "{schema_id}": {source}"#))]
@@ -257,7 +279,7 @@ impl ResolveError {
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum SetupError {
+pub enum CompileError {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     MetaSchema {
         /// The [`Uri`] of meta schema which encountered an error
@@ -290,7 +312,7 @@ impl std::fmt::Display for SchemaNotFoundError {
         write!(f, "schema \"{}\" not found", self.schema_id)
     }
 }
-impl StdError for SchemaNotFoundError {}
+impl Error for SchemaNotFoundError {}
 
 #[derive(Debug, Clone)]
 pub struct UnexpectedValueError {
@@ -313,7 +335,7 @@ impl fmt::Display for UnexpectedValueError {
         )
     }
 }
-impl StdError for UnexpectedValueError {}
+impl Error for UnexpectedValueError {}
 
 #[derive(Debug, Clone, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
@@ -332,7 +354,80 @@ impl Display for UnkownMetaSchemaError {
         write!(f, "unknown meta schema: {}", self.schema_id)
     }
 }
-impl StdError for UnkownMetaSchemaError {}
+impl Error for UnkownMetaSchemaError {}
+
+#[derive(Debug, Clone)]
+pub struct UriNotAbsoluteError {
+    pub uri: String,
+}
+impl Display for UriNotAbsoluteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "uri is not absolute: \"{}\"", self.uri)
+    }
+}
+
+impl Error for UriNotAbsoluteError {}
+
+#[derive(Debug, Clone, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
+pub enum AbsoluteUriParseError {
+    #[snafu(display("{}", source), context(false))]
+    Url { source: url::ParseError },
+    #[snafu(display("{}", source), context(false))]
+    Urn { source: urn::Error },
+    #[snafu(display("{}", source))]
+    NotAbsolute { source: UriNotAbsoluteError },
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
+pub enum UriParseError {
+    #[snafu(display("{}", source), context(false))]
+    Url { source: url::ParseError },
+    #[snafu(display("{}", source), context(false))]
+    Urn { source: urn::Error },
+    #[snafu(
+        display(
+            "failed to parse uri due to a regular expression error: \n\t{}",
+            source
+        ),
+        context(false)
+    )]
+    Regex { source: fancy_regex::Error },
+}
+
+impl AbsoluteUriParseError {
+    /// Returns `true` if the uri parse error is [`Url`].
+    ///
+    /// [`Url`]: UriParseError::Url
+    #[must_use]
+    pub fn is_url(&self) -> bool {
+        matches!(self, Self::Url { .. })
+    }
+
+    /// Returns `true` if the uri parse error is [`Urn`].
+    ///
+    /// [`Urn`]: UriParseError::Urn
+    #[must_use]
+    pub fn is_urn(&self) -> bool {
+        matches!(self, Self::Urn { .. })
+    }
+
+    pub fn as_url(&self) -> Option<&url::ParseError> {
+        if let Self::Url { source } = self {
+            Some(source)
+        } else {
+            None
+        }
+    }
+    pub fn as_urn(&self) -> Option<&urn::Error> {
+        if let Self::Urn { source } = self {
+            Some(source)
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

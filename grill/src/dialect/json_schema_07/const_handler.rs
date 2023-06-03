@@ -1,7 +1,3 @@
-use std::fmt::Display;
-
-use crate::{handler::SyncHandler, output::ValidationError, schema::CompiledSchema, Schema};
-
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
 ///
 /// The value of this keyword MAY be of any type, including null.
@@ -13,38 +9,38 @@ pub struct ConstHandler {
     pub expected: Option<serde_json::Value>,
 }
 
-impl SyncHandler for ConstHandler {
-    fn compile<'s>(
-        &mut self,
-        _compiler: &mut crate::Compiler<'s>,
-        schema: &'s Schema,
-    ) -> Result<bool, crate::error::SetupError> {
-        match schema {
-            Schema::Object(obj) if obj.constant.is_some() => {
-                self.expected = obj.constant.clone();
-                Ok(true)
-            }
-            _ => Ok(false),
-        }
-    }
-    fn evaluate<'v>(
-        &self,
-        scope: &mut crate::Scope,
-        schema: &CompiledSchema,
-        value: &'v serde_json::Value,
-        _structure: crate::Structure,
-    ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
-        let expected = self.expected.as_ref().unwrap();
-        let mut annotation = scope.annotate("const", value);
-        if value != expected {
-            annotation.error(ConstInvalid {
-                actual: value,
-                expected: expected.clone(),
-            });
-        }
-        Ok(Some(annotation))
-    }
-}
+// impl SyncHandler for ConstHandler {
+//     fn compile<'s>(
+//         &mut self,
+//         _compiler: &mut crate::Compiler<'s>,
+//         schema: &'s Schema,
+//     ) -> Result<bool, crate::error::SetupError> {
+//         match schema {
+//             Schema::Object(obj) if obj.constant.is_some() => {
+//                 self.expected = obj.constant.clone();
+//                 Ok(true)
+//             }
+//             _ => Ok(false),
+//         }
+//     }
+//     fn evaluate<'v>(
+//         &self,
+//         scope: &mut crate::Scope,
+//         schema: &CompiledSchema,
+//         value: &'v serde_json::Value,
+//         _structure: crate::Structure,
+//     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
+//         let expected = self.expected.as_ref().unwrap();
+//         let mut annotation = scope.annotate("const", value);
+//         if value != expected {
+//             annotation.error(ConstInvalid {
+//                 actual: value,
+//                 expected: expected.clone(),
+//             });
+//         }
+//         Ok(Some(annotation))
+//     }
+// }
 
 /// [`ValidationError`] for the `enum` keyword, produced by [`ConstHandler`].
 #[derive(Clone, Debug)]
@@ -52,73 +48,73 @@ pub struct ConstInvalid<'v> {
     pub expected: serde_json::Value,
     pub actual: &'v serde_json::Value,
 }
-impl Display for ConstInvalid<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "expected {}, found {}", self.actual, self.expected)
-    }
-}
-impl<'v> ValidationError<'v> for ConstInvalid<'v> {}
+// impl Display for ConstInvalid<'_> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "expected {}, found {}", self.actual, self.expected)
+//     }
+// }
+// impl<'v> ValidationError<'v> for ConstInvalid<'v> {}
 
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
+// #[cfg(test)]
+// mod tests {
+//     use serde_json::json;
 
-    use crate::{Location, State, Structure};
+//     use crate::{Location, State, Structure};
 
-    use super::*;
+//     use super::*;
 
-    #[test]
-    fn test_const_setup() {
-        let mut compiler = crate::Compiler::default();
-        let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-        let mut handler = ConstHandler::default();
-        assert!(handler.compile(&mut compiler, &schema).unwrap());
-        assert_eq!(handler.expected, Some(serde_json::json!(1)));
+//     #[test]
+//     fn test_const_setup() {
+//         let mut compiler = crate::Compiler::default();
+//         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
+//         let mut handler = ConstHandler::default();
+//         assert!(handler.compile(&mut compiler, &schema).unwrap());
+//         assert_eq!(handler.expected, Some(serde_json::json!(1)));
 
-        let schema: Schema = serde_json::from_value(json!({})).unwrap();
-        let mut handler = ConstHandler::default();
-        assert!(!handler.compile(&mut compiler, &schema).unwrap());
-    }
+//         let schema: Schema = serde_json::from_value(json!({})).unwrap();
+//         let mut handler = ConstHandler::default();
+//         assert!(!handler.compile(&mut compiler, &schema).unwrap());
+//     }
 
-    #[test]
-    fn test_const_evaluate() {
-        let mut compiler = crate::Compiler::default();
-        let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-        let mut handler = ConstHandler::default();
-        handler.compile(&mut compiler, &schema).unwrap();
-        let mut state = State::new();
-        let mut scope = crate::Scope::new(Location::default(), &mut state);
-        let value = serde_json::json!(1);
-        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(result.is_some());
-        let result = result.unwrap();
-        assert!(result.is_valid());
-        let value = serde_json::json!(2);
-        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(result.is_some());
-        let result = result.unwrap();
-        assert!(result.is_invalid());
-    }
-    #[test]
-    fn test_const_obj() {
-        let mut compiler = crate::Compiler::default();
-        let schema: Schema =
-            serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
-        let mut handler = ConstHandler::default();
-        handler.compile(&mut compiler, &schema).unwrap();
-        let mut state = State::new();
-        let mut scope = crate::Scope::new(Location::default(), &mut state);
+//     #[test]
+//     fn test_const_evaluate() {
+//         let mut compiler = crate::Compiler::default();
+//         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
+//         let mut handler = ConstHandler::default();
+//         handler.compile(&mut compiler, &schema).unwrap();
+//         let mut state = State::new();
+//         let mut scope = crate::Scope::new(Location::default(), &mut state);
+//         let value = serde_json::json!(1);
+//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         assert!(result.is_ok());
+//         let result = result.unwrap();
+//         assert!(result.is_some());
+//         let result = result.unwrap();
+//         assert!(result.is_valid());
+//         let value = serde_json::json!(2);
+//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         assert!(result.is_ok());
+//         let result = result.unwrap();
+//         assert!(result.is_some());
+//         let result = result.unwrap();
+//         assert!(result.is_invalid());
+//     }
+//     #[test]
+//     fn test_const_obj() {
+//         let mut compiler = crate::Compiler::default();
+//         let schema: Schema =
+//             serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
+//         let mut handler = ConstHandler::default();
+//         handler.compile(&mut compiler, &schema).unwrap();
+//         let mut state = State::new();
+//         let mut scope = crate::Scope::new(Location::default(), &mut state);
 
-        let value = serde_json::json!({"b": "b", "a":"a"});
-        let result = handler.evaluate(&mut scope, &value, Structure::Complete);
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(result.is_some());
-        let result = result.unwrap();
-        assert!(result.is_valid());
-    }
-}
+//         let value = serde_json::json!({"b": "b", "a":"a"});
+//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         assert!(result.is_ok());
+//         let result = result.unwrap();
+//         assert!(result.is_some());
+//         let result = result.unwrap();
+//         assert!(result.is_valid());
+//     }
+// }

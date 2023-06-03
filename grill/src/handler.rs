@@ -1,10 +1,10 @@
 use std::{error::Error, fmt};
 
 use crate::{
-    error::SetupError,
+    error::CompileError,
     output::{Annotation, Structure},
     schema::CompiledSchema,
-    Compiler, Schema, Scope,
+    Compile, Schema, Scope,
 };
 
 use async_trait::async_trait;
@@ -19,6 +19,43 @@ pub enum Handler {
     Async(Box<dyn AsyncHandler>),
 }
 
+impl Handler {
+    /// Returns `true` if the handler is [`Sync`].
+    ///
+    /// [`Sync`]: Handler::Sync
+    #[must_use]
+    pub fn is_sync(&self) -> bool {
+        matches!(self, Self::Sync(..))
+    }
+    #[must_use]
+    #[allow(clippy::borrowed_box)]
+    pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler>> {
+        if let Self::Sync(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` if the handler is [`Async`].
+    ///
+    /// [`Async`]: Handler::Async
+    #[must_use]
+    pub fn is_async(&self) -> bool {
+        matches!(self, Self::Async(..))
+    }
+
+    #[must_use]
+    #[allow(clippy::borrowed_box)]
+    pub fn as_async(&self) -> Option<&Box<dyn AsyncHandler>> {
+        if let Self::Async(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[async_trait]
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
@@ -30,9 +67,9 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// be called for the given [`Schema`].
     async fn compile<'h, 'c, 's, 'p>(
         &mut self,
-        compiler: &'c mut Compiler<'s>,
+        compile: &'c mut Compile<'s>,
         schema: &'s Schema,
-    ) -> Result<bool, SetupError>;
+    ) -> Result<bool, CompileError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
     async fn evaluate<'h, 's, 'v>(
@@ -56,9 +93,9 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
     /// be called for the given [`Schema`].
     fn compile<'s>(
         &mut self,
-        compiler: &mut Compiler<'s>,
+        compile: &mut Compile<'s>,
         schema: &'s Schema,
-    ) -> Result<bool, SetupError>;
+    ) -> Result<bool, CompileError>;
 
     /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
     ///

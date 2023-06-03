@@ -30,10 +30,6 @@ pub use interrogator::Interrogator;
 /// evaluate a schema.
 pub mod dialect;
 
-mod source;
-use schema::Types;
-pub use source::Source;
-
 /// JSON Schema and supporting types.
 pub mod schema;
 /// A JSON Schema.
@@ -60,8 +56,8 @@ pub use output::{Output, Structure};
 pub mod resolve;
 pub use resolve::Resolve;
 
-mod compiler;
-pub use compiler::Compiler;
+mod compile;
+pub use compile::Compile;
 
 pub(crate) const ISSUES_URL: &str = "https://github.com/chanced/grill/issues/new";
 
@@ -69,3 +65,14 @@ pub mod state;
 pub use state::State;
 
 mod integration;
+
+mod keyword;
+pub use keyword::Keyword;
+
+pub(crate) mod graph;
+
+mod uri;
+pub use uri::{AbsoluteUri, Uri};
+
+#[cfg(test)]
+pub mod test;
