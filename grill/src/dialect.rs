@@ -21,24 +21,10 @@ pub struct Dialect {
     pub id: AbsoluteUri,
 
     /// Set of vocabularies defined by the dialect.
-    pub vocabularies: HashMap<String, Vocabulary>,
+    pub vocabularies: HashMap<AbsoluteUri, Vocabulary>,
 
     /// Set of meta schemas which make up the dialect.
-    pub meta_schemas: HashMap<String, Object>,
-}
-
-fn collect_meta_schemas(meta_schemas: &[Object]) -> Result<HashMap<String, Object>, DialectError> {
-    meta_schemas
-        .iter()
-        .map(|s| {
-            if s.id.is_none() {
-                Err(DialectError::MissingSchemaId { schema: s.clone() })
-            } else {
-                let id = s.id.clone().unwrap();
-                Ok((id, s.clone()))
-            }
-        })
-        .collect()
+    pub meta_schemas: HashMap<AbsoluteUri, Object>,
 }
 
 impl Dialect {
@@ -94,6 +80,22 @@ impl Dialect {
             Err(DialectError::MissingSchemaId { schema })
         }
     }
+}
+
+fn collect_meta_schemas(
+    meta_schemas: &[Object],
+) -> Result<HashMap<AbsoluteUri, Object>, DialectError> {
+    meta_schemas
+        .iter()
+        .map(|s| {
+            if s.id.is_none() {
+                Err(DialectError::MissingSchemaId { schema: s.clone() })
+            } else {
+                let id = s.id.clone().unwrap();
+                Ok((id, s.clone()))
+            }
+        })
+        .collect()
 }
 
 fn confirm_required_vocabulary<'a>(

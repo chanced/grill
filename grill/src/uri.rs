@@ -2,6 +2,7 @@ use std::{fmt::Display, ops::Deref, str::FromStr};
 
 use fancy_regex::Regex;
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use url::Url;
 use urn::Urn;
 
@@ -9,11 +10,41 @@ static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][[a-zA-Z]\d+\
 
 use crate::error::{AbsoluteUriParseError, UriParseError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub enum AbsoluteUri {
     Url(Url),
     Urn(Urn),
 }
+
+impl From<AbsoluteUri> for String {
+    fn from(value: AbsoluteUri) -> Self {
+        value.to_string()
+    }
+}
+impl From<&AbsoluteUri> for String {
+    fn from(value: &AbsoluteUri) -> Self {
+        value.to_string()
+    }
+}
+impl From<&AbsoluteUri> for &str {
+    fn from(value: &AbsoluteUri) -> Self {
+        value.as_str()
+    }
+}
+
+impl PartialOrd for AbsoluteUri {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        PartialOrd::partial_cmp(self.as_str(), other.as_str())
+    }
+}
+
+impl Ord for AbsoluteUri {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        Ord::cmp(self.as_str(), other.as_str())
+    }
+}
+
 impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
     ///
@@ -180,7 +211,8 @@ impl FromStr for AbsoluteUri {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub enum Uri {
     Url(Url),
     Urn(Urn),
@@ -343,6 +375,34 @@ impl Deref for Uri {
             Uri::Urn(urn) => urn.as_str(),
             Uri::Partial { path, .. } => path.as_str(),
         }
+    }
+}
+
+impl PartialOrd for Uri {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        PartialOrd::partial_cmp(self.as_str(), other.as_str())
+    }
+}
+
+impl Ord for Uri {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        Ord::cmp(self.as_str(), other.as_str())
+    }
+}
+
+impl From<Uri> for String {
+    fn from(value: Uri) -> Self {
+        value.to_string()
+    }
+}
+impl From<&Uri> for String {
+    fn from(value: &Uri) -> Self {
+        value.to_string()
+    }
+}
+impl From<&Uri> for &str {
+    fn from(value: &Uri) -> Self {
+        value.as_str()
     }
 }
 

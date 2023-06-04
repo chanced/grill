@@ -1,10 +1,8 @@
-
-
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::collections::{BTreeMap, HashSet};
 
-use crate::Schema;
+use crate::{AbsoluteUri, Schema};
 
 use super::{BoolOrNumber, Format, Items, Types};
 
@@ -19,7 +17,7 @@ pub struct Object {
     /// - [JSON Schema Core 2020-12 # 8.2.1. The `"$id"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#name-the-id-keyword)
     /// - [Understanding JSON Schema # Structuring a complex schema: `$id`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=id#id)
     #[serde(rename = "$id", default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<AbsoluteUri>,
 
     /// ## `$schema`
     /// The `$schema` keyword is both used as a JSON Schema dialect identifier
@@ -30,7 +28,7 @@ pub struct Object {
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
+    pub schema: Option<AbsoluteUri>,
 
     /// ## `$comment`
     /// The `"$comment"` keyword is strictly intended for adding comments to a
@@ -101,7 +99,7 @@ pub struct Object {
         default,
         skip_serializing_if = "BTreeMap::is_empty"
     )]
-    pub vocabulary: BTreeMap<String, bool>,
+    pub vocabulary: BTreeMap<AbsoluteUri, bool>,
     /// ## `title`
     /// A title can be used to decorate a user interface with information about
     /// the data produced by this user interface.
