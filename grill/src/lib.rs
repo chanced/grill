@@ -21,7 +21,7 @@ pub use location::Location;
 
 mod interrogator;
 
-pub use interrogator::Interrogator;
+pub use interrogator::{Builder, Interrogator};
 
 // pub use uniresid as uri;
 // pub use uniresid::{AbsoluteUri, Uri};
@@ -29,11 +29,6 @@ pub use interrogator::Interrogator;
 /// A dialect represents the set of keywords and semantics that can be used to
 /// evaluate a schema.
 pub mod dialect;
-
-/// JSON Schema and supporting types.
-pub mod schema;
-/// A JSON Schema.
-pub use schema::Schema;
 
 mod scope;
 pub use scope::Scope;
@@ -66,13 +61,21 @@ pub use state::State;
 
 mod integration;
 
-mod keyword;
-pub use keyword::Keyword;
-
 pub(crate) mod graph;
 
+mod metaschema;
+pub use metaschema::Metaschema;
 mod uri;
-pub use uri::{AbsoluteUri, Uri};
+pub use uri::Uri;
+
+pub type Object = serde_json::Map<String, serde_json::Value>;
+pub type Array = Vec<serde_json::Value>;
+
+pub mod json_schema;
+
+mod schema_ref;
+
+pub use schema_ref::SchemaRef;
 
 #[cfg(test)]
 pub mod test;

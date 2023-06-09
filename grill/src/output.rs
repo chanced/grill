@@ -254,8 +254,8 @@ mod tests {
                 annotations: vec![],
                 errors: vec![],
                 location: Location {
-                    instance_location: Pointer::new(&["baddata"]),
-                    keyword_location: Pointer::new(&["error-keyword"]),
+                    instance_location: Pointer::new(["bad-data"]),
+                    keyword_location: Pointer::new(["error-keyword"]),
                     ..Default::default()
                 },
                 error: Some(Box::new(String::from("bad data"))),

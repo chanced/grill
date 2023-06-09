@@ -1,10 +1,9 @@
-use std::{error::Error, fmt};
+use std::fmt;
 
 use crate::{
-    error::CompileError,
+    error::{CompileError, EvaluateError},
     output::{Annotation, Structure},
-    schema::CompiledSchema,
-    Compile, Schema, Scope,
+    Compile, Scope,
 };
 
 use async_trait::async_trait;
@@ -68,17 +67,16 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
     async fn compile<'h, 'c, 's, 'p>(
         &mut self,
         compile: &'c mut Compile<'s>,
-        schema: &'s Schema,
+        schema: &'s Value,
     ) -> Result<bool, CompileError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
     async fn evaluate<'h, 's, 'v>(
         &'h self,
         scope: &'s mut Scope,
-        schema: &'s CompiledSchema,
         value: &'v Value,
         _structure: Structure,
-    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
+    ) -> Result<Option<Annotation<'v>>, EvaluateError>;
 }
 
 clone_trait_object!(AsyncHandler);
@@ -94,7 +92,7 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
     fn compile<'s>(
         &mut self,
         compile: &mut Compile<'s>,
-        schema: &'s Schema,
+        schema: &'s Value,
     ) -> Result<bool, CompileError>;
 
     /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
@@ -103,9 +101,8 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
     fn evaluate<'v>(
         &self,
         scope: &mut Scope,
-        schema: &CompiledSchema,
         value: &'v Value,
         _structure: Structure,
-    ) -> Result<Option<Annotation<'v>>, Box<dyn Error>>;
+    ) -> Result<Option<Annotation<'v>>, EvaluateError>;
 }
 clone_trait_object!(SyncHandler);

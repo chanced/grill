@@ -1,16 +1,14 @@
-use std::{fmt::Display, ops::Deref};
+use serde::{Deserialize, Serialize};
+use serde_json::{Number, Value};
+use std::collections::{BTreeMap, HashSet};
 
-/// A wrapper type used to distinguish between keywords and other strings as
-/// parameters to functions.
-///
-/// # Example
-/// ```
-/// let keyword = Keyword("type");
-/// ```
-#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
-pub struct Keyword<'s>(pub &'s str);
+use crate::{AbsoluteUri, Schema};
 
-impl Keyword<'_> {
+use super::{BoolOrNumber, Format, Items, Types};
+
+/// A raw JSON Schema object.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct Object {
     /// ## `$id`
     /// The value of `$id` is a URI-reference without a fragment that resolves
     /// against the Retrieval URI. The resulting URI is the base URI for the
@@ -18,7 +16,8 @@ impl Keyword<'_> {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.1. The `"$id"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#name-the-id-keyword)
     /// - [Understanding JSON Schema # Structuring a complex schema: `$id`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=id#id)
-    pub const ID: Keyword<'static> = Keyword("$id");
+    #[serde(rename = "$id", default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<AbsoluteUri>,
 
     /// ## `$schema`
     /// The `$schema` keyword is both used as a JSON Schema dialect identifier
@@ -28,7 +27,8 @@ impl Keyword<'_> {
     /// - [JSON Schema Core 2020-12 # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
     /// - [Draft 2019-09 Core # 8.1.1. The `"$schema"` Keyword](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.1.1)
     /// - [Draft 7 # 7. The `"$schema"` Keyword](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-01#section-7)
-    pub const SCHEMA: Keyword<'static> = Keyword("$schema");
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<AbsoluteUri>,
 
     /// ## `$comment`
     /// The `"$comment"` keyword is strictly intended for adding comments to a
@@ -41,7 +41,8 @@ impl Keyword<'_> {
     ///
     /// - [Understanding JSON Schema # Generic keywords:
     ///   Comments](https://json-schema.org/understanding-json-schema/reference/generic.html?highlight=const#comments)
-    pub const COMMENT: Keyword<'static> = Keyword("$comment");
+    #[serde(rename = "$comment", default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 
     /// ## `$vocabulary`
     /// The `"$vocabulary"` keyword is used in meta-schemas to identify the
@@ -93,13 +94,19 @@ impl Keyword<'_> {
     /// validator to understand the vocabularies declared by M.
     ///
     /// - [JSON Schema Core 2020-12 # 8.1.2. The `"$vocabulary"` Keyword](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.2)
-    pub const VOCABULARY: Keyword<'static> = Keyword("$vocabulary");
+    #[serde(
+        rename = "$vocabulary",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub vocabulary: BTreeMap<AbsoluteUri, bool>,
     /// ## `title`
     /// A title can be used to decorate a user interface with information about
     /// the data produced by this user interface.
     ///
     /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
-    pub const TITLE: Keyword<'static> = Keyword("title");
+    #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 
     /// ## `description`
     /// A `description` can provide explanation about the purpose of the
@@ -107,7 +114,8 @@ impl Keyword<'_> {
     ///
     /// - [JSON Schema Validation 2020-12 # 9.1 `"title"` and
     ///   "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
-    pub const DESCRIPTION: Keyword<'static> = Keyword("description");
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 
     /// ## `deprecated`
     /// The value of this keyword MUST be a boolean. When multiple occurrences
@@ -130,7 +138,8 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as a value of false.
     ///
     /// - [JSON Schema Validation 2020-12 # 9.3 `"deprecated"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-deprecated)
-    pub const DEPRECATED: Keyword<'static> = Keyword("deprecated");
+    #[serde(rename = "deprecated", skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<bool>,
 
     /// ## `readOnly`
     ///  When multiple occurrences of these keywords are applicable to a single
@@ -153,8 +162,8 @@ impl Keyword<'_> {
     /// them or whether it attempts to resolve the conflict in some manner.
     ///
     /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)
-    pub const READ_ONLY: Keyword<'static> = Keyword("readOnly");
-
+    #[serde(rename = "readOnly", skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
     /// ## `writeOnly`
     /// When multiple occurrences of these keywords are applicable to a single
     /// sub-instance, the resulting behavior SHOULD be as for a `true` value if
@@ -172,7 +181,8 @@ impl Keyword<'_> {
     /// produce an error upon retrieval, or have the retrieval request ignored,
     /// at the authority's discretion.
     /// - [JSON Schema Validation 2020-12 # 9.4 `"readOnly"` and `"writeOnly"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-readonly-and-writeonly)
-    pub const WRITE_ONLY: Keyword<'static> = Keyword("writeOnly");
+    #[serde(rename = "writeOnly", skip_serializing_if = "Option::is_none")]
+    pub write_only: Option<bool>,
 
     /// ## `$anchor`
     /// Using JSON Pointer fragments requires knowledge of the structure of the
@@ -209,7 +219,7 @@ impl Keyword<'_> {
     /// If present, the value of this keyword MUST be a string and MUST start
     /// with a letter (`[A-Za-z]`) or underscore `'_'`, followed by any number
     /// of letters, digits (`[0-9]`), hyphens `'-'`, underscores `'_'`, and
-    /// periods `'.'`. This matches the US-ASCII part of XML's `NCName` production
+    /// periods `'.'`. This matches the US-ASCII part of XML's NCName production
     /// [xml-names]. Note that the anchor string does not include the `'#'`
     /// character, as it is not a URI-reference. An `"$anchor": "foo"` becomes
     /// the fragment `"#foo"` when used in a URI. See below for full examples.
@@ -219,7 +229,8 @@ impl Keyword<'_> {
     /// - [JSON Schema Core 2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [Draft 2019-09 Core # 8.2.3. Defining location-independent identifiers with `"$anchor"`](https://json-schema.org/draft/2019-09/json-schema-core.html#rfc.section.8.2.3)
     /// - [Understanding JSON Schema # `$anchor`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=anchor#anchor)
-    pub const ANCHOR: Keyword<'static> = Keyword("$anchor");
+    #[serde(rename = "$anchor", default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<String>,
 
     /// ## `$dynamicAnchor`
     /// A `"$dynamicAnchor"` can be thought of like a normal $anchor except that
@@ -232,7 +243,12 @@ impl Keyword<'_> {
     /// - [JSON Schema Core 2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [JSON Schema Core 2020-12 # 8.2.2. Defining location-independent identifiers](https://json-schema.org/draft/2020-12/json-schema-core.html#name-defining-location-independe)
     /// - [JSON Schema Core 2020-12 Release Notes # `$dynamicRef` and `$dynamicAnchor`](https://json-schema.org/draft/2020-12/release-notes.html#dynamicref-and-dynamicanchor)
-    pub const DYNAMIC_ANCHOR: Keyword<'static> = Keyword("$dynamicAnchor");
+    #[serde(
+        rename = "$dynamicAnchor",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dynamic_anchor: Option<String>,
 
     /// ## `$dynamicRef`
     /// The `"$dynamicRef"` keyword is an applicator that allows for deferring the
@@ -254,7 +270,12 @@ impl Keyword<'_> {
     /// - [Draft
     ///   2020-12 # 8.2.3.2. Dynamic References with `"$dynamicRef"`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dynamic-references-with-dyn)
     /// - [JSON Schema Core 2020-12 Release Notes # `$dynamicRef` and `$dynamicAnchor`](https://json-schema.org/draft/2020-12/release-notes.html#dynamicref-and-dynamicanchor)
-    pub const DYNAMIC_REF: Keyword<'static> = Keyword("$dynamicRef");
+    #[serde(
+        rename = "$dynamicRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dynamic_reference: Option<String>,
 
     /// ## `$ref`
     /// The `"$ref"` keyword is an applicator that is used to reference a
@@ -269,7 +290,8 @@ impl Keyword<'_> {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.3.1. Direct References with `"$ref"`](https://json-schema.org/draft/2020-12/json-schema-core.html#ref)
     /// - [Understanding JSON Schema # Structuring a complex schema `$ref`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=ref#ref)
-    pub const REF: Keyword<'static> = Keyword("$ref");
+    #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
+    pub reference: Option<String>,
 
     /// ##`$recursiveAnchor` `"$recursiveAnchor"` is used to dynamically
     /// identify a base URI at runtime for `"$recursiveRef"` by marking where
@@ -278,7 +300,27 @@ impl Keyword<'_> {
     /// defined to rely on it.
     ///
     /// - [Draft 2019-09 Core # 8.2.4.2.2.  Enabling Recursion with `"$recursiveAnchor"`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-8.2.4.2.2)
-    pub const RECURSIVE_ANCHOR: Keyword<'static> = Keyword("$recursiveAnchor");
+    #[serde(
+        rename = "$recursiveAnchor",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub recursive_anchor: Option<bool>,
+
+    /// ##`$recursiveRef` The `"$recursiveRef"` and `"$recursiveAnchor"`
+    /// keywords are used to construct extensible recursive schemas.  A
+    /// recursive schema is one that has a reference to its own root, identified
+    /// by the empty fragment URI reference `'#'`.
+    ///
+    /// - [Draft 2019-09 Core # 8.2.4.2.  Recursive References with `"$recursiveRef"`
+    ///   and
+    ///   `"$recursiveAnchor"`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-8.2.4.2)
+    #[serde(
+        rename = "$recursiveRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub recursive_reference: Option<String>,
 
     /// ## `type`
     /// The `"type"` keyword is fundamental to JSON Schema. It specifies the
@@ -293,7 +335,8 @@ impl Keyword<'_> {
     /// case, the JSON snippet is valid if it matches any of the given types.
     ///
     /// - [Understanding JSON Schema # Type-specific keywords](https://json-schema.org/understanding-json-schema/reference/type.html)
-    pub const TYPE: Keyword<'static> = Keyword("type");
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub types: Option<Types>,
 
     /// The format keyword allows for basic semantic identification of certain
     /// kinds of string values that are commonly used. For example, because JSON
@@ -305,14 +348,16 @@ impl Keyword<'_> {
     /// - [JSON Schema Core 2020-12 # 7. Vocabularies for Semantic Content With `"format"`](https://json-schema.org/draft/2020-12/json-schema-validation.html#name-vocabularies-for-semantic-c)
     /// - [Understanding Json Schema # string Built-in Formats](https://json-schema.org/understanding-json-schema/reference/string.html#id7)
     /// - [OpenAPI 3.1 Specification # 4.2 Format](https://spec.openapis.org/oas/v3.1.0#format)
-    pub const FORMAT: Keyword<'static> = Keyword("format");
+    #[serde(rename = "format", default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Format>,
 
     /// ## `const`
     /// The `"const"` keyword is used to restrict a value to a single value.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.1.3. `const`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-const)
     /// - [Understanding JSON Schema - Constant values](https://json-schema.org/understanding-json-schema/reference/generic.html?highlight=const#constant-values)
-    pub const CONST: Keyword<'static> = Keyword("const");
+    #[serde(rename = "const", default, skip_serializing_if = "Option::is_none")]
+    pub constant: Option<serde_json::Value>,
 
     /// ## `$defs`
     /// The "$defs" keyword reserves a location for schema authors to inline
@@ -324,7 +369,8 @@ impl Keyword<'_> {
     ///
     /// - [JSON Schema Core 2020-12 # 8.2.4. Schema Re-Use With `"$defs"`](https://json-schema.org/draft/2020-12/json-schema-core.html#defs)
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
-    pub const DEFS: Keyword<'static> = Keyword("$defs");
+    #[serde(rename = "$defs", default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub definitions: BTreeMap<String, Schema>,
 
     /// ## `definitions`
     /// Legacy from Draft 07. See [`definitions`](`Object::definitions`).
@@ -333,7 +379,13 @@ impl Keyword<'_> {
     /// If using JSON Schema 07, use this field instead of [`definitions`](`Object::definitions`).
     ///
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
-    pub const DEFINITIONS_LEGACY: Keyword<'static> = Keyword("definitions");
+    #[serde(
+        rename = "definitions",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    // #[deprecated]
+    pub definitions_legacy: BTreeMap<String, Schema>,
 
     /// ## `enum`
     /// An instance validates successfully against this keyword if its value is
@@ -342,35 +394,40 @@ impl Keyword<'_> {
     /// Elements in the array might be of any type, including null.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.1.2. `enum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-enum)
-    pub const ENUM: Keyword<'static> = Keyword("enum");
+    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
+    pub enumeration: Vec<Value>,
 
     /// ## `allOf`
     /// The `"allOf"` keyword acts as an `AND` where each subschema must be
     /// valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `allOf`](https://json-schema.org/understanding-json-schema/reference/combining.html?highlight=allOf#allOf)
-    pub const ALL_OF: Keyword<'static> = Keyword("allOf");
+    #[serde(rename = "allOf", default, skip_serializing_if = "Vec::is_empty")]
+    pub all_of: Vec<Schema>,
 
     /// ## `anyOf`
     /// The `"anyOf"` keyword acts as an `OR` where at least one of the
     /// subschemas must be valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `anyOf`](https://json-schema.org/understanding-json-schema/reference/combining.html?highlight=anyof#anyOf)
-    pub const ANY_OF: Keyword<'static> = Keyword("anyOf");
+    #[serde(rename = "anyOf", default, skip_serializing_if = "Vec::is_empty")]
+    pub any_of: Vec<Schema>,
 
     /// ## `oneOf`
     /// The `"oneOf"` keyword acts as an `XOR` where exactly one of the
     /// subschemas must be valid
     ///
     /// - [Understanding JSON Schema # Schema Composition `oneOf`](https://json-schema.org/understanding-json-schema/reference/combining.html#oneof)
-    pub const ONE_OF: Keyword<'static> = Keyword("oneOf");
+    #[serde(rename = "oneOf", default, skip_serializing_if = "Vec::is_empty")]
+    pub one_of: Vec<Schema>,
 
     /// ## `not`
     /// The not keyword declares that an instance validates if it doesn’t
     /// validate against the given subschema.
     ///
     /// - [Understanding JSON Schema # Schema Composition `not`](https://json-schema.org/understanding-json-schema/reference/combining.html?#id8)
-    pub const NOT: Keyword<'static> = Keyword("not");
+    #[serde(rename = "not", default, skip_serializing_if = "Option::is_none")]
+    pub not: Option<Schema>,
 
     /// ## `if`
     /// This validation outcome of this keyword's subschema has no direct effect
@@ -384,7 +441,8 @@ impl Keyword<'_> {
     /// present.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.1. `if`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.1)
-    pub const IF: Keyword<'static> = Keyword("if");
+    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
+    pub cond_if: Option<Schema>,
 
     /// ## `then`
     /// When `"if"` is present, and the instance successfully validates against
@@ -397,7 +455,8 @@ impl Keyword<'_> {
     /// annotation collection purposes, in such cases.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.2. `then`](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.2.2)
-    pub const THEN: Keyword<'static> = Keyword("then");
+    #[serde(rename = "then", default, skip_serializing_if = "Option::is_none")]
+    pub cond_then: Option<Schema>,
 
     /// ## `else`
     /// When `"if"` is present, and the instance fails to validate against its
@@ -410,7 +469,8 @@ impl Keyword<'_> {
     /// annotation collection purposes, in such cases.
     ///
     /// - [JSON Schema Core 2020-12 # 10.2.2.3. `else`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-else)
-    pub const ELSE: Keyword<'static> = Keyword("else");
+    #[serde(rename = "else", default, skip_serializing_if = "Option::is_none")]
+    pub cond_else: Option<Schema>,
 
     /// ## `dependentSchemas`
     /// This keyword specifies subschemas that are evaluated if the instance is
@@ -423,7 +483,12 @@ impl Keyword<'_> {
     /// must validate against the subschema. Its use is dependent on the
     /// presence of the property.
     /// - [JSON Schema Core 2020-12 # 10.2.2.4. `dependentSchemas`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-dependentschemas)
-    pub const DEPENDENT_SCHEMAS: Keyword<'static> = Keyword("dependentSchemas");
+    #[serde(
+        rename = "dependentSchemas",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub dependent_schemas: BTreeMap<String, Schema>,
 
     /// ## `prefixItems`
     /// Validation succeeds if each element of the instance validates against
@@ -440,7 +505,8 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same assertion behavior as an empty array.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.1.1. `prefixItems`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-prefixitems)
-    pub const PREFIX_ITEMS: Keyword<'static> = Keyword("prefixItems");
+    #[serde(rename = "prefixItems", default, skip_serializing_if = "Vec::is_empty")]
+    pub prefix_items: Vec<Schema>,
 
     /// ## `items`
     /// This keyword applies its subschema to all instance elements at indexes
@@ -462,10 +528,11 @@ impl Keyword<'_> {
 
     /// - [JSON Schema Core 2020-12 # 10.3.1.2. `items`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-items)
     /// - [JSON Schema Validation 07 # 6.4.1 `items`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.1)
-    pub const ITEMS: Keyword<'static> = Keyword("items");
+    #[serde(rename = "items", default, skip_serializing_if = "Option::is_none")]
+    pub items: Option<Items>,
 
     /// - [JSON Schema Core 2019-09 # 9.3.1.2.  `additionalItems`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-02#section-9.3.1.2)
-    pub const ADDITIONAL_ITEMS: Keyword<'static> = Keyword("additionalItems");
+    pub additional_items: Option<Schema>,
 
     /// ## `contains`
     /// An array instance is valid against `"contains"` if at least one of its
@@ -492,7 +559,8 @@ impl Keyword<'_> {
     /// collected.
     ///
     ///  - [JSON Schema Core 2020-12 # 10.3.1.3. `contains`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-contains)
-    pub const CONTAINS: Keyword<'static> = Keyword("contains");
+    #[serde(rename = "contains", default, skip_serializing_if = "Option::is_none")]
+    pub contains: Option<Schema>,
 
     /// ## `properties`
     /// Validation succeeds if, for each name that appears in both the instance
@@ -507,7 +575,12 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same assertion behavior as an empty
     /// object.
     /// - [JSON Schema Core 2020-12 # 10.3.2.1. properties](https://json-schema.org/draft/2020-12/json-schema-core.html#name-properties)
-    pub const PROPERTIES: Keyword<'static> = Keyword("properties");
+    #[serde(
+        rename = "properties",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub properties: BTreeMap<String, Schema>,
 
     /// ## `patternProperties`
     /// Each property name of this object SHOULD be a valid regular expression,
@@ -528,7 +601,12 @@ impl Keyword<'_> {
     /// object.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.2. `patternProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-patternproperties)
-    pub const PATTERN_PROPERTIES: Keyword<'static> = Keyword("patternProperties");
+    #[serde(
+        rename = "patternProperties",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub pattern_properties: BTreeMap<String, String>,
 
     /// ## `additionalProperties`
     /// The value of "additionalProperties" MUST be a valid JSON Schema.
@@ -549,7 +627,12 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same assertion behavior as an empty schema.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.3.`additionalProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-additionalproperties)
-    pub const ADDITIONAL_PROPERTIES: Keyword<'static> = Keyword("additionalProperties");
+    #[serde(
+        rename = "additionalProperties",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub additional_properties: Option<Schema>,
 
     /// ## `propertyNames`
     /// If the instance is an object, this keyword validates if every property
@@ -557,7 +640,12 @@ impl Keyword<'_> {
     /// property name that the schema is testing will always be a string.
     ///
     /// - [JSON Schema Core 2020-12 # 10.3.2.4.`propertyNames`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-propertynames)
-    pub const PROPERTY_NAMES: Keyword<'static> = Keyword("propertyNames");
+    #[serde(
+        rename = "propertyNames",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub property_names: Option<Schema>,
 
     /// ## `unevaluatedItems`
     /// The behavior of this keyword depends on the annotation results of
@@ -590,7 +678,12 @@ impl Keyword<'_> {
     /// schema.
     ///
     /// - [JSON Schema Core 2020-12 # 11.2. `unevaluatedItems`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-unevaluateditems)
-    pub const UNEVALUATED_ITEMS: Keyword<'static> = Keyword("unevaluatedItems");
+    #[serde(
+        rename = "unevaluatedItems",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unevaluated_items: Option<Schema>,
 
     /// ## `unevaluatedProperties`
     /// The behavior of this keyword depends on the annotation results of adjacent
@@ -622,7 +715,12 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same assertion behavior as an empty schema.
     ///
     /// - [JSON Schema Core 2020-12 # 11.3. `unevaluatedProperties`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-unevaluatedproperties)
-    pub const UNEVALUATED_PROPERTIES: Keyword<'static> = Keyword("unevaluatedProperties");
+    #[serde(
+        rename = "unevaluatedProperties",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unevaluated_properties: Option<Schema>,
 
     /// ## `multipleOf`
     /// The value of `"multipleOf"` MUST be a number, strictly greater than 0.
@@ -631,7 +729,8 @@ impl Keyword<'_> {
     /// results in an integer.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.1. `multipleOf`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-multipleof)
-    pub const MULTIPLE_OF: Keyword<'static> = Keyword("multipleOf");
+    #[serde(rename = "multipleOf", skip_serializing_if = "Option::is_none")]
+    pub multiple_of: Option<Number>,
 
     /// #`maximum`
     /// The value of `"maximum"` MUST be a number, representing an inclusive upper
@@ -640,7 +739,8 @@ impl Keyword<'_> {
     /// If the instance is a number, then this keyword validates only if the
     /// instance is less than or exactly equal to `"maximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.2. `maximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maximum)
-    pub const MAXIMUM: Keyword<'static> = Keyword("maximum");
+    #[serde(rename = "maximum", skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<Number>,
 
     /// ## `exclusiveMaximum`
     /// For JSON Schema drafts 7 and higher, the value of `"exclusiveMaximum"` MUST be a number, representing an
@@ -651,7 +751,8 @@ impl Keyword<'_> {
     /// If the instance is a number, then the instance is valid only if it has a
     /// value strictly less than (not equal to) `"exclusiveMaximum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.3. `exclusiveMaximum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusivemaximum)
-    pub const EXCLUSIVE_MAXIMUM: Keyword<'static> = Keyword("exclusiveMaximum");
+    #[serde(rename = "exclusiveMaximum", skip_serializing_if = "Option::is_none")]
+    pub exclusive_maximum: Option<BoolOrNumber>,
 
     /// ## `minimum`
     /// The value of `"minimum"` MUST be a number, representing an inclusive
@@ -660,7 +761,8 @@ impl Keyword<'_> {
     /// If the instance is a number, then this keyword validates only if the
     /// instance is greater than or exactly equal to `"minimum"`.
     /// - [JSON Schema Validation 2020-12 # 6.2.4. `minimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minimum)
-    pub const MINIMUM: Keyword<'static> = Keyword("minimum");
+    #[serde(rename = "minimum", skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<Number>,
 
     /// ## `exclusiveMinimum`
     ///
@@ -671,7 +773,8 @@ impl Keyword<'_> {
     /// value strictly greater than (not equal to) `"exclusiveMinimum"`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.2.5. `exclusiveMinimum`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-exclusiveminimum)
-    pub const EXCLUSIVE_MINIMUM: Keyword<'static> = Keyword("exclusiveMinimum");
+    #[serde(rename = "exclusiveMinimum", skip_serializing_if = "Option::is_none")]
+    pub exclusive_minimum: Option<BoolOrNumber>,
 
     /// ## `maxLength`
     /// The value of `"maxLength"` MUST be a non-negative integer.
@@ -680,7 +783,8 @@ impl Keyword<'_> {
     /// than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.1. `maxLength`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxlength)
-    pub const MAX_LENGTH: Keyword<'static> = Keyword("maxLength");
+    #[serde(rename = "maxLength", skip_serializing_if = "Option::is_none")]
+    pub max_length: Option<usize>,
 
     /// ## `minLength`
     /// The value of this keyword MUST be a non-negative integer.
@@ -689,7 +793,8 @@ impl Keyword<'_> {
     /// than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.2. `minLength`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minlength)
-    pub const MIN_LENGTH: Keyword<'static> = Keyword("minLength");
+    #[serde(rename = "minLength", skip_serializing_if = "Option::is_none")]
+    pub min_length: Option<usize>,
 
     /// ## `pattern`
     /// The value of this keyword MUST be a string. This string SHOULD be a
@@ -702,7 +807,8 @@ impl Keyword<'_> {
     /// Regular expressions are not implicitly anchored.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `pattern`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-pattern)
-    pub const PATTERN: Keyword<'static> = Keyword("pattern");
+    #[serde(rename = "pattern", skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
 
     /// ## `maxItems`
     /// The value of this keyword MUST be a non-negative integer.
@@ -710,7 +816,8 @@ impl Keyword<'_> {
     /// An array instance is valid against "maxItems" if its size is less than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `maxItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxitems)
-    pub const MAX_ITEMS: Keyword<'static> = Keyword("maxItems");
+    #[serde(rename = "maxItems", skip_serializing_if = "Option::is_none")]
+    pub max_items: Option<usize>,
 
     /// ## `minItems`
     /// The value of this keyword MUST be a non-negative integer.
@@ -720,7 +827,8 @@ impl Keyword<'_> {
     ///
     /// Omitting this keyword has the same behavior as a value of 0.
     /// - [JSON Schema Validation 2020-12 # 6.3.3. `minItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minitems)
-    pub const MIN_ITEMS: Keyword<'static> = Keyword("minItems");
+    #[serde(rename = "minItems", skip_serializing_if = "Option::is_none")]
+    pub min_items: Option<usize>,
 
     /// ## `uniqueItems`
     /// The value of this keyword MUST be a boolean.
@@ -732,7 +840,8 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as a value of false.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.3. `uniqueItems`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-uniqueitems)
-    pub const UNIQUE_ITEMS: Keyword<'static> = Keyword("uniqueItems");
+    #[serde(rename = "uniqueItems", skip_serializing_if = "Option::is_none")]
+    pub unique_items: Option<bool>,
 
     /// ## `maxContains`
     /// The value of this keyword MUST be a non-negative integer.
@@ -748,7 +857,8 @@ impl Keyword<'_> {
     /// array length is less than or equal to the "maxContains" value.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.4. `maxContains`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxcontains)
-    pub const MAX_CONTAINS: Keyword<'static> = Keyword("maxContains");
+    #[serde(rename = "maxContains", skip_serializing_if = "Option::is_none")]
+    pub max_contains: Option<usize>,
 
     /// ## `minContains`
     /// The value of this keyword MUST be a non-negative integer.
@@ -771,7 +881,8 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as a value of `1`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.4.4. `minContains`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-mincontains)
-    pub const MIN_CONTAINS: Keyword<'static> = Keyword("minContains");
+    #[serde(rename = "minContains", skip_serializing_if = "Option::is_none")]
+    pub min_contains: Option<usize>,
 
     /// ## `maxProperties`
     /// The value of this keyword MUST be a non-negative integer.
@@ -779,7 +890,8 @@ impl Keyword<'_> {
     /// An object instance is valid against "maxProperties" if its number of properties is less than, or equal to, the value of this keyword.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.1 `maxProperties`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-maxproperties)
-    pub const MAX_PROPERTIES: Keyword<'static> = Keyword("maxProperties");
+    #[serde(rename = "maxProperties", skip_serializing_if = "Option::is_none")]
+    pub max_properties: Option<usize>,
 
     /// ## `minProperties`
     /// The value of this keyword MUST be a non-negative integer.
@@ -790,7 +902,8 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as a value of `0`.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.2 `minProperties`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-minproperties)
-    pub const MIN_PROPERTIES: Keyword<'static> = Keyword("minProperties");
+    #[serde(rename = "minProperties", skip_serializing_if = "Option::is_none")]
+    pub min_properties: Option<usize>,
 
     /// ## `required`
     /// The value of this keyword MUST be an array. Elements of this array, if
@@ -802,7 +915,12 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as an empty array.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.3 `required`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-required)
-    pub const REQUIRED: Keyword<'static> = Keyword("required");
+    #[serde(
+        rename = "required",
+        default,
+        skip_serializing_if = "HashSet::is_empty"
+    )]
+    pub required: HashSet<String>,
 
     /// ## `dependentRequired`
     /// The value of this keyword MUST be an object. Properties in this object,
@@ -820,7 +938,12 @@ impl Keyword<'_> {
     /// Omitting this keyword has the same behavior as an empty object.
     ///
     /// - [JSON Schema Validation 2020-12 # 6.5.4 `dependentRequired`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-dependentrequired)
-    pub const DEPENDENT_REQUIRED: Keyword<'static> = Keyword("dependentRequired");
+    #[serde(
+        rename = "dependentRequired",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub dependent_required: BTreeMap<String, HashSet<String>>,
 
     /// ## `contentEncoding`
     /// If the instance value is a string, this property defines that the string
@@ -843,7 +966,7 @@ impl Keyword<'_> {
     /// only of 7-bit ASCII characters. Therefore, this keyword has no meaning
     /// for strings containing characters outside of that range.
     ///
-    /// If this keyword is absent, but `"contentMediaType"` is present, this
+    /// If this keyword is absent, but "contentMediaType" is present, this
     /// indicates that the encoding is the identity encoding, meaning that no
     /// transformation was needed in order to represent the content in a UTF-8
     /// string.
@@ -852,7 +975,8 @@ impl Keyword<'_> {
 
     /// - [JSON Schema Validation 2020-12 # 8.3. `contentEncoding`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentencoding)
     /// - [Understanding JSON Schema # Media: string-encoding non-JSON data - `contentEncoding`](https://json-schema.org/understanding-json-schema/reference/non_json_data.html#id2)
-    pub const CONTENT_ENCODING: Keyword<'static> = Keyword("contentEncoding");
+    #[serde(rename = "contentEncoding", skip_serializing_if = "Option::is_none")]
+    pub content_encoding: Option<String>,
 
     /// ## `contentMediaType`
     /// If the instance is a string, this property indicates the media type of
@@ -862,17 +986,47 @@ impl Keyword<'_> {
     /// The value of this property MUST be a string, which MUST be a media type, as defined by [RFC 2046]().
     ///
     /// - [JSON Schema Validation 2020-12 # 8.4. `contentMediaType`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentmediatype)
-    pub const CONTENT_MEDIA_TYPE: Keyword<'static> = Keyword("contentMediaType");
+    #[serde(rename = "contentMediaType", skip_serializing_if = "Option::is_none")]
+    pub content_media_type: Option<String>,
 
     /// ## `contentSchema`
-    /// If the instance is a string, and if `"contentMediaType"` is present, this property contains a schema which describes the structure of the string.
+    /// If the instance is a string, and if "contentMediaType" is present, this property contains a schema which describes the structure of the string.
     ///
     /// This keyword MAY be used with any media type that can be mapped into JSON Schema's data model.
     ///
-    /// The value of this property MUST be a valid JSON schema. It SHOULD be ignored if `"contentMediaType"` is not present   
+    /// The value of this property MUST be a valid JSON schema. It SHOULD be ignored if "contentMediaType" is not present   
+    ///
+    /// ### Example
+    /// ```json
+    /// {
+    ///     "type": "string",
+    ///     "contentMediaType": "application/jwt",
+    ///     "contentSchema": {
+    ///         "type": "array",
+    ///         "minItems": 2,
+    ///         "prefixItems": [
+    ///             {
+    ///                 "const": {
+    ///                     "typ": "JWT",
+    ///                     "alg": "HS256"
+    ///                 }
+    ///             },
+    ///             {
+    ///                 "type": "object",
+    ///                 "required": ["iss", "exp"],
+    ///                 "properties": {
+    ///                     "iss": {"type": "string"},
+    ///                     "exp": {"type": "integer"}
+    ///                 }
+    ///             }
+    ///         ]
+    ///     }
+    /// }
+    /// ```
     ///
     /// - [JSON Schema Validation 2020-12 # 8.5. `contentSchema`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-contentschema)
-    pub const CONTENT_SCHEMA: Keyword<'static> = Keyword("contentSchema");
+    #[serde(rename = "contentSchema", skip_serializing_if = "Option::is_none")]
+    pub content_schema: Option<Schema>,
 
     /// ## `examples`
     /// The value of this keyword MUST be an array. There are no restrictions placed on the values within the array. When multiple occurrences of this keyword are applicable to a single sub-instance, implementations MUST provide a flat array of all values rather than an array of arrays.
@@ -884,83 +1038,39 @@ impl Keyword<'_> {
     /// in this manner.
     ///
     /// - [JSON Schema Validation 2020-12 # 9.5 `"examples"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-examples)
-    pub const EXAMPLES: Keyword<'static> = Keyword("examples");
+    #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
+    pub examples: Option<Vec<Value>>,
+
+    #[serde(flatten, default)]
+    pub additional_keywords: BTreeMap<String, Value>,
 }
 
-impl Deref for Keyword<'_> {
-    type Target = str;
+#[cfg(test)]
+mod tests {
 
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
+    #[test]
+    fn test_object_de() {
+        let r = big_rational_str::str_to_big_rational("34.34").unwrap();
 
-impl PartialOrd for Keyword<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(other.0)
-    }
-}
-impl Ord for Keyword<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(other.0)
+        // let schema = json!({"multipleOf": "34.34"});
+        // let schema: Object = serde_json::from_value(schema).unwrap();
+        // println!("{schema:?}");
     }
 }
 
-impl PartialEq<str> for Keyword<'_> {
-    fn eq(&self, other: &str) -> bool {
-        self.0 == other
-    }
-}
-
-impl PartialEq<String> for Keyword<'_> {
-    fn eq(&self, other: &String) -> bool {
-        self.0 == other.as_str()
-    }
-}
-
-impl PartialEq<Keyword<'_>> for String {
-    fn eq(&self, other: &Keyword<'_>) -> bool {
-        self.as_str() == other.0
-    }
-}
-impl PartialEq<Keyword<'_>> for str {
-    fn eq(&self, other: &Keyword<'_>) -> bool {
-        self == other.0
-    }
-}
-
-impl PartialOrd<str> for Keyword<'_> {
-    fn partial_cmp(&self, other: &str) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(other)
-    }
-}
-
-impl PartialEq<&'_ str> for Keyword<'_> {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
-    }
-}
-
-impl AsRef<str> for Keyword<'_> {
-    fn as_ref(&self) -> &str {
-        self.0
-    }
-}
-
-impl Display for Keyword<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl From<Keyword<'_>> for jsonptr::Token {
-    fn from(keyword: Keyword) -> Self {
-        jsonptr::Token::from(keyword.0)
-    }
-}
-
-impl<'s> From<&'s str> for Keyword<'s> {
-    fn from(keyword: &'s str) -> Self {
-        Self(keyword)
-    }
-}
+// fn non_fragmented_uri<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let mut s: Option<String> = Option::deserialize(deserializer)?;
+//     if let Some(v) = s.as_ref() {
+//         if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
+//             let v = v.trim();
+//             if matches!(v.find('#'), Some(idx) if idx < v.len() - 1) {
+//                 return Err(serde::de::Error::custom("URI must not contain a fragment"));
+//             }
+//             s = Some(v.to_string());
+//         }
+//     }
+//     Ok(s)
+// }

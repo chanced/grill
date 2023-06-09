@@ -3,25 +3,11 @@ use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
 use snafu::ResultExt;
 
-use crate::{
-    error::{resolve_error, DeserializeError, ResolveError},
-    Schema,
-};
+use crate::error::{resolve_error, DeserializeError, ResolveError};
 
 #[async_trait]
 pub trait Resolve: DynClone + Send + Sync + 'static {
     async fn resolve(&self, uri: &str) -> Result<Option<Value>, ResolveError>;
-    async fn resolve_schema(&self, uri: &str) -> Result<Option<Schema>, ResolveError> {
-        match self.resolve(uri).await? {
-            Some(value) => match serde_json::from_value(value) {
-                Ok(schema) => Ok(Some(schema)),
-                Err(err) => Err(DeserializeError::from(err)).context(resolve_error::Deserialize {
-                    schema_id: uri.to_string(),
-                }),
-            },
-            None => Ok(None),
-        }
-    }
 }
 
 clone_trait_object!(Resolve);

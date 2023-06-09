@@ -1,3 +1,5 @@
+use crate::{handler::SyncHandler, Handler};
+
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
 ///
 /// The value of this keyword MAY be of any type, including null.
@@ -9,6 +11,45 @@ pub struct ConstHandler {
     pub expected: Option<serde_json::Value>,
 }
 
+impl ConstHandler {
+    #[must_use]
+    pub fn new() -> ConstHandler {
+        Self::default()
+    }
+    #[must_use]
+    pub fn into_handler(self) -> Handler {
+        Handler::Sync(Box::new(self))
+    }
+}
+
+impl SyncHandler for ConstHandler {
+    fn compile<'s>(
+        &mut self,
+        compile: &mut crate::Compile<'s>,
+        schema: &'s serde_json::Value,
+    ) -> Result<bool, crate::error::CompileError> {
+        todo!()
+    }
+
+    fn evaluate<'v>(
+        &self,
+        scope: &mut crate::Scope,
+        value: &'v serde_json::Value,
+        _structure: crate::Structure,
+    ) -> Result<Option<crate::output::Annotation<'v>>, crate::error::EvaluateError> {
+        todo!()
+    }
+}
+impl From<ConstHandler> for Handler {
+    fn from(value: ConstHandler) -> Self {
+        value.into_handler()
+    }
+}
+impl From<&ConstHandler> for Handler {
+    fn from(value: &ConstHandler) -> Self {
+        value.clone().into_handler()
+    }
+}
 // impl SyncHandler for ConstHandler {
 //     fn compile<'s>(
 //         &mut self,
@@ -42,7 +83,7 @@ pub struct ConstHandler {
 //     }
 // }
 
-/// [`ValidationError`] for the `enum` keyword, produced by [`ConstHandler`].
+/// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstHandler`].
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
     pub expected: serde_json::Value,

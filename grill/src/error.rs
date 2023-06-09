@@ -1,15 +1,67 @@
-use crate::schema::Object;
-use crate::{schema::Types, Location};
+use crate::{uri::AbsoluteUri, Location, Uri};
 use jsonptr::Pointer;
-use serde_json::Value;
+use serde_json::{Number, Value};
 use snafu::Snafu;
 use std::{
-    borrow::Cow,
     error::Error,
     fmt::{self, Display},
 };
 
 pub use crate::output::ValidationError;
+pub use urn::Error as UrnError;
+
+#[derive(Debug)]
+pub struct DuplicateSourceError {
+    pub id: AbsoluteUri,
+    pub source: Value,
+}
+
+#[derive(Debug)]
+pub struct SourceUriFragmentedError {
+    pub uri: AbsoluteUri,
+}
+
+impl Display for SourceUriFragmentedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "source uris may not contain fragments; found: \"{}\"",
+            self.uri
+        )
+    }
+}
+impl std::error::Error for SourceUriFragmentedError {}
+
+impl Display for DuplicateSourceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "duplicate source: {}", self.id)
+    }
+}
+
+impl std::error::Error for DuplicateSourceError {}
+
+#[derive(Debug)]
+pub struct DuplicateDialectError {
+    pub id: AbsoluteUri,
+}
+
+impl Display for DuplicateDialectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "duplicate dialect: {}", self.id)
+    }
+}
+impl std::error::Error for DuplicateDialectError {}
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("failed to compile schema: {}", source), context(false))]
+    Compile { source: CompileError },
+    #[snafu(display("duplicate dialect id: {}", source), context(false))]
+    DuplicateDialect { source: DuplicateDialectError },
+    #[snafu(display("{}", source), context(false))]
+    DuplicateSource { source: DuplicateSourceError },
+    #[snafu(display("{}", source), context(false))]
+    SourceUriFragmented { source: SourceUriFragmentedError },
+}
 
 #[derive(Debug, Snafu)]
 pub enum StoreError {
@@ -19,52 +71,27 @@ pub enum StoreError {
     Compile { uri: String, source: CompileError },
 }
 
-// TODO: Finish EvaluateError
-
-#[derive(Debug)]
-pub enum EvaluateError {
-    Any,
-}
-impl Display for EvaluateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EvaluateError::Any => write!(f, "Any"),
-        }
-    }
-}
-impl Error for EvaluateError {}
-
-#[derive(Debug)]
-pub enum DialectError {
-    MissingSchemaId {
-        schema: Object,
+#[derive(Debug, Snafu)]
+pub enum EvaluateError<'v> {
+    #[snafu(display("error parsing number: {}", source))]
+    ParseNumber {
+        source: big_rational_str::ParseError,
+        number: &'v Number,
     },
-    MissingRequiredVocabulary {
-        vocabulary_id: String,
-        meta_schema_id: String,
+
+    #[snafu(display("custom error: {}", source))]
+    Custom {
+        source: Box<dyn Error>,
+        value: &'v Value,
     },
-    SchemaIdNotAbsolute {
-        id: String,
+
+    #[snafu(display("error evaluating regular expression: {}", source))]
+    Regex {
+        regex: String,
+        value: &'v Value,
+        source: fancy_regex::Error,
     },
 }
-
-impl Display for DialectError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use DialectError::*;
-        match self {
-            MissingSchemaId { .. } => {
-                write!(f, "Schema is not identified")
-            }
-            MissingRequiredVocabulary { vocabulary_id, .. } => {
-                write!(f, "Vocabulary \"{vocabulary_id}\" is required")
-            }
-            SchemaIdNotAbsolute { id } => {
-                write!(f, "Schema ID is not absolute: \"{id}\"")
-            }
-        }
-    }
-}
-impl std::error::Error for DialectError {}
 
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug)]
@@ -281,19 +308,16 @@ impl ResolveError {
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum CompileError {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
-    MetaSchema {
+    UnknownMetaschema {
         /// The [`Uri`] of meta schema which encountered an error
         schema_id: String,
         /// The error which occurred when parsing the meta schema
-        source: MetaSchemaError,
+        source: UnknownMetaschemaError,
     },
     /// A schema was not able to be resolved.
     SchemaNotFound {
         /// The source [`ResolveError`]
         source: ResolveError,
-    },
-    UnexpectedValue {
-        source: UnexpectedValueError,
     },
     Internal {
         source: Box<dyn Error + Send + Sync>,
@@ -314,32 +338,9 @@ impl std::fmt::Display for SchemaNotFoundError {
 }
 impl Error for SchemaNotFoundError {}
 
-#[derive(Debug, Clone)]
-pub struct UnexpectedValueError {
-    pub schema_id: Option<String>,
-    pub pointer: Pointer,
-    pub property: Cow<'static, str>,
-    pub expected_types: Types,
-    pub found: Box<Value>,
-    pub msg: String,
-}
-
-impl fmt::Display for UnexpectedValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            r#"expected {} for "{}", found {}"#,
-            self.expected_types,
-            self.property,
-            Types::of_value(&self.found)
-        )
-    }
-}
-impl Error for UnexpectedValueError {}
-
 #[derive(Debug, Clone, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum MetaSchemaError {
+pub enum UnknownMetaschemaError {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     #[snafu(display("{}", source), context(false))]
     Unknown { source: UnkownMetaSchemaError },
@@ -356,7 +357,7 @@ impl Display for UnkownMetaSchemaError {
 }
 impl Error for UnkownMetaSchemaError {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UriNotAbsoluteError {
     pub uri: String,
 }
@@ -368,7 +369,7 @@ impl Display for UriNotAbsoluteError {
 
 impl Error for UriNotAbsoluteError {}
 
-#[derive(Debug, Clone, Snafu)]
+#[derive(Debug, Clone, Snafu, PartialEq, Eq)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum AbsoluteUriParseError {
     #[snafu(display("{}", source), context(false))]
@@ -379,21 +380,13 @@ pub enum AbsoluteUriParseError {
     NotAbsolute { source: UriNotAbsoluteError },
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum UriParseError {
     #[snafu(display("{}", source), context(false))]
     Url { source: url::ParseError },
     #[snafu(display("{}", source), context(false))]
     Urn { source: urn::Error },
-    #[snafu(
-        display(
-            "failed to parse uri due to a regular expression error: \n\t{}",
-            source
-        ),
-        context(false)
-    )]
-    Regex { source: fancy_regex::Error },
 }
 
 impl AbsoluteUriParseError {
@@ -412,7 +405,7 @@ impl AbsoluteUriParseError {
     pub fn is_urn(&self) -> bool {
         matches!(self, Self::Urn { .. })
     }
-
+    #[must_use]
     pub fn as_url(&self) -> Option<&url::ParseError> {
         if let Self::Url { source } = self {
             Some(source)
@@ -420,6 +413,7 @@ impl AbsoluteUriParseError {
             None
         }
     }
+    #[must_use]
     pub fn as_urn(&self) -> Option<&urn::Error> {
         if let Self::Urn { source } = self {
             Some(source)
@@ -428,6 +422,32 @@ impl AbsoluteUriParseError {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Snafu)]
+pub enum IdentifyError {
+    #[snafu(display("{}", source), context(false))]
+    Parse { source: UriParseError },
+    #[snafu(display("{}", source), context(false))]
+    HasFragment { source: HasFragmentError<Uri> },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HasFragmentError<U>
+where
+    U: PartialEq + Eq,
+{
+    pub uri: U,
+}
+impl<U> Display for HasFragmentError<U>
+where
+    U: Display + PartialEq + Eq,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, r#"URI "{}" contains a fragment"#, self.uri)
+    }
+}
+impl<U> std::error::Error for HasFragmentError<U> where U: std::fmt::Debug + Display + PartialEq + Eq
+{}
 
 #[cfg(test)]
 mod tests {

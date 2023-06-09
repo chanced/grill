@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-
 use petgraph::{prelude::NodeIndex, Directed, Graph as DirectedGraph};
 
 #[derive(Debug, Clone)]
-/// DependencyGraph contains a graph of dependencies referenced v`ref`)
-/// by schemas. It is to detect cyclic sc
+/// Contains a graph of schema references in order to detect cyclic
+/// dependencies.
 pub(crate) struct DependencyGraph {
     ext_refs_graph: DirectedGraph<String, String, Directed>,
     indexes: HashMap<String, NodeIndex>,

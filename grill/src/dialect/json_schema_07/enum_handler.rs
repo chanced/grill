@@ -1,12 +1,3 @@
-
-use itertools::Itertools;
-use std::{error::Error, fmt::Display};
-
-use crate::{
-    handler::SyncHandler,
-    output::{ValidationError},
-};
-
 /// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.
 ///
 /// An instance validates successfully against this keyword if its value is

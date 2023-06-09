@@ -15,7 +15,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 anymap           = { workspace = true }
 async-trait      = { workspace = true }
 big-rational-str = { workspace = true }
-dashmap          = { workspace = true }
 dyn-clone        = { workspace = true }
 fancy-regex      = { workspace = true }
 itertools        = { workspace = true }

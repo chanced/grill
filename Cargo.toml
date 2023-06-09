@@ -7,11 +7,9 @@ grill = { path = "grill" }
 anymap           = { version = "1.0.0-beta.2" }
 async-trait      = { version = "0.1" }
 big-rational-str = { version = "0.1.6" }
-dashmap          = { version = "5.4" }
 dyn-clone        = { version = "1.0.11" }
 erased-serde     = { version = "0.3.25" }
 fancy-regex      = { version = "0.11.0" }
-fraction         = { version = "0.13", features = ["with-serde-support"] }
 itertools        = { version = "0.10" }
 jsonptr          = { version = "0.4", features = ["url"] }
 num              = { version = "0.4", features = ["serde"] }

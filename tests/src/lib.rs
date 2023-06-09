@@ -1,13 +1,12 @@
 use serde::Deserialize;
-
-use grill::Schema;
+use serde_json::Value;
 
 pub type TestCases = Vec<TestCase>;
 
 #[derive(Debug, Deserialize)]
 pub struct TestCase {
     pub description: String,
-    pub schema: Schema,
+    pub schema: Value,
     pub tests: Vec<Test>,
 }
 
