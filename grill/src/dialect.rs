@@ -1,12 +1,8 @@
-pub mod json_schema_07;
-
 use crate::{error::IdentifyError, uri::AbsoluteUri, Handler, Metaschema, Object, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
 use itertools::Itertools;
 use serde_json::Value;
-use std::{borrow::Borrow, collections::HashMap, fmt::Debug, ops::Deref};
-
-use self::json_schema_07::ConstHandler;
+use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash, ops::Deref};
 
 /// Defines a set of keywords and semantics that can be used to evaluate a
 /// JSON Schema document.
@@ -83,7 +79,11 @@ impl PartialEq for Dialect {
         self.id == other.id
     }
 }
-
+impl Hash for Dialect {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
 impl Dialect {
     /// Creates a new [`Dialect`].
     pub fn new(

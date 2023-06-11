@@ -8,8 +8,12 @@ pub use enum_handler::{EnumHandler, EnumInvalid};
 pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
-use super::{Dialect, Vocabulary};
-use crate::{json_schema::identify, uri::AbsoluteUri, Metaschema, Uri};
+use crate::{
+    dialect::{Dialect, Vocabulary},
+    json_schema::identify,
+    uri::AbsoluteUri,
+    Metaschema, Uri,
+};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
@@ -30,13 +34,13 @@ pub static JSON_HYPER_SCHEMA_07_URI: Lazy<Uri> =
 pub static JSON_HYPER_SCHEMA_07_ABSOLUTE_URI: Lazy<Uri> =
     Lazy::new(|| Uri::Url(Lazy::force(&JSON_HYPER_SCHEMA_07_URL).clone()));
 
-pub const JSON_SCHEMA_07_BYTES: &[u8] = include_bytes!("../../../dialect/07/schema.json");
+pub const JSON_SCHEMA_07_BYTES: &[u8] = include_bytes!("../../../json_schema/07/schema.json");
 pub const JSON_HYPER_SCHEMA_07_BYTES: &[u8] =
-    include_bytes!("../../../dialect/07/hyper-schema.json");
+    include_bytes!("../../../json_schema/07/hyper-schema.json");
 pub const JSON_HYPER_SCHEMA_07_LINKS_BYTES: &[u8] =
-    include_bytes!("../../../dialect/07/links.json");
+    include_bytes!("../../../json_schema/07/links.json");
 pub const JSON_HYPER_SCHEMA_07_OUTPUT_BYTES: &[u8] =
-    include_bytes!("../../../dialect/07/hyper-schema-output.json");
+    include_bytes!("../../../json_schema/07/hyper-schema-output.json");
 
 pub static JSON_SCHEMA_07: Lazy<Value> =
     Lazy::new(|| serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap());
@@ -96,7 +100,7 @@ pub fn json_hyper_schema_07_absolute_uri() -> &'static Uri {
 }
 
 #[must_use]
-pub fn json_schema_07_dialect() -> &'static Dialect {
+pub fn dialect() -> &'static Dialect {
     Lazy::force(&JSON_SCHEMA_07_DIALECT)
 }
 

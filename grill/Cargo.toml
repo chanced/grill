@@ -16,6 +16,7 @@ anymap           = { workspace = true }
 async-trait      = { workspace = true }
 big-rational-str = { workspace = true }
 dyn-clone        = { workspace = true }
+erased-serde     = { workspace = true }
 fancy-regex      = { workspace = true }
 itertools        = { workspace = true }
 jsonptr          = { workspace = true }
@@ -23,13 +24,15 @@ num              = { workspace = true }
 num-rational     = { workspace = true }
 once_cell        = { workspace = true }
 petgraph         = { workspace = true }
-reqwest          = { version = "0.11", optional = true }
+reqwest          = { workspace = true, optional = true }
 serde            = { workspace = true }
 serde_json       = { workspace = true }
+serde_yaml       = { workspace = true, optional = true }
 slotmap          = { workspace = true }
 snafu            = { workspace = true }
 strum            = { workspace = true }
 strum_macros     = { workspace = true }
+toml             = { workspace = true, optional = true }
 url              = { workspace = true }
 urn              = { workspace = true }
 
@@ -38,9 +41,10 @@ criterion = { version = "0.4" }
 tokio     = { version = "1.28", features = ["full"] }
 
 [features]
-
-default = ["http"]
+default = ["http", "toml", "yaml"]
 http    = ["reqwest"]
+toml    = ["dep:toml"]
+yaml    = ["dep:serde_yaml"]
 
 [[bench]]
 harness = false

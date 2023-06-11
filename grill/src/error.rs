@@ -3,8 +3,10 @@ use jsonptr::Pointer;
 use serde_json::{Number, Value};
 use snafu::Snafu;
 use std::{
+    collections::HashMap,
     error::Error,
     fmt::{self, Display},
+    string::FromUtf8Error,
 };
 
 pub use crate::output::ValidationError;
@@ -17,11 +19,17 @@ pub struct DuplicateSourceError {
 }
 
 #[derive(Debug)]
-pub struct SourceUriFragmentedError {
+pub struct FragmentedSourceUriError {
     pub uri: AbsoluteUri,
 }
+impl FragmentedSourceUriError {
+    #[must_use]
+    pub fn new(uri: AbsoluteUri) -> Self {
+        Self { uri }
+    }
+}
 
-impl Display for SourceUriFragmentedError {
+impl Display for FragmentedSourceUriError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -30,7 +38,7 @@ impl Display for SourceUriFragmentedError {
         )
     }
 }
-impl std::error::Error for SourceUriFragmentedError {}
+impl Error for FragmentedSourceUriError {}
 
 impl Display for DuplicateSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -38,29 +46,42 @@ impl Display for DuplicateSourceError {
     }
 }
 
-impl std::error::Error for DuplicateSourceError {}
+impl Error for DuplicateSourceError {}
 
 #[derive(Debug)]
-pub struct DuplicateDialectError {
+pub struct FragmentedDialectIdError {
     pub id: AbsoluteUri,
 }
-
-impl Display for DuplicateDialectError {
+impl Display for FragmentedDialectIdError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "duplicate dialect: {}", self.id)
+        write!(
+            f,
+            "dialect ids may not contain fragments; found: \"{}\"",
+            self.id
+        )
     }
 }
-impl std::error::Error for DuplicateDialectError {}
+impl FragmentedDialectIdError {
+    #[must_use]
+    pub fn new(id: AbsoluteUri) -> Self {
+        Self { id }
+    }
+}
+
+impl Error for FragmentedDialectIdError {}
+
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("failed to compile schema: {}", source), context(false))]
     Compile { source: CompileError },
     #[snafu(display("duplicate dialect id: {}", source), context(false))]
-    DuplicateDialect { source: DuplicateDialectError },
-    #[snafu(display("{}", source), context(false))]
     DuplicateSource { source: DuplicateSourceError },
     #[snafu(display("{}", source), context(false))]
-    SourceUriFragmented { source: SourceUriFragmentedError },
+    FragmentedSourceUri { source: FragmentedSourceUriError },
+    #[snafu(display("{}", source), context(false))]
+    FragmentedDialectId { source: FragmentedDialectIdError },
+    #[snafu(display("failed to parse uri: {}", source), context(false))]
+    UriParse { source: AbsoluteUriParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -96,113 +117,22 @@ pub enum EvaluateError<'v> {
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug)]
 pub struct DeserializeError {
-    #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-    /// JSON deserialization error
-    pub json: serde_json::Error,
-
-    /// JSON deserialization error
-    #[cfg(any(feature = "yaml", feature = "toml"))]
-    pub json: Option<serde_json::Error>,
-
-    /// YAML deserialization error
-    #[cfg(feature = "yaml")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "yaml")))]
-    pub yaml: Option<yaml::Error>,
-
-    /// TOML deserialization error
-    #[cfg_attr(docsrs, doc(cfg(feature = "yaml")))]
-    #[cfg(feature = "toml")]
-    pub toml: Option<toml::de::Error>,
+    pub sources: HashMap<&'static str, erased_serde::Error>,
 }
 
 impl Display for DeserializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-        {
-            write!(f, "{}", self.json)
+        write!(f, "failed to deserialize")?;
+        for (format, err) in &self.sources {
+            write!(f, "\t{format}: {err}")?;
         }
-        #[cfg(any(feature = "yaml", feature = "toml"))]
-        {
-            if let Some(err) = &self.json {
-                write!(f, "json: {err}")?;
-            }
-            #[cfg(feature = "yaml")]
-            if let Some(err) = &self.yaml {
-                write!(f, "yaml: {err}")?;
-            }
-            #[cfg(feature = "toml")]
-            if let Some(err) = &self.toml {
-                write!(f, "toml: {err}")?;
-            }
-            Ok(())
-        }
+        Ok(())
     }
 }
 
 impl Error for DeserializeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-        {
-            Some(&self.json)
-        }
-        #[cfg(any(feature = "yaml", feature = "toml"))]
-        {
-            if let Some(err) = &self.json {
-                return Some(err);
-            }
-            #[cfg(feature = "yaml")]
-            if let Some(err) = &self.yaml {
-                return Some(err);
-            }
-            #[cfg(feature = "toml")]
-            if let Some(err) = &self.toml {
-                return Some(err);
-            }
-            None
-        }
-    }
-}
-
-impl From<serde_json::Error> for DeserializeError {
-    fn from(err: serde_json::Error) -> Self {
-        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-        {
-            Self { json: err }
-        }
-        #[cfg(any(feature = "yaml", feature = "toml"))]
-        {
-            Self {
-                json: Some(err),
-                #[cfg(feature = "yaml")]
-                yaml: None,
-                #[cfg(feature = "toml")]
-                toml: None,
-            }
-        }
-    }
-}
-
-#[cfg(feature = "yaml")]
-impl From<yaml::Error> for DeserializeError {
-    fn from(value: yaml::Error) -> Self {
-        Self {
-            yaml: Some(value),
-            json: None,
-            #[cfg(feature = "toml")]
-            toml: None,
-        }
-    }
-}
-
-#[cfg(feature = "toml")]
-impl From<toml::de::Error> for DeserializeError {
-    fn from(value: toml::de::Error) -> Self {
-        Self {
-            toml: Some(value),
-            json: None,
-            #[cfg(feature = "yaml")]
-            yaml: None,
-        }
+        self.sources.iter().next().map(|(_, err)| err as _)
     }
 }
 
@@ -226,15 +156,6 @@ pub enum ResolveError {
         /// The [`std::io::Error`] which occurred
         source: std::io::Error,
     },
-    /// The schema was not able to be parsed with the enabled formats
-    #[snafu(display(r#"error deserialzing schema "{schema_id}": {source}"#))]
-    Deserialize {
-        /// The URI of the schema which was not able to be resolved
-        schema_id: String,
-        /// The [`DeserializeError`] which occurred
-        source: DeserializeError,
-    },
-
     /// A [`jsonptr::Error`] occurred while attempting to resolve a schema
     #[snafu(display(r#"error resolving pointer "{pointer}" in schema "{schema_id}": {source}"#))]
     Pointer {
@@ -244,6 +165,15 @@ pub enum ResolveError {
         pointer: jsonptr::Pointer,
         /// The [`jsonptr::Error`] which occurred
         source: jsonptr::Error,
+    },
+
+    /// The schema was not able to be parsed with the enabled formats
+    #[snafu(display(r#"error deserialzing schema "{schema_id}": {source}"#))]
+    Deserialize {
+        /// The URI of the schema which was not able to be resolved
+        schema_id: String,
+        /// The [`DeserializeError`] which occurred
+        source: DeserializeError,
     },
 
     /// A [`Resolve`] implementation returned a custom error
@@ -270,6 +200,7 @@ impl ResolveError {
             referering_location,
         }
     }
+
     pub fn custom(schema_id: String, source: impl 'static + Error + Send + Sync) -> Self {
         Self::Custom {
             schema_id,
@@ -368,6 +299,13 @@ impl Display for UriNotAbsoluteError {
 }
 
 impl Error for UriNotAbsoluteError {}
+#[derive(Debug, Snafu)]
+pub enum SourceSliceError {
+    #[snafu(display("{}", source), context(false))]
+    InvalidUtf8 { source: FromUtf8Error },
+    #[snafu(display("{}", source), context(false))]
+    ParseAbsoluteUri { source: AbsoluteUriParseError },
+}
 
 #[derive(Debug, Clone, Snafu, PartialEq, Eq)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
@@ -446,8 +384,7 @@ where
         write!(f, r#"URI "{}" contains a fragment"#, self.uri)
     }
 }
-impl<U> std::error::Error for HasFragmentError<U> where U: std::fmt::Debug + Display + PartialEq + Eq
-{}
+impl<U> Error for HasFragmentError<U> where U: std::fmt::Debug + Display + PartialEq + Eq {}
 
 #[cfg(test)]
 mod tests {

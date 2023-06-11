@@ -5,20 +5,20 @@ use num_rational::BigRational;
 use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
-use crate::{output::Annotation, Location, SchemaRef, State};
+use crate::{output::Annotation, Location, SchemaKey, State};
 /// Contains state and location information for a given keyword pertaining
 /// to an evaluation.
-pub struct Scope<'a> {
-    pub state: &'a mut State,
+pub struct Scope<'state> {
+    pub state: &'state mut State,
     location: Location,
     number: Option<BigRational>,
 }
 
-impl<'a> Scope<'a> {
+impl<'state> Scope<'state> {
     pub fn new(
         location: Location,
-        state: &'a mut State,
-        schemas: SlotMap<SchemaRef, Value>,
+        state: &'state mut State,
+        schemas: SlotMap<SchemaKey, Value>,
     ) -> Self {
         Self {
             state,

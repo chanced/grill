@@ -11,7 +11,10 @@
     clippy::large_enum_variant,
     clippy::enum_glob_use,
     clippy::implicit_hasher,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::similar_names, 
+    clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
+    clippy::missing_errors_doc // TODO: remove when I get around to documenting
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
@@ -54,12 +57,11 @@ pub use resolve::Resolve;
 mod compile;
 pub use compile::Compile;
 
-pub(crate) const ISSUES_URL: &str = "https://github.com/chanced/grill/issues/new";
-
 pub mod state;
 pub use state::State;
 
-mod integration;
+// mod integration;
+// pub use integration::Integration;
 
 pub(crate) mod graph;
 
@@ -73,9 +75,10 @@ pub type Array = Vec<serde_json::Value>;
 
 pub mod json_schema;
 
-mod schema_ref;
+pub use interrogator::SchemaKey;
 
-pub use schema_ref::SchemaRef;
+pub mod deserialize;
+pub use deserialize::{Deserializer};
 
 #[cfg(test)]
 pub mod test;

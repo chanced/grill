@@ -144,6 +144,11 @@ impl AbsoluteUri {
         }
     }
 }
+impl From<&AbsoluteUri> for AbsoluteUri {
+    fn from(value: &AbsoluteUri) -> Self {
+        value.clone()
+    }
+}
 
 impl From<AbsoluteUri> for String {
     fn from(value: AbsoluteUri) -> Self {
@@ -155,7 +160,29 @@ impl From<&AbsoluteUri> for String {
         value.to_string()
     }
 }
+impl TryFrom<Uri> for AbsoluteUri {
+    type Error = AbsoluteUriParseError;
 
+    fn try_from(value: Uri) -> Result<Self, Self::Error> {
+        match value {
+            Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
+            Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
+            Uri::Partial(p) => Self::parse(p.as_str()),
+        }
+    }
+}
+
+impl TryFrom<&Uri> for AbsoluteUri {
+    type Error = AbsoluteUriParseError;
+
+    fn try_from(value: &Uri) -> Result<Self, Self::Error> {
+        match value {
+            Uri::Url(url) => Ok(AbsoluteUri::Url(url.clone())),
+            Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn.clone())),
+            Uri::Partial(p) => Self::parse(p.as_str()),
+        }
+    }
+}
 impl PartialOrd for AbsoluteUri {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         PartialOrd::partial_cmp(self.as_str(), other.as_str())
@@ -242,6 +269,16 @@ impl From<Url> for AbsoluteUri {
 impl From<Urn> for AbsoluteUri {
     fn from(value: Urn) -> Self {
         Self::Urn(value)
+    }
+}
+impl From<&Url> for AbsoluteUri {
+    fn from(value: &Url) -> Self {
+        AbsoluteUri::Url(value.clone())
+    }
+}
+impl From<&Urn> for AbsoluteUri {
+    fn from(value: &Urn) -> Self {
+        AbsoluteUri::Urn(value.clone())
     }
 }
 
@@ -655,6 +692,12 @@ impl From<AbsoluteUri> for Uri {
             AbsoluteUri::Url(url) => Self::Url(url),
             AbsoluteUri::Urn(urn) => Self::Urn(urn),
         }
+    }
+}
+
+impl From<&Uri> for Uri {
+    fn from(value: &Uri) -> Self {
+        value.clone()
     }
 }
 
