@@ -1,3 +1,5 @@
+//! Output formats, annotations, and errors
+//!
 mod annotation;
 mod node;
 
@@ -188,7 +190,10 @@ impl Structure {
 /// A trait which represents a validation error to be used as the `"error"` field in output
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait ValidationError<'v>: fmt::Display + fmt::Debug + DynClone + Send + Sync {}
+pub trait ValidationError<'v>: fmt::Display + fmt::Debug + DynClone + Send + Sync {
+    fn into_owned(self) -> Box<dyn ValidationError<'static>>;
+}
+
 dyn_clone::clone_trait_object!(<'v> ValidationError<'v>);
 
 impl Serialize for dyn ValidationError<'_> {
@@ -197,7 +202,11 @@ impl Serialize for dyn ValidationError<'_> {
     }
 }
 
-impl ValidationError<'_> for String {}
+impl ValidationError<'_> for String {
+    fn into_owned(self) -> Box<dyn ValidationError<'static>> {
+        Box::new(self)
+    }
+}
 
 pub struct Flag<'v>(Annotation<'v>);
 
@@ -216,7 +225,8 @@ pub enum Output<'v> {
     Complete(Complete<'v>),
 }
 impl<'v> Output<'v> {
-    pub(crate) fn new(structure: Structure, annotation: Annotation<'v>) -> Output {
+    #[must_use]
+    pub fn new(structure: Structure, annotation: Annotation<'v>) -> Output {
         match structure {
             Structure::Flag => Output::Flag(Flag(annotation)), // TODO
             Structure::Basic => Output::Basic(Basic(annotation)), // TODO

@@ -6,8 +6,7 @@ use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
 use crate::{output::Annotation, Location, SchemaKey, State};
-/// Contains state and location information for a given keyword pertaining
-/// to an evaluation.
+/// Contains state and location information needed to perform an [`evaluation`](`crate::Interrogator::evaluate`).
 pub struct Scope<'state> {
     pub state: &'state mut State,
     location: Location,

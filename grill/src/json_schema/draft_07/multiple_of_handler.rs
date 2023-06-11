@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 use crate::{
     error::CompileError, handler::SyncHandler, json_schema::Keyword, output::ValidationError,
@@ -35,7 +35,7 @@ impl SyncHandler for MultipleOfHandler {
 #[derive(Debug, Clone)]
 pub struct MultipleOfInvalid<'v> {
     pub expected_multiple_of: Number,
-    pub actual: &'v Number,
+    pub actual: Cow<'v, Number>,
 }
 
 impl Display for MultipleOfInvalid<'_> {
@@ -48,7 +48,19 @@ impl Display for MultipleOfInvalid<'_> {
     }
 }
 
-impl<'v> ValidationError<'v> for MultipleOfInvalid<'v> {}
+impl<'v> ValidationError<'v> for MultipleOfInvalid<'v> {
+    fn into_owned(self) -> Box<dyn ValidationError<'static>> {
+        let MultipleOfInvalid {
+            actual,
+            expected_multiple_of,
+        } = self;
+
+        Box::new(MultipleOfInvalid {
+            expected_multiple_of,
+            actual: Cow::Owned(actual.into_owned()),
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {

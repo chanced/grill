@@ -1,3 +1,7 @@
+//! Logical errors that can occur during usage of this crate.
+//!
+//! Validation errors are defined within their respective keyword's module.
+
 use crate::{uri::AbsoluteUri, Location, Uri};
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
@@ -14,7 +18,7 @@ pub use urn::Error as UrnError;
 
 #[derive(Debug)]
 pub struct DuplicateSourceError {
-    pub id: AbsoluteUri,
+    pub uri: AbsoluteUri,
     pub source: Value,
 }
 
@@ -42,7 +46,7 @@ impl Error for FragmentedSourceUriError {}
 
 impl Display for DuplicateSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "duplicate source: {}", self.id)
+        write!(f, "duplicate source: {}", self.uri)
     }
 }
 
@@ -71,6 +75,7 @@ impl FragmentedDialectIdError {
 impl Error for FragmentedDialectIdError {}
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum BuildError {
     #[snafu(display("failed to compile schema: {}", source), context(false))]
     Compile { source: CompileError },
@@ -81,10 +86,16 @@ pub enum BuildError {
     #[snafu(display("{}", source), context(false))]
     FragmentedDialectId { source: FragmentedDialectIdError },
     #[snafu(display("failed to parse uri: {}", source), context(false))]
-    UriParse { source: AbsoluteUriParseError },
+    MalformedAbsoluteUri { source: AbsoluteUriParseError },
+    #[snafu(display("failed to deserialize source: {}", uri))]
+    DeserializeSource {
+        source: DeserializeError,
+        uri: AbsoluteUri,
+    },
 }
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum StoreError {
     #[snafu(display("failed to resolve schema: {uri}\ncaused by:\n\t{source}"))]
     Resolve { uri: String, source: ResolveError },
@@ -93,6 +104,7 @@ pub enum StoreError {
 }
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum EvaluateError<'v> {
     #[snafu(display("error parsing number: {}", source))]
     ParseNumber {
@@ -117,13 +129,13 @@ pub enum EvaluateError<'v> {
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug)]
 pub struct DeserializeError {
-    pub sources: HashMap<&'static str, erased_serde::Error>,
+    pub formats: HashMap<&'static str, erased_serde::Error>,
 }
 
 impl Display for DeserializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "failed to deserialize")?;
-        for (format, err) in &self.sources {
+        for (format, err) in &self.formats {
             write!(f, "\t{format}: {err}")?;
         }
         Ok(())
@@ -132,7 +144,7 @@ impl Display for DeserializeError {
 
 impl Error for DeserializeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.sources.iter().next().map(|(_, err)| err as _)
+        self.formats.iter().next().map(|(_, err)| err as _)
     }
 }
 
@@ -256,7 +268,6 @@ pub enum CompileError {
 }
 
 #[derive(Debug, Clone)]
-
 pub struct SchemaNotFoundError {
     pub schema_id: String,
     pub path: Pointer,
@@ -300,6 +311,19 @@ impl Display for UriNotAbsoluteError {
 
 impl Error for UriNotAbsoluteError {}
 #[derive(Debug, Snafu)]
+pub enum SourceError {
+    #[snafu(display("{}", source), context(false))]
+    InvalidUtf8 { source: FromUtf8Error },
+    #[snafu(display("{}", source), context(false))]
+    ParseAbsoluteUri { source: AbsoluteUriParseError },
+    #[snafu(display("{}", source), context(false))]
+    Deserialize { source: DeserializeError },
+    #[snafu(display("{}", source), context(false))]
+    DuplicateSource { source: DuplicateSourceError },
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum SourceSliceError {
     #[snafu(display("{}", source), context(false))]
     InvalidUtf8 { source: FromUtf8Error },
@@ -362,6 +386,7 @@ impl AbsoluteUriParseError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum IdentifyError {
     #[snafu(display("{}", source), context(false))]
     Parse { source: UriParseError },

@@ -1,3 +1,5 @@
+//! Trait and common implementations for deserializing source data into schemas.
+
 use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
 

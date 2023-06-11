@@ -1,3 +1,6 @@
+//! State map for storing arbitrary data structures to be used during
+//! evaluation.
+
 use dyn_clone::{clone_trait_object, DynClone};
 
 use std::any::{Any, TypeId};

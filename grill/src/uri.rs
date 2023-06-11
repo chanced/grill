@@ -1,3 +1,5 @@
+//! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
+
 use std::{
     borrow::Cow, convert::Infallible, fmt::Display, ops::Deref, str::FromStr, string::ToString,
 };
@@ -8,6 +10,7 @@ use urn::Urn;
 
 use crate::error::{AbsoluteUriParseError, UriParseError, UrnError};
 
+/// A URI in the form of a fully qualified [`Url`] or [`Urn`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum AbsoluteUri {
@@ -167,7 +170,7 @@ impl TryFrom<Uri> for AbsoluteUri {
         match value {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
-            Uri::Partial(p) => Self::parse(p.as_str()),
+            Uri::Relative(p) => Self::parse(p.as_str()),
         }
     }
 }
@@ -179,7 +182,7 @@ impl TryFrom<&Uri> for AbsoluteUri {
         match value {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url.clone())),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn.clone())),
-            Uri::Partial(p) => Self::parse(p.as_str()),
+            Uri::Relative(p) => Self::parse(p.as_str()),
         }
     }
 }
@@ -310,26 +313,95 @@ impl FromStr for AbsoluteUri {
     }
 }
 
+pub trait TryIntoAbsoluteUri {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError>;
+}
+
+impl TryIntoAbsoluteUri for String {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        AbsoluteUri::parse(&self)
+    }
+}
+
+impl TryIntoAbsoluteUri for &str {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        AbsoluteUri::parse(self)
+    }
+}
+impl TryIntoAbsoluteUri for AbsoluteUri {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(self)
+    }
+}
+impl TryIntoAbsoluteUri for &AbsoluteUri {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(self.clone())
+    }
+}
+impl TryIntoAbsoluteUri for &Url {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(AbsoluteUri::Url(self.clone()))
+    }
+}
+impl TryIntoAbsoluteUri for &Urn {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(AbsoluteUri::Urn(self.clone()))
+    }
+}
+impl TryIntoAbsoluteUri for Url {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(AbsoluteUri::Url(self))
+    }
+}
+impl TryIntoAbsoluteUri for Urn {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        Ok(AbsoluteUri::Urn(self))
+    }
+}
+impl TryIntoAbsoluteUri for &String {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        AbsoluteUri::parse(self)
+    }
+}
+impl TryIntoAbsoluteUri for &Uri {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        match self {
+            Uri::Url(url) => Ok(AbsoluteUri::Url(url.clone())),
+            Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn.clone())),
+            Uri::Relative(rel) => AbsoluteUri::parse(rel.as_str()),
+        }
+    }
+}
+impl TryIntoAbsoluteUri for Uri {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+        TryIntoAbsoluteUri::try_into_absolute_uri(&self)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(from = "String", into = "String")]
-pub struct PartialUri {
+pub struct RelativeUri {
     path: String,
     hash_idx: Option<usize>,
 }
 
-impl PartialUri {
+impl RelativeUri {
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         let hash_idx = value.find('#');
         let path = value.to_string();
         Self { path, hash_idx }
     }
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.path
     }
+    #[must_use]
     pub fn path(&self) -> &str {
         let Some(hash_idx) = self.hash_idx else { return &self.path };
         &self.path[..hash_idx]
     }
+    #[must_use]
     pub fn fragment(&self) -> Option<&str> {
         let hash_idx = self.hash_idx?;
         if hash_idx + 1 == self.path.len() {
@@ -396,13 +468,13 @@ impl PartialUri {
     }
 }
 
-impl Display for PartialUri {
+impl Display for RelativeUri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.path.fmt(f)
     }
 }
 
-impl From<String> for PartialUri {
+impl From<String> for RelativeUri {
     fn from(value: String) -> Self {
         Self {
             path: value,
@@ -411,14 +483,14 @@ impl From<String> for PartialUri {
     }
 }
 
-impl FromStr for PartialUri {
+impl FromStr for RelativeUri {
     type Err = Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self::parse(s))
     }
 }
 
-impl From<&String> for PartialUri {
+impl From<&String> for RelativeUri {
     fn from(value: &String) -> Self {
         Self {
             path: value.clone(),
@@ -426,25 +498,25 @@ impl From<&String> for PartialUri {
         }
     }
 }
-impl From<PartialUri> for Uri {
-    fn from(value: PartialUri) -> Self {
-        Uri::Partial(value)
+impl From<RelativeUri> for Uri {
+    fn from(value: RelativeUri) -> Self {
+        Uri::Relative(value)
     }
 }
 
-impl From<PartialUri> for String {
-    fn from(value: PartialUri) -> Self {
+impl From<RelativeUri> for String {
+    fn from(value: RelativeUri) -> Self {
         value.to_string()
     }
 }
 
-impl From<&PartialUri> for String {
-    fn from(value: &PartialUri) -> Self {
+impl From<&RelativeUri> for String {
+    fn from(value: &RelativeUri) -> Self {
         value.to_string()
     }
 }
 
-impl Deref for PartialUri {
+impl Deref for RelativeUri {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.path.as_str()
@@ -456,7 +528,7 @@ impl Deref for PartialUri {
 pub enum Uri {
     Url(Url),
     Urn(Urn),
-    Partial(PartialUri),
+    Relative(RelativeUri),
 }
 
 impl Display for Uri {
@@ -464,7 +536,7 @@ impl Display for Uri {
         match self {
             Uri::Url(url) => Display::fmt(url, f),
             Uri::Urn(urn) => Display::fmt(urn, f),
-            Uri::Partial(par) => Display::fmt(par, f),
+            Uri::Relative(rel) => Display::fmt(rel, f),
         }
     }
 }
@@ -485,7 +557,7 @@ impl Uri {
         } else if matches_url(value) {
             Ok(Url::parse(value)?.into())
         } else {
-            Ok(PartialUri::parse(value).into())
+            Ok(RelativeUri::parse(value).into())
         }
     }
     #[must_use]
@@ -493,7 +565,7 @@ impl Uri {
         match self {
             Uri::Url(url) => url.fragment(),
             Uri::Urn(urn) => urn.f_component(),
-            Uri::Partial(par) => par.fragment(),
+            Uri::Relative(rel) => rel.fragment(),
         }
     }
 
@@ -515,7 +587,7 @@ impl Uri {
                 urn.set_f_component(fragment)?;
                 Ok(existing)
             }
-            Uri::Partial(par) => Ok(par.set_fragment(fragment)),
+            Uri::Relative(rel) => Ok(rel.set_fragment(fragment)),
         }
     }
 
@@ -540,7 +612,7 @@ impl Uri {
                 Some(result)
             }
             Uri::Urn(urn) => Some(Cow::Borrowed(urn.nid())),
-            Uri::Partial(_) => None,
+            Uri::Relative(_) => None,
         }
     }
 
@@ -549,7 +621,7 @@ impl Uri {
         match self {
             Self::Url(url) => url.path(),
             Self::Urn(urn) => urn.nss(),
-            Self::Partial(par) => par.path(),
+            Self::Relative(rel) => rel.path(),
         }
     }
     /// # Errors
@@ -567,9 +639,9 @@ impl Uri {
                 urn.set_f_component(fragment.as_deref())?;
                 Ok(nss)
             }
-            Self::Partial(par) => {
-                let path = par.path().to_string();
-                par.set_path(path_or_nss);
+            Self::Relative(rel) => {
+                let path = rel.path().to_string();
+                rel.set_path(path_or_nss);
                 Ok(path)
             }
         }
@@ -580,7 +652,7 @@ impl Uri {
         match self {
             Uri::Url(url) => url.as_str(),
             Uri::Urn(urn) => urn.as_str(),
-            Uri::Partial(par) => par.as_str(),
+            Uri::Relative(rel) => rel.as_str(),
         }
     }
 
@@ -670,7 +742,7 @@ impl Deref for Uri {
         match self {
             Uri::Url(url) => url.as_str(),
             Uri::Urn(urn) => urn.as_str(),
-            Uri::Partial(par) => par.as_str(),
+            Uri::Relative(rel) => rel.as_str(),
         }
     }
 }

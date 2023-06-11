@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{handler::SyncHandler, Handler};
 
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
@@ -87,7 +89,7 @@ impl From<&ConstHandler> for Handler {
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
     pub expected: serde_json::Value,
-    pub actual: &'v serde_json::Value,
+    pub actual: Cow<'v, serde_json::Value>,
 }
 // impl Display for ConstInvalid<'_> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

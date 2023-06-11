@@ -6,18 +6,22 @@ use std::{
 };
 
 use dyn_clone::{clone_trait_object, DynClone};
-use fancy_regex::CompileError;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
+use snafu::ResultExt;
 
 use crate::{
     deserialize::json,
     dialect::Dialect,
-    error::{AbsoluteUriParseError, BuildError, FragmentedDialectIdError, SourceSliceError},
+    error::{
+        build_error, AbsoluteUriParseError, BuildError, CompileError, DeserializeError,
+        DuplicateSourceError, EvaluateError, FragmentedDialectIdError, FragmentedSourceUriError,
+        SourceError, SourceSliceError,
+    },
     graph::DependencyGraph,
     json_schema,
-    uri::AbsoluteUri,
-    Deserializer, Handler, Resolve,
+    uri::{AbsoluteUri, TryIntoAbsoluteUri},
+    Deserializer, Handler, Output, Resolve, Structure,
 };
 
 #[derive(Clone)]
@@ -35,7 +39,7 @@ new_key_type! {
     pub struct SchemaKey;
 }
 
-/// Compiles and stores schemas.
+/// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
     dialects: Vec<Dialect>,
@@ -60,12 +64,200 @@ where
     /// Returns [`CompileError`] if:
     ///   - the schema fails to compile.
     ///   - the uri fails to convert to an [`AbsoluteUri`].
-    pub fn compile(
-        &mut self,
-        uri: impl TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
-    ) -> Result<SchemaKey, CompileError> {
+    pub fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<SchemaKey, CompileError> {
         todo!()
     }
+
+    pub fn evaluate(
+        &self,
+        key: Key,
+        value: &Value,
+        structure: Structure,
+    ) -> Result<Output, EvaluateError> {
+        todo!()
+    }
+
+    /// Adds a source schema from a slice of bytes that will be deserialized
+    /// with avaialble [`Deserializer`] at the time of
+    /// [`build`](`Builder::build`).
+    ///
+    /// # Example
+    /// ```rust
+    /// let mut interrogator = grill::Interrogator::json_schema().build().unwrap();
+    /// interrogator.source_slice("https://example.com/schema.json", br#"{"type": "string"}"#).unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`SourceSliceError`] if:
+    /// - the `uri` fails to convert to an [`AbsoluteUri`]
+    /// - a source is not valid UTF-8
+    pub fn source_slice(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: &[u8],
+    ) -> Result<(), SourceError> {
+        let source = Source::String(
+            uri.try_into_absolute_uri()?,
+            String::from_utf8(source.to_vec())?,
+        );
+
+        self.add_source(source)
+    }
+
+    fn add_source(&mut self, source: Source) -> Result<(), SourceError> {
+        let uri = source.uri();
+        let source = source.value(&self.deserializers)?;
+
+        if let Some(src) = self.sources.get(&uri) {
+            if src == &source {
+                return Ok(());
+            }
+            return Err(SourceError::DuplicateSource {
+                source: DuplicateSourceError { uri, source },
+            });
+        }
+        self.sources.insert(uri, source);
+        Ok(())
+    }
+
+    /// Adds a schema source from a `str`
+    /// # Example
+    /// ```rust
+    /// let mut interrogator = grill::Interrogator::json_schema().build().unwrap();
+    /// interrogator.source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
+    pub fn source_str(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: &str,
+    ) -> Result<(), SourceError> {
+        self.add_source(Source::String(
+            uri.try_into_absolute_uri()?,
+            source.to_string(),
+        ))
+    }
+
+    /// Adds a source schema from a [`Value`]
+    /// # Example
+    /// ```rust
+    /// use grill::Interrogator;
+    /// use serde_json::json;
+    ///
+    /// let mut interrogator = Interrogator::json_schema().build();
+    /// interrogator.source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
+    ///
+    pub fn source_value(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: impl Borrow<Value>,
+    ) -> Result<(), SourceError> {
+        self.add_source(Source::Value(
+            uri.try_into_absolute_uri()?,
+            source.borrow().clone(),
+        ))
+    }
+
+    /// Adds a set of source schemas from an [`Iterator`] of
+    /// `(TryIntoAbsoluteUri, Deref<Target=str>)`
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::collections::HashMap;
+    /// use grill::Interrogator;
+    ///
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
+    /// let mut interrogator = Interrogator::json_schema().build();
+    /// interrogator.source_strs(sources).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    /// Returns [`AbsoluteUriParseError`] if a URI fails to convert to an
+    /// [`AbsoluteUri`]
+    pub fn source_strs<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    where
+        K: TryIntoAbsoluteUri,
+        V: Deref<Target = str>,
+        I: IntoIterator<Item = (K, V)>,
+    {
+        for (k, v) in sources {
+            self.add_source(Source::String(k.try_into_absolute_uri()?, v.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Adds a set of source schemas from an [`Iterator`] of
+    /// `(TryIntoAbsoluteUri, AsRef<[u8]>)`
+    ///
+    /// # Example
+    /// ```
+    /// use std::collections::HashMap;
+    /// use grill::Interrogator;
+    ///
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
+    /// let interrogator = Interrogator::json_schema().build().unwrap();
+    ///     .json_schema()
+    ///     .source_slices(sources)
+    ///     .unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`SourceSliceError`] if:
+    /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
+    /// - a source is not valid UTF-8
+    ///
+    pub fn source_slices<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    where
+        K: TryIntoAbsoluteUri,
+        V: AsRef<[u8]>,
+        I: IntoIterator<Item = (K, V)>,
+    {
+        for (k, v) in sources {
+            self.add_source(Source::String(
+                k.try_into_absolute_uri()?,
+                String::from_utf8(v.as_ref().to_vec())?,
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Adds a set of source schemas from an [`Iterator`] of
+    /// `(TryIntoAbsoluteUri, Borrow<serde_json::Value>>)`
+    ///
+    /// # Example
+    /// ```
+    /// use grill::Interrogator;
+    /// use std::collections::HashMap;
+    /// use serde_json::json;
+    ///
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://example.com/schema.json", json!({"type": "string"});
+    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
+    /// interrogator.source_values(sources).unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`SourceSliceError`] if:
+    /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
+    /// - a source is not valid UTF-8
+    ///
+    pub fn source_values<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    where
+        K: Borrow<AbsoluteUri>,
+        V: Borrow<Value>,
+        I: IntoIterator<Item = (K, V)>,
+    {
+        for (k, v) in sources {
+            self.add_source(Source::Value(k.borrow().clone(), v.borrow().clone()))?;
+        }
+        Ok(())
+    }
+
     /// Returns a new, empty [`Builder`].
     #[must_use]
     #[allow(unused_must_use)]
@@ -139,10 +331,10 @@ where
     pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, AbsoluteUriParseError>
     where
         I: IntoIterator<Item = V>,
-        V: TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        V: TryIntoAbsoluteUri,
     {
         for schema in schemas {
-            self.precompile.insert(schema.try_into()?);
+            self.precompile.insert(schema.try_into_absolute_uri()?);
         }
         Ok(self)
     }
@@ -156,19 +348,20 @@ where
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
     ///     .source_slice("https://example.com/schema.json", br#"{"type": "string"}"#).unwrap()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     /// ```
     /// # Errors
-    /// Returns [`SourceSliceError`] if:
+    /// Returns [`SourceError`] if:
     /// - the `uri` fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
     pub fn source_slice(
         mut self,
-        uri: impl TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        uri: impl TryIntoAbsoluteUri,
         source: &[u8],
     ) -> Result<Self, SourceSliceError> {
         self.sources.push(Source::String(
-            uri.try_into()?,
+            uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
         ));
         Ok(self)
@@ -180,18 +373,21 @@ where
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
     ///     .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     /// ```
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
     /// [`AbsoluteUri`](`crate::AbsoluteUri`).
     pub fn source_str(
         mut self,
-        uri: impl TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        uri: impl TryIntoAbsoluteUri,
         source: &str,
     ) -> Result<Self, AbsoluteUriParseError> {
-        self.sources
-            .push(Source::String(uri.try_into()?, source.to_string()));
+        self.sources.push(Source::String(
+            uri.try_into_absolute_uri()?,
+            source.to_string(),
+        ));
         Ok(self)
     }
 
@@ -203,7 +399,8 @@ where
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
     ///     .source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     /// ```
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
@@ -211,16 +408,18 @@ where
     ///
     pub fn source_value(
         mut self,
-        uri: impl TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
     ) -> Result<Self, AbsoluteUriParseError> {
-        self.sources
-            .push(Source::Value(uri.try_into()?, source.borrow().clone()));
+        self.sources.push(Source::Value(
+            uri.try_into_absolute_uri()?,
+            source.borrow().clone(),
+        ));
         Ok(self)
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryInto<AbsoluteUri, Error = AbsoluteUriParseError>, Deref<Target=str>)`
+    /// `(TryIntoAbsoluteUri, Deref<Target=str>)`
     ///
     /// # Example
     /// ```rust
@@ -230,26 +429,27 @@ where
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
     ///     .source_strs(sources).unwrap()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     /// ```
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if a URI fails to convert to an
     /// [`AbsoluteUri`]
     pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, AbsoluteUriParseError>
     where
-        K: TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        K: TryIntoAbsoluteUri,
         V: Deref<Target = str>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
             self.sources
-                .push(Source::String(k.try_into()?, v.to_string()));
+                .push(Source::String(k.try_into_absolute_uri()?, v.to_string()));
         }
         Ok(self)
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryInto<AbsoluteUri, Error = AbsoluteUriParseError>, AsRef<[u8]>)`
+    /// `(TryIntoAbsoluteUri, AsRef<[u8]>)`
     ///
     /// # Example
     /// ```
@@ -258,7 +458,8 @@ where
     /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
-    ///     .source_slices(sources)
+    ///     .source_slices(sources).unwrap()
+    ///     .build()
     ///     .unwrap();
     /// ```
     /// # Errors
@@ -268,35 +469,57 @@ where
     ///
     pub fn source_slices<I, K, V>(mut self, sources: I) -> Result<Self, SourceSliceError>
     where
-        K: TryInto<AbsoluteUri, Error = AbsoluteUriParseError>,
+        K: TryIntoAbsoluteUri,
         V: AsRef<[u8]>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
             self.sources.push(Source::String(
-                k.try_into()?,
+                k.try_into_absolute_uri()?,
                 String::from_utf8(v.as_ref().to_vec())?,
             ));
         }
         Ok(self)
     }
-    #[must_use]
-    pub fn source_values<I, K, V>(mut self, sources: I) -> Self
+
+    /// Adds a set of source schemas from an [`Iterator`] of
+    /// `(TryIntoAbsoluteUri, Borrow<serde_json::Value>>)`
+    ///
+    /// # Example
+    /// ```
+    /// use std::collections::HashMap;
+    /// use serde_json::json;
+    ///
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://example.com/schema.json", json!({"type": "string"});
+    /// let interrogator = grill::Builder::default()
+    ///     .json_schema()
+    ///     .source_values(sources).unwrap()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    /// # Errors
+    /// Returns [`SourceError`] if:
+    /// - [`TryIntoAbsoluteUri`] fails to convert to an [`AbsoluteUri`]
+    /// - a source is not valid UTF-8
+    pub fn source_values<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
     where
-        K: Borrow<AbsoluteUri>,
+        K: TryIntoAbsoluteUri,
         V: Borrow<Value>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.sources
-                .push(Source::Value(k.borrow().clone(), v.borrow().clone()));
+            self.sources.push(Source::Value(
+                k.try_into_absolute_uri()?,
+                v.borrow().clone(),
+            ));
         }
-        self
+        Ok(self)
     }
 
     /// Adds [`Dialect`]s for JSON Schema Drafts 2020-12, 2019-09, 7, and 4
     #[must_use]
-    pub fn json_schema(mut self) -> Builder {
+    pub fn json_schema(self) -> Builder {
         Builder::default()
             .json_schema_2020_12()
             .json_schema_2019_09()
@@ -306,32 +529,26 @@ where
 
     /// Adds JSON Schema 04 [`Dialect`]
     #[must_use]
-    pub fn json_schema_04(mut self) -> Self {
-        // TODO: add 04 dialect
-        // self.dialect(crate::Dialect::json_schema_04::json_schema_04_dialect())
-        self
+    pub fn json_schema_04(self) -> Self {
+        self.dialect(json_schema::draft_04::dialect())
     }
 
     /// Adds JSON Schema 07 [`Dialect`]
     #[must_use]
-    pub fn json_schema_07(mut self) -> Self {
+    pub fn json_schema_07(self) -> Self {
         self.dialect(json_schema::draft_07::dialect())
     }
 
     /// Adds JSON Schema 2019-09 [`Dialect`]
     #[must_use]
-    pub fn json_schema_2019_09(mut self) -> Self {
-        // TODO: add 2019-09 dialect
-        // self.dialect(crate::json_schema::draft_2019_09::dialect())
-        self
+    pub fn json_schema_2019_09(self) -> Self {
+        self.dialect(json_schema::draft_2019_09::dialect())
     }
 
     /// Adds JSON Schema 2020-12 [`Dialect`]
     #[must_use]
-    pub fn json_schema_2020_12(mut self) -> Self {
-        // TODO: add 2020-12 dialect
-        // self.dialect(crate::json_schema::draft_2020_12::dialect())
-        self
+    pub fn json_schema_2020_12(self) -> Self {
+        self.dialect(json_schema::draft_2020_12::dialect())
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -380,7 +597,7 @@ where
         R: 'static + Deserializer,
     {
         let f = format.to_lowercase();
-        for (idx, (fmt, de)) in self.deserializers.iter().enumerate() {
+        for (idx, (fmt, _)) in self.deserializers.iter().enumerate() {
             if fmt.to_lowercase() == f {
                 self.deserializers[idx] = (format, Box::new(deserializer));
                 return self;
@@ -390,57 +607,62 @@ where
         self
     }
 
-    pub fn build(self) -> Result<Interrogator, BuildError> {
+    pub fn build(self) -> Result<Interrogator<Key>, BuildError> {
         let Self {
             dialects,
             sources,
-            resolver_lookup,
+            resolver_lookup: _resolver_lookup,
             resolvers,
             deserializers,
             precompile,
             _marker,
         } = self;
-        Ok(Interrogator {
-            default_dialect: dialects[0].id.clone(),
-            dep_graph: DependencyGraph::new(),
-            deserializers: Vec::new(),
-            dialect_lookup: HashMap::new(),
-            dialects: Vec::new(),
-            resolvers: Vec::new(),
-            schemas: SlotMap::with_key(),
-            sources: HashMap::new(),
-        })
-        // let graph = DependencyGraph::new();
-        // let (dialects, dialect_lookup) = Self::get_dialects(dialects)?;
-        // let sources = Self::get_sources(sources)?;
-        // let deserializers = Self::get_deserializers(deserializers);
-        // let dep_graph = DependencyGraph::new();
-        // let default_dialect = dialects[0].id.clone(); // TODO: FIX
-        // let i = Interrogator::<Key> {
-        //     dialects,
-        //     dialect_lookup,
-        //     sources,
-        //     dep_graph,
-        //     resolvers,
-        //     deserializers,
-        //     default_dialect,
-        //     schemas: SlotMap::default(),
-        // };
-        // todo!()
+        let dep_graph = DependencyGraph::new();
+
+        let (dialects, dialect_lookup) = Self::get_dialects(dialects)?;
+        let deserializers = Self::get_deserializers(deserializers);
+        let sources = Self::get_sources(sources, &deserializers)?;
+
+        let default_dialect = dialects[0].id.clone();
+        let schemas: SlotMap<Key, Schema> = SlotMap::with_key();
+        let mut interrogator = Interrogator {
+            dialects,
+            dialect_lookup,
+            default_dialect,
+            sources,
+            resolvers,
+            schemas,
+            deserializers,
+            dep_graph,
+        };
+        for id in precompile {
+            interrogator.compile(id)?;
+        }
+        Ok(interrogator)
     }
 
-    fn get_sources(sources: Vec<Source>) -> Result<HashMap<AbsoluteUri, Value>, BuildError> {
-        // let mut sources = HashMap::with_capacity(sources.len());
-        // for (uri, source) in sources {
-        //     if let Some(fragment) = uri.fragment() {
-        //         if !fragment.is_empty() {
-        //             return Err(FragmentedSourceUriError::new(uri).into());
-        //         }
-        //     }
-        //     sources.insert(uri, source);
+    fn get_sources(
+        sources: Vec<Source>,
+        deserializers: &[(&'static str, Box<dyn Deserializer>)],
+    ) -> Result<HashMap<AbsoluteUri, Value>, BuildError> {
+        let mut res: HashMap<AbsoluteUri, Value> = HashMap::with_capacity(sources.len());
+        for src in sources {
+            let uri = src.uri();
+            if let Some(fragment) = uri.fragment() {
+                if !fragment.is_empty() {
+                    return Err(FragmentedSourceUriError { uri }.into());
+                }
+            }
+            let src = src
+                .value(deserializers)
+                .context(build_error::DeserializeSource { uri: uri.clone() })?;
+
+            res.insert(uri, src);
+        }
+        // if res.capacity() > res.len() {
+        //     res.shrink_to_fit();
         // }
-        todo!()
-        // Ok(sources)
+        Ok(res)
     }
     fn get_deserializers(
         deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
@@ -483,4 +705,40 @@ where
 enum Source {
     String(AbsoluteUri, String),
     Value(AbsoluteUri, Value),
+}
+
+impl Source {
+    fn uri(&self) -> AbsoluteUri {
+        match self {
+            Self::Value(uri, _) | Self::String(uri, _) => uri.clone(),
+        }
+    }
+    fn value(
+        &self,
+        deserializers: &[(&'static str, Box<dyn Deserializer>)],
+    ) -> Result<Value, DeserializeError> {
+        match self {
+            Self::String(_, s) => {
+                let mut source = None;
+                let mut errs: HashMap<&'static str, erased_serde::Error> = HashMap::new();
+                for (fmt, de) in deserializers {
+                    match de.deserialize(s) {
+                        Ok(v) => {
+                            source = Some(v);
+                            break;
+                        }
+                        Err(e) => {
+                            errs.insert(fmt, e);
+                            continue;
+                        }
+                    }
+                }
+                let Some(source) = source  else {
+                    return Err(DeserializeError { formats: errs });
+                };
+                Ok(source)
+            }
+            Self::Value(_, source) => Ok(source.clone()),
+        }
+    }
 }

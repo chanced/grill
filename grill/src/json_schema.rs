@@ -1,8 +1,44 @@
+//! JSON Schema integration
+
 pub mod draft_04;
 pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
 mod keyword;
+
+pub use draft_04::dialect as draft_04_dialect;
+pub use draft_07::dialect as draft_07_dialect;
+pub use draft_2019_09::dialect as draft_2019_09_dialect;
+pub use draft_2020_12::dialect as draft_2020_12_dialect;
+
+pub use draft_04::{
+    is_json_hyper_schema_04_absolute_uri, is_json_hyper_schema_04_uri, is_json_schema_04,
+    is_json_schema_04_absolute_uri, is_json_schema_04_uri, json_hyper_schema_04_absolute_uri,
+    json_hyper_schema_04_uri, json_hyper_schema_04_url, json_schema_04_absolute_uri,
+    json_schema_04_uri, json_schema_04_url,
+};
+
+pub use draft_07::{
+    is_json_hyper_schema_07_absolute_uri, is_json_hyper_schema_07_uri, is_json_schema_07,
+    is_json_schema_07_absolute_uri, is_json_schema_07_uri, json_hyper_schema_07_absolute_uri,
+    json_hyper_schema_07_uri, json_hyper_schema_07_url, json_schema_07_absolute_uri,
+    json_schema_07_uri, json_schema_07_url,
+};
+pub use draft_2019_09::{
+    is_json_hyper_schema_2019_09_absolute_uri, is_json_hyper_schema_2019_09_uri,
+    is_json_schema_2019_09, is_json_schema_2019_09_absolute_uri, is_json_schema_2019_09_uri,
+    json_hyper_schema_2019_09_absolute_uri, json_hyper_schema_2019_09_uri,
+    json_hyper_schema_2019_09_url, json_schema_2019_09_absolute_uri, json_schema_2019_09_uri,
+    json_schema_2019_09_url,
+};
+
+pub use draft_2020_12::{
+    is_json_hyper_schema_2020_12_absolute_uri, is_json_hyper_schema_2020_12_uri,
+    is_json_schema_2020_12, is_json_schema_2020_12_absolute_uri, is_json_schema_2020_12_uri,
+    json_hyper_schema_2020_12_absolute_uri, json_hyper_schema_2020_12_uri,
+    json_hyper_schema_2020_12_url, json_schema_2020_12_absolute_uri, json_schema_2020_12_uri,
+    json_schema_2020_12_url,
+};
 
 use crate::{
     error::{HasFragmentError, IdentifyError, UriParseError},

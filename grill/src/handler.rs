@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
 
+/// A handler that performs logic for a given condition in a JSON Schema.
 #[derive(Debug, Clone)]
 pub enum Handler {
     /// A synchronous handler.

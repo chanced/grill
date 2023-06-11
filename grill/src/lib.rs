@@ -40,13 +40,9 @@ mod handler;
 
 pub use handler::Handler;
 
-/// Logical errors that can occur during setup, compilation, and evaluation of a
-/// schema.
-///
-/// Validation errors are defined within their respective keyword's module.
 pub mod error;
 
-/// Output formats, annotations, and errors
+
 pub mod output;
 pub use output::{Output, Structure};
 
@@ -67,10 +63,16 @@ pub(crate) mod graph;
 
 mod metaschema;
 pub use metaschema::Metaschema;
-mod uri;
-pub use uri::Uri;
+pub mod uri;
+pub use uri::{Uri, AbsoluteUri};
 
+/// A JSON object.
+/// 
+/// Alias for [`serde_json::Map<String, serde_json::Value>`](`serde_json::Map`).
 pub type Object = serde_json::Map<String, serde_json::Value>;
+/// A JSON array.
+/// 
+/// Alias for `Vec<serde_json::Value>`.
 pub type Array = Vec<serde_json::Value>;
 
 pub mod json_schema;
