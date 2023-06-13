@@ -82,5 +82,8 @@ pub use interrogator::SchemaKey;
 pub mod deserialize;
 pub use deserialize::{Deserializer};
 
+mod keyword;
+pub use keyword::Keyword;
+
 #[cfg(test)]
 pub mod test;

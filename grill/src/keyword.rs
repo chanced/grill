@@ -1,9 +1,12 @@
 use std::{fmt::Display, ops::Deref};
 
+use serde::{Deserialize, Serialize};
+
 /// A wrapper type used to distinguish between keywords and other strings as
 /// parameters to functions.
 ///
-#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(Hash, Default, PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Keyword<'s>(pub &'s str);
 
 impl Keyword<'_> {

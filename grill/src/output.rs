@@ -1,299 +1,27 @@
 //! Output formats, annotations, and errors
 //!
-// pub mod annotation;
 mod node;
+mod structure;
+mod traverse;
+mod validation_error;
 
-// pub use annotation::Annotation;
+pub mod basic;
+pub mod complete;
+pub mod detailed;
+pub mod flag;
+pub mod verbose;
+
+pub use basic::Basic;
+pub use complete::Complete;
+pub use detailed::Detailed;
+pub use flag::Flag;
 pub use node::Node;
+pub use structure::Structure;
+pub use validation_error::ValidationError;
+pub use verbose::Verbose;
 
-use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
+use crate::Uri;
 use std::fmt::{self, Display};
-
-use crate::{AbsoluteUri, Uri};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Structure {
-    /// A concise [`Output`] [`Structure`] which only contains a single
-    /// `"valid"` `bool` field.
-    ///
-    /// This `Structure` may have a positive impact on
-    /// performance as [`Handler`]s are expected to short circuit and return errors as
-    /// soon as possible.
-    ///
-    /// # Example
-    /// ```json
-    /// { "valid": false }
-    /// ```
-    ///
-    /// - [JSON Schema Core 2020-12 # 12.4.1
-    ///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
-    Flag,
-    /// The `Basic` structure is a flat list of output units.
-    /// # Example
-    /// ```json
-    /// {
-    ///   "valid": false,
-    ///   "errors": [
-    ///     {
-    ///       "keywordLocation": "",
-    ///       "instanceLocation": "",
-    ///       "error": "A subschema had errors."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
-    ///       "instanceLocation": "/1",
-    ///       "error": "A subschema had errors."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref/required",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/required",
-    ///       "instanceLocation": "/1",
-    ///       "error": "Required property 'y' not found."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/items/$ref/additionalProperties",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/additionalProperties",
-    ///       "instanceLocation": "/1/z",
-    ///       "error": "Additional property 'z' found but was invalid."
-    ///     },
-    ///     {
-    ///       "keywordLocation": "/minItems",
-    ///       "instanceLocation": "",
-    ///       "error": "Expected at least 3 items but found 2"
-    ///     }
-    ///   ]
-    /// }
-    /// ```
-    Basic,
-    /// The `Detailed` structure is based on the schema and can be more readable
-    /// for both humans and machines. Having the structure organized this way
-    /// makes associations between the errors more apparent. For example, the
-    /// fact that the missing "y" property and the extra "z" property both stem
-    /// from the same location in the instance is not immediately obvious in the
-    /// "Basic" structure. In a hierarchy, the correlation is more easily
-    /// identified.
-    ///
-    /// The following rules govern the construction of the results object:
-    ///
-    /// - All applicator keywords (`"*Of"`, `"$ref"`, `"if"`/`"then"`/`"else"`,
-    ///   etc.) require a node.
-    /// - Nodes that have no children are removed.
-    /// - Nodes that have a single child are replaced by the child.
-    /// - Branch nodes do not require an error message or an annotation.
-    ///
-    /// # Example
-    ///
-    /// ## Schema:
-    /// ```json
-    /// {
-    ///   "$id": "https://example.com/polygon",
-    ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
-    ///   "$defs": {
-    ///     "point": {
-    ///       "type": "object",
-    ///       "properties": {
-    ///         "x": { "type": "number" },
-    ///         "y": { "type": "number" }
-    ///       },
-    ///       "additionalProperties": false,
-    ///       "required": [ "x", "y" ]
-    ///     }
-    ///   },
-    ///   "type": "array",
-    ///   "items": { "$ref": "#/$defs/point" },
-    ///   "minItems": 3
-    /// }
-    /// ```
-    /// ## Instance:
-    /// ```json
-    /// [ { "x": 2.5, "y": 1.3 }, { "x": 1, "z": 6.7 } ]
-    /// ```
-    /// ## Output:
-    ///
-    /// ```json
-    /// {
-    ///   "valid": false,
-    ///   "keywordLocation": "",
-    ///   "instanceLocation": "",
-    ///   "errors": [
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/items/$ref",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
-    ///       "instanceLocation": "/1",
-    ///       "errors": [
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/required",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/required",
-    ///           "instanceLocation": "/1",
-    ///           "error": "Required property 'y' not found."
-    ///         },
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/additionalProperties",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
-    ///           "instanceLocation": "/1/z",
-    ///           "error": "Additional property 'z' found but was invalid."
-    ///         }
-    ///       ]
-    ///     },
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/minItems",
-    ///       "instanceLocation": "",
-    ///       "error": "Expected at least 3 items but found 2"
-    ///     }
-    ///   ]
-    /// }
-    ///
-    Detailed,
-    Verbose,
-    Complete,
-}
-
-impl Structure {
-    /// Returns `true` if the structure is [`Flag`].
-    ///
-    /// [`Flag`]: Structure::Flag
-    #[must_use]
-    pub fn is_flag(&self) -> bool {
-        matches!(self, Self::Flag)
-    }
-
-    /// Returns `true` if the structure is [`Basic`].
-    ///
-    /// [`Basic`]: Structure::Basic
-    #[must_use]
-    pub fn is_basic(&self) -> bool {
-        matches!(self, Self::Basic)
-    }
-
-    /// Returns `true` if the structure is [`Detailed`].
-    ///
-    /// [`Detailed`]: Structure::Detailed
-    #[must_use]
-    pub fn is_detailed(&self) -> bool {
-        matches!(self, Self::Detailed)
-    }
-
-    /// Returns `true` if the structure is [`Verbose`].
-    ///
-    /// [`Verbose`]: Structure::Verbose
-    #[must_use]
-    pub fn is_verbose(&self) -> bool {
-        matches!(self, Self::Verbose)
-    }
-
-    /// Returns `true` if the structure is [`Complete`].
-    ///
-    /// [`Complete`]: Structure::Complete
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        matches!(self, Self::Complete)
-    }
-}
-
-/// A trait which represents a validation error to be used as the `"error"` field in output
-///
-/// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait ValidationError<'v>: fmt::Display + fmt::Debug + DynClone + Send + Sync {
-    fn into_owned(self) -> Box<dyn ValidationError<'static>>;
-}
-
-dyn_clone::clone_trait_object!(<'v> ValidationError<'v>);
-
-impl Serialize for dyn ValidationError<'_> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(self)
-    }
-}
-
-impl ValidationError<'_> for String {
-    fn into_owned(self) -> Box<dyn ValidationError<'static>> {
-        Box::new(self)
-    }
-}
-
-/// A concise [`Output`] [`Structure`] which only contains a single `"valid"` `bool` field.
-///
-/// [`Handler`]s should short circuit and return errors as soon as possible when using this
-/// structure.
-#[derive(Debug)]
-pub struct Flag(pub bool);
-impl Flag {
-    #[must_use]
-    pub fn new(node: Node) -> Self {
-        Self(node.is_valid())
-    }
-    #[must_use]
-    pub fn is_valid(&self) -> bool {
-        self.0
-    }
-}
-
-#[derive(Debug)]
-pub struct Basic<'v> {
-    nodes: Vec<Node<'v>>,
-}
-impl<'v> Basic<'v> {
-    #[must_use]
-    pub fn new(node: Node<'v>) -> Self {
-        todo!()
-    }
-    pub fn is_valid(&self) -> bool {
-        todo!()
-    }
-    pub fn nodes(&self) -> &[Node] {
-        &self.nodes
-    }
-}
-
-#[derive(Debug)]
-pub struct Detailed<'v>(Node<'v>);
-
-impl<'v> Detailed<'v> {
-    #[must_use]
-    pub fn new(node: Node<'v>) -> Self {
-        Self(node)
-    }
-    pub fn is_valid(&self) -> bool {
-        self.0.is_valid()
-    }
-}
-
-#[derive(Debug)]
-pub struct Verbose<'v>(Node<'v>);
-impl<'v> Verbose<'v> {
-    #[must_use]
-    pub fn new(node: Node<'v>) -> Self {
-        Self(node)
-    }
-    pub fn is_valid(&self) -> bool {
-        self.0.is_valid()
-    }
-}
-
-#[derive(Debug)]
-pub struct Complete<'v>(pub Node<'v>);
-impl<'v> Complete<'v> {
-    #[must_use]
-    pub fn new(annotation: Node<'v>) -> Self {
-        Self(annotation)
-    }
-    pub fn is_valid(&self) -> bool {
-        self.0.is_valid()
-    }
-}
 
 #[derive(Debug)]
 pub enum Output<'v> {
@@ -312,7 +40,7 @@ impl<'v> Output<'v> {
             Structure::Basic => Basic::new(node).into(),
             Structure::Detailed => Detailed::new(node).into(),
             Structure::Verbose => Verbose::new(node).into(),
-            Structure::Complete => Complete(node).into(),
+            Structure::Complete => Complete::new(node).into(),
         }
     }
     pub fn structure(&self) -> Structure {

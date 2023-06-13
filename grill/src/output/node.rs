@@ -16,58 +16,82 @@ pub struct Node<'v> {
     location: Location,
     /// Additional properties
     additional_properties: BTreeMap<String, Value>,
-    /// A validation error
+    /// Validation error
     error: Option<Box<dyn 'v + ValidationError<'v>>>,
-    valid: Vec<Node<'v>>,
-    invalid: Vec<Node<'v>>,
+    /// Sub annotations
+    annotations: Vec<Node<'v>>,
+    /// Sub errors
+    errors: Vec<Node<'v>>,
 }
 
 impl<'v> Node<'v> {
-
     pub fn is_valid(&self) -> bool {
-        return self.is_annotation()
+        return self.is_annotation();
     }
-
+    #[must_use]
+    pub fn into_owned(&self) -> Node<'static> {
+        Node {
+            location: self.location.clone(),
+            additional_properties: self.additional_properties.clone(),
+            error: self.error.clone(),
+            annotations: self.annotations.iter().map(|x| x.into_owned()).collect(),
+            errors: self.errors.iter().map(|x| x.into_owned()).collect(),
+        }
+    }
     #[must_use]
     pub fn is_annotation(&self) -> bool {
-        self.error.is_none() && self.invalid.is_empty()
+        self.error.is_none() && self.errors.is_empty()
     }
     /// Returns `true` if there is an `error` or sub-nodes which are errors.
     #[must_use]
     pub fn is_error(&self) -> bool {
-        self.error.is_none() && self.invalid.is_empty()
+        self.error.is_none() && self.errors.is_empty()
     }
+    #[must_use]
     pub fn additional_properties(&self) -> &BTreeMap<String, Value> {
         &self.additional_properties
     }
+    pub fn insert_additional_property(&mut self, key: String, value: Value) {
+        self.additional_properties.insert(key, value);
+    }
+    #[must_use]
     pub fn absolute_keyword_location(&self) -> &Uri {
         &self.location.absolute_keyword_location()
     }
+    #[must_use]
     pub fn keyword_location(&self) -> &Pointer {
         self.location.keyword_location()
     }
+    #[must_use]
     pub fn instance_location(&self) -> &Pointer {
         self.location.instance_location()
     }
+    #[must_use]
     pub fn location(&self) -> &Location {
         &self.location
     }
+    #[must_use]
     pub fn error(&self) -> Option<&dyn ValidationError<'v>> {
         self.error.as_deref()
     }
 
+    pub fn set_error(&mut self, error: impl 'v + ValidationError<'v>) {
+        self.error = Some(Box::new(error) as Box<dyn 'v + ValidationError<'v>>);
+    }
+
+    #[must_use]
     pub fn errors(&self) -> &[Node<'v>] {
-        &self.invalid
+        &self.errors
     }
     pub fn annotations(&self) -> &[Node<'v>] {
-        &self.valid
+        &self.annotations
     }
     /// Inserts a nested [`Annotation`]
     pub fn insert(&mut self, detail: Node<'v>) {
         if detail.is_error() {
-            self.invalid.push(detail);
+            self.errors.push(detail);
         } else {
-            self.valid.push(detail);
+            self.annotations.push(detail);
         }
     }
 }
@@ -109,8 +133,8 @@ impl<'n> Serialize for Node<'n> {
             location: &self.location,
             additional_props: &self.additional_properties,
             error: self.error.as_ref().map(ToString::to_string),
-            annotations: &self.valid,
-            errors: &self.invalid,
+            annotations: &self.annotations,
+            errors: &self.errors,
         };
         data.serialize(serializer)
     }
@@ -146,8 +170,8 @@ impl<'de> Deserialize<'de> for Node<'static> {
             location,
             additional_properties: additional_props,
             error: error.map(|e| Box::new(e) as Box<dyn ValidationError<'static>>),
-            valid: annotations,
-            invalid: errors,
+            annotations,
+            errors,
         })
     }
 }
