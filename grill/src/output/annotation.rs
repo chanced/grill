@@ -1,4 +1,7 @@
-use std::mem;
+use std::{
+    collections::{BTreeMap, VecDeque},
+    default, mem,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,6 +9,90 @@ use serde_json::Value;
 use crate::Location;
 
 use super::{Node, ValidationError};
+
+pub struct Iter<'i, 'v> {
+    queue: VecDeque<&'i Annotation<'v>>,
+}
+impl<'i, 'v> Iter<'i, 'v> {
+    pub fn new(annotation: &'i Annotation<'v>) -> Self {
+        let mut queue = VecDeque::new();
+        queue.push_back(annotation);
+        Self { queue }
+    }
+}
+impl<'i, 'v> Iterator for Iter<'i, 'v> {
+    type Item = &'i Annotation<'v>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.queue.pop_front()?;
+        for annotation in next.annotations().iter().rev() {
+            self.queue.push_front(annotation);
+        }
+        Some(next)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Invalid<'i, 'v> {
+    queue: VecDeque<&'i Annotation<'v>>,
+}
+impl<'i, 'v> Invalid<'i, 'v> {
+    pub fn new(annotation: &'i Annotation<'v>) -> Self {
+        if annotation.is_valid() {
+            return Self::default();
+        }
+        let mut queue = VecDeque::new();
+        queue.push_back(annotation);
+        Self { queue }
+    }
+}
+
+impl<'i, 'v> Iterator for Invalid<'i, 'v> {
+    type Item = &'i Annotation<'v>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut next: &'i Annotation<'v>;
+        loop {
+            next = self.queue.pop_front()?;
+            self.queue.reserve(next.node().invalid.len());
+            for annotation in next.node().invalid.iter().rev() {
+                self.queue.push_front(annotation);
+            }
+            if next.is_invalid() {
+                return Some(next);
+            }
+        }
+    }
+}
+pub struct Valid<'i, 'v> {
+    queue: VecDeque<&'i Annotation<'v>>,
+}
+
+impl<'i, 'v> Valid<'i, 'v> {
+    pub fn new(annotation: &'i Annotation<'v>) -> Self {
+        let mut queue = VecDeque::new();
+        queue.push_back(annotation);
+        Self { queue }
+    }
+}
+
+impl<'i, 'v> Iterator for Valid<'i, 'v> {
+    type Item = &'i Annotation<'v>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut next: &'i Annotation<'v>;
+        loop {
+            next = self.queue.pop_front()?;
+            self.queue.reserve(next.annotations().len());
+            for annotation in next.annotations().iter().rev() {
+                self.queue.push_front(annotation);
+            }
+            if next.is_valid() {
+                return Some(next);
+            }
+        }
+    }
+}
 
 /// Represents a valid or invalid (error) annotation
 #[derive(Debug, Clone, Serialize)]
@@ -20,13 +107,20 @@ pub enum Annotation<'v> {
 
 impl<'v> Annotation<'v> {
     #[must_use]
-    pub fn new(location: Location, _value: &'v Value) -> Self {
+    pub fn new(location: Location, error: Option<Box<dyn ValidationError<'v>>>) -> Self {
         Self::Valid(Node {
             location,
-            ..Default::default()
+            error,
+            valid: Vec::default(),
+            invalid: Vec::default(),
+            additional_properties: BTreeMap::default(),
         })
     }
-
+    pub fn node(&self) -> &Node<'v> {
+        match self {
+            Annotation::Valid(n) | Annotation::Invalid(n) => n,
+        }
+    }
     /// Sets the error of this annotation
     pub fn error(&mut self, error: impl 'v + ValidationError<'v>) {
         let error = Some(Box::new(error) as Box<dyn 'v + ValidationError<'v>>);
@@ -41,19 +135,32 @@ impl<'v> Annotation<'v> {
         }
     }
 
-    #[must_use]
-    pub fn nested_errors(&self) -> &[Annotation<'v>] {
+    /// Returns a slice of nested `Annotation`s.
+    pub fn annotations(&self) -> &[Annotation<'v>] {
         match self {
-            Annotation::Valid(n) | Annotation::Invalid(n) => &n.errors,
+            Annotation::Valid(n) | Annotation::Invalid(n) => &n.valid,
         }
     }
 
-    #[must_use]
-    pub fn annotations(&self) -> &[Annotation<'v>] {
-        match self {
-            Annotation::Valid(n) | Annotation::Invalid(n) => &n.annotations,
-        }
+    /// Returns an [`Iter`] which **includes self** and nested `Annotation`s.
+    ///
+    /// For direct nested `Annotation`s, use [`annotations`].
+    pub fn iter(&self) -> Iter<'_, 'v> {
+        Iter::new(self)
     }
+
+    /// Returns a depth-first [`Iterator`] [`Valid`] over valid `Annotation`s,
+    /// **including `self`** if `self` is valid.
+    pub fn valid(&self) -> Valid<'_, 'v> {
+        Valid::new(self)
+    }
+
+    /// Returns a depth-first [`Iterator`] [`Invalid`] over invalid `Annotation`s,
+    /// **including `self`** if `self` is invalid.
+    pub fn invalid(&self) -> Invalid<'_, 'v> {
+        Invalid::new(self)
+    }
+
     pub fn field(&mut self, field: String, value: Value) {
         match self {
             Annotation::Invalid(n) | Annotation::Valid(n) => {
@@ -67,20 +174,20 @@ impl<'v> Annotation<'v> {
         match self {
             Annotation::Valid(detail) => match annotation {
                 Annotation::Valid(_) => {
-                    detail.annotations.push(annotation);
+                    detail.valid.push(annotation);
                 }
                 Annotation::Invalid(_) => {
-                    detail.errors.push(annotation);
+                    detail.invalid.push(annotation);
                     let detail = mem::take(detail);
                     *self = Annotation::Invalid(detail);
                 }
             },
             Annotation::Invalid(detail) => match annotation {
                 Annotation::Valid(_) => {
-                    detail.annotations.push(annotation);
+                    detail.valid.push(annotation);
                 }
                 Annotation::Invalid(_) => {
-                    detail.errors.push(annotation);
+                    detail.invalid.push(annotation);
                 }
             },
         }

@@ -1,7 +1,9 @@
 use jsonptr::Pointer;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+use crate::{AbsoluteUri, Uri};
+
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Location {
     /// The relative location of the validating keyword that follows the validation
     /// path. The value MUST be expressed as a JSON Pointer, and it MUST include any
@@ -17,7 +19,7 @@ pub struct Location {
     ///
     /// - [JSON Schema Core 2020-12 #12.3.1. Keyword Relative Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-relative-location)
     #[serde(rename = "keywordLocation")]
-    pub keyword_location: Pointer,
+    keyword_location: Pointer,
 
     /// The absolute, dereferenced location of the validating keyword. The value
     /// MUST be expressed as a full URI using the canonical URI of the relevant
@@ -29,7 +31,7 @@ pub struct Location {
     /// (meaning the complete location) rather than the `"absolute-URI"
     /// terminology from RFC 3986 (meaning with scheme but without fragment).
     /// Keyword absolute locations will have a fragment in order to identify the
-    /// keyword.d
+    /// keyword.
     ///
     /// # Example
     /// ```plaintext
@@ -37,31 +39,41 @@ pub struct Location {
     /// ```
     /// - [JSON Schema Core 2020-12 # 12.3.2. Keyword Absolute Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-absolute-location)
     #[serde(rename = "absoluteKeywordLocation")]
-    pub absolute_keyword_location: String,
+    absolute_keyword_location: (Uri, Pointer),
 
     /// The location of the JSON value within the instance being validated. The
     /// value MUST be expressed as a JSON Pointer.
     ///
     /// - [JSON Schema Core 2020-12 # 12.3.3. Instance Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-instance-location)
     #[serde(rename = "instanceLocation")]
-    pub instance_location: Pointer,
+    instance_location: Pointer,
 }
 
 impl Location {
+    pub fn absolute_keyword_location(&self) -> Uri {
+        let (uri, ptr) = &self.absolute_keyword_location;
+        let mut uri = uri.clone();
+        uri.set_fragment(Some(&ptr.to_string()));
+        uri
+    }
+
     pub fn push_keyword_location(&mut self, keyword: &str) {
         let tok: jsonptr::Token = keyword.into();
         self.keyword_location.push_back(tok.clone());
-        let (uri, ptr) = self
-            .absolute_keyword_location
-            .split_once('#')
-            .unwrap_or((&self.absolute_keyword_location, ""));
-        let mut ptr = Pointer::try_from(ptr).unwrap_or(Pointer::default());
+        let (_, mut ptr) = &mut self.absolute_keyword_location;
         ptr.push_back(tok);
-        self.absolute_keyword_location = format!("{uri}#{ptr}");
     }
 
     pub fn push_instance_location(&mut self, instance: &str) {
         let tok: jsonptr::Token = instance.into();
         self.instance_location.push_back(tok);
+    }
+
+    pub fn keyword_location(&self) -> &Pointer {
+        &self.keyword_location
+    }
+
+    pub fn instance_location(&self) -> &Pointer {
+        &self.instance_location
     }
 }

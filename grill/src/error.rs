@@ -2,7 +2,7 @@
 //!
 //! Validation errors are defined within their respective keyword's module.
 
-use crate::{uri::AbsoluteUri, Location, Uri};
+use crate::{uri::AbsoluteUri, Location, Output, Uri};
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
 use snafu::Snafu;
@@ -250,6 +250,14 @@ impl ResolveError {
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum CompileError {
+    /// The schema failed evaluation
+    #[snafu(display("schema failed evaluation: {}", source))]
+    EvaluationFailed {
+        /// The [`EvaluateError`] which occurred
+        source: Output<'static>,
+    },
+    /// An error occurred during evaluation of the schema
+    FailedToEvaluate { source: Output<'static> },
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     UnknownMetaschema {
         /// The [`Uri`] of meta schema which encountered an error

@@ -172,20 +172,20 @@ mod tests {
     #[test]
     fn test_json_schema_2019_09_filter() {
         let schema = json!({
-            "$schema": "https://json-schema.org/draft-2019-09/schema#",
+            "$schema": "https://json-schema.org/draft/2019-09/schema",
             "$id": "https://example.com"
         });
 
         assert!(is_json_schema_2019_09(&schema));
 
         let schema = json!({
-            "$schema": "https://json-schema.org/draft-2019-09/schema",
+            "$schema": "https://json-schema.org/draft/2019-09/schema",
             "$id": "https://example.com"
         });
         assert!(is_json_schema_2019_09(&schema));
 
         let schema = json!({
-            "$schema": "https://json-schema.org/draft-2020-12/schema",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://example.com"
         });
         assert!(!is_json_schema_2019_09(&schema));

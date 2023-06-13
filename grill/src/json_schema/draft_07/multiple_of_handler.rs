@@ -1,7 +1,10 @@
 use std::{borrow::Cow, fmt::Display};
 
 use crate::{
-    error::CompileError, handler::SyncHandler, json_schema::Keyword, output::ValidationError,
+    error::CompileError,
+    handler::SyncHandler,
+    json_schema::Keyword,
+    output::{self, ValidationError},
     Compile, Handler,
 };
 use serde_json::{Number, Value};
@@ -27,7 +30,7 @@ impl SyncHandler for MultipleOfHandler {
         scope: &mut crate::Scope,
         value: &'v Value,
         _structure: crate::Structure,
-    ) -> Result<Option<crate::output::Annotation<'v>>, crate::error::EvaluateError> {
+    ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()
     }
 }

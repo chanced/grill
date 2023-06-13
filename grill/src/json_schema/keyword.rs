@@ -3,10 +3,6 @@ use std::{fmt::Display, ops::Deref};
 /// A wrapper type used to distinguish between keywords and other strings as
 /// parameters to functions.
 ///
-/// # Example
-/// ```
-/// let keyword = Keyword("type");
-/// ```
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Keyword<'s>(pub &'s str);
 

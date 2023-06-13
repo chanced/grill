@@ -378,7 +378,7 @@ impl TryIntoAbsoluteUri for Uri {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(from = "String", into = "String")]
 pub struct RelativeUri {
     path: String,
@@ -529,6 +529,12 @@ pub enum Uri {
     Url(Url),
     Urn(Urn),
     Relative(RelativeUri),
+}
+
+impl Default for Uri {
+    fn default() -> Self {
+        Self::Relative(RelativeUri::default())
+    }
 }
 
 impl Display for Uri {

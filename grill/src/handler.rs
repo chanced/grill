@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     error::{CompileError, EvaluateError},
-    output::{Annotation, Structure},
+    output::{self, Structure},
     Compile, Scope,
 };
 
@@ -77,7 +77,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
         scope: &'s mut Scope,
         value: &'v Value,
         _structure: Structure,
-    ) -> Result<Option<Annotation<'v>>, EvaluateError>;
+    ) -> Result<Option<output::Node<'v>>, EvaluateError>;
 }
 
 clone_trait_object!(AsyncHandler);
@@ -104,6 +104,6 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
         scope: &mut Scope,
         value: &'v Value,
         _structure: Structure,
-    ) -> Result<Option<Annotation<'v>>, EvaluateError>;
+    ) -> Result<Option<output::Node<'v>>, EvaluateError>;
 }
 clone_trait_object!(SyncHandler);

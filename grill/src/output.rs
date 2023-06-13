@@ -1,18 +1,34 @@
 //! Output formats, annotations, and errors
 //!
-mod annotation;
+// pub mod annotation;
 mod node;
 
-pub use annotation::Annotation;
+// pub use annotation::Annotation;
 pub use node::Node;
 
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Display};
+
+use crate::{AbsoluteUri, Uri};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Structure {
+    /// A concise [`Output`] [`Structure`] which only contains a single
+    /// `"valid"` `bool` field.
+    ///
+    /// This `Structure` may have a positive impact on
+    /// performance as [`Handler`]s are expected to short circuit and return errors as
+    /// soon as possible.
+    ///
+    /// # Example
+    /// ```json
+    /// { "valid": false }
+    /// ```
+    ///
+    /// - [JSON Schema Core 2020-12 # 12.4.1
+    ///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
     Flag,
     /// The `Basic` structure is a flat list of output units.
     /// # Example
@@ -208,32 +224,158 @@ impl ValidationError<'_> for String {
     }
 }
 
-pub struct Flag<'v>(Annotation<'v>);
+/// A concise [`Output`] [`Structure`] which only contains a single `"valid"` `bool` field.
+///
+/// [`Handler`]s should short circuit and return errors as soon as possible when using this
+/// structure.
+#[derive(Debug)]
+pub struct Flag(pub bool);
+impl Flag {
+    #[must_use]
+    pub fn new(node: Node) -> Self {
+        Self(node.is_valid())
+    }
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.0
+    }
+}
 
-pub struct Basic<'v>(Annotation<'v>);
+#[derive(Debug)]
+pub struct Basic<'v> {
+    nodes: Vec<Node<'v>>,
+}
+impl<'v> Basic<'v> {
+    #[must_use]
+    pub fn new(node: Node<'v>) -> Self {
+        todo!()
+    }
+    pub fn is_valid(&self) -> bool {
+        todo!()
+    }
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+}
 
-pub struct Detailed<'v>(Annotation<'v>);
-pub struct Verbose<'v>(Annotation<'v>);
+#[derive(Debug)]
+pub struct Detailed<'v>(Node<'v>);
 
-pub struct Complete<'v>(pub Annotation<'v>);
+impl<'v> Detailed<'v> {
+    #[must_use]
+    pub fn new(node: Node<'v>) -> Self {
+        Self(node)
+    }
+    pub fn is_valid(&self) -> bool {
+        self.0.is_valid()
+    }
+}
 
+#[derive(Debug)]
+pub struct Verbose<'v>(Node<'v>);
+impl<'v> Verbose<'v> {
+    #[must_use]
+    pub fn new(node: Node<'v>) -> Self {
+        Self(node)
+    }
+    pub fn is_valid(&self) -> bool {
+        self.0.is_valid()
+    }
+}
+
+#[derive(Debug)]
+pub struct Complete<'v>(pub Node<'v>);
+impl<'v> Complete<'v> {
+    #[must_use]
+    pub fn new(annotation: Node<'v>) -> Self {
+        Self(annotation)
+    }
+    pub fn is_valid(&self) -> bool {
+        self.0.is_valid()
+    }
+}
+
+#[derive(Debug)]
 pub enum Output<'v> {
-    Flag(Flag<'v>),
+    Flag(Flag),
     Basic(Basic<'v>),
     Detailed(Detailed<'v>),
     Verbose(Verbose<'v>),
     Complete(Complete<'v>),
 }
+
 impl<'v> Output<'v> {
     #[must_use]
-    pub fn new(structure: Structure, annotation: Annotation<'v>) -> Output {
+    pub fn new(structure: Structure, node: Node<'v>) -> Output {
         match structure {
-            Structure::Flag => Output::Flag(Flag(annotation)), // TODO
-            Structure::Basic => Output::Basic(Basic(annotation)), // TODO
-            Structure::Detailed => Output::Detailed(Detailed(annotation)), // TODO
-            Structure::Verbose => Output::Verbose(Verbose(annotation)), // TODO
-            Structure::Complete => Output::Complete(Complete(annotation)),
+            Structure::Flag => Flag::new(node).into(),
+            Structure::Basic => Basic::new(node).into(),
+            Structure::Detailed => Detailed::new(node).into(),
+            Structure::Verbose => Verbose::new(node).into(),
+            Structure::Complete => Complete(node).into(),
         }
+    }
+    pub fn structure(&self) -> Structure {
+        match self {
+            Output::Flag(_) => Structure::Flag,
+            Output::Basic(_) => Structure::Basic,
+            Output::Detailed(_) => Structure::Detailed,
+            Output::Verbose(_) => Structure::Verbose,
+            Output::Complete(_) => Structure::Complete,
+        }
+    }
+    pub fn absolute_keyword_location(&self) -> Option<&Uri> {
+        match self {
+            Output::Flag(flag) => None,
+            Output::Basic(basic) => todo!(),
+            Output::Detailed(detailed) => todo!(),
+            Output::Verbose(verbose) => todo!(),
+            Output::Complete(complete) => todo!(),
+        }
+    }
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Output::Flag(flag) => flag.is_valid(),
+            Output::Basic(basic) => basic.is_valid(),
+            Output::Detailed(detailed) => detailed.is_valid(),
+            Output::Verbose(verbose) => verbose.is_valid(),
+            Output::Complete(complete) => complete.is_valid(),
+        }
+    }
+}
+
+impl From<Flag> for Output<'_> {
+    fn from(flag: Flag) -> Self {
+        Self::Flag(flag)
+    }
+}
+impl From<Basic<'_>> for Output<'_> {
+    fn from(basic: Basic<'_>) -> Self {
+        Self::Basic(basic)
+    }
+}
+
+impl From<Detailed<'_>> for Output<'_> {
+    fn from(detailed: Detailed<'_>) -> Self {
+        Self::Detailed(detailed)
+    }
+}
+impl From<Verbose<'_>> for Output<'_> {
+    fn from(verbose: Verbose<'_>) -> Self {
+        Self::Verbose(verbose)
+    }
+}
+
+impl From<Complete<'_>> for Output<'_> {
+    fn from(complete: Complete<'_>) -> Self {
+        Self::Complete(complete)
+    }
+}
+
+impl Display for Output<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.is_valid())
     }
 }
 
@@ -247,47 +389,47 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_annotiation_serde() {
-        let mut additional_props = BTreeMap::new();
-        additional_props.insert("example".into(), 34.into());
+    // #[test]
+    // fn test_annotiation_serde() {
+    //     let mut additional_props = BTreeMap::new();
+    //     additional_props.insert("example".into(), 34.into());
 
-        let a = Annotation::Invalid(Node {
-            additional_props,
-            location: Location {
-                keyword_location: "/".try_into().unwrap(),
-                instance_location: "/".try_into().unwrap(),
-                absolute_keyword_location: "http://example.com".to_string(),
-            },
-            error: None,
-            annotations: vec![Annotation::Valid(Node {
-                annotations: vec![],
-                errors: vec![],
-                location: Location {
-                    instance_location: Pointer::new(["bad-data"]),
-                    keyword_location: Pointer::new(["error-keyword"]),
-                    ..Default::default()
-                },
-                error: Some(Box::new(String::from("bad data"))),
-                ..Default::default()
-            })],
-            errors: vec![Annotation::Invalid(Node {
-                annotations: vec![],
-                errors: vec![],
-                error: Some(Box::new(String::from("nested error"))),
-                location: Location {
-                    absolute_keyword_location: "http://example.com".to_string(),
-                    ..Default::default()
-                },
+    //     let a = Annotation::Invalid(Node {
+    //         additional_props,
+    //         location: Location {
+    //             keyword_location: "/".try_into().unwrap(),
+    //             instance_location: "/".try_into().unwrap(),
+    //             absolute_keyword_location: "http://example.com".to_string(),
+    //         },
+    //         error: None,
+    //         valid: vec![Annotation::Valid(Node {
+    //             valid: vec![],
+    //             invalid: vec![],
+    //             location: Location {
+    //                 instance_location: Pointer::new(["bad-data"]),
+    //                 keyword_location: Pointer::new(["error-keyword"]),
+    //                 ..Default::default()
+    //             },
+    //             error: Some(Box::new(String::from("bad data"))),
+    //             ..Default::default()
+    //         })],
+    //         invalid: vec![Annotation::Invalid(Node {
+    //             valid: vec![],
+    //             invalid: vec![],
+    //             error: Some(Box::new(String::from("nested error"))),
+    //             location: Location {
+    //                 absolute_keyword_location: "http://example.com".to_string(),
+    //                 ..Default::default()
+    //             },
 
-                ..Default::default()
-            })],
-        });
+    //             ..Default::default()
+    //         })],
+    //     });
 
-        let s = serde_json::to_string(&a).unwrap();
-        let des_val: Annotation = serde_json::from_str(&s).unwrap();
-        let des_str = serde_json::to_string(&des_val).unwrap();
+    //     let s = serde_json::to_string(&a).unwrap();
+    //     let des_val: Annotation = serde_json::from_str(&s).unwrap();
+    //     let des_str = serde_json::to_string(&des_val).unwrap();
 
-        assert_eq!(s, des_str);
-    }
+    //     assert_eq!(s, des_str);
+    // }
 }

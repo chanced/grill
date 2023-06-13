@@ -179,14 +179,14 @@ mod tests {
     #[test]
     fn test_json_schema_2020_12_filter() {
         let schema = json!({
-            "$schema": "https://json-schema.org/draft-2020-12/schema#",
+            "$schema": "https://json-schema.org/draft/2020-12/schema#",
             "$id": "https://example.com"
         });
 
         assert!(is_json_schema_2020_12(&schema));
 
         let schema = json!({
-            "$schema": "https://json-schema.org/draft-2020-12/schema",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://example.com"
         });
         assert!(is_json_schema_2020_12(&schema));

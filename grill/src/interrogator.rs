@@ -5,7 +5,6 @@ use std::{
     ops::Deref,
 };
 
-use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use snafu::ResultExt;
@@ -83,8 +82,10 @@ where
     ///
     /// # Example
     /// ```rust
-    /// let mut interrogator = grill::Interrogator::json_schema().build().unwrap();
-    /// interrogator.source_slice("https://example.com/schema.json", br#"{"type": "string"}"#).unwrap();
+    /// use grill::Interrogator;
+    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
+    /// let source = br#"{"type": "string"}"#;
+    /// interrogator.source_slice("https://example.com/schema.json", source).unwrap();
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -145,8 +146,9 @@ where
     /// use grill::Interrogator;
     /// use serde_json::json;
     ///
-    /// let mut interrogator = Interrogator::json_schema().build();
-    /// interrogator.source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap();
+    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
+    /// let source = json!({"type": "string"});
+    /// interrogator.source_value("https://example.com/schema.json", source).unwrap();
     /// ```
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
@@ -173,7 +175,7 @@ where
     ///
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    /// let mut interrogator = Interrogator::json_schema().build();
+    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
     /// interrogator.source_strs(sources).unwrap();
     /// ```
     ///
@@ -202,10 +204,8 @@ where
     ///
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    /// let interrogator = Interrogator::json_schema().build().unwrap();
-    ///     .json_schema()
-    ///     .source_slices(sources)
-    ///     .unwrap();
+    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
+    /// interrogator.source_slices(sources).unwrap();
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -237,7 +237,8 @@ where
     /// use serde_json::json;
     ///
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", json!({"type": "string"});
+    /// let source = json!({"type": "string"});
+    /// sources.insert("https://example.com/schema.json", source);
     /// let mut interrogator = Interrogator::json_schema().build().unwrap();
     /// interrogator.source_values(sources).unwrap();
     /// ```
@@ -248,12 +249,15 @@ where
     ///
     pub fn source_values<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: Borrow<AbsoluteUri>,
+        K: TryIntoAbsoluteUri,
         V: Borrow<Value>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.add_source(Source::Value(k.borrow().clone(), v.borrow().clone()))?;
+            self.add_source(Source::Value(
+                k.try_into_absolute_uri()?,
+                v.borrow().clone(),
+            ))?;
         }
         Ok(())
     }
@@ -345,11 +349,10 @@ where
     ///
     /// # Example
     /// ```rust
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
-    ///     .source_slice("https://example.com/schema.json", br#"{"type": "string"}"#).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    /// use grill::Builder;
+    /// let source = br#"{"type": "string"}"#;
+    /// let interrogator = Builder::default().json_schema().build().unwrap()
+    /// interrogator.source_slice("https://example.com/schema.json", ).unwrap();
     /// ```
     /// # Errors
     /// Returns [`SourceError`] if:
@@ -491,7 +494,8 @@ where
     /// use serde_json::json;
     ///
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", json!({"type": "string"});
+    /// let source = json!({"type": "string"});
+    /// sources.insert("https://example.com/schema.json", source);
     /// let interrogator = grill::Builder::default()
     ///     .json_schema()
     ///     .source_values(sources).unwrap()
