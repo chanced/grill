@@ -13,39 +13,27 @@ use crate::{
     deserialize::json,
     dialect::Dialect,
     error::{
-        build_error, AbsoluteUriParseError, BuildError, CompileError, DeserializeError,
-        DuplicateSourceError, EvaluateError, FragmentedDialectIdError, FragmentedSourceUriError,
-        MissingDialectsError, SourceError, SourceSliceError,
+        build_error, resolve_error, AbsoluteUriParseError, BuildError, CompileError,
+        DeserializeError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
+        FragmentedSourceUriError, IdentifyError, MissingDialectError, ResolveError, ResolveErrors,
+        SourceError, SourceSliceError, UnknownDialectError,
     },
     graph::DependencyGraph,
     json_schema,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Deserializer, Handler, Output, Resolve, Structure,
+    Deserializer, Handler, Keyword, Output, Resolve, Schema, SchemaKey, Structure,
 };
-
-#[derive(Clone)]
-pub struct Schema {
-    /// The URI of the schema.
-    pub id: Option<AbsoluteUri>,
-    /// The URI of the schema's `Metaschema`.
-    pub meta_schema: AbsoluteUri,
-    /// The Handlers associated with the schema.
-    pub handlers: Box<[Handler]>,
-}
-
-new_key_type! {
-    pub struct SchemaKey;
-}
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
     dialects: Vec<Dialect>,
-    dialect_lookup: HashMap<AbsoluteUri, usize>,
-    default_dialect: AbsoluteUri,
+    // dialect_lookup: HashMap<AbsoluteUri, usize>,
+    default_dialect: usize,
     sources: HashMap<AbsoluteUri, Value>,
     resolvers: Vec<Box<dyn Resolve>>,
     schemas: SlotMap<Key, Schema>,
+    schema_lookup: HashMap<AbsoluteUri, Key>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     dep_graph: DependencyGraph,
 }
@@ -62,10 +50,32 @@ where
     /// Returns [`CompileError`] if:
     ///   - the schema fails to compile.
     ///   - the uri fails to convert to an [`AbsoluteUri`].
-    pub fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<SchemaKey, CompileError> {
+    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+        let uri = uri.try_into_absolute_uri()?;
+        if let Some((key, _)) = self.schema_by_id(&uri) {
+            return Ok(key);
+        }
+        let value = self.resolve(&uri).await?;
+        let dialect = self.identify_dialect(value)?;
+
         todo!()
     }
 
+    fn identify_dialect(&self, schema: &Value) -> Result<Dialect, UnknownDialectError> {
+        for dialect in self.dialects {
+            if dialect.matches(schema) {
+                return Ok(dialect);
+            }
+        }
+        match schema
+            .get(Keyword::SCHEMA.as_str())
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+        {
+            Some(metaschema_id) => Err(UnknownDialectError { metaschema_id }),
+            None => Ok(self.dialects[self.default_dialect]),
+        }
+    }
     pub fn evaluate(
         &self,
         key: Key,
@@ -73,6 +83,65 @@ where
         structure: Structure,
     ) -> Result<Output, EvaluateError> {
         todo!()
+    }
+    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
+        let key = self.schema_lookup.get(id).copied()?;
+        let schema = self.schemas.get(key)?;
+        Some((key, schema))
+    }
+    pub async fn resolve(
+        &mut self,
+        uri: impl Borrow<AbsoluteUri>,
+    ) -> Result<&Value, ResolveErrors> {
+        let uri = uri.borrow();
+        {
+            if let Some(schema) = self.resolve_local(uri) {
+                return Ok(schema);
+            }
+        }
+        let mut uri_without_fragment = uri.clone();
+        uri_without_fragment.set_fragment(None);
+        let value = self.try_resolvers(&uri_without_fragment).await?;
+        let value = self.add_source_value(&uri, value);
+        todo!()
+    }
+    async fn try_resolvers(&self, uri: &AbsoluteUri) -> Result<Value, ResolveErrors> {
+        let mut errors = ResolveErrors::new();
+        for resolver in &self.resolvers {
+            match resolver.resolve(uri).await {
+                Ok(Some(data)) => {
+                    match self.deserialize(&data).context(resolve_error::Deserialize {
+                        schema_id: uri.clone(),
+                    }) {
+                        Ok(value) => return Ok(value),
+                        Err(err) => errors.push(err),
+                    }
+                }
+                Err(err) => errors.push(err),
+                _ => continue,
+            }
+        }
+        errors.push(ResolveError::not_found(uri.to_string(), None));
+        Err(errors)
+    }
+    fn add_source_value(&mut self, uri: &AbsoluteUri, value: Value) -> &Value {
+        let uri = uri.clone();
+        self.sources.insert(uri, value);
+        self.sources.get(&uri).unwrap()
+    }
+    fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
+        let mut error = DeserializeError::new();
+        for (format, deserializer) in self.deserializers {
+            match deserializer.deserialize(data) {
+                Ok(value) => return Ok(value),
+                Err(err) => error.add(format, err),
+            }
+        }
+        Err(error)
+    }
+
+    fn resolve_local(&self, uri: &AbsoluteUri) -> Option<&Value> {
+        self.sources.get(uri)
     }
 
     /// Adds a source schema from a slice of bytes that will be deserialized
@@ -322,7 +391,6 @@ pub struct Builder<Key: slotmap::Key = SchemaKey> {
     resolvers: Vec<Box<dyn Resolve>>,
     resolver_lookup: HashMap<any::TypeId, usize>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
-    precompile: HashSet<AbsoluteUri>,
     _marker: std::marker::PhantomData<Key>,
 }
 
@@ -340,7 +408,6 @@ impl Builder<SchemaKey> {
             resolvers: Vec::new(),
             resolver_lookup: HashMap::new(),
             deserializers: Vec::new(),
-            precompile: HashSet::new(),
             default_dialect: None,
             _marker: std::marker::PhantomData,
         }
@@ -358,9 +425,9 @@ where
     ///
     /// # Example
     /// ```
-    /// use grill::{Interrogator};
+    /// use grill::{Interrogator, new_key_type};
     ///
-    /// slotmap::new_key_type! {
+    /// new_key_type! {
     ///     pub struct MySchemaKey;
     /// }
     /// let mut interrogator = Interrogator::json_schema_2020_12()
@@ -379,7 +446,6 @@ where
             resolvers: self.resolvers,
             resolver_lookup: self.resolver_lookup,
             deserializers: self.deserializers,
-            precompile: self.precompile,
             default_dialect: self.default_dialect,
             _marker: std::marker::PhantomData,
         }
@@ -411,30 +477,6 @@ where
     ) -> Result<Self, AbsoluteUriParseError> {
         let dialect = dialect.try_into_absolute_uri()?;
         self.default_dialect = Some(dialect);
-        Ok(self)
-    }
-    /// Precompiles schemas at the given URIs.
-    ///
-    /// # Example
-    /// ```rust
-    /// let interrogator = grill::Builder::default()
-    ///    .json_schema_2020_12()
-    ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    ///    .precompile(["https://example.com/schema.json"]).unwrap()
-    ///    .build()
-    ///    .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if the URI fails to convert
-    /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
-    pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, AbsoluteUriParseError>
-    where
-        I: IntoIterator<Item = V>,
-        V: TryIntoAbsoluteUri,
-    {
-        for schema in schemas {
-            self.precompile.insert(schema.try_into_absolute_uri()?);
-        }
         Ok(self)
     }
 
@@ -703,31 +745,27 @@ where
             resolver_lookup: _resolver_lookup,
             resolvers,
             deserializers,
-            precompile,
             default_dialect,
             _marker,
         } = self;
         let dep_graph = DependencyGraph::new();
 
-        let (dialects, dialect_lookup, default_dialect) =
-            Self::build_dialects(dialects, default_dialect)?;
+        let (dialects, default_dialect) = Self::build_dialects(dialects, default_dialect)?;
         let deserializers = Self::build_deserializers(deserializers);
         let sources = Self::build_sources(sources, &deserializers)?;
         let schemas: SlotMap<Key, Schema> = SlotMap::with_key();
+        let schema_lookup = HashMap::new();
         let mut interrogator = Interrogator {
             dialects,
-            dialect_lookup,
             default_dialect,
             sources,
             resolvers,
             schemas,
+            schema_lookup,
             deserializers,
             dep_graph,
         };
 
-        for id in precompile {
-            interrogator.compile(id)?;
-        }
         Ok(interrogator)
     }
 
@@ -768,19 +806,24 @@ where
     fn build_dialects(
         dialects: Vec<Dialect>,
         default_dialect: Option<AbsoluteUri>,
-    ) -> Result<(Vec<Dialect>, HashMap<AbsoluteUri, usize>, AbsoluteUri), BuildError> {
+    ) -> Result<(Vec<Dialect>, usize), BuildError> {
         let queue = Self::dialect_queue(dialects)?;
         if queue.is_empty() {
-            return Err(MissingDialectsError.into());
+            return Err(MissingDialectError.into());
         }
         let mut dialects = Vec::with_capacity(queue.len());
-        let mut lookup = HashMap::with_capacity(queue.len());
+        let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(queue.len());
         for dialect in queue.into_iter().rev() {
             lookup.insert(dialect.id.clone(), dialects.len());
             dialects.push(dialect);
         }
         let default_dialect = default_dialect.unwrap_or(dialects[0].id.clone());
-        Ok((dialects, lookup, default_dialect))
+        let default_dialect = lookup.get(&default_dialect).copied().ok_or_else(|| {
+            BuildError::DefaultDialectNotFound {
+                uri: default_dialect,
+            }
+        })?;
+        Ok((dialects, default_dialect))
     }
 
     fn dialect_queue(dialects: Vec<Dialect>) -> Result<Vec<Dialect>, FragmentedDialectIdError> {
@@ -803,6 +846,30 @@ where
         }
         Ok(queue)
     }
+    // /// Precompiles schemas at the given URIs.
+    // ///
+    // /// # Example
+    // /// ```rust
+    // /// let interrogator = grill::Builder::default()
+    // ///    .json_schema_2020_12()
+    // ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
+    // ///    .precompile(["https://example.com/schema.json"]).unwrap()
+    // ///    .build()
+    // ///    .unwrap();
+    // /// ```
+    // /// # Errors
+    // /// Returns [`AbsoluteUriParseError`] if the URI fails to convert
+    // /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
+    // pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, AbsoluteUriParseError>
+    // where
+    //     I: IntoIterator<Item = V>,
+    //     V: TryIntoAbsoluteUri,
+    // {
+    //     for schema in schemas {
+    //         self.precompile.insert(schema.try_into_absolute_uri()?);
+    //     }
+    //     Ok(self)
+    // }
 }
 enum Source {
     String(AbsoluteUri, String),

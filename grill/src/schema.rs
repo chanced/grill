@@ -1,130 +1,17 @@
-// use serde::{Deserialize, Serialize};
+use slotmap::new_key_type;
 
-// /// A JSON Schema document.
-// #[derive(Clone, Debug, Serialize, Deserialize)]
-// #[serde(untagged)]
-// pub enum Schema {
-//     Bool(bool),
-//     Object(Box<Object>),
-// }
+use crate::{AbsoluteUri, Handler};
 
-// impl Schema {
-//     /// Returns `true` if the schema is [`Bool`].
-//     ///
-//     /// [`Bool`]: Schema::Bool
-//     #[must_use]
-//     pub fn is_bool(&self) -> bool {
-//         matches!(self, Self::Bool(..))
-//     }
+new_key_type! {
+    pub struct SchemaKey;
+}
 
-//     #[must_use]
-//     pub fn as_bool(&self) -> Option<&bool> {
-//         if let Self::Bool(v) = self {
-//             Some(v)
-//         } else {
-//             None
-//         }
-//     }
-
-//     /// Returns `true` if the schema is [`Object`].
-//     ///
-//     /// [`Object`]: Schema::Object
-//     #[must_use]
-//     pub fn is_object(&self) -> bool {
-//         matches!(self, Self::Object(..))
-//     }
-//     #[must_use]
-//     pub fn as_object(&self) -> Option<&Object> {
-//         if let Self::Object(v) = self {
-//             Some(v)
-//         } else {
-//             None
-//         }
-//     }
-// }
-// impl Default for Schema {
-//     fn default() -> Self {
-//         Schema::Bool(true)
-//     }
-// }
-
-// // struct Annotate<'v, 's, 'h, 'a> {
-// //     instance_location: &'v str,
-// //     keyword_location: &'s str,
-// //     absolute_keyword_location: &'s str,
-// //     value: &'v Value,
-// //     structure: Structure,
-// //     scope: &'s mut Scope<'a>,
-// //     handlers: &'h [Handler],
-// // }
-
-// // impl<'v, 's, 'c, 'a> Annotate<'v, 's, 'c, 'a> {
-// //     async fn exec(self) -> Result<Annotation<'v>, Box<dyn std::error::Error>> {
-// //         let Annotate {
-// //             instance_location,
-// //             keyword_location,
-// //             absolute_keyword_location,
-// //             value,
-// //             structure,
-// //             scope,
-// //             handlers,
-// //         } = self;
-
-// //         let mut nested = scope.nested(
-// //             instance_location,
-// //             keyword_location,
-// //             Some(absolute_keyword_location.to_string()),
-// //         )?;
-
-// //         let mut result = Annotation::new(nested.location().clone(), value);
-// //         for handler in schema.handlers().iter() {
-// //             let annotation = match handler {
-// //                 Handler::Sync(h) => h.evaluate(&mut nested, schema, value, structure)?,
-// //                 Handler::Async(h) => h.evaluate(&mut nested, schema, value, structure).await?,
-// //             };
-// //             if let Some(annotation) = annotation {
-// //                 result.add(annotation);
-// //                 // return early if the annotation is invalid and the output
-// //                 // structure is Flag
-// //                 if structure.is_flag() && result.is_invalid() {
-// //                     return Ok(result);
-// //                 }
-// //             }
-// //         }
-// //         Ok(result)
-// //     }
-// // }
-
-// #[cfg(test)]
-// mod tests {
-//     // #[test]
-//     // #[allow(clippy::too_many_lines)]
-//     // fn test_serde() {
-//     //     let schema = json!(
-//     //         {
-//     //                 "$schema": "https://json-schema.org/draft/2020-12/schema",
-//     //                 "$id": "https://example.com/product.schema.json",
-//     //                 "title": "Product",
-//     //                 "description": "A product in the catalog",
-//     //                 "type": "object"
-//     //         }
-//     //     );
-//     //     let obj: Object = serde_json::from_value(schema.clone()).unwrap();
-//     //     assert_eq!(
-//     //         obj.description,
-//     //         Some("A product in the catalog".to_string())
-//     //     );
-//     //     assert_eq!(obj.title, Some("Product".to_string()));
-//     //     assert_eq!(
-//     //         obj.id,
-//     //         Some("https://example.com/product.schema.json".to_string())
-//     //     );
-//     //     assert_eq!(
-//     //         obj.schema,
-//     //         Some("https://json-schema.org/draft/2020-12/schema".to_string())
-//     //     );
-
-//     //     let schema: Schema = serde_json::from_value(schema).unwrap();
-//     //     assert!(matches!(schema, Schema::Object(..)));
-//     // }
-// }
+#[derive(Clone)]
+pub struct Schema {
+    /// The URI of the schema.
+    pub id: AbsoluteUri,
+    /// The URI of the schema's `Metaschema`.
+    pub meta_schema: AbsoluteUri,
+    /// The Handlers associated with the schema.
+    pub handlers: Box<[Handler]>,
+}

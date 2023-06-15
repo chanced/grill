@@ -5,7 +5,7 @@ use crate::{error::IdentifyError, uri::AbsoluteUri, Handler, Metaschema, Object,
 use dyn_clone::{clone_trait_object, DynClone};
 use itertools::Itertools;
 use serde_json::Value;
-use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash, ops::Deref};
+use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash};
 
 /// Defines a set of keywords and semantics that can be used to evaluate a
 /// JSON Schema document.
@@ -33,7 +33,7 @@ impl Vocabulary {
 }
 
 pub trait Filter: Send + Sync + DynClone {
-    fn filter(&self, value: &Value) -> bool;
+    fn matches(&self, value: &Value) -> bool;
 }
 clone_trait_object!(Filter);
 
@@ -41,7 +41,7 @@ impl<F> Filter for F
 where
     F: Fn(&Value) -> bool + Send + Sync + Clone,
 {
-    fn filter(&self, value: &Value) -> bool {
+    fn matches(&self, value: &Value) -> bool {
         (self)(value)
     }
 }
@@ -112,6 +112,12 @@ impl Dialect {
             filter: Box::new(filter),
             identify: Box::new(identify),
         }
+    }
+    pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+        self.identify.identify(schema)
+    }
+    pub fn matches(&self, schema: &Value) -> bool {
+        self.filter.matches(schema)
     }
 }
 

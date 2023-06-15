@@ -23,12 +23,9 @@ pub mod location;
 pub use location::Location;
 
 mod interrogator;
-
 pub use interrogator::{Builder, Interrogator};
 
-// pub use uniresid as uri;
-// pub use uniresid::{AbsoluteUri, Uri};
-
+pub use slotmap::new_key_type;
 
 pub mod dialect;
 
@@ -36,16 +33,13 @@ mod scope;
 pub use scope::Scope;
 
 mod handler;
-
 pub use handler::Handler;
 
 pub mod error;
 
-
 pub mod output;
 pub use output::{Output, Structure};
 
-/// Traits and implementations for loading JSON Schema source definitions.
 pub mod resolve;
 pub use resolve::Resolve;
 
@@ -55,15 +49,23 @@ pub use compile::Compile;
 pub mod state;
 pub use state::State;
 
-// mod integration;
-// pub use integration::Integration;
-
 pub(crate) mod graph;
 
 mod metaschema;
 pub use metaschema::Metaschema;
 pub mod uri;
 pub use uri::{Uri, AbsoluteUri};
+
+pub mod json_schema;
+
+pub mod deserialize;
+pub use deserialize::Deserializer;
+
+mod keyword;
+pub use keyword::Keyword;
+
+mod schema;
+pub use schema::{Schema, SchemaKey};
 
 /// A JSON object.
 /// 
@@ -74,15 +76,10 @@ pub type Object = serde_json::Map<String, serde_json::Value>;
 /// Alias for `Vec<serde_json::Value>`.
 pub type Array = Vec<serde_json::Value>;
 
-pub mod json_schema;
-
-pub use interrogator::SchemaKey;
-
-pub mod deserialize;
-pub use deserialize::{Deserializer};
-
-mod keyword;
-pub use keyword::Keyword;
 
 #[cfg(test)]
 pub mod test;
+
+
+// mod integration;
+// pub use integration::Integration;

@@ -93,13 +93,15 @@ pub enum BuildError {
         uri: AbsoluteUri,
     },
     #[snafu(display("{}", source), context(false))]
-    MissingDialects { source: MissingDialectsError },
+    MissingDialects { source: MissingDialectError },
+    #[snafu(display("{}", uri))]
+    DefaultDialectNotFound { uri: AbsoluteUri },
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MissingDialectsError;
+pub struct MissingDialectError;
 
-impl Display for MissingDialectsError {
+impl Display for MissingDialectError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -107,7 +109,7 @@ impl Display for MissingDialectsError {
         )
     }
 }
-impl std::error::Error for MissingDialectsError {}
+impl std::error::Error for MissingDialectError {}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
@@ -146,7 +148,16 @@ pub enum EvaluateError<'v> {
 pub struct DeserializeError {
     pub formats: HashMap<&'static str, erased_serde::Error>,
 }
-
+impl DeserializeError {
+    pub fn new() -> Self {
+        Self {
+            formats: HashMap::new(),
+        }
+    }
+    pub fn add(&mut self, format: &'static str, err: erased_serde::Error) {
+        self.formats.insert(format, err);
+    }
+}
 impl Display for DeserializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "failed to deserialize")?;
@@ -162,6 +173,32 @@ impl Error for DeserializeError {
         self.formats.iter().next().map(|(_, err)| err as _)
     }
 }
+#[derive(Debug)]
+pub struct ResolveErrors {
+    pub errors: Vec<ResolveError>,
+}
+impl ResolveErrors {
+    pub fn new() -> Self {
+        Self { errors: Vec::new() }
+    }
+    pub fn push(&mut self, err: ResolveError) {
+        self.errors.push(err);
+    }
+}
+impl Display for ResolveErrors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to resolve schema")?;
+        for err in &self.errors {
+            write!(f, "\n\t{}", err)?;
+        }
+        Ok(())
+    }
+}
+impl Error for ResolveErrors {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.errors.iter().next().map(|err| err as _)
+    }
+}
 
 /// Errors which can occur during schema resolution.
 #[derive(Debug, Snafu)]
@@ -173,7 +210,7 @@ pub enum ResolveError {
         /// The URI of the schema which was not found
         schema_id: String,
         /// The Location of the referring keyword (e.g. `"$ref"`, `"$recursiveRef"`, `"$dynamicRef"` etc.)
-        referering_location: Location,
+        referering_location: Option<Location>,
     },
     /// An [`std::io::Error`] occurred while reading the schema
     #[snafu(display(r#"error reading schema "{schema_id}": {source}"#))]
@@ -193,12 +230,11 @@ pub enum ResolveError {
         /// The [`jsonptr::Error`] which occurred
         source: jsonptr::Error,
     },
-
     /// The schema was not able to be parsed with the enabled formats
     #[snafu(display(r#"error deserialzing schema "{schema_id}": {source}"#))]
     Deserialize {
         /// The URI of the schema which was not able to be resolved
-        schema_id: String,
+        schema_id: AbsoluteUri,
         /// The [`DeserializeError`] which occurred
         source: DeserializeError,
     },
@@ -221,7 +257,7 @@ pub enum ResolveError {
 
 impl ResolveError {
     #[must_use]
-    pub fn not_found(schema_id: String, referering_location: Location) -> Self {
+    pub fn not_found(schema_id: String, referering_location: Option<Location>) -> Self {
         Self::NotFound {
             schema_id,
             referering_location,
@@ -267,25 +303,41 @@ impl ResolveError {
 pub enum CompileError {
     /// The schema failed evaluation
     #[snafu(display("schema failed evaluation: {}", source))]
-    EvaluationFailed {
+    InvalidSchema {
         /// The [`EvaluateError`] which occurred
         source: Output<'static>,
     },
-    /// An error occurred during evaluation of the schema
-    FailedToEvaluate { source: Output<'static> },
+
+    /// Failed to identify a schema
+    #[snafu(display("{}", source), context(false))]
+    FailedToIdentifySchema {
+        /// The [`IdentifyError`] which occurred
+        source: IdentifyError,
+    },
+
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
-    UnknownMetaschema {
-        /// The [`Uri`] of meta schema which encountered an error
-        schema_id: String,
-        /// The error which occurred when parsing the meta schema
-        source: UnknownMetaschemaError,
-    },
+    #[snafu(display("{}", source), context(false))]
+    DialectNotKnown { source: UnknownDialectError },
+
     /// A schema was not able to be resolved.
-    SchemaNotFound {
+    #[snafu(display("failed to resolve schema: {}", source,), context(false))]
+    FailedToResolveSchema {
         /// The source [`ResolveError`]
-        source: ResolveError,
+        source: ResolveErrors,
     },
-    Internal {
+
+    /// Failed to parse an [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
+    #[snafu(display("failed to parse absolute URI: {}", source))]
+    ParseAbsoluteUri {
+        value: String,
+        source: AbsoluteUriParseError,
+    },
+
+    #[snafu(display("{}", source), context(false))]
+    FailedToParseAbsoluteUri { source: AbsoluteUriParseError },
+
+    /// Custom errors returned by a custom [`Handler`]
+    Custom {
         source: Box<dyn Error + Send + Sync>,
     },
 }
@@ -303,13 +355,16 @@ impl std::fmt::Display for SchemaNotFoundError {
 }
 impl Error for SchemaNotFoundError {}
 
-#[derive(Debug, Clone, Snafu)]
-#[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum UnknownMetaschemaError {
-    /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
-    #[snafu(display("{}", source), context(false))]
-    Unknown { source: UnkownMetaSchemaError },
+#[derive(Debug, Clone)]
+pub struct UnknownDialectError {
+    pub metaschema_id: String,
 }
+impl Display for UnknownDialectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "metaschema dialect not found: {}", self.metaschema_id)
+    }
+}
+impl std::error::Error for UnknownDialectError {}
 
 #[derive(Debug, Clone)]
 pub struct UnkownMetaSchemaError {
@@ -334,6 +389,7 @@ impl Display for UriNotAbsoluteError {
 
 impl Error for UriNotAbsoluteError {}
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum SourceError {
     #[snafu(display("{}", source), context(false))]
     InvalidUtf8 { source: FromUtf8Error },
@@ -433,8 +489,3 @@ where
     }
 }
 impl<U> Error for HasFragmentError<U> where U: std::fmt::Debug + Display + PartialEq + Eq {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-}

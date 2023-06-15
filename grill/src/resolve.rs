@@ -1,3 +1,5 @@
+//! Traits and implementations for loading JSON Schema source definitions.
+
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
