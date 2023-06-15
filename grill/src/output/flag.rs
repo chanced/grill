@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-/// A concise [`Output`] [`Structure`] which only contains a single `"valid"` `bool` field.
+/// A concise [`Output`](`crate::output::Output`)
+/// [`Structure`](`crate::output::Structure`) which only contains a single
+/// `"valid"` `bool` field.
 ///
-/// [`Handler`]s should short circuit and return errors as soon as possible when using this
-/// structure.
+/// [`Handler`](`crate::Handler`)s should short circuit and return errors as
+/// soon as possible when using this structure.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Flag {
     valid: bool,

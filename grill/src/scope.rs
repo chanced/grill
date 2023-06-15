@@ -1,22 +1,30 @@
 use big_rational_str::ParseError;
 
+use inherent::inherent;
 use jsonptr::Pointer;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
-use crate::{output::Annotation, Location, SchemaKey, State};
+use crate::{location::Locate, output::Node, Location, SchemaKey, State};
 /// Contains state and location information needed to perform an [`evaluation`](`crate::Interrogator::evaluate`).
-pub struct Scope<'state> {
-    pub state: &'state mut State,
+pub struct Scope<'s> {
+    pub state: &'s mut State,
     location: Location,
     number: Option<BigRational>,
 }
 
-impl<'state> Scope<'state> {
+#[inherent]
+impl Locate for Scope<'_> {
+    #[must_use]
+    pub fn location(&self) -> &Location {
+        &self.location
+    }
+}
+impl<'s> Scope<'s> {
     pub fn new(
         location: Location,
-        state: &'state mut State,
+        state: &'s mut State,
         schemas: SlotMap<SchemaKey, Value>,
     ) -> Self {
         Self {
@@ -26,17 +34,12 @@ impl<'state> Scope<'state> {
         }
     }
     #[must_use]
-    pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Annotation<'v> {
+    pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Node<'v> {
         let mut location = self.location.clone();
         location.push_keyword_location(keyword);
-        Annotation::new(location, value)
+        Node::new(location, value)
     }
 
-    /// Returns the location of the keyword.
-    #[must_use]
-    pub fn location(&self) -> &Location {
-        &self.location
-    }
     /// # Errors
     /// Returns a [`ParseError`](`big_rational_str::ParseError`) if `number` cannot be parsed as a [`BigRational`].
     #[allow(clippy::missing_panics_doc)]
@@ -51,18 +54,6 @@ impl<'state> Scope<'state> {
         }
     }
 
-    #[must_use]
-    pub fn absolute_keyword_lcoation(&self) -> &str {
-        &self.location.absolute_keyword_location
-    }
-    #[must_use]
-    pub fn keyword_location(&self) -> &Pointer {
-        &self.location.keyword_location
-    }
-    #[must_use]
-    pub fn instance_location(&self) -> &Pointer {
-        &self.location.instance_location
-    }
     /// Returns a new, nested [`Scope`], where `instance` should be the name of
     /// field or index within the value being evaluated and `keyword` is the
     /// keyword being executed.
@@ -76,28 +67,29 @@ impl<'state> Scope<'state> {
         keyword: &str,
         absolute_keyword_location: Option<String>,
     ) -> Result<Scope, jsonptr::MalformedPointerError> {
-        let mut keyword_location = self.keyword_location().clone();
-        keyword_location.push_back(keyword.into());
-        let absolute_keyword_location =
-            if let Some(absolute_keyword_location) = absolute_keyword_location {
-                absolute_keyword_location
-            } else {
-                let v = self.location.absolute_keyword_location.clone();
-                let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
-                let mut ptr: Pointer = Pointer::try_from(ptr)?;
-                ptr.push_back(keyword.into());
-                format!("{uri}#{ptr}")
-            };
-        let mut instance_location = self.instance_location().clone();
-        instance_location.push_back(instance.into());
-        Ok(Scope {
-            location: Location {
-                keyword_location,
-                absolute_keyword_location,
-                instance_location,
-            },
-            state: self.state,
-            number: None,
-        })
+        // let mut keyword_location = self.keyword_location().clone();
+        // keyword_location.push_back(keyword.into());
+        // let absolute_keyword_location =
+        //     if let Some(absolute_keyword_location) = absolute_keyword_location {
+        //         absolute_keyword_location
+        //     } else {
+        //         let v = self.location.absolute_keyword_location.clone();
+        //         let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
+        //         let mut ptr: Pointer = Pointer::try_from(ptr)?;
+        //         ptr.push_back(keyword.into());
+        //         format!("{uri}#{ptr}")
+        //     };
+        // let mut instance_location = self.instance_location().clone();
+        // instance_location.push_back(instance.into());
+        // Ok(Scope {
+        //     location: Location {
+        //         keyword_location,
+        //         absolute_keyword_location,
+        //         instance_location,
+        //     },
+        //     state: self.state,
+        //     number: None,
+        // })
+        todo!()
     }
 }

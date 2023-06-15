@@ -1,10 +1,9 @@
-//! JSON Schema integration
+//! JSON Schema dialect implementations 04, 07, 2019-09, 2020-12.
 
 pub mod draft_04;
 pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
-mod keyword;
 
 pub use draft_04::dialect as draft_04_dialect;
 pub use draft_07::dialect as draft_07_dialect;
@@ -40,11 +39,11 @@ pub use draft_2020_12::{
     json_schema_2020_12_url,
 };
 
+use crate::Keyword;
 use crate::{
     error::{HasFragmentError, IdentifyError, UriParseError},
     Uri,
 };
-pub use keyword::Keyword;
 use serde_json::Value;
 
 /// Identifies JSON Schema Draft 07 through current

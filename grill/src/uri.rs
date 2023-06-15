@@ -1,14 +1,19 @@
 //! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
 
+use crate::error::{AbsoluteUriParseError, UriParseError, UrnError};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow, convert::Infallible, fmt::Display, ops::Deref, str::FromStr, string::ToString,
 };
-
-use serde::{Deserialize, Serialize};
 use url::Url;
-use urn::Urn;
+use urn::{
+    percent::{encode_f_component, encode_nss},
+    Urn,
+};
 
-use crate::error::{AbsoluteUriParseError, UriParseError, UrnError};
+const URL_FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+const URL_PATH: &AsciiSet = &URL_FRAGMENT.add(b'#').add(b'?').add(b'{').add(b'}');
 
 /// A URI in the form of a fully qualified [`Url`] or [`Urn`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -22,63 +27,42 @@ impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
     ///
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a [`Uri`](`uri::Uri`) or [`Urn`](`urn::Urn`)
+    /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
     pub fn parse(value: &str) -> Result<Self, AbsoluteUriParseError> {
         if value.starts_with("urn:") {
-            Ok(Self::Urn(Urn::from_str(value)?))
+            Ok(Urn::from_str(value)?.into())
         } else {
-            Ok(Self::Url(Url::parse(value)?))
+            Ok(Url::parse(value)?.into())
         }
     }
-    /// Returns the fragment if it exists.
+    /// Returns the percent encoded fragment, if it exists.
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
         match self {
-            Self::Url(uri) => uri.fragment(),
+            Self::Url(url) => url.fragment(),
             Self::Urn(urn) => urn.f_component(),
         }
     }
-    /// Sets the fragment component of the [`Url`] or [`Urn`] and returns the
-    /// previous value, if it exists.
+
+    /// Percent encodes and sets the fragment component of the [`Url`] or [`Urn`] and returns the
+    /// previous fragment in percent-encoded format if it exists.
     ///
     /// # Errors
     /// Returns [`urn::Error`](`urn::Error`) if the `AbsoluteUri` is a
     /// [`Urn`](`urn::Urn`) and the fragment and the fragment fails validation.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<Option<String>, UrnError> {
+    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
         match self {
-            Self::Url(uri) => {
-                let existing = uri.fragment().map(ToString::to_string);
-                uri.set_fragment(fragment);
-                Ok(existing)
-            }
-            Self::Urn(urn) => {
-                let existing = urn.f_component().map(ToString::to_string);
-                urn.set_f_component(fragment)?;
-                Ok(existing)
-            }
+            Self::Url(url) => set_url_fragment(url, fragment),
+            Self::Urn(urn) => set_urn_fragment(urn, fragment),
         }
     }
 
-    /// Returns the namespace if the absolute uri is [`Urn`], otherwise returns
-    /// the host for a [`Url`].
+    /// Returns the namespace if the absolute uri is a [`Urn`], otherwise returns
+    /// the authority of the [`Url`].
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {
         match self {
-            Self::Url(url) => {
-                let host = url.host()?;
-                let mut result: Cow<'_, str> = Cow::Owned(host.to_string());
-                if let Some(port) = url.port() {
-                    result = Cow::Owned(format!("{result}:{port}"));
-                }
-                let mut authority = url.username().to_string();
-                if !authority.is_empty() {
-                    if let Some(pass) = url.password() {
-                        authority.push_str(&format!(":{pass}"));
-                    }
-                    result = Cow::Owned(format!("{authority}@{result}"));
-                }
-                Some(result)
-            }
+            Self::Url(url) => get_url_authority(url),
             Self::Urn(urn) => Some(Cow::Borrowed(urn.nid())),
         }
     }
@@ -93,16 +77,8 @@ impl AbsoluteUri {
 
     pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, UrnError> {
         match self {
-            Self::Url(url) => {
-                let path = url.path().to_string();
-                url.set_path(path_or_nss);
-                Ok(path)
-            }
-            Self::Urn(urn) => {
-                let nss = urn.nss().to_string();
-                urn.set_nss(path_or_nss)?;
-                Ok(nss)
-            }
+            Self::Url(url) => Ok(set_url_path(url, path_or_nss)),
+            Self::Urn(urn) => set_urn_nss(urn, path_or_nss),
         }
     }
 
@@ -374,7 +350,11 @@ impl TryIntoAbsoluteUri for &Uri {
 }
 impl TryIntoAbsoluteUri for Uri {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
-        TryIntoAbsoluteUri::try_into_absolute_uri(&self)
+        match self {
+            Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
+            Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
+            Uri::Relative(rel) => AbsoluteUri::parse(rel.as_str()),
+        }
     }
 }
 
@@ -415,29 +395,26 @@ impl RelativeUri {
     ///
     /// Note, fragments are left intact. Use `set_fragment` to change the fragment.
     pub fn set_path(&mut self, path: &str) -> String {
-        let (prev_path, prev_frag) = self.hash_idx.map_or_else(
-            || (self.path.clone(), None),
-            |idx| {
-                (
-                    self.path[..idx].to_string(),
-                    Some(self.path[idx + 1..].to_string()),
-                )
-            },
-        );
-
-        self.path = path.to_string();
-        if let Some(fragment) = prev_frag {
-            self.hash_idx = Some(path.len());
+        let (prev_path, fragment) = self.owned_parts();
+        self.path = utf8_percent_encode(path, URL_PATH).to_string();
+        if let Some(fragment) = fragment {
+            self.hash_idx = Some(self.path.len());
             self.path += "#";
             self.path += &fragment;
         }
-
         prev_path
     }
-
+    fn owned_parts(&self) -> (String, Option<String>) {
+        let Some(hash_idx) = self.hash_idx else { return (self.path.to_string(), None) };
+        (
+            self.path[..hash_idx].to_string(),
+            Some(self.path[hash_idx + 1..].to_string()),
+        )
+    }
     /// Sets the fragment of the `PartialUri` and returns the previous fragment, if
     /// present.
     pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
+        let fragment = fragment.map(|f| utf8_percent_encode(f, URL_FRAGMENT).to_string());
         if let Some(hash_idx) = self.hash_idx {
             let previous = if hash_idx + 1 == self.path.len() {
                 ""
@@ -451,13 +428,10 @@ impl RelativeUri {
             } else {
                 self.path.truncate(hash_idx);
             }
-            if let Some(fragment) = fragment {
-                self.hash_idx = Some(hash_idx);
-                self.path += "#";
-                self.path += fragment;
-            } else {
-                return Some(previous);
-            };
+            let Some(fragment) = fragment else { return Some(previous) };
+            self.hash_idx = Some(hash_idx);
+            self.path += "#";
+            self.path += &fragment;
             Some(previous)
         } else {
             let Some(fragment) = fragment else { return None };
@@ -581,19 +555,11 @@ impl Uri {
     /// # Errors
     /// Returns [`urn::Error`](`urn::Error`) if the `AbsoluteUri` is a
     /// [`Urn`](`urn::Urn`) and the fragment and the fragment fails validation.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<Option<String>, UrnError> {
+    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
         match self {
-            Uri::Url(uri) => {
-                let existing = uri.fragment().map(ToString::to_string);
-                uri.set_fragment(fragment);
-                Ok(existing)
-            }
-            Uri::Urn(urn) => {
-                let existing = urn.f_component().map(ToString::to_string);
-                urn.set_f_component(fragment)?;
-                Ok(existing)
-            }
-            Uri::Relative(rel) => Ok(rel.set_fragment(fragment)),
+            Uri::Url(url) => set_url_fragment(url, fragment),
+            Uri::Urn(urn) => set_urn_fragment(urn, fragment),
+            Uri::Relative(rel) => rel.set_fragment(fragment),
         }
     }
 
@@ -633,23 +599,9 @@ impl Uri {
     /// # Errors
     pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, UrnError> {
         match self {
-            Self::Url(url) => {
-                let path = url.path().to_string();
-                url.set_path(path_or_nss);
-                Ok(path)
-            }
-            Self::Urn(urn) => {
-                let nss = urn.nss().to_string();
-                let fragment = urn.f_component().map(ToString::to_string);
-                urn.set_nss(path_or_nss)?;
-                urn.set_f_component(fragment.as_deref())?;
-                Ok(nss)
-            }
-            Self::Relative(rel) => {
-                let path = rel.path().to_string();
-                rel.set_path(path_or_nss);
-                Ok(path)
-            }
+            Self::Url(url) => Ok(set_url_path(url, path_or_nss)),
+            Self::Urn(urn) => set_urn_nss(urn, path_or_nss),
+            Self::Relative(rel) => Ok(rel.set_path(path_or_nss)),
         }
     }
 
@@ -805,6 +757,50 @@ fn matches_url(value: &str) -> bool {
     }
     false
 }
+
+fn get_url_authority(url: &Url) -> Option<Cow<'_, str>> {
+    let host = url.host()?;
+    let mut result: Cow<'_, str> = Cow::Owned(host.to_string());
+    if let Some(port) = url.port() {
+        result = Cow::Owned(format!("{result}:{port}"));
+    }
+    let mut authority = url.username().to_string();
+    if !authority.is_empty() {
+        if let Some(pass) = url.password() {
+            authority.push_str(&format!(":{pass}"));
+        }
+        result = Cow::Owned(format!("{authority}@{result}"));
+    }
+    Some(result)
+}
+
+fn set_urn_fragment(urn: &mut Urn, fragment: Option<&str>) -> Option<String> {
+    let existing = urn.f_component().map(ToString::to_string);
+    // safety: encode_f_component does not currently return an error.
+    let fragment = fragment.map(encode_f_component).map(Result::unwrap);
+    urn.set_f_component(fragment.as_deref())
+        .expect("fragment should be valid after percent encoding");
+    existing
+}
+
+fn set_url_fragment(url: &mut Url, fragment: Option<&str>) -> Option<String> {
+    let existing = url.fragment().map(ToString::to_string);
+    url.set_fragment(fragment);
+    existing
+}
+
+fn set_urn_nss(urn: &mut Urn, nss: &str) -> Result<String, UrnError> {
+    let existing = urn.nss().to_string();
+    urn.set_nss(&encode_nss(nss)?)?;
+    Ok(existing)
+}
+
+fn set_url_path(url: &mut Url, path: &str) -> String {
+    let existing = url.path().to_string();
+    url.set_path(path);
+    existing
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -896,64 +892,123 @@ mod tests {
             assert_eq!(expected, uri.fragment());
         }
     }
+
     #[test]
     fn test_set_fragment() {
         let tests = [
-            ("https://www.example.com/", None, "https://www.example.com/"),
             (
-                "https://username:password@example.com/path#fraggle-rock",
-                Some("fraggle-rock/back-to-rock"),
-                "https://username:password@example.com/path#fraggle-rock/back-to-rock",
+                "https://www.example.com/",
+                None,
+                None,
+                "https://www.example.com/",
+            ),
+            (
+                "https://username:password@example.com/path#fragment",
+                Some("fragment/nested"),
+                Some("fragment/nested"),
+                "https://username:password@example.com/path#fragment/nested",
             ),
             (
                 "https://example.com/path#with-fragment",
+                None,
                 None,
                 "https://example.com/path",
             ),
             (
                 "urn:example:resource",
                 Some("fragment"),
+                Some("fragment"),
                 "urn:example:resource#fragment",
             ),
+            (
+                "urn:example:resource",
+                Some("some fragment with spaces"),
+                Some("some%20fragment%20with%20spaces"),
+                "urn:example:resource#some%20fragment%20with%20spaces",
+            ),
+            (
+                "https://example.com/path#with-fragment",
+                Some("fragment with spaces"),
+                Some("fragment%20with%20spaces"),
+                "https://example.com/path#fragment%20with%20spaces",
+            ),
         ];
-        for (input, fragment, expected) in tests {
+
+        for (input, fragment, expected_fragment, expected_uri) in tests {
             let mut absolute_uri = AbsoluteUri::parse(input).unwrap();
-            absolute_uri.set_fragment(fragment).unwrap();
-            assert_eq!(expected, absolute_uri.to_string());
-            assert_eq!(fragment, absolute_uri.fragment());
+            absolute_uri.set_fragment(fragment);
+            assert_eq!(expected_uri, absolute_uri.to_string());
+            assert_eq!(expected_fragment, absolute_uri.fragment());
         }
 
         let tests = [
-            ("https://www.example.com/", None, "https://www.example.com/"),
             (
-                "https://username:password@example.com/path#fraggle-rock",
-                Some("fraggle-rock/back-to-rock"),
-                "https://username:password@example.com/path#fraggle-rock/back-to-rock",
+                "https://www.example.com/",
+                None,
+                None,
+                "https://www.example.com/",
+            ),
+            (
+                "https://username:password@example.com/path#fragment",
+                Some("fragment/nested"),
+                Some("fragment/nested"),
+                "https://username:password@example.com/path#fragment/nested",
             ),
             (
                 "https://example.com/path#with-fragment",
+                None,
                 None,
                 "https://example.com/path",
             ),
             (
                 "urn:example:resource",
                 Some("fragment"),
+                Some("fragment"),
                 "urn:example:resource#fragment",
+            ),
+            (
+                "urn:example:resource",
+                Some("some fragment with spaces"),
+                Some("some%20fragment%20with%20spaces"),
+                "urn:example:resource#some%20fragment%20with%20spaces",
+            ),
+            (
+                "https://example.com/path#with-fragment",
+                Some("fragment with spaces"),
+                Some("fragment%20with%20spaces"),
+                "https://example.com/path#fragment%20with%20spaces",
             ),
             (
                 "/partial/path#existing-fragment",
                 Some("new-fragment"),
+                Some("new-fragment"),
                 "/partial/path#new-fragment",
             ),
-            ("#existing-fragment", Some("new-fragment"), "#new-fragment"),
-            ("#existing-fragment", None, ""),
-            ("/partial/path#existing-fragment", None, "/partial/path"),
+            (
+                "#existing-fragment",
+                Some("new-fragment"),
+                Some("new-fragment"),
+                "#new-fragment",
+            ),
+            ("#existing-fragment", None, None, ""),
+            (
+                "/partial/path#existing-fragment",
+                None,
+                None,
+                "/partial/path",
+            ),
+            (
+                "#existing-fragment",
+                Some("new fragment with spaces"),
+                Some("new%20fragment%20with%20spaces"),
+                "#new%20fragment%20with%20spaces",
+            ),
         ];
-        for (input, fragment, expected) in tests {
+        for (input, fragment, expected_fragment, expected_uri) in tests {
             let mut uri = Uri::parse(input).unwrap();
-            uri.set_fragment(fragment).unwrap();
-            assert_eq!(expected, uri.to_string());
-            assert_eq!(fragment, uri.fragment());
+            uri.set_fragment(fragment);
+            assert_eq!(expected_uri, uri.to_string());
+            assert_eq!(expected_fragment, uri.fragment());
         }
     }
     #[test]
@@ -962,77 +1017,116 @@ mod tests {
             (
                 "https://www.example.com",
                 "/new-path",
+                "/new-path",
                 "https://www.example.com/new-path",
             ),
             (
                 "https://username:password@example.com/path#fraggle-rock",
+                "/new-path",
                 "/new-path",
                 "https://username:password@example.com/new-path#fraggle-rock",
             ),
             (
                 "https://example.com/path#with-fragment",
                 "",
+                "/",
                 "https://example.com/#with-fragment",
             ),
             (
                 "urn:example:resource#fragment",
+                "new-resource",
                 "new-resource",
                 "urn:example:new-resource#fragment",
             ),
             (
                 "urn:example:resource",
                 "new-resource",
+                "new-resource",
                 "urn:example:new-resource",
             ),
+            (
+                "https://example.com/",
+                "new path",
+                "/new%20path",
+                "https://example.com/new%20path",
+            ),
+            (
+                "urn:example:resource#fragment",
+                "new resource",
+                "new%20resource",
+                "urn:example:new%20resource#fragment",
+            ),
+            (
+                "urn:example:resource",
+                "some path with spaces",
+                "some%20path%20with%20spaces",
+                "urn:example:some%20path%20with%20spaces",
+            ),
         ];
-        for (input, mut new_path, expected) in tests {
+        for (input, new_path, expected_path, expected) in tests {
             let mut absolute_uri = AbsoluteUri::parse(input).unwrap();
             absolute_uri.set_path_or_nss(new_path).unwrap();
             assert_eq!(expected, absolute_uri.to_string());
-            if new_path.is_empty() {
-                new_path = "/";
-            }
-            assert_eq!(new_path, absolute_uri.path_or_nss());
+            assert_eq!(expected_path, absolute_uri.path_or_nss());
         }
 
         let tests = [
             (
                 "https://www.example.com",
                 "/new-path",
+                "/new-path",
                 "https://www.example.com/new-path",
             ),
             (
                 "https://username:password@example.com/path#fraggle-rock",
+                "/new-path",
                 "/new-path",
                 "https://username:password@example.com/new-path#fraggle-rock",
             ),
             (
                 "https://example.com/path#with-fragment",
                 "",
+                "/",
                 "https://example.com/#with-fragment",
             ),
             (
                 "urn:example:resource#fragment",
+                "new-resource",
                 "new-resource",
                 "urn:example:new-resource#fragment",
             ),
             (
                 "urn:example:resource",
                 "new-resource",
+                "new-resource",
                 "urn:example:new-resource",
             ),
-            ("", "/new-path", "/new-path"),
-            ("/", "/resource", "/resource"),
-            ("/path#fragment", "/new-path", "/new-path#fragment"),
+            ("", "/new-path", "/new-path", "/new-path"),
+            ("/", "/resource", "/resource", "/resource"),
+            (
+                "/path#fragment",
+                "/new-path",
+                "/new-path",
+                "/new-path#fragment",
+            ),
+            (
+                "https://example.com/",
+                "new path",
+                "/new%20path",
+                "https://example.com/new%20path",
+            ),
+            (
+                "urn:example:resource#fragment",
+                "new resource",
+                "new%20resource",
+                "urn:example:new%20resource#fragment",
+            ),
         ];
-        for (input, mut new_path, expected) in tests {
+        for (input, new_path, expected_path, expected) in tests {
             let mut uri = Uri::parse(input).unwrap();
             uri.set_path_or_nss(new_path).unwrap();
             assert_eq!(expected, uri.to_string());
-            if new_path.is_empty() {
-                new_path = "/";
-            }
-            assert_eq!(new_path, uri.path_or_nss());
+            assert_eq!(expected_path, uri.path_or_nss());
         }
     }
 }

@@ -19,7 +19,7 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
 #[allow(clippy::wildcard_imports)]
-mod location;
+pub mod location;
 pub use location::Location;
 
 mod interrogator;
@@ -29,8 +29,7 @@ pub use interrogator::{Builder, Interrogator};
 // pub use uniresid as uri;
 // pub use uniresid::{AbsoluteUri, Uri};
 
-/// A dialect represents the set of keywords and semantics that can be used to
-/// evaluate a schema.
+
 pub mod dialect;
 
 mod scope;

@@ -10,6 +10,7 @@ impl<'v> Detailed<'v> {
     pub fn new(node: Node<'v>) -> Self {
         Self { node }
     }
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.node.is_valid()
     }

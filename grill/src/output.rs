@@ -1,4 +1,4 @@
-//! Output formats, annotations, and errors
+//! Output formats, annotations, and errors.
 //!
 mod node;
 mod structure;
@@ -43,6 +43,7 @@ impl<'v> Output<'v> {
             Structure::Complete => Complete::new(node).into(),
         }
     }
+    #[must_use]
     pub fn structure(&self) -> Structure {
         match self {
             Output::Flag(_) => Structure::Flag,
@@ -52,6 +53,7 @@ impl<'v> Output<'v> {
             Output::Complete(_) => Structure::Complete,
         }
     }
+    #[must_use]
     pub fn absolute_keyword_location(&self) -> Option<&Uri> {
         match self {
             Output::Flag(flag) => None,
@@ -73,37 +75,42 @@ impl<'v> Output<'v> {
     }
 }
 
+impl<'v> std::error::Error for Output<'v> {}
+
+impl Display for Output<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_valid() {
+            return write!(f, "Valid");
+        }
+        write!(f, "{}", self.is_valid()) // TODO: FIX
+    }
+}
+
 impl From<Flag> for Output<'_> {
     fn from(flag: Flag) -> Self {
         Self::Flag(flag)
     }
 }
-impl From<Basic<'_>> for Output<'_> {
-    fn from(basic: Basic<'_>) -> Self {
+impl<'v> From<Basic<'v>> for Output<'v> {
+    fn from(basic: Basic<'v>) -> Self {
         Self::Basic(basic)
     }
 }
 
-impl From<Detailed<'_>> for Output<'_> {
-    fn from(detailed: Detailed<'_>) -> Self {
+impl<'v> From<Detailed<'v>> for Output<'v> {
+    fn from(detailed: Detailed<'v>) -> Self {
         Self::Detailed(detailed)
     }
 }
-impl From<Verbose<'_>> for Output<'_> {
-    fn from(verbose: Verbose<'_>) -> Self {
+impl<'v> From<Verbose<'v>> for Output<'v> {
+    fn from(verbose: Verbose<'v>) -> Self {
         Self::Verbose(verbose)
     }
 }
 
-impl From<Complete<'_>> for Output<'_> {
-    fn from(complete: Complete<'_>) -> Self {
+impl<'v> From<Complete<'v>> for Output<'v> {
+    fn from(complete: Complete<'v>) -> Self {
         Self::Complete(complete)
-    }
-}
-
-impl Display for Output<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.is_valid())
     }
 }
 

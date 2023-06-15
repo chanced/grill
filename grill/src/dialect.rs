@@ -1,3 +1,6 @@
+//! Keywords and semantics that can be used to evaluate a value against a
+//! schema.
+
 use crate::{error::IdentifyError, uri::AbsoluteUri, Handler, Metaschema, Object, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
 use itertools::Itertools;

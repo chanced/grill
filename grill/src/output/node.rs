@@ -1,11 +1,10 @@
+use super::ValidationError;
+use crate::{location::Locate, Location, Uri};
+use inherent::inherent;
 use jsonptr::Pointer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, error::Error, fmt::Display};
-
-use crate::{Location, Uri};
-
-use super::ValidationError;
 
 /// An output node for a given keyword. Contains the keyword's location, sub
 /// annotations and errors, possibly a [`ValidationError`] and any additional
@@ -17,7 +16,7 @@ pub struct Node<'v> {
     /// Additional properties
     additional_properties: BTreeMap<String, Value>,
     /// Validation error
-    error: Option<Box<dyn 'v + ValidationError<'v>>>,
+    error: Option<Box<dyn 'static + ValidationError<'v>>>,
     /// Sub annotations
     annotations: Vec<Node<'v>>,
     /// Sub errors
@@ -25,17 +24,18 @@ pub struct Node<'v> {
 }
 
 impl<'v> Node<'v> {
+    #[must_use]
     pub fn is_valid(&self) -> bool {
-        return self.is_annotation();
+        self.is_annotation()
     }
     #[must_use]
-    pub fn into_owned(&self) -> Node<'static> {
+    pub fn into_owned_box(&self) -> Node<'static> {
         Node {
             location: self.location.clone(),
             additional_properties: self.additional_properties.clone(),
-            error: self.error.clone(),
-            annotations: self.annotations.iter().map(|x| x.into_owned()).collect(),
-            errors: self.errors.iter().map(|x| x.into_owned()).collect(),
+            error: self.error.clone().map(ValidationError::into_owned_box),
+            annotations: self.annotations.iter().map(Node::into_owned_box).collect(),
+            errors: self.errors.iter().map(Node::into_owned_box).collect(),
         }
     }
     #[must_use]
@@ -51,38 +51,38 @@ impl<'v> Node<'v> {
     pub fn additional_properties(&self) -> &BTreeMap<String, Value> {
         &self.additional_properties
     }
-    pub fn insert_additional_property(&mut self, key: String, value: Value) {
-        self.additional_properties.insert(key, value);
+
+    pub fn additional_properties_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        &mut self.additional_properties
     }
+
+    pub fn insert_additional_property(&mut self, key: &str, value: Value) {
+        self.additional_properties.insert(key.to_string(), value);
+    }
+    pub fn remove_additional_property(&mut self, key: &str) {
+        self.additional_properties.remove(key);
+    }
+
     #[must_use]
-    pub fn absolute_keyword_location(&self) -> &Uri {
-        &self.location.absolute_keyword_location()
+    pub fn get_additional_property(&self, key: &str) -> Option<&Value> {
+        self.additional_properties.get(key)
     }
-    #[must_use]
-    pub fn keyword_location(&self) -> &Pointer {
-        self.location.keyword_location()
-    }
-    #[must_use]
-    pub fn instance_location(&self) -> &Pointer {
-        self.location.instance_location()
-    }
-    #[must_use]
-    pub fn location(&self) -> &Location {
-        &self.location
-    }
+
     #[must_use]
     pub fn error(&self) -> Option<&dyn ValidationError<'v>> {
         self.error.as_deref()
     }
 
-    pub fn set_error(&mut self, error: impl 'v + ValidationError<'v>) {
-        self.error = Some(Box::new(error) as Box<dyn 'v + ValidationError<'v>>);
+    pub fn set_error(&mut self, error: impl 'static + ValidationError<'v>) {
+        self.error = Some(Box::new(error) as Box<dyn 'static + ValidationError<'v>>);
     }
 
     #[must_use]
     pub fn errors(&self) -> &[Node<'v>] {
         &self.errors
     }
+
+    #[must_use]
     pub fn annotations(&self) -> &[Node<'v>] {
         &self.annotations
     }
@@ -94,17 +94,26 @@ impl<'v> Node<'v> {
             self.annotations.push(detail);
         }
     }
+
+    pub(crate) fn new(location: Location, value: &Value) -> Node<'_> {
+        todo!()
+    }
 }
+
+#[inherent]
+impl Locate for Node<'_> {
+    #[must_use]
+    pub fn location(&self) -> &Location {
+        &self.location
+    }
+}
+
 impl Display for Node<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(err) = &self.error {
-            write!(f, "{}", err)
+            write!(f, "{err}")
         } else {
-            write!(
-                f,
-                "{} passed evaluation",
-                self.location.absolute_keyword_location()
-            )
+            write!(f, "{} passed evaluation", self.absolute_keyword_location()) // TODO ABSOLUTE KEYWORD LOCATION
         }
     }
 }

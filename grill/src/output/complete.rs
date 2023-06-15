@@ -5,8 +5,9 @@ pub struct Complete<'v> {
 impl<'v> Complete<'v> {
     #[must_use]
     pub fn new(node: super::Node<'v>) -> Self {
-        Self{node}
+        Self { node }
     }
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.node.is_valid()
     }

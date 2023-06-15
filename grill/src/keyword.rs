@@ -336,10 +336,10 @@ impl Keyword<'_> {
     pub const DEFS: Keyword<'static> = Keyword("$defs");
 
     /// ## `definitions`
-    /// Legacy from Draft 07. See [`definitions`](`Object::definitions`).
+    /// Legacy definitions from Draft 07 and earlier.
     ///
     /// ## Note
-    /// If using JSON Schema 07, use this field instead of [`definitions`](`Object::definitions`).
+    /// If using JSON Schema 07 or earlier, use this field instead of [`"$defs"`](`Keyword::DEFS`).
     ///
     /// - [Understanding JSON Schema # `$defs`](https://json-schema.org/understanding-json-schema/structuring.html?highlight=$defs#defs)
     pub const DEFINITIONS_LEGACY: Keyword<'static> = Keyword("definitions");

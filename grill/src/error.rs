@@ -92,7 +92,22 @@ pub enum BuildError {
         source: DeserializeError,
         uri: AbsoluteUri,
     },
+    #[snafu(display("{}", source), context(false))]
+    MissingDialects { source: MissingDialectsError },
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct MissingDialectsError;
+
+impl Display for MissingDialectsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "at least one dialect is required to build an Interrogator; none were provided"
+        )
+    }
+}
+impl std::error::Error for MissingDialectsError {}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]

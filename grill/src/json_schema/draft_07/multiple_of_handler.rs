@@ -52,31 +52,16 @@ impl Display for MultipleOfInvalid<'_> {
 }
 
 impl<'v> ValidationError<'v> for MultipleOfInvalid<'v> {
-    fn into_owned(self) -> Box<dyn ValidationError<'static>> {
-        let MultipleOfInvalid {
-            actual,
-            expected_multiple_of,
-        } = self;
-
+    fn into_owned_box(self: Box<Self>) -> Box<dyn ValidationError<'static>> {
         Box::new(MultipleOfInvalid {
-            expected_multiple_of,
-            actual: Cow::Owned(actual.into_owned()),
+            actual: Cow::Owned(self.actual.into_owned()),
+            expected_multiple_of: self.expected_multiple_of,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use num::{FromPrimitive, Zero};
-    use num_rational::BigRational;
-    use serde_json::{json, Value};
-
-    use crate::{test, Compile, Handler, Location, Scope, State, Structure};
-
-    use super::*;
-
     #[test]
     fn test_multiple_of_setup() {
         // let mut handler = MultipleOfHandler::default();

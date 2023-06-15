@@ -15,7 +15,7 @@ use crate::{
     error::{
         build_error, AbsoluteUriParseError, BuildError, CompileError, DeserializeError,
         DuplicateSourceError, EvaluateError, FragmentedDialectIdError, FragmentedSourceUriError,
-        SourceError, SourceSliceError,
+        MissingDialectsError, SourceError, SourceSliceError,
     },
     graph::DependencyGraph,
     json_schema,
@@ -34,7 +34,6 @@ pub struct Schema {
 }
 
 new_key_type! {
-    /// Reference to a [`CompiledSchema`]
     pub struct SchemaKey;
 }
 
@@ -83,7 +82,7 @@ where
     /// # Example
     /// ```rust
     /// use grill::Interrogator;
-    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
+    /// let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
     /// let source = br#"{"type": "string"}"#;
     /// interrogator.source_slice("https://example.com/schema.json", source).unwrap();
     /// ```
@@ -112,9 +111,7 @@ where
             if src == &source {
                 return Ok(());
             }
-            return Err(SourceError::DuplicateSource {
-                source: DuplicateSourceError { uri, source },
-            });
+            return Err(DuplicateSourceError { uri, source }.into());
         }
         self.sources.insert(uri, source);
         Ok(())
@@ -123,7 +120,7 @@ where
     /// Adds a schema source from a `str`
     /// # Example
     /// ```rust
-    /// let mut interrogator = grill::Interrogator::json_schema().build().unwrap();
+    /// let mut interrogator = grill::Interrogator::json_schema_2020_12().build().unwrap();
     /// interrogator.source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap();
     /// ```
     /// # Errors
@@ -261,22 +258,59 @@ where
         }
         Ok(())
     }
-
-    /// Returns a new, empty [`Builder`].
-    #[must_use]
-    #[allow(unused_must_use)]
-    pub fn builder() -> Builder<Key> {
-        Builder::new()
-    }
 }
 
 impl Interrogator {
-    /// Returns a new [`Builder`] loaded [`Dialect`]s for JSON Schema Drafts
-    /// 2020-12, 2019-09, 7, and 4
+    /// Returns a new, empty [`Builder`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema() -> Builder {
-        Builder::<SchemaKey>::default().json_schema()
+    pub fn builder() -> Builder<SchemaKey> {
+        Builder::new()
+    }
+
+    /// Returns a new [`Builder`] with the JSON Schema Draft 2020-12 [`Dialect`] that is
+    /// set as the default dialect.
+    #[must_use]
+    #[allow(unused_must_use)]
+    pub fn json_schema_2020_12() -> Builder<SchemaKey> {
+        Builder::<SchemaKey>::default()
+            .json_schema_2020_12()
+            .default_dialect(json_schema::json_schema_2020_12_absolute_uri())
+            .unwrap()
+    }
+
+    /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
+    /// set as the default dialect.
+    #[must_use]
+    #[allow(unused_must_use)]
+    pub fn json_schema_2019_09() -> Builder<SchemaKey> {
+        Builder::<SchemaKey>::default()
+            .json_schema_2019_09()
+            .default_dialect(json_schema::json_schema_2019_09_absolute_uri())
+            .unwrap()
+    }
+
+    /// Returns a new [`Builder`] with the JSON Schema Draft 07 [`Dialect`] that is
+    /// set as the default dialect.
+    #[must_use]
+    #[allow(unused_must_use)]
+    pub fn json_schema_07() -> Builder<SchemaKey> {
+        Builder::<SchemaKey>::default()
+            .json_schema_07()
+            .default_dialect(json_schema::json_schema_07_absolute_uri())
+            .unwrap()
+    }
+
+    /// Returns a new [`Builder`] with the JSON Schema Draft 04 [`Dialect`] that is
+    /// set as the default dialect.
+    #[must_use]
+    #[allow(unused_must_use)]
+    pub fn json_schema_04() -> Builder<SchemaKey> {
+        // safety: &AbsoluteUri::try_into_absolute_uri never returns an error
+        Builder::<SchemaKey>::default()
+            .json_schema_04()
+            .default_dialect(json_schema::json_schema_04_absolute_uri())
+            .unwrap()
     }
 }
 
@@ -284,6 +318,7 @@ impl Interrogator {
 pub struct Builder<Key: slotmap::Key = SchemaKey> {
     dialects: Vec<Dialect>,
     sources: Vec<Source>,
+    default_dialect: Option<AbsoluteUri>,
     resolvers: Vec<Box<dyn Resolve>>,
     resolver_lookup: HashMap<any::TypeId, usize>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
@@ -296,11 +331,7 @@ impl Default for Builder<SchemaKey> {
         Self::new()
     }
 }
-
-impl<Key> Builder<Key>
-where
-    Key: slotmap::Key,
-{
+impl Builder<SchemaKey> {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -310,20 +341,84 @@ where
             resolver_lookup: HashMap::new(),
             deserializers: Vec::new(),
             precompile: HashSet::new(),
+            default_dialect: None,
             _marker: std::marker::PhantomData,
         }
     }
+}
+impl<Key> Builder<Key>
+where
+    Key: slotmap::Key,
+{
+    /// Sets a custom key type for schemas within the [`Interrogator`]. The default
+    /// key type is [`grill::SchemaKey`](`SchemaKey`).
+    ///
+    /// This is useful if you have multiple `Interrogator`s and want to ensure that
+    /// keys from one `Interrogator` are not accidentally used in another.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{Interrogator};
+    ///
+    /// slotmap::new_key_type! {
+    ///     pub struct MySchemaKey;
+    /// }
+    /// let mut interrogator = Interrogator::json_schema_2020_12()
+    ///     .key::<MySchemaKey>()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    #[must_use]
+    pub fn key<K>(self) -> Builder<K>
+    where
+        K: slotmap::Key,
+    {
+        Builder {
+            dialects: self.dialects,
+            sources: self.sources,
+            resolvers: self.resolvers,
+            resolver_lookup: self.resolver_lookup,
+            deserializers: self.deserializers,
+            precompile: self.precompile,
+            default_dialect: self.default_dialect,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
     #[must_use]
     pub fn dialect(mut self, dialect: impl Borrow<Dialect>) -> Self {
         self.dialects.push(dialect.borrow().clone());
         self
+    }
+
+    /// Sets the default dialect to use when a `$schema` is not provided.
+    ///
+    /// If not set, the first `Dialect` added to the `Builder` is used.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{Builder, json_schema_2020_12_absolute_uri};
+    ///
+    /// let interrogator = Builder::default()
+    ///     .json_schema_2020_12()
+    ///     .default_dialect(json_schema_2020_12_absolute_uri())
+    ///     .build()
+    ///     .unwrap()
+    /// ```
+    pub fn default_dialect(
+        mut self,
+        dialect: impl TryIntoAbsoluteUri,
+    ) -> Result<Self, AbsoluteUriParseError> {
+        let dialect = dialect.try_into_absolute_uri()?;
+        self.default_dialect = Some(dialect);
+        Ok(self)
     }
     /// Precompiles schemas at the given URIs.
     ///
     /// # Example
     /// ```rust
     /// let interrogator = grill::Builder::default()
-    ///    .json_schema()
+    ///    .json_schema_2020_12()
     ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
     ///    .precompile(["https://example.com/schema.json"]).unwrap()
     ///    .build()
@@ -351,7 +446,7 @@ where
     /// ```rust
     /// use grill::Builder;
     /// let source = br#"{"type": "string"}"#;
-    /// let interrogator = Builder::default().json_schema().build().unwrap()
+    /// let interrogator = Builder::default().json_schema_2020_12().build().unwrap()
     /// interrogator.source_slice("https://example.com/schema.json", ).unwrap();
     /// ```
     /// # Errors
@@ -374,7 +469,7 @@ where
     /// # Example
     /// ```rust
     /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
+    ///     .json_schema_2020_12()
     ///     .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
     ///     .build()
     ///     .unwrap();
@@ -400,7 +495,7 @@ where
     /// use serde_json::json;
     ///
     /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
+    ///     .json_schema_2020_12()
     ///     .source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap()
     ///     .build()
     ///     .unwrap();
@@ -430,7 +525,7 @@ where
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
     /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
+    ///     .json_schema_2020_12()
     ///     .source_strs(sources).unwrap()
     ///     .build()
     ///     .unwrap();
@@ -460,7 +555,7 @@ where
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
     /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
+    ///     .json_schema_2020_12()
     ///     .source_slices(sources).unwrap()
     ///     .build()
     ///     .unwrap();
@@ -497,7 +592,7 @@ where
     /// let source = json!({"type": "string"});
     /// sources.insert("https://example.com/schema.json", source);
     /// let interrogator = grill::Builder::default()
-    ///     .json_schema()
+    ///     .json_schema_2020_12()
     ///     .source_values(sources).unwrap()
     ///     .build()
     ///     .unwrap();
@@ -519,16 +614,6 @@ where
             ));
         }
         Ok(self)
-    }
-
-    /// Adds [`Dialect`]s for JSON Schema Drafts 2020-12, 2019-09, 7, and 4
-    #[must_use]
-    pub fn json_schema(self) -> Builder {
-        Builder::default()
-            .json_schema_2020_12()
-            .json_schema_2019_09()
-            .json_schema_07()
-            .json_schema_04()
     }
 
     /// Adds JSON Schema 04 [`Dialect`]
@@ -593,7 +678,7 @@ where
     /// Inserts a source [`Deserializer`]. If a [`Deserializer`] for the given
     /// format eists, it will be replaced.
     ///
-    /// If a `Deserializer` is not provided prior to building, the default
+    /// If a `Deserializer` is not provided prior to invoking [`build`](`Builder::build`), the default
     /// [`json`] [`Deserializer`] will be added.
     #[must_use]
     pub fn deserializer<R>(mut self, format: &'static str, deserializer: R) -> Self
@@ -619,15 +704,15 @@ where
             resolvers,
             deserializers,
             precompile,
+            default_dialect,
             _marker,
         } = self;
         let dep_graph = DependencyGraph::new();
 
-        let (dialects, dialect_lookup) = Self::get_dialects(dialects)?;
-        let deserializers = Self::get_deserializers(deserializers);
-        let sources = Self::get_sources(sources, &deserializers)?;
-
-        let default_dialect = dialects[0].id.clone();
+        let (dialects, dialect_lookup, default_dialect) =
+            Self::build_dialects(dialects, default_dialect)?;
+        let deserializers = Self::build_deserializers(deserializers);
+        let sources = Self::build_sources(sources, &deserializers)?;
         let schemas: SlotMap<Key, Schema> = SlotMap::with_key();
         let mut interrogator = Interrogator {
             dialects,
@@ -639,13 +724,14 @@ where
             deserializers,
             dep_graph,
         };
+
         for id in precompile {
             interrogator.compile(id)?;
         }
         Ok(interrogator)
     }
 
-    fn get_sources(
+    fn build_sources(
         sources: Vec<Source>,
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
     ) -> Result<HashMap<AbsoluteUri, Value>, BuildError> {
@@ -668,7 +754,7 @@ where
         // }
         Ok(res)
     }
-    fn get_deserializers(
+    fn build_deserializers(
         deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     ) -> Vec<(&'static str, Box<dyn Deserializer>)> {
         if deserializers.is_empty() {
@@ -677,9 +763,27 @@ where
             deserializers
         }
     }
-    fn get_dialects(
+
+    #[allow(clippy::type_complexity)]
+    fn build_dialects(
         dialects: Vec<Dialect>,
-    ) -> Result<(Vec<Dialect>, HashMap<AbsoluteUri, usize>), FragmentedDialectIdError> {
+        default_dialect: Option<AbsoluteUri>,
+    ) -> Result<(Vec<Dialect>, HashMap<AbsoluteUri, usize>, AbsoluteUri), BuildError> {
+        let queue = Self::dialect_queue(dialects)?;
+        if queue.is_empty() {
+            return Err(MissingDialectsError.into());
+        }
+        let mut dialects = Vec::with_capacity(queue.len());
+        let mut lookup = HashMap::with_capacity(queue.len());
+        for dialect in queue.into_iter().rev() {
+            lookup.insert(dialect.id.clone(), dialects.len());
+            dialects.push(dialect);
+        }
+        let default_dialect = default_dialect.unwrap_or(dialects[0].id.clone());
+        Ok((dialects, lookup, default_dialect))
+    }
+
+    fn dialect_queue(dialects: Vec<Dialect>) -> Result<Vec<Dialect>, FragmentedDialectIdError> {
         let mut queue = Vec::with_capacity(dialects.len());
         let mut indexed = HashSet::with_capacity(dialects.len());
         for dialect in dialects.into_iter().rev() {
@@ -697,13 +801,7 @@ where
             queue.push(dialect);
             indexed.insert(id);
         }
-        let mut dialects = Vec::with_capacity(queue.len());
-        let mut lookup = HashMap::with_capacity(queue.len());
-        for dialect in queue.into_iter().rev() {
-            lookup.insert(dialect.id.clone(), dialects.len());
-            dialects.push(dialect);
-        }
-        Ok((dialects, lookup))
+        Ok(queue)
     }
 }
 enum Source {

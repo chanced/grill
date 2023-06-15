@@ -10,11 +10,13 @@ big-rational-str = { version = "0.1.6" }
 dyn-clone        = { version = "1.0.11" }
 erased-serde     = { version = "0.3.25" }
 fancy-regex      = { version = "0.11.0" }
+inherent         = { version = "1" }
 itertools        = { version = "0.10" }
 jsonptr          = { version = "0.4", features = ["url"] }
 num              = { version = "0.4", features = ["serde"] }
 num-rational     = { version = "0.4.1" }
 once_cell        = { version = "1.10" }
+percent-encoding = { version = "2.3" }
 petgraph         = { version = "0.6" }
 reqwest          = { version = "0.11" }
 serde            = { version = "1.0.163", features = ["derive", "rc"] }
