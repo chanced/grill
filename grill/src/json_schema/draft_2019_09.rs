@@ -1,12 +1,9 @@
-use crate::{
-    dialect::{Dialect, Vocabulary},
-    json_schema::identify,
-    uri::AbsoluteUri,
-    Metaschema, Uri,
-};
+use crate::{dialect::Dialect, json_schema::identify, uri::AbsoluteUri, Metaschema, Uri};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
+
+use super::anchors;
 
 pub const JSON_SCHEMA_2019_09_URI_STR: &str = "https://json-schema.org/draft/2019-09/schema";
 pub static JSON_SCHEMA_2019_09_URL: Lazy<Url> =
@@ -52,16 +49,14 @@ pub static JSON_SCHEMA_2019_09: Lazy<Value> =
 pub static JSON_SCHEMA_2019_09_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_2019_09_absolute_uri().clone(),
-        &[Metaschema {
+        [Metaschema {
             id: JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
             schema: JSON_SCHEMA_2019_09.as_object().unwrap().clone(),
         }],
-        &[Vocabulary::new(
-            json_schema_2019_09_absolute_uri(),
-            [super::draft_07::ConstHandler::new()], // TOOD: FIX
-        )],
+        [super::draft_07::ConstHandler::new()], // TOOD: FIX
         is_json_schema_2019_09,
         identify,
+        anchors,
     )
 });
 

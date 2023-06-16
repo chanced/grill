@@ -1,43 +1,124 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
-use crate::{error::IdentifyError, uri::AbsoluteUri, Handler, Metaschema, Object, Uri};
+use crate::{error::IdentifyError, uri::AbsoluteUri, Anchor, Handler, Metaschema, Object, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
-use itertools::Itertools;
+use jsonptr::Pointer;
 use serde_json::Value;
-use std::{borrow::Borrow, collections::HashMap, fmt::Debug, hash::Hash};
+use std::{borrow::Borrow, collections::HashMap, convert::Into, fmt::Debug, hash::Hash};
 
-/// Defines a set of keywords and semantics that can be used to evaluate a
-/// JSON Schema document.
-#[derive(Clone, Debug)]
-pub struct Vocabulary {
-    /// The URI of the vocabulary.
+#[derive(Clone)]
+pub struct Dialect {
+    /// Identifier of the `Dialect`
     pub id: AbsoluteUri,
-    /// Set of handlers for keywords defined by the vocabulary.
+    /// Set of meta schemas which make up the dialect.
+    pub meta_schemas: HashMap<AbsoluteUri, Object>,
+    /// Set of [`Handler`]s defined by the dialect.
     pub handlers: Vec<Handler>,
+    /// Determines whether or not the `Dialect` is applicable to the given schema
+    pub filter: Box<dyn 'static + Match>,
+    /// Identifies the schema if possible
+    pub identify: Box<dyn 'static + Identify>,
+    /// Collects [`Anchor`]s from a [`Value`]
+    pub anchors: Box<dyn 'static + Anchors>,
 }
 
-impl Vocabulary {
-    pub fn new<I, H>(id: &AbsoluteUri, handlers: I) -> Self
+impl Dialect {
+    /// Creates a new [`Dialect`].
+    pub fn new<M, S, I, H>(
+        id: impl Borrow<AbsoluteUri>,
+        meta_schemas: M,
+        handlers: H,
+        filter: impl 'static + Match,
+        identify: impl 'static + Identify,
+        anchors: impl 'static + Anchors,
+    ) -> Self
     where
-        I: IntoIterator<Item = H>,
-        H: Into<Handler>,
+        S: Borrow<Metaschema>,
+        M: IntoIterator<Item = S>,
+        I: Into<Handler>,
+        H: IntoIterator<Item = I>,
     {
-        let id = id.clone();
-        let handlers = handlers
+        let meta_schemas = meta_schemas
             .into_iter()
-            .map(|h| Into::<Handler>::into(h))
-            .collect_vec();
-        Self { id, handlers }
+            .map(|m| {
+                let m = m.borrow();
+                (m.id.clone(), m.schema.clone())
+            })
+            .collect();
+        let handlers = handlers.into_iter().map(Into::into).collect();
+        let id = id.borrow().clone();
+        let filter = Box::new(filter);
+        let identify = Box::new(identify);
+        let anchors = Box::new(anchors);
+        Self {
+            id,
+            meta_schemas,
+            handlers,
+            filter,
+            identify,
+            anchors,
+        }
+    }
+    pub(crate) fn parts(&self) -> Parts {
+        Parts {
+            id: self.id.clone(),
+            handlers: self.handlers.clone(),
+            filter: self.filter.clone(),
+            identify: self.identify.clone(),
+            anchors: self.anchors.clone(),
+        }
+    }
+    pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+        self.identify.identify(schema)
+    }
+
+    #[must_use]
+    pub fn matches(&self, schema: &Value) -> bool {
+        self.filter.matches(schema)
     }
 }
 
-pub trait Filter: Send + Sync + DynClone {
+impl PartialEq for Dialect {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl Hash for Dialect {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+impl Debug for Dialect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dialect")
+            .field("id", &self.id)
+            .field("meta_schemas", &self.meta_schemas)
+            .field("handlers", &self.handlers)
+            .finish_non_exhaustive()
+    }
+}
+
+pub trait Anchors: Send + Sync + DynClone {
+    fn anchors<'v>(&self, path: Pointer, value: &'v Value) -> Vec<Anchor<'v>>;
+}
+clone_trait_object!(Anchors);
+
+impl<F> Anchors for F
+where
+    F: Send + Sync + Clone + Fn(Pointer, &Value) -> Vec<Anchor>,
+{
+    fn anchors<'v>(&self, path: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
+        (self)(path, value)
+    }
+}
+
+pub trait Match: Send + Sync + DynClone {
     fn matches(&self, value: &Value) -> bool;
 }
-clone_trait_object!(Filter);
+clone_trait_object!(Match);
 
-impl<F> Filter for F
+impl<F> Match for F
 where
     F: Fn(&Value) -> bool + Send + Sync + Clone,
 {
@@ -64,61 +145,12 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct Dialect {
-    /// Identifier of the `Dialect`
+pub(crate) struct Parts {
     pub id: AbsoluteUri,
-    /// Set of vocabularies defined by the dialect.
-    pub vocabularies: HashMap<AbsoluteUri, Box<[Handler]>>,
-    /// Set of meta schemas which make up the dialect.
-    pub meta_schemas: HashMap<AbsoluteUri, Object>,
-    /// Determines whether or not the `Dialect` is applicable to the given schema
-    pub filter: Box<dyn 'static + Filter>,
-    /// Identifies the schema if possible
+    pub handlers: Vec<Handler>,
+    pub filter: Box<dyn 'static + Match>,
     pub identify: Box<dyn 'static + Identify>,
-}
-impl PartialEq for Dialect {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-impl Hash for Dialect {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-impl Dialect {
-    /// Creates a new [`Dialect`].
-    pub fn new(
-        id: impl Borrow<AbsoluteUri>,
-        meta_schemas: &[Metaschema],
-        vocabularies: &[Vocabulary],
-        filter: impl 'static + Filter,
-        identify: impl 'static + Identify,
-    ) -> Self {
-        let meta_schemas = meta_schemas
-            .iter()
-            .map(|m| (m.id.clone(), m.schema.clone()))
-            .collect();
-        let vocabularies = vocabularies
-            .iter()
-            .map(|v| (v.id.clone(), Box::from(v.handlers.clone())))
-            .collect();
-
-        Self {
-            id: id.borrow().clone(),
-            meta_schemas,
-            vocabularies,
-            filter: Box::new(filter),
-            identify: Box::new(identify),
-        }
-    }
-    pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
-        self.identify.identify(schema)
-    }
-    pub fn matches(&self, schema: &Value) -> bool {
-        self.filter.matches(schema)
-    }
+    pub anchors: Box<dyn 'static + Anchors>,
 }
 
 // #[cfg(test)]

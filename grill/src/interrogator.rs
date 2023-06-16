@@ -1,10 +1,13 @@
 use std::{
     any::{self},
-    borrow::Borrow,
+    borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
     ops::Deref,
+    str::FromStr,
 };
 
+use either::Either;
+use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use snafu::ResultExt;
@@ -15,8 +18,8 @@ use crate::{
     error::{
         build_error, resolve_error, AbsoluteUriParseError, BuildError, CompileError,
         DeserializeError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
-        FragmentedSourceUriError, IdentifyError, MissingDialectError, ResolveError, ResolveErrors,
-        SourceError, SourceSliceError, UnknownDialectError,
+        FragmentedSourceUriError, MissingDialectError, ResolveError, ResolveErrors, SourceError,
+        SourceSliceError, UnknownDialectError,
     },
     graph::DependencyGraph,
     json_schema,
@@ -56,13 +59,12 @@ where
             return Ok(key);
         }
         let value = self.resolve(&uri).await?;
-        let dialect = self.identify_dialect(value)?;
-
+        let dialect = self.identify_dialect(&value)?;
         todo!()
     }
 
-    fn identify_dialect(&self, schema: &Value) -> Result<Dialect, UnknownDialectError> {
-        for dialect in self.dialects {
+    fn identify_dialect(&self, schema: &Value) -> Result<&Dialect, UnknownDialectError> {
+        for dialect in &self.dialects {
             if dialect.matches(schema) {
                 return Ok(dialect);
             }
@@ -73,7 +75,7 @@ where
             .map(ToString::to_string)
         {
             Some(metaschema_id) => Err(UnknownDialectError { metaschema_id }),
-            None => Ok(self.dialects[self.default_dialect]),
+            None => Ok(&self.dialects[self.default_dialect]),
         }
     }
     pub fn evaluate(
@@ -84,27 +86,35 @@ where
     ) -> Result<Output, EvaluateError> {
         todo!()
     }
+    #[must_use]
     pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
         let key = self.schema_lookup.get(id).copied()?;
         let schema = self.schemas.get(key)?;
         Some((key, schema))
     }
-    pub async fn resolve(
-        &mut self,
-        uri: impl Borrow<AbsoluteUri>,
-    ) -> Result<&Value, ResolveErrors> {
+
+    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, ResolveErrors> {
         let uri = uri.borrow();
         {
             if let Some(schema) = self.resolve_local(uri) {
-                return Ok(schema);
+                return Ok(schema.clone());
             }
         }
         let mut uri_without_fragment = uri.clone();
         uri_without_fragment.set_fragment(None);
-        let value = self.try_resolvers(&uri_without_fragment).await?;
-        let value = self.add_source_value(&uri, value);
+        let resolved = self.try_resolvers(&uri_without_fragment).await?;
+        // self.add_schema_source(&uri_without_fragment, resolved.clone());
+        let frag = uri.fragment().unwrap_or_default();
+        if frag.is_empty() {
+            return Ok(resolved);
+        }
+        let ptr = Pointer::try_from(frag);
+
+        // I don't want to recurse into the object and seek an anchor... hm.
+        //
         todo!()
     }
+
     async fn try_resolvers(&self, uri: &AbsoluteUri) -> Result<Value, ResolveErrors> {
         let mut errors = ResolveErrors::new();
         for resolver in &self.resolvers {
@@ -124,14 +134,10 @@ where
         errors.push(ResolveError::not_found(uri.to_string(), None));
         Err(errors)
     }
-    fn add_source_value(&mut self, uri: &AbsoluteUri, value: Value) -> &Value {
-        let uri = uri.clone();
-        self.sources.insert(uri, value);
-        self.sources.get(&uri).unwrap()
-    }
+
     fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
         let mut error = DeserializeError::new();
-        for (format, deserializer) in self.deserializers {
+        for (format, deserializer) in self.deserializers.iter().cloned() {
             match deserializer.deserialize(data) {
                 Ok(value) => return Ok(value),
                 Err(err) => error.add(format, err),
@@ -818,7 +824,7 @@ where
             dialects.push(dialect);
         }
         let default_dialect = default_dialect.unwrap_or(dialects[0].id.clone());
-        let default_dialect = lookup.get(&default_dialect).copied().ok_or_else(|| {
+        let default_dialect = lookup.get(&default_dialect).copied().ok_or({
             BuildError::DefaultDialectNotFound {
                 uri: default_dialect,
             }
@@ -909,5 +915,25 @@ impl Source {
             }
             Self::Value(_, source) => Ok(source.clone()),
         }
+    }
+}
+
+fn ensure_no_fragment(uri: &AbsoluteUri) -> Result<(), FragmentedSourceUriError> {
+    if let Some(fragment) = uri.fragment() {
+        if !fragment.is_empty() {
+            return Err(FragmentedSourceUriError { uri: uri.clone() });
+        }
+    }
+    Ok(())
+}
+
+fn parse_pointer_or_anchor(
+    fragment: &str,
+) -> Result<Either<Pointer, &str>, jsonptr::MalformedPointerError> {
+    if fragment.starts_with('/') {
+        let ptr = Pointer::from_str(fragment)?;
+        Ok(Either::Left(ptr))
+    } else {
+        Ok(Either::Right(fragment))
     }
 }

@@ -8,15 +8,12 @@ pub use enum_handler::{EnumHandler, EnumInvalid};
 pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
-use crate::{
-    dialect::{Dialect, Vocabulary},
-    json_schema::identify,
-    uri::AbsoluteUri,
-    Metaschema, Uri,
-};
+use crate::{dialect::Dialect, json_schema::identify, uri::AbsoluteUri, Metaschema, Uri};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
+
+use super::anchors;
 
 pub const JSON_SCHEMA_07_URI_STR: &str = "http://json-schema.org/draft-07/schema#";
 pub static JSON_SCHEMA_07_URL: Lazy<Url> =
@@ -48,16 +45,14 @@ pub static JSON_SCHEMA_07: Lazy<Value> =
 pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_07_absolute_uri().clone(),
-        &[Metaschema {
+        [Metaschema {
             id: JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
             schema: JSON_SCHEMA_07.as_object().unwrap().clone(),
         }],
-        &[Vocabulary::new(
-            json_schema_07_absolute_uri(),
-            [ConstHandler::new()],
-        )],
+        [ConstHandler::new()],
         is_json_schema_07,
         identify,
+        anchors,
     )
 });
 

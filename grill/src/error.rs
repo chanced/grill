@@ -149,6 +149,7 @@ pub struct DeserializeError {
     pub formats: HashMap<&'static str, erased_serde::Error>,
 }
 impl DeserializeError {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             formats: HashMap::new(),
@@ -156,6 +157,12 @@ impl DeserializeError {
     }
     pub fn add(&mut self, format: &'static str, err: erased_serde::Error) {
         self.formats.insert(format, err);
+    }
+}
+
+impl Default for DeserializeError {
+    fn default() -> Self {
+        Self::new()
     }
 }
 impl Display for DeserializeError {
@@ -178,6 +185,7 @@ pub struct ResolveErrors {
     pub errors: Vec<ResolveError>,
 }
 impl ResolveErrors {
+    #[must_use]
     pub fn new() -> Self {
         Self { errors: Vec::new() }
     }
@@ -185,18 +193,24 @@ impl ResolveErrors {
         self.errors.push(err);
     }
 }
+
+impl Default for ResolveErrors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Display for ResolveErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "failed to resolve schema")?;
         for err in &self.errors {
-            write!(f, "\n\t{}", err)?;
+            write!(f, "\n\t{err}")?;
         }
         Ok(())
     }
 }
 impl Error for ResolveErrors {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.errors.iter().next().map(|err| err as _)
+        self.errors.first().map(|err| err as _)
     }
 }
 

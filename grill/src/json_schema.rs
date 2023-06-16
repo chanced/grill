@@ -38,12 +38,13 @@ pub use draft_2020_12::{
     json_hyper_schema_2020_12_url, json_schema_2020_12_absolute_uri, json_schema_2020_12_uri,
     json_schema_2020_12_url,
 };
+use jsonptr::{Pointer, Token};
 
-use crate::Keyword;
 use crate::{
     error::{HasFragmentError, IdentifyError, UriParseError},
     Uri,
 };
+use crate::{Anchor, Keyword};
 use serde_json::Value;
 
 /// Identifies JSON Schema Draft 07 through current
@@ -97,6 +98,57 @@ pub fn identify_legacy(schema: &Value) -> Result<Option<Uri>, UriParseError> {
     Ok(Some(Uri::parse(id)?))
 }
 
+/// An implementation of [`Anchors`](`crate::dialect::Anchors`) which recursively traverses a [`Value`]
+/// and returns a [`Vec`] of [`Anchor`]s.
+#[must_use]
+pub fn anchors<'v>(ptr: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
+    let recurse = |(tok, value): (Token, &'v Value)| {
+        let mut ptr = ptr.clone();
+        ptr.push_back(tok);
+        anchors(ptr, value)
+    };
+    match value {
+        Value::Array(arr) => arr
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (k.into(), v))
+            .flat_map(recurse)
+            .collect(),
+        Value::Object(obj) => {
+            let mut results = Vec::new();
+            if let Some(Value::String(anchor)) = obj.get(Keyword::ANCHOR.as_str()) {
+                // TODO: did this get renamed from "anchor" in 04 or 07?
+                results.push(Anchor::Static {
+                    container: value,
+                    name: anchor,
+                    pointer: ptr.clone(),
+                });
+            }
+            if let Some(Value::String(_)) = obj.get(Keyword::RECURSIVE_ANCHOR.as_str()) {
+                results.push(Anchor::Recursive {
+                    container: value,
+                    pointer: ptr.clone(),
+                });
+            }
+            if let Some(Value::String(anchor)) = obj.get(Keyword::DYNAMIC_ANCHOR.as_str()) {
+                results.push(Anchor::Dynamic {
+                    name: anchor.as_str(),
+                    container: value,
+                    pointer: ptr.clone(),
+                });
+            }
+            results.extend(
+                obj.iter()
+                    .filter(|(_, v)| matches!(v, Value::Object(_) | Value::Array(_)))
+                    .map(|(k, v)| (k.into(), v))
+                    .flat_map(recurse),
+            );
+            results
+        }
+        _ => Vec::new(),
+    }
+}
+
 // #[derive(Default)]
 // pub struct JsonSchema<'instance, 'schema, 'state> {
 //     _instance_marker: PhantomData<&'instance ()>,
@@ -112,3 +164,88 @@ pub fn identify_legacy(schema: &Value) -> Result<Option<Uri>, UriParseError> {
 //     type Scope = Scope<'state>;
 //     type Compile = Compile<'schema>;
 // }
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn assert_anchors_contains(anchors: &[Anchor], expected: Anchor) {
+        for anc in anchors {
+            if anc == &expected {
+                return;
+            }
+        }
+        panic!("anchor {expected:?} not found in {anchors:?}");
+    }
+
+    #[test]
+    fn test_anchors() {
+        let fixture = json!({
+            "obj": {
+                "$anchor": "obj-anchor",
+                "$dynamicAnchor": "obj-dynamic-anchor",
+                "$recursiveAnchor": ""
+            },
+            "arr": [
+                {
+                    "$anchor": "arr-anchor-0"
+                },
+                {
+                    "$anchor": "arr-anchor-1"
+                },
+                {
+                    "$anchor": "arr-anchor-2"
+                }
+            ]
+        });
+        let results = anchors(Pointer::default(), &fixture);
+        assert_anchors_contains(
+            &results,
+            Anchor::Static {
+                name: "obj-anchor",
+                pointer: "/obj".try_into().unwrap(),
+                container: fixture.get("obj").unwrap(),
+            },
+        );
+        assert_anchors_contains(
+            &results,
+            Anchor::Dynamic {
+                name: "obj-dynamic-anchor",
+                pointer: "/obj".try_into().unwrap(),
+                container: fixture.get("obj").unwrap(),
+            },
+        );
+        assert_anchors_contains(
+            &results,
+            Anchor::Recursive {
+                pointer: "/obj".try_into().unwrap(),
+                container: fixture.get("obj").unwrap(),
+            },
+        );
+        assert_anchors_contains(
+            &results,
+            Anchor::Static {
+                name: "arr-anchor-0",
+                pointer: "/arr/0".try_into().unwrap(),
+                container: fixture.get("arr").unwrap().get(0).unwrap(),
+            },
+        );
+        assert_anchors_contains(
+            &results,
+            Anchor::Static {
+                name: "arr-anchor-1",
+                pointer: "/arr/1".try_into().unwrap(),
+                container: fixture.get("arr").unwrap().get(1).unwrap(),
+            },
+        );
+        assert_anchors_contains(
+            &results,
+            Anchor::Static {
+                name: "arr-anchor-2",
+                pointer: "/arr/2".try_into().unwrap(),
+                container: fixture.get("arr").unwrap().get(2).unwrap(),
+            },
+        );
+    }
+}

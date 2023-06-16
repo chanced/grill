@@ -895,6 +895,7 @@ impl Keyword<'_> {
     /// - [JSON Schema Validation 2020-12 # 9.5 `"examples"`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#name-examples)
     pub const EXAMPLES: Keyword<'static> = Keyword("examples");
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0
     }

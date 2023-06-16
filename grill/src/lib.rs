@@ -14,11 +14,14 @@
     clippy::needless_pass_by_value,
     clippy::similar_names, 
     clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
-    clippy::missing_errors_doc // TODO: remove when I get around to documenting
+    clippy::missing_errors_doc, // TODO: remove when I get around to documenting
+    clippy::wildcard_imports
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
-#[allow(clippy::wildcard_imports)]
+mod anchor;
+pub use anchor::Anchor;
+
 pub mod location;
 pub use location::Location;
 
