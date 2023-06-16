@@ -98,8 +98,10 @@ pub fn identify_legacy(schema: &Value) -> Result<Option<Uri>, UriParseError> {
     Ok(Some(Uri::parse(id)?))
 }
 
-/// An implementation of [`Anchors`](`crate::dialect::Anchors`) which recursively traverses a [`Value`]
-/// and returns a [`Vec`] of [`Anchor`]s.
+/// An implementation of [`Anchors`](`crate::dialect::Anchors`) which
+/// recursively traverses a [`Value`] and returns a [`Vec`] of [`Anchor`]s for
+/// all `"$anchor"`, `"$recursiveAnchor"`, `"$dynamicAnchor"` anchors.
+///
 #[must_use]
 pub fn anchors<'v>(ptr: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
     let recurse = |(tok, value): (Token, &'v Value)| {
@@ -178,7 +180,14 @@ mod tests {
         }
         panic!("anchor {expected:?} not found in {anchors:?}");
     }
-
+    fn assert_anchors_not_contains_pointer(anchors: &[Anchor], ptr: &str) {
+        for anc in anchors {
+            assert!(
+                !(anc.pointer() == ptr),
+                "Expected anchors not to contain {ptr}"
+            );
+        }
+    }
     #[test]
     fn test_anchors() {
         let fixture = json!({
@@ -196,8 +205,18 @@ mod tests {
                 },
                 {
                     "$anchor": "arr-anchor-2"
-                }
-            ]
+                },
+                {
+                    "nested": {
+                        "$anchor": "nested-anchor",
+                    },
+                },
+            ],
+            "malformed": {
+                "$anchor": {},
+                "$dynamicAnchor": [{}],
+                "$recursiveAnchor": 12
+            }
         });
         let results = anchors(Pointer::default(), &fixture);
         assert_anchors_contains(
@@ -247,5 +266,7 @@ mod tests {
                 container: fixture.get("arr").unwrap().get(2).unwrap(),
             },
         );
+
+        assert_anchors_not_contains_pointer(&results, "/malformed");
     }
 }

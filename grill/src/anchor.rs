@@ -28,6 +28,30 @@ pub enum Anchor<'v> {
 }
 
 impl<'v> Anchor<'v> {
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::Static { name, .. } | Self::Dynamic { name, .. } => Some(name),
+            Self::Recursive { .. } => None,
+        }
+    }
+    #[must_use]
+    pub fn pointer(&self) -> &Pointer {
+        match self {
+            Self::Static { pointer, .. }
+            | Self::Recursive { pointer, .. }
+            | Self::Dynamic { pointer, .. } => pointer,
+        }
+    }
+    #[must_use]
+    pub fn container(&self) -> &Value {
+        match self {
+            Self::Static { container, .. }
+            | Self::Recursive { container, .. }
+            | Self::Dynamic { container, .. } => container, 
+        }
+    }
+
     /// Returns `true` if the anchor is [`Static`].
     ///
     /// [`Static`]: Anchor::Static
