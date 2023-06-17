@@ -13,7 +13,7 @@ use slotmap::{new_key_type, SlotMap};
 use snafu::ResultExt;
 
 use crate::{
-    deserialize::json,
+    deserialize::deserialize_json,
     dialect::Dialect,
     error::{
         build_error, resolve_error, AbsoluteUriParseError, BuildError, CompileError,
@@ -706,21 +706,21 @@ where
     /// Adds JSON source [`Deserializer`] [`deserialize::json`](`crate::deserialize::json`)
     #[must_use]
     pub fn json(self) -> Self {
-        self.deserializer("json", json)
+        self.deserializer("json", deserialize_json)
     }
 
     /// Adds TOML source [`Deserializer`] [`deserialize::toml`](`crate::deserialize::toml`)
     #[cfg(feature = "toml")]
     #[must_use]
     pub fn toml(self) -> Self {
-        self.deserializer("toml", crate::deserialize::toml)
+        self.deserializer("toml", crate::deserialize::deserialize_toml)
     }
 
     /// Adds YAML source [`Deserializer`] [`deserialize::yaml`](`crate::deserialize::yaml`)
     #[cfg(feature = "yaml")]
     #[must_use]
     pub fn yaml(self) -> Self {
-        self.deserializer("yaml", crate::deserialize::yaml)
+        self.deserializer("yaml", crate::deserialize::deserialize_yaml)
     }
 
     /// Inserts a source [`Deserializer`]. If a [`Deserializer`] for the given
@@ -802,7 +802,7 @@ where
         deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     ) -> Vec<(&'static str, Box<dyn Deserializer>)> {
         if deserializers.is_empty() {
-            vec![("json", Box::new(json))]
+            vec![("json", Box::new(deserialize_json))]
         } else {
             deserializers
         }
