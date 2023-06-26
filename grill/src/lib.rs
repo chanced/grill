@@ -64,8 +64,7 @@ pub mod json_schema;
 pub mod deserialize;
 pub use deserialize::Deserializer;
 
-mod keyword;
-pub use keyword::Keyword;
+pub mod keyword;
 
 mod schema;
 pub use schema::{Schema, SchemaKey};

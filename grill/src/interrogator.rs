@@ -18,13 +18,14 @@ use crate::{
     error::{
         build_error, resolve_error, AbsoluteUriParseError, BuildError, CompileError,
         DeserializeError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
-        FragmentedSourceUriError, MissingDialectError, ResolveError, ResolveErrors, SourceError,
+        FragmentedUriError, MissingDialectError, ResolveError, ResolveErrors, SourceError,
         SourceSliceError, UnknownDialectError,
     },
     graph::DependencyGraph,
     json_schema,
+    keyword::Keyword,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Deserializer, Handler, Keyword, Output, Resolve, Schema, SchemaKey, Structure,
+    Deserializer, Handler, Output, Resolve, Schema, SchemaKey, Structure,
 };
 
 /// Compiles and evaluates JSON Schemas.
@@ -784,7 +785,7 @@ where
             let uri = src.uri();
             if let Some(fragment) = uri.fragment() {
                 if !fragment.is_empty() {
-                    return Err(FragmentedSourceUriError { uri }.into());
+                    return Err(FragmentedUriError { uri }.into());
                 }
             }
             let src = src
@@ -918,10 +919,10 @@ impl Source {
     }
 }
 
-fn ensure_no_fragment(uri: &AbsoluteUri) -> Result<(), FragmentedSourceUriError> {
+fn ensure_no_fragment(uri: &AbsoluteUri) -> Result<(), FragmentedUriError> {
     if let Some(fragment) = uri.fragment() {
         if !fragment.is_empty() {
-            return Err(FragmentedSourceUriError { uri: uri.clone() });
+            return Err(FragmentedUriError { uri: uri.clone() });
         }
     }
     Ok(())

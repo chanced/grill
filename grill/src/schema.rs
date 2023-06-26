@@ -1,6 +1,7 @@
+use serde_json::Value;
 use slotmap::new_key_type;
 
-use crate::{AbsoluteUri, Handler};
+use crate::{AbsoluteUri, Handler, keyword::Keyword};
 
 new_key_type! {
     pub struct SchemaKey;

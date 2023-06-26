@@ -2,7 +2,7 @@
 //!
 //! Validation errors are defined within their respective keyword's module.
 
-use crate::{uri::AbsoluteUri, Location, Output, Uri};
+use crate::{keyword::Keyword, uri::AbsoluteUri, Location, Output, Uri};
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
 use snafu::Snafu;
@@ -22,18 +22,62 @@ pub struct DuplicateSourceError {
     pub source: Value,
 }
 
+#[derive(Debug, Snafu)]
+pub enum LocateSchemasError {}
+
+/// The inner error of a [`MalformedAnchorError`].
+#[derive(Debug, Clone)]
+pub struct AnchorError {
+    pub location: AbsoluteUri,
+    pub anchor: String,
+    pub keyword: Keyword<'static>,
+}
+impl Display for AnchorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "anchor \"{}\" at \"{}\" is malformed",
+            self.anchor, self.location
+        )
+    }
+}
+impl std::error::Error for AnchorError {}
+
+#[derive(Debug, Snafu, Clone)]
+/// An `$anchor` or `$dynamicAnchor` is malformed
+pub enum MalformedAnchorError {
+    /// an `$anchor` or `$dynamicAnchor` must not be empty
+    #[snafu(display("{} must not be empty", source.keyword), context(false))]
+    Empty { source: AnchorError },
+    /// `$anchor` and `$dynamicAnchor` must start with either a letter
+    /// (`([A-Za-z])`) or an underscore (`_`).
+    #[snafu(display("{} must start with either a letter (([A-Za-z])) or an underscore (_); found {} for {} at {}", source.keyword, character, source.anchor, source.location))]
+    InvalidLeadingCharacter {
+        source: AnchorError,
+        character: char,
+    },
+    /// `$anchor` and `$dynamicAnchor` may only contain letters (`([A-Za-z])`),
+    /// digits (`[0-9]`), hyphens (`'-'`), underscores (`'_'`), and periods
+    /// (`'.'`).
+    #[snafu(display("{} may only contain letters([A-Za-z]) digits ([0-9]), hyphens ('-'), underscores ('_') and periods ('.'); found {} for {} at {}", source.keyword, character, source.anchor, source.location))]
+    InvalidCharacter {
+        source: AnchorError,
+        character: char,
+    },
+}
+
 #[derive(Debug)]
-pub struct FragmentedSourceUriError {
+pub struct FragmentedUriError {
     pub uri: AbsoluteUri,
 }
-impl FragmentedSourceUriError {
+impl FragmentedUriError {
     #[must_use]
     pub fn new(uri: AbsoluteUri) -> Self {
         Self { uri }
     }
 }
 
-impl Display for FragmentedSourceUriError {
+impl Display for FragmentedUriError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -42,7 +86,7 @@ impl Display for FragmentedSourceUriError {
         )
     }
 }
-impl Error for FragmentedSourceUriError {}
+impl Error for FragmentedUriError {}
 
 impl Display for DuplicateSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -82,7 +126,7 @@ pub enum BuildError {
     #[snafu(display("duplicate dialect id: {}", source), context(false))]
     DuplicateSource { source: DuplicateSourceError },
     #[snafu(display("{}", source), context(false))]
-    FragmentedSourceUri { source: FragmentedSourceUriError },
+    FragmentedSourceUri { source: FragmentedUriError },
     #[snafu(display("{}", source), context(false))]
     FragmentedDialectId { source: FragmentedDialectIdError },
     #[snafu(display("failed to parse uri: {}", source), context(false))]
@@ -503,3 +547,21 @@ where
     }
 }
 impl<U> Error for HasFragmentError<U> where U: std::fmt::Debug + Display + PartialEq + Eq {}
+
+#[derive(Clone, Debug)]
+pub struct DialectNotFoundError {
+    pub dialect_id: AbsoluteUri,
+}
+impl Display for DialectNotFoundError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "dialect not found: {}", self.dialect_id)
+    }
+}
+impl std::error::Error for DialectNotFoundError {}
+
+impl DialectNotFoundError {
+    #[must_use]
+    pub fn new(dialect_id: AbsoluteUri) -> Self {
+        Self { dialect_id }
+    }
+}

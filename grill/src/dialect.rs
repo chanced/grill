@@ -1,11 +1,29 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
-use crate::{error::IdentifyError, uri::AbsoluteUri, Anchor, Handler, Metaschema, Object, Uri};
-use dyn_clone::{clone_trait_object, DynClone};
+mod identify_schema;
+mod is_schema;
+mod locate_schemas;
+
+pub use identify_schema::IdentifySchema;
+pub use is_schema::IsSchema;
 use jsonptr::Pointer;
+pub use locate_schemas::{LocateSchemas, LocatedSchema};
+
+use crate::{
+    error::{IdentifyError, LocateSchemasError},
+    keyword::{Keyword, SchemaKeyword},
+    uri::AbsoluteUri,
+    Handler, Metaschema, Object, Uri,
+};
 use serde_json::Value;
-use std::{borrow::Borrow, collections::HashMap, convert::Into, fmt::Debug, hash::Hash};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    convert::Into,
+    fmt::Debug,
+    hash::Hash,
+};
 
 #[derive(Clone)]
 pub struct Dialect {
@@ -16,28 +34,33 @@ pub struct Dialect {
     /// Set of [`Handler`]s defined by the dialect.
     pub handlers: Vec<Handler>,
     /// Determines whether or not the `Dialect` is applicable to the given schema
-    pub filter: Box<dyn 'static + Match>,
+    pub is_schema: Box<dyn 'static + IsSchema>,
     /// Identifies the schema if possible
-    pub identify: Box<dyn 'static + Identify>,
+    pub identify_schema: Box<dyn 'static + IdentifySchema>,
     /// Collects [`Anchor`]s from a [`Value`]
-    pub anchors: Box<dyn 'static + Anchors>,
+    pub locate_schemas: Box<dyn 'static + LocateSchemas>,
+    /// Keywords in the `Dialect` which may contain one or more schemas, be that
+    /// as a direct value, a value in an array, or a property on an object.
+    pub schema_properties: HashMap<Keyword<'static>, SchemaKeyword<'static>>,
 }
 
 impl Dialect {
     /// Creates a new [`Dialect`].
-    pub fn new<M, S, I, H>(
+    pub fn new<M, S, I, H, K>(
         id: impl Borrow<AbsoluteUri>,
         meta_schemas: M,
+        schema_fields: K,
         handlers: H,
-        filter: impl 'static + Match,
-        identify: impl 'static + Identify,
-        anchors: impl 'static + Anchors,
+        is_schema: impl 'static + IsSchema,
+        identify_schema: impl 'static + IdentifySchema,
+        locate_schema: impl 'static + LocateSchemas,
     ) -> Self
     where
         S: Borrow<Metaschema>,
         M: IntoIterator<Item = S>,
         I: Into<Handler>,
         H: IntoIterator<Item = I>,
+        K: IntoIterator<Item = SchemaKeyword<'static>>,
     {
         let meta_schemas = meta_schemas
             .into_iter()
@@ -48,34 +71,93 @@ impl Dialect {
             .collect();
         let handlers = handlers.into_iter().map(Into::into).collect();
         let id = id.borrow().clone();
-        let filter = Box::new(filter);
-        let identify = Box::new(identify);
-        let anchors = Box::new(anchors);
+        let filter = Box::new(is_schema);
+        let identify = Box::new(identify_schema);
+        let anchors = Box::new(locate_schema);
+        let keywords_containing_schemas = schema_fields
+            .into_iter()
+            .map(|prop| (prop.keyword(), prop))
+            .collect();
+
         Self {
             id,
             meta_schemas,
+            schema_properties: keywords_containing_schemas,
             handlers,
-            filter,
-            identify,
-            anchors,
+            is_schema: filter,
+            identify_schema: identify,
+            locate_schemas: anchors,
         }
     }
     pub(crate) fn parts(&self) -> Parts {
         Parts {
             id: self.id.clone(),
             handlers: self.handlers.clone(),
-            filter: self.filter.clone(),
-            identify: self.identify.clone(),
-            anchors: self.anchors.clone(),
+            filter: self.is_schema.clone(),
+            identify: self.identify_schema.clone(),
+            anchors: self.locate_schemas.clone(),
         }
     }
     pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
-        self.identify.identify(schema)
+        self.identify_schema.identify_schema(schema)
+    }
+    #[must_use]
+    pub fn can_keyword_contain_schemas(&self, property: Keyword) -> bool {
+        self.schema_properties.contains_key(&property)
+    }
+
+    /// Returns `true` if the path may contain one or more schemas. This assumes
+    /// that the path starts at the root of a schema.
+    #[must_use]
+    pub fn is_schema_property(&self, path: &Pointer) -> bool {
+        let mut iter = path.into_iter().peekable();
+        while let Some(tok) = iter.next() {
+            let Some(prop) = self.schema_properties.get(&Keyword(tok.decoded())) else { return false };
+            match prop {
+                SchemaKeyword::Array(_) => {
+                    let Some(next) = iter.next() else { return false};
+                    if next.parse::<usize>().is_err() {
+                        return false;
+                    }
+                }
+                SchemaKeyword::Map(_) => {
+                    let next = iter.next();
+                    if next.is_none() {
+                        return false;
+                    };
+                }
+                SchemaKeyword::SingleOrArray(_) => {
+                    if let Some(next) = iter.peek() {
+                        if self.schema_properties.contains_key(&Keyword(next)) {
+                            continue;
+                        }
+                        let next = iter.next().unwrap();
+                        if next.parse::<usize>().is_err() {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                SchemaKeyword::Single(_) => continue,
+            }
+        }
+        true
     }
 
     #[must_use]
     pub fn matches(&self, schema: &Value) -> bool {
-        self.filter.matches(schema)
+        self.is_schema.is_schema(schema)
+    }
+
+    pub fn locate_schemas<'v>(
+        &self,
+        path: Pointer,
+        value: &'v Value,
+        dialects: Dialects,
+        base_uri: &AbsoluteUri,
+    ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
+        self.locate_schemas
+            .locate_schemas(path, value, dialects, base_uri)
     }
 }
 
@@ -98,59 +180,64 @@ impl Debug for Dialect {
             .finish_non_exhaustive()
     }
 }
-
-pub trait Anchors: Send + Sync + DynClone {
-    fn anchors<'v>(&self, path: Pointer, value: &'v Value) -> Vec<Anchor<'v>>;
+#[derive(Debug, Clone, Copy)]
+pub struct Dialects<'d> {
+    dialects: &'d [&'d Dialect],
+    default_dialect: usize,
 }
-clone_trait_object!(Anchors);
 
-impl<F> Anchors for F
-where
-    F: Send + Sync + Clone + Fn(Pointer, &Value) -> Vec<Anchor>,
-{
-    fn anchors<'v>(&self, path: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
-        (self)(path, value)
+impl<'d> Dialects<'d> {
+    #[must_use]
+    pub fn new(dialects: &'d [&'d Dialect], default_dialect: &'d Dialect) -> Self {
+        let mut this = Self {
+            dialects,
+            default_dialect: 0,
+        };
+        this.set_default_dialect_index(this.position(default_dialect).unwrap());
+        this
     }
-}
-
-pub trait Match: Send + Sync + DynClone {
-    fn matches(&self, value: &Value) -> bool;
-}
-clone_trait_object!(Match);
-
-impl<F> Match for F
-where
-    F: Fn(&Value) -> bool + Send + Sync + Clone,
-{
-    fn matches(&self, value: &Value) -> bool {
-        (self)(value)
+    /// Sets the default [`Dialect`] to use when no other [`Dialect`] matches.
+    ///
+    /// # Panics
+    /// Panics if the default dialect is not in the list of dialects.
+    pub fn set_default_dialect_index(&mut self, dialect: usize) {
+        assert!(dialect < self.dialects.len());
+        self.default_dialect = dialect;
     }
-}
-pub trait Identify: Send + Sync + DynClone {
-    /// Identifies a schema
-    /// # Errors
-    /// Returns [`IdentifyError`] if `schema`:
-    ///   * The identity fails to parse as a [`Uri`]
-    ///   * The identity contains a fragment (e.g. `"https://example.com/example#fragment"`)
-    fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError>;
-}
-clone_trait_object!(Identify);
-
-impl<F> Identify for F
-where
-    F: Clone + Send + Sync + Fn(&Value) -> Result<Option<Uri>, IdentifyError>,
-{
-    fn identify(&self, value: &Value) -> Result<Option<Uri>, IdentifyError> {
-        (self)(value)
+    #[must_use]
+    pub fn default_dialect(&self) -> &'d Dialect {
+        self.dialects[self.default_dialect]
+    }
+    /// Returns the index of the given [`Dialect`] in the list of [`Dialect`]s.
+    #[must_use]
+    pub fn position(&self, dialect: &Dialect) -> Option<usize> {
+        self.dialects.iter().position(|d| *d == dialect)
+    }
+    #[must_use]
+    pub fn get(&self, idx: usize) -> Option<&'d Dialect> {
+        self.dialects.get(idx).copied()
+    }
+    #[must_use]
+    pub fn dialect_index_for(&self, schema: &Value) -> usize {
+        let default = self.default_dialect();
+        if default.matches(schema) {
+            return self.default_dialect;
+        }
+        for (idx, dialect) in self.dialects.iter().enumerate() {
+            if dialect.id != default.id && dialect.matches(schema) {
+                return idx;
+            }
+        }
+        self.default_dialect
     }
 }
 
 pub(crate) struct Parts {
     pub id: AbsoluteUri,
     pub handlers: Vec<Handler>,
-    pub filter: Box<dyn 'static + Match>,
-    pub identify: Box<dyn 'static + Identify>,
-    pub anchors: Box<dyn 'static + Anchors>,
+    pub filter: Box<dyn 'static + IsSchema>,
+    pub identify: Box<dyn 'static + IdentifySchema>,
+    pub anchors: Box<dyn 'static + LocateSchemas>,
 }
 
 // #[cfg(test)]
@@ -210,4 +297,18 @@ pub(crate) struct Parts {
 //     }
 // }
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::json_schema::draft_2019_09::JSON_SCHEMA_2019_09_DIALECT;
+
+    #[test]
+    fn test_is_is_schema_property() {
+        let d = JSON_SCHEMA_2019_09_DIALECT.clone();
+        let ptr = |s: &str| s.try_into().unwrap();
+        assert!(d.is_schema_property(&ptr("/properties/prop/items/0/$defs/nested")));
+        assert!(d.is_schema_property(&ptr("/properties/prop/items/$defs/nested")));
+        assert!(d.is_schema_property(&ptr("/anyOf/3/if/$defs/nested/prefixItems/0")));
+        assert!(!d.is_schema_property(&ptr("/anyOf/invalid/if/$defs/nested/prefixItems/34")));
+        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested/prefixItems/21")));
+        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested///")));
+    }
+}

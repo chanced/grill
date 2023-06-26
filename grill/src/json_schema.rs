@@ -41,114 +41,118 @@ pub use draft_2020_12::{
 use jsonptr::{Pointer, Token};
 
 use crate::{
-    error::{HasFragmentError, IdentifyError, UriParseError},
-    Uri,
+    dialect::{Dialect, Dialects, LocatedSchema},
+    error::{HasFragmentError, IdentifyError, LocateSchemasError, UriParseError},
+    AbsoluteUri, Array, Uri,
 };
-use crate::{Anchor, Keyword};
+use crate::{keyword::Keyword, Anchor};
 use serde_json::Value;
 
-/// Identifies JSON Schema Draft 07 through current
-///
-///
-/// # Example
-/// ```
-/// use grill::{Uri, json_schema::identify};
-/// use serde_json::json;
-/// let schema = json!({
-///     "$schema": "https://json-schema.org/draft/2020-12/schema",
-///     "$id": "https://example.com/example"
-/// });
-/// let expected_id = Uri::parse("https://example.com/example").unwrap();
-/// assert_eq!(identify(&schema), Ok(Some(expected_id)))
-/// ```
-/// # Errors
-/// Returns [`IdentifyError`] if `schema`:
-///   * has an `"$id"` field which can not be parsed as a [`Uri`]
-///   * The [`Uri`] parsed from`"$id"` contains a non-empty fragment (i.e. `"https://example.com/example#fragment"`)
-pub fn identify(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
-    let Some(id) = schema.get(Keyword::ID.as_ref()).and_then(Value::as_str) else { return Ok(None) };
-    let uri = Uri::parse(id)?;
-    let Some(fragment) = uri.fragment() else { return Ok(Some(uri))};
-    if fragment.is_empty() {
-        Ok(Some(uri))
-    } else {
-        Err(IdentifyError::HasFragment {
-            source: HasFragmentError { uri },
+fn ident_schema_location_by_anchor<'v>(
+    path: Pointer,
+    value: &'v Value,
+    base_uri: &AbsoluteUri,
+) -> Option<LocatedSchema<'v>> {
+    let Some(Value::String(anchor)) = value.get(Keyword::ANCHOR.as_str()) else { return None };
+    if anchor.is_empty() {
+        return None;
+    }
+    let mut uri = base_uri.clone();
+    uri.set_fragment(Some(anchor));
+    Some(LocatedSchema {
+        uri,
+        value,
+        path,
+        keyword: Keyword::ANCHOR,
+    })
+}
+
+// removed for now: https://json-schema.slack.com/archives/CT8QRGTK5/p1687528273221999
+// fn append_nested_named_locations(located_schemas: &mut Vec<LocatedSchema>, base_uri: &AbsoluteUri) {
+//     let mut append = Vec::new();
+//     for located in located_schemas.iter() {
+//         if located.uri.authority_or_namespace() != base_uri.authority_or_namespace()
+//             || located.uri.path_or_nss() != base_uri.path_or_nss()
+//         {
+//             if let Some(fragment) = located.uri.fragment() {
+//                 if !fragment.is_empty() && !fragment.starts_with('/') {
+//                     let mut uri = base_uri.clone();
+//                     uri.set_fragment(Some(fragment));
+//                     append.push(LocatedSchema {
+//                         uri,
+//                         value: located.value,
+//                         path: located.path.clone(),
+//                         keyword: located.keyword,
+//                     });
+//                 }
+//             }
+//         }
+//     }
+//     located_schemas.append(&mut append);
+// }
+
+fn locate_schemas_in_array<'v>(
+    path: Pointer,
+    arr: &'v Array,
+    dialects: Dialects,
+    base_uri: &AbsoluteUri,
+) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
+    let located = arr
+        .iter()
+        .enumerate()
+        .map(|(key, value)| {
+            let tok = key.into();
+            let mut path = path.clone();
+            path.push_back(tok);
+            dialects
+                .default_dialect()
+                .locate_schemas(path, value, dialects, base_uri)
         })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    Ok(located)
+}
+
+fn identify_schema_location_by_id<'v>(
+    path: &Pointer,
+    value: &'v Value,
+    base_uri: &AbsoluteUri,
+    dialect: &Dialect,
+) -> Option<(LocatedSchema<'v>, LocatedSchema<'v>)> {
+    // Only identified schemas are indexed initially. If a handler needs an
+    // unidentified schema, it will be indexed upon use as part of the `compile`
+    // step for a handler.
+    let Ok(Some(id)) = dialect.identify(value) else { return None};
+    let path = path.clone();
+    let mut uri = base_uri.clone();
+    if !path.is_empty() {
+        uri.set_fragment(Some(&path));
     }
-}
-
-/// Identifies JSON Schema Draft 04 and earlier.
-///
-/// # Example
-/// ```
-/// use grill::{Uri, json_schema::identify_legacy};
-/// use serde_json::json;
-/// let schema = json!({
-///     "$schema": "https://json-schema.org/draft/2020-12/schema",
-///     "id": "https://example.com/example"
-/// });
-/// let expected_id = Uri::parse("https://example.com/example").unwrap();
-/// assert_eq!(identify_legacy(&schema), Ok(Some(expected_id)))
-/// ```
-/// # Errors
-/// Returns [`UriParseError`] if `schema` has an `"id"` field which can not be parsed as a [`Uri`]
-pub fn identify_legacy(schema: &Value) -> Result<Option<Uri>, UriParseError> {
-    let Some(id) = schema.get(Keyword::ID_LEGACY.as_ref()).and_then(Value::as_str) else { return Ok(None)};
-    Ok(Some(Uri::parse(id)?))
-}
-
-/// An implementation of [`Anchors`](`crate::dialect::Anchors`) which
-/// recursively traverses a [`Value`] and returns a [`Vec`] of [`Anchor`]s for
-/// all `"$anchor"`, `"$recursiveAnchor"`, `"$dynamicAnchor"` anchors.
-///
-#[must_use]
-pub fn anchors<'v>(ptr: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
-    let recurse = |(tok, value): (Token, &'v Value)| {
-        let mut ptr = ptr.clone();
-        ptr.push_back(tok);
-        anchors(ptr, value)
+    let by_ptr = LocatedSchema {
+        keyword: Keyword::ID,
+        path: path.clone(),
+        uri,
+        value,
     };
-    match value {
-        Value::Array(arr) => arr
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k.into(), v))
-            .flat_map(recurse)
-            .collect(),
-        Value::Object(obj) => {
-            let mut results = Vec::new();
-            if let Some(Value::String(anchor)) = obj.get(Keyword::ANCHOR.as_str()) {
-                // TODO: did this get renamed from "anchor" in 04 or 07?
-                results.push(Anchor::Static {
-                    container: value,
-                    name: anchor,
-                    pointer: ptr.clone(),
-                });
-            }
-            if let Some(Value::String(_)) = obj.get(Keyword::RECURSIVE_ANCHOR.as_str()) {
-                results.push(Anchor::Recursive {
-                    container: value,
-                    pointer: ptr.clone(),
-                });
-            }
-            if let Some(Value::String(anchor)) = obj.get(Keyword::DYNAMIC_ANCHOR.as_str()) {
-                results.push(Anchor::Dynamic {
-                    name: anchor.as_str(),
-                    container: value,
-                    pointer: ptr.clone(),
-                });
-            }
-            results.extend(
-                obj.iter()
-                    .filter(|(_, v)| matches!(v, Value::Object(_) | Value::Array(_)))
-                    .map(|(k, v)| (k.into(), v))
-                    .flat_map(recurse),
-            );
-            results
+    let uri = match id {
+        Uri::Url(url) => AbsoluteUri::Url(url),
+        Uri::Urn(urn) => AbsoluteUri::Urn(urn),
+        Uri::Relative(rel) => {
+            let mut base = base_uri.clone();
+            base.set_path_or_nss(rel.path()).unwrap();
+            base.set_fragment(None);
+            base
         }
-        _ => Vec::new(),
-    }
+    };
+    let by_id = LocatedSchema {
+        keyword: Keyword::ID,
+        path,
+        uri,
+        value,
+    };
+    Some((by_ptr, by_id))
 }
 
 // #[derive(Default)]
@@ -167,106 +171,4 @@ pub fn anchors<'v>(ptr: Pointer, value: &'v Value) -> Vec<Anchor<'v>> {
 //     type Compile = Compile<'schema>;
 // }
 #[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::*;
-
-    fn assert_anchors_contains(anchors: &[Anchor], expected: Anchor) {
-        for anc in anchors {
-            if anc == &expected {
-                return;
-            }
-        }
-        panic!("anchor {expected:?} not found in {anchors:?}");
-    }
-    fn assert_anchors_not_contains_pointer(anchors: &[Anchor], ptr: &str) {
-        for anc in anchors {
-            assert!(
-                !(anc.pointer() == ptr),
-                "Expected anchors not to contain {ptr}"
-            );
-        }
-    }
-    #[test]
-    fn test_anchors() {
-        let fixture = json!({
-            "obj": {
-                "$anchor": "obj-anchor",
-                "$dynamicAnchor": "obj-dynamic-anchor",
-                "$recursiveAnchor": ""
-            },
-            "arr": [
-                {
-                    "$anchor": "arr-anchor-0"
-                },
-                {
-                    "$anchor": "arr-anchor-1"
-                },
-                {
-                    "$anchor": "arr-anchor-2"
-                },
-                {
-                    "nested": {
-                        "$anchor": "nested-anchor",
-                    },
-                },
-            ],
-            "malformed": {
-                "$anchor": {},
-                "$dynamicAnchor": [{}],
-                "$recursiveAnchor": 12
-            }
-        });
-        let results = anchors(Pointer::default(), &fixture);
-        assert_anchors_contains(
-            &results,
-            Anchor::Static {
-                name: "obj-anchor",
-                pointer: "/obj".try_into().unwrap(),
-                container: fixture.get("obj").unwrap(),
-            },
-        );
-        assert_anchors_contains(
-            &results,
-            Anchor::Dynamic {
-                name: "obj-dynamic-anchor",
-                pointer: "/obj".try_into().unwrap(),
-                container: fixture.get("obj").unwrap(),
-            },
-        );
-        assert_anchors_contains(
-            &results,
-            Anchor::Recursive {
-                pointer: "/obj".try_into().unwrap(),
-                container: fixture.get("obj").unwrap(),
-            },
-        );
-        assert_anchors_contains(
-            &results,
-            Anchor::Static {
-                name: "arr-anchor-0",
-                pointer: "/arr/0".try_into().unwrap(),
-                container: fixture.get("arr").unwrap().get(0).unwrap(),
-            },
-        );
-        assert_anchors_contains(
-            &results,
-            Anchor::Static {
-                name: "arr-anchor-1",
-                pointer: "/arr/1".try_into().unwrap(),
-                container: fixture.get("arr").unwrap().get(1).unwrap(),
-            },
-        );
-        assert_anchors_contains(
-            &results,
-            Anchor::Static {
-                name: "arr-anchor-2",
-                pointer: "/arr/2".try_into().unwrap(),
-                container: fixture.get("arr").unwrap().get(2).unwrap(),
-            },
-        );
-
-        assert_anchors_not_contains_pointer(&results, "/malformed");
-    }
-}
+mod tests {}

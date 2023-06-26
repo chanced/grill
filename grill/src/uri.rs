@@ -56,6 +56,15 @@ impl AbsoluteUri {
             Self::Urn(urn) => set_urn_fragment(urn, fragment),
         }
     }
+    /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the
+    /// `AbsoluteUri`.
+    #[must_use]
+    pub fn as_uri(&self) -> Uri {
+        match self {
+            Self::Url(url) => Uri::Url(url.clone()),
+            Self::Urn(urn) => Uri::Urn(urn.clone()),
+        }
+    }
 
     /// Returns the namespace if the absolute uri is a [`Urn`], otherwise returns
     /// the authority of the [`Url`].
@@ -150,7 +159,6 @@ impl TryFrom<Uri> for AbsoluteUri {
         }
     }
 }
-
 impl TryFrom<&Uri> for AbsoluteUri {
     type Error = AbsoluteUriParseError;
 
@@ -413,7 +421,12 @@ impl RelativeUri {
     }
     /// Sets the fragment of the `PartialUri` and returns the previous fragment, if
     /// present.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
+    pub fn set_fragment(&mut self, mut fragment: Option<&str>) -> Option<String> {
+        if let Some(frag) = &fragment {
+            if frag.is_empty() {
+                fragment = None;
+            }
+        }
         let fragment = fragment.map(|f| utf8_percent_encode(f, URL_FRAGMENT).to_string());
         if let Some(hash_idx) = self.hash_idx {
             let previous = if hash_idx + 1 == self.path.len() {
@@ -555,7 +568,12 @@ impl Uri {
     /// # Errors
     /// Returns [`urn::Error`](`urn::Error`) if the `AbsoluteUri` is a
     /// [`Urn`](`urn::Urn`) and the fragment and the fragment fails validation.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
+    pub fn set_fragment(&mut self, mut fragment: Option<&str>) -> Option<String> {
+        if let Some(frag) = &fragment {
+            if frag.is_empty() {
+                fragment = None;
+            }
+        }
         match self {
             Uri::Url(url) => set_url_fragment(url, fragment),
             Uri::Urn(urn) => set_urn_fragment(urn, fragment),

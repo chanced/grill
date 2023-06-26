@@ -1,9 +1,19 @@
-use crate::{dialect::Dialect, json_schema::identify, uri::AbsoluteUri, Metaschema, Uri};
+pub use super::draft_2019_09::identify_schema;
+
+use super::{
+    ident_schema_location_by_anchor, identify_schema_location_by_id, locate_schemas_in_array,
+};
+use crate::{
+    dialect::{Dialect, Dialects, LocatedSchema},
+    error::LocateSchemasError,
+    keyword::{Keyword, SCHEMA_KEYWORDS},
+    uri::AbsoluteUri,
+    Metaschema, Uri,
+};
+use jsonptr::Pointer;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
-
-use super::anchors;
 
 pub const JSON_SCHEMA_2020_12_URI_STR: &str = "https://json-schema.org/draft/2020-12/schema";
 pub static JSON_SCHEMA_2020_12_URL: Lazy<Url> =
@@ -56,19 +66,29 @@ pub static JSON_SCHEMA_2020_12: Lazy<Value> =
 pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_2020_12_absolute_uri().clone(),
-        [Metaschema {
-            id: JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-            schema: JSON_SCHEMA_2020_12.as_object().unwrap().clone(),
-        }],
+        [
+            Metaschema {
+                id: JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
+                schema: JSON_SCHEMA_2020_12.as_object().unwrap().clone(),
+            }, // TODO: add other schemas
+        ],
+        SCHEMA_KEYWORDS,
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
         is_json_schema_2020_12,
-        identify,
-        anchors,
+        identify_schema,
+        locate_schemas,
     )
 });
 
 #[must_use]
 pub fn is_json_schema_2020_12(v: &Value) -> bool {
+    // bools are handled the same way across json schema dialects
+    // so there's no need to cycle through the remaining schemas
+    // just to ultimately end up with a default dialect
+    if v.is_boolean() {
+        return true;
+    }
+
     let Value::Object(obj) = v else { return false };
     let Some(s) = obj.get("$schema").and_then(Value::as_str) else { return false };
     if s == JSON_SCHEMA_2020_12_URI_STR {
@@ -123,7 +143,7 @@ pub fn is_json_hyper_schema_2020_12_uri(uri: &Uri) -> bool {
         false
     }
 }
-pub fn is_json_hyper_schema_2020_12_absolute_uri(uri: &Uri) -> bool {
+pub fn is_json_hyper_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
     if let Some(u) = uri.as_url() {
         if u.scheme() != "http" && u.scheme() != "https" {
             false
@@ -151,7 +171,7 @@ pub fn is_json_schema_2020_12_uri(uri: &Uri) -> bool {
     }
 }
 
-pub fn is_json_schema_2020_12_absolute_uri(uri: &Uri) -> bool {
+pub fn is_json_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
     if let Some(u) = uri.as_url() {
         if u.scheme() != "http" && u.scheme() != "https" {
             false
@@ -163,6 +183,52 @@ pub fn is_json_schema_2020_12_absolute_uri(uri: &Uri) -> bool {
     } else {
         false
     }
+}
+/// An implementation of [`LocateSchemas`](`crate::dialect::LocateSchemas`)
+/// which recursively traverses a [`Value`] and returns a [`Vec`] of
+/// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
+/// schema with an`"$anchor"`.
+///
+#[must_use]
+pub fn locate_schemas<'v>(
+    path: Pointer,
+    value: &'v Value,
+    mut dialects: Dialects,
+    base_uri: &AbsoluteUri,
+) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
+    match value {
+        Value::Array(arr) => locate_schemas_in_array(path, arr, dialects, base_uri),
+        Value::Object(_) => locate_schemas_in_obj(path, value, dialects, base_uri),
+        _ => Ok(Vec::new()),
+    }
+}
+
+fn locate_schemas_in_obj<'v>(
+    path: Pointer,
+    value: &'v Value,
+    mut dialects: Dialects,
+    base_uri: &AbsoluteUri,
+) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
+    todo!()
+}
+
+fn ident_schema_location_by_dynamic_anchor<'v>(
+    path: Pointer,
+    value: &'v Value,
+    base_uri: &AbsoluteUri,
+) -> Option<LocatedSchema<'v>> {
+    let Some(Value::String(anchor)) = value.get(Keyword::DYNAMIC_ANCHOR.as_str()) else { return None };
+    if anchor.is_empty() {
+        return None;
+    }
+    let mut uri = base_uri.clone();
+    uri.set_fragment(Some(anchor));
+    Some(LocatedSchema {
+        uri,
+        value,
+        path,
+        keyword: Keyword::DYNAMIC_ANCHOR,
+    })
 }
 
 #[cfg(test)]
