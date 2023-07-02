@@ -16,10 +16,10 @@ use crate::{
     deserialize::deserialize_json,
     dialect::Dialect,
     error::{
-        build_error, resolve_error, AbsoluteUriParseError, BuildError, CompileError,
-        DeserializeError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
-        FragmentedUriError, MissingDialectError, ResolveError, ResolveErrors, SourceError,
-        SourceSliceError, UnknownDialectError,
+        build_error, resolve_error, BuildError, CompileError, DeserializeError,
+        DuplicateSourceError, EvaluateError, FragmentedDialectIdError, FragmentedUriError,
+        MissingDialectError, ResolveError, ResolveErrors, SourceError, SourceSliceError,
+        UnknownDialectError, UriError,
     },
     graph::DependencyGraph,
     json_schema,
@@ -478,10 +478,7 @@ where
     ///     .build()
     ///     .unwrap()
     /// ```
-    pub fn default_dialect(
-        mut self,
-        dialect: impl TryIntoAbsoluteUri,
-    ) -> Result<Self, AbsoluteUriParseError> {
+    pub fn default_dialect(mut self, dialect: impl TryIntoAbsoluteUri) -> Result<Self, UriError> {
         let dialect = dialect.try_into_absolute_uri()?;
         self.default_dialect = Some(dialect);
         Ok(self)
@@ -530,7 +527,7 @@ where
         mut self,
         uri: impl TryIntoAbsoluteUri,
         source: &str,
-    ) -> Result<Self, AbsoluteUriParseError> {
+    ) -> Result<Self, UriError> {
         self.sources.push(Source::String(
             uri.try_into_absolute_uri()?,
             source.to_string(),
@@ -557,7 +554,7 @@ where
         mut self,
         uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
-    ) -> Result<Self, AbsoluteUriParseError> {
+    ) -> Result<Self, UriError> {
         self.sources.push(Source::Value(
             uri.try_into_absolute_uri()?,
             source.borrow().clone(),
@@ -582,7 +579,7 @@ where
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if a URI fails to convert to an
     /// [`AbsoluteUri`]
-    pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, AbsoluteUriParseError>
+    pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, UriError>
     where
         K: TryIntoAbsoluteUri,
         V: Deref<Target = str>,

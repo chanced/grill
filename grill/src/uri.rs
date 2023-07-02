@@ -1,6 +1,6 @@
 //! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
 
-use crate::error::{AbsoluteUriParseError, UriParseError, UrnError};
+use crate::error::{UriError, UrnError};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -28,7 +28,7 @@ impl AbsoluteUri {
     ///
     /// # Errors
     /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
-    pub fn parse(value: &str) -> Result<Self, AbsoluteUriParseError> {
+    pub fn parse(value: &str) -> Result<Self, UriError> {
         if value.starts_with("urn:") {
             Ok(Urn::from_str(value)?.into())
         } else {
@@ -66,15 +66,16 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns the namespace if the absolute uri is a [`Urn`], otherwise returns
-    /// the authority of the [`Url`].
+    /// Returns the authority (`Url`) or namespace (`Urn`)
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {
         match self {
-            Self::Url(url) => get_url_authority(url),
+            Self::Url(url) => get_url_authority(url).map(Cow::Owned),
             Self::Urn(urn) => Some(Cow::Borrowed(urn.nid())),
         }
     }
+
+    /// Sets the
 
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
@@ -83,14 +84,23 @@ impl AbsoluteUri {
             Self::Urn(urn) => urn.nss(),
         }
     }
-
+    /// Sets the path (`Url`) or Name Specific String (`Urn`)
     pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, UrnError> {
         match self {
             Self::Url(url) => Ok(set_url_path(url, path_or_nss)),
             Self::Urn(urn) => set_urn_nss(urn, path_or_nss),
         }
     }
-
+    /// Sets the authority (`Url`) or namespace (`Urn`)
+    pub fn set_authority_or_namespace(
+        &mut self,
+        authority_or_namespace: &str,
+    ) -> Result<Option<String>, UriError> {
+        match self {
+            Self::Url(u) => set_url_authority(u, authority_or_namespace),
+            Self::Urn(u) => set_urn_namespace(u, authority_or_namespace),
+        }
+    }
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -132,6 +142,7 @@ impl AbsoluteUri {
         }
     }
 }
+
 impl From<&AbsoluteUri> for AbsoluteUri {
     fn from(value: &AbsoluteUri) -> Self {
         value.clone()
@@ -149,7 +160,7 @@ impl From<&AbsoluteUri> for String {
     }
 }
 impl TryFrom<Uri> for AbsoluteUri {
-    type Error = AbsoluteUriParseError;
+    type Error = UriError;
 
     fn try_from(value: Uri) -> Result<Self, Self::Error> {
         match value {
@@ -160,7 +171,7 @@ impl TryFrom<Uri> for AbsoluteUri {
     }
 }
 impl TryFrom<&Uri> for AbsoluteUri {
-    type Error = AbsoluteUriParseError;
+    type Error = UriError;
 
     fn try_from(value: &Uri) -> Result<Self, Self::Error> {
         match value {
@@ -270,85 +281,85 @@ impl From<&Urn> for AbsoluteUri {
 }
 
 impl TryFrom<&str> for AbsoluteUri {
-    type Error = AbsoluteUriParseError;
+    type Error = UriError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
 impl TryFrom<&String> for AbsoluteUri {
-    type Error = AbsoluteUriParseError;
+    type Error = UriError;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
 impl TryFrom<String> for AbsoluteUri {
-    type Error = AbsoluteUriParseError;
+    type Error = UriError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::parse(&value)
     }
 }
 
 impl FromStr for AbsoluteUri {
-    type Err = AbsoluteUriParseError;
+    type Err = UriError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
     }
 }
 
 pub trait TryIntoAbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError>;
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError>;
 }
 
 impl TryIntoAbsoluteUri for String {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         AbsoluteUri::parse(&self)
     }
 }
 
 impl TryIntoAbsoluteUri for &str {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         AbsoluteUri::parse(self)
     }
 }
 impl TryIntoAbsoluteUri for AbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(self)
     }
 }
 impl TryIntoAbsoluteUri for &AbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(self.clone())
     }
 }
 impl TryIntoAbsoluteUri for &Url {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(AbsoluteUri::Url(self.clone()))
     }
 }
 impl TryIntoAbsoluteUri for &Urn {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(AbsoluteUri::Urn(self.clone()))
     }
 }
 impl TryIntoAbsoluteUri for Url {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(AbsoluteUri::Url(self))
     }
 }
 impl TryIntoAbsoluteUri for Urn {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(AbsoluteUri::Urn(self))
     }
 }
 impl TryIntoAbsoluteUri for &String {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         AbsoluteUri::parse(self)
     }
 }
 impl TryIntoAbsoluteUri for &Uri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url.clone())),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn.clone())),
@@ -357,7 +368,7 @@ impl TryIntoAbsoluteUri for &Uri {
     }
 }
 impl TryIntoAbsoluteUri for Uri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, AbsoluteUriParseError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
@@ -544,7 +555,7 @@ impl Uri {
     ///
     /// # Errors
     /// Returns `UriParseError` if `value` fails to parse as a `Uri`
-    pub fn parse(value: &str) -> Result<Self, UriParseError> {
+    pub fn parse(value: &str) -> Result<Self, UriError> {
         if value.starts_with("urn:") {
             Ok(Urn::from_str(value)?.into())
         } else if matches_url(value) {
@@ -693,20 +704,20 @@ impl PartialEq<&str> for Uri {
 }
 
 impl FromStr for Uri {
-    type Err = UriParseError;
+    type Err = UriError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
     }
 }
 
 impl TryFrom<String> for Uri {
-    type Error = UriParseError;
+    type Error = UriError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::parse(&value)
     }
 }
 impl TryFrom<&String> for Uri {
-    type Error = UriParseError;
+    type Error = UriError;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
@@ -776,20 +787,83 @@ fn matches_url(value: &str) -> bool {
     false
 }
 
-fn get_url_authority(url: &Url) -> Option<Cow<'_, str>> {
-    let host = url.host()?;
-    let mut result: Cow<'_, str> = Cow::Owned(host.to_string());
-    if let Some(port) = url.port() {
-        result = Cow::Owned(format!("{result}:{port}"));
+fn get_url_authority(u: &Url) -> Option<String> {
+    if !u.has_authority() {
+        return None;
     }
-    let mut authority = url.username().to_string();
-    if !authority.is_empty() {
-        if let Some(pass) = url.password() {
-            authority.push_str(&format!(":{pass}"));
+    let host = u.host();
+    let port = u.port();
+    let username = u.username();
+    let password = u.password();
+    let mut prev_authority = String::new();
+    if !username.is_empty() {
+        prev_authority.push_str(username);
+        if let Some(password) = password {
+            prev_authority.push(':');
+            prev_authority.push_str(password);
         }
-        result = Cow::Owned(format!("{authority}@{result}"));
     }
-    Some(result)
+    if let Some(host) = host {
+        if !prev_authority.is_empty() {
+            prev_authority.push('@');
+        }
+        prev_authority.push_str(host.to_string().as_str());
+    }
+    if let Some(port) = port {
+        if !prev_authority.is_empty() {
+            prev_authority.push(':');
+        }
+        prev_authority.push_str(&port.to_string());
+    }
+    Some(prev_authority)
+}
+
+fn set_urn_namespace(u: &mut Urn, namespace: &str) -> Result<Option<String>, UriError> {
+    let prev_namespace = u.nid().to_string();
+    u.set_nid(namespace)?;
+    Ok(Some(prev_namespace))
+}
+
+fn set_url_authority(u: &mut Url, authority: &str) -> Result<Option<String>, UriError> {
+    let prev_authority = get_url_authority(u);
+
+    let (userinfo, host_and_port) = authority
+        .split_once('@')
+        .map_or((None, authority), |(a, b)| (Some(a), b));
+
+    let (user, pass) = userinfo.map_or((None, None), |userinfo| {
+        userinfo
+            .split_once(':')
+            .map_or((Some(userinfo), None), |(user, pwd)| {
+                (Some(user), Some(pwd))
+            })
+    });
+
+    let (host, port) = host_and_port
+        .split_once(':')
+        .map_or((host_and_port, None), |(a, b)| (a, Some(b)));
+    let port = port
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| url::ParseError::InvalidPort)?;
+    u.set_port(port)
+        .map_err(|_| url::ParseError::SetHostOnCannotBeABaseUrl)?;
+
+    u.set_host(Some(host))?;
+
+    if let Some(user) = user {
+        u.set_username(user)
+            .map_err(|_| url::ParseError::SetHostOnCannotBeABaseUrl)?;
+    } else {
+        // ignoring the error; internally the url crate does not check for non-empty strings
+        // and errors if the username cannot be set (e.g., in the case of file://).
+        // https://github.com/servo/rust-url/issues/844
+        _ = u.set_username("");
+    }
+    // same as above, ignoring error
+    _ = u.set_password(pass);
+
+    Ok(prev_authority)
 }
 
 fn set_urn_fragment(urn: &mut Urn, fragment: Option<&str>) -> Option<String> {
@@ -822,6 +896,12 @@ fn set_url_path(url: &mut Url, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_url_authority() {
+        let url = Url::parse("https://user:example@example.com:8080").unwrap();
+        println!("{:?}", get_url_authority(&url));
+    }
 
     #[test]
     fn test_uri_authority_or_namespace() {

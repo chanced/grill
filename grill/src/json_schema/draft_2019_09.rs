@@ -177,17 +177,16 @@ pub fn is_json_schema_2019_09_absolute_uri(uri: &AbsoluteUri) -> bool {
 
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.
 ///
-///
 /// # Example
 /// ```
-/// use grill::{Uri, json_schema::identify};
+/// use grill::{ Uri, json_schema::draft_2019_09::identify_schema };
 /// use serde_json::json;
 /// let schema = json!({
 ///     "$schema": "https://json-schema.org/draft/2020-12/schema",
 ///     "$id": "https://example.com/example"
 /// });
 /// let expected_id = Uri::parse("https://example.com/example").unwrap();
-/// assert_eq!(identify(&schema), Ok(Some(expected_id)))
+/// assert_eq!(identify_schema(&schema), Ok(Some(expected_id)))
 /// ```
 /// # Errors
 /// Returns [`IdentifyError`] if `schema`:
@@ -242,12 +241,6 @@ fn locate_schemas_in_obj<'v>(
         return dialect.locate_schemas(path, value, dialects, base_uri);
     }
 
-    if let Some((by_ptr, by_id)) = identify_schema_location_by_id(&path, value, base_uri, dialect) {
-        if by_id.uri != by_ptr.uri {
-            results.push(by_ptr);
-        }
-        results.push(by_id);
-    }
     if let Some(anchored) = ident_schema_location_by_anchor(path.clone(), value, base_uri) {
         results.push(anchored);
     }

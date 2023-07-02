@@ -14,7 +14,9 @@ use std::{
 };
 
 pub use crate::output::ValidationError;
-pub use urn::Error as UrnError;
+
+pub type UrnError = urn::Error;
+pub type UrlError = url::ParseError;
 
 #[derive(Debug)]
 pub struct DuplicateSourceError {
@@ -23,7 +25,12 @@ pub struct DuplicateSourceError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum LocateSchemasError {}
+pub enum LocateSchemasError {
+    #[snafu(display("{}", source), context(false))]
+    Anchor { source: AnchorError },
+    #[snafu(display("{}", source), context(false))]
+    Urn { source: UrnError },
+}
 
 /// The inner error of a [`MalformedAnchorError`].
 #[derive(Debug, Clone)]
@@ -130,7 +137,7 @@ pub enum BuildError {
     #[snafu(display("{}", source), context(false))]
     FragmentedDialectId { source: FragmentedDialectIdError },
     #[snafu(display("failed to parse uri: {}", source), context(false))]
-    MalformedAbsoluteUri { source: AbsoluteUriParseError },
+    MalformedAbsoluteUri { source: UriError },
     #[snafu(display("failed to deserialize source: {}", uri))]
     DeserializeSource {
         source: DeserializeError,
@@ -386,13 +393,10 @@ pub enum CompileError {
 
     /// Failed to parse an [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
     #[snafu(display("failed to parse absolute URI: {}", source))]
-    ParseAbsoluteUri {
-        value: String,
-        source: AbsoluteUriParseError,
-    },
+    ParseAbsoluteUri { value: String, source: UriError },
 
     #[snafu(display("{}", source), context(false))]
-    FailedToParseAbsoluteUri { source: AbsoluteUriParseError },
+    FailedToParseAbsoluteUri { source: UriError },
 
     /// Custom errors returned by a custom [`Handler`]
     Custom {
@@ -452,7 +456,7 @@ pub enum SourceError {
     #[snafu(display("{}", source), context(false))]
     InvalidUtf8 { source: FromUtf8Error },
     #[snafu(display("{}", source), context(false))]
-    ParseAbsoluteUri { source: AbsoluteUriParseError },
+    ParseAbsoluteUri { source: UriError },
     #[snafu(display("{}", source), context(false))]
     Deserialize { source: DeserializeError },
     #[snafu(display("{}", source), context(false))]
@@ -465,30 +469,21 @@ pub enum SourceSliceError {
     #[snafu(display("{}", source), context(false))]
     InvalidUtf8 { source: FromUtf8Error },
     #[snafu(display("{}", source), context(false))]
-    ParseAbsoluteUri { source: AbsoluteUriParseError },
+    ParseAbsoluteUri { source: UriError },
 }
 
-#[derive(Debug, Clone, Snafu, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum AbsoluteUriParseError {
+pub enum UriError {
     #[snafu(display("{}", source), context(false))]
-    Url { source: url::ParseError },
+    Url { source: UrlError },
     #[snafu(display("{}", source), context(false))]
     Urn { source: urn::Error },
     #[snafu(display("{}", source))]
     NotAbsolute { source: UriNotAbsoluteError },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Snafu)]
-#[snafu(visibility(pub), context(suffix(false)), module)]
-pub enum UriParseError {
-    #[snafu(display("{}", source), context(false))]
-    Url { source: url::ParseError },
-    #[snafu(display("{}", source), context(false))]
-    Urn { source: urn::Error },
-}
-
-impl AbsoluteUriParseError {
+impl UriError {
     /// Returns `true` if the uri parse error is [`Url`].
     ///
     /// [`Url`]: UriParseError::Url
@@ -496,7 +491,6 @@ impl AbsoluteUriParseError {
     pub fn is_url(&self) -> bool {
         matches!(self, Self::Url { .. })
     }
-
     /// Returns `true` if the uri parse error is [`Urn`].
     ///
     /// [`Urn`]: UriParseError::Urn
@@ -505,7 +499,7 @@ impl AbsoluteUriParseError {
         matches!(self, Self::Urn { .. })
     }
     #[must_use]
-    pub fn as_url(&self) -> Option<&url::ParseError> {
+    pub fn as_url(&self) -> Option<&UrlError> {
         if let Self::Url { source } = self {
             Some(source)
         } else {
@@ -526,7 +520,7 @@ impl AbsoluteUriParseError {
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum IdentifyError {
     #[snafu(display("{}", source), context(false))]
-    Parse { source: UriParseError },
+    Parse { source: UriError },
     #[snafu(display("{}", source), context(false))]
     HasFragment { source: HasFragmentError<Uri> },
 }

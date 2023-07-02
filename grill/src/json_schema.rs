@@ -42,7 +42,7 @@ use jsonptr::{Pointer, Token};
 
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
-    error::{HasFragmentError, IdentifyError, LocateSchemasError, UriParseError},
+    error::{HasFragmentError, IdentifyError, LocateSchemasError, UriError},
     AbsoluteUri, Array, Uri,
 };
 use crate::{keyword::Keyword, Anchor};
@@ -118,15 +118,22 @@ fn locate_schemas_in_array<'v>(
 fn identify_schema_location_by_id<'v>(
     path: &Pointer,
     value: &'v Value,
-    base_uri: &AbsoluteUri,
-    dialect: &Dialect,
+    base: &mut AbsoluteUri,
+    dialects: &mut Dialects,
 ) -> Option<(LocatedSchema<'v>, LocatedSchema<'v>)> {
     // Only identified schemas are indexed initially. If a handler needs an
     // unidentified schema, it will be indexed upon use as part of the `compile`
     // step for a handler.
+    let dialect = dialects.default_dialect();
     let Ok(Some(id)) = dialect.identify(value) else { return None};
+    if let Some(auth_ns) = id.authority_or_namespace() {
+        // if auth_ns != base.authority_or_namespace() {
+        //     base.set_path_or_nss(path_or_nss)
+        // }
+        todo!()
+    }
     let path = path.clone();
-    let mut uri = base_uri.clone();
+    let mut uri = base.clone();
     if !path.is_empty() {
         uri.set_fragment(Some(&path));
     }
@@ -140,7 +147,7 @@ fn identify_schema_location_by_id<'v>(
         Uri::Url(url) => AbsoluteUri::Url(url),
         Uri::Urn(urn) => AbsoluteUri::Urn(urn),
         Uri::Relative(rel) => {
-            let mut base = base_uri.clone();
+            let mut base = base.clone();
             base.set_path_or_nss(rel.path()).unwrap();
             base.set_fragment(None);
             base
