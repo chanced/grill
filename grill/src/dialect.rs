@@ -101,9 +101,10 @@ impl Dialect {
     pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
         self.identify_schema.identify_schema(schema)
     }
+
     #[must_use]
-    pub fn can_keyword_contain_schemas(&self, property: Keyword) -> bool {
-        self.schema_properties.contains_key(&property)
+    pub fn can_keyword_contain_schemas(&self, keyword: Keyword) -> bool {
+        self.schema_properties.contains_key(&keyword)
     }
 
     /// Returns `true` if the path may contain one or more schemas. This assumes

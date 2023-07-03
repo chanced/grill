@@ -11,7 +11,8 @@ use serde_json::Value;
 use url::Url;
 
 use super::{
-    ident_schema_location_by_anchor, identify_schema_location_by_id, locate_schemas_in_array,
+    ident_schema_location_by_anchor, ident_schema_location_by_dynamic_anchor,
+    identify_schema_location_by_id, identify_schema_location_by_path, locate_schemas_in_array,
 };
 
 pub const JSON_SCHEMA_2019_09_URI_STR: &str = "https://json-schema.org/draft/2019-09/schema";
@@ -224,7 +225,7 @@ pub fn locate_schemas<'v>(
 }
 
 fn locate_schemas_in_obj<'v>(
-    path: Pointer,
+    mut path: Pointer,
     value: &'v Value,
     mut dialects: Dialects,
     base_uri: &AbsoluteUri,
@@ -240,8 +241,24 @@ fn locate_schemas_in_obj<'v>(
     if default_dialect != dialect {
         return dialect.locate_schemas(path, value, dialects, base_uri);
     }
+    if path.is_empty() || default_dialect.is_schema_property(&path) {
+        results.push(identify_schema_location_by_path(&path, value, base_uri));
+    }
 
-    if let Some(anchored) = ident_schema_location_by_anchor(path.clone(), value, base_uri) {
+    let mut base_uri = base_uri.clone();
+
+    if let Some(located) =
+        identify_schema_location_by_id(&path, value, &mut base_uri, &mut dialects)?
+    {
+        path = Pointer::default();
+        results.push(located);
+    }
+
+    if let Some(anchored) = ident_schema_location_by_anchor(&path, value, &base_uri) {
+        results.push(anchored);
+    }
+
+    if let Some(anchored) = ident_schema_location_by_dynamic_anchor(&path, value, &base_uri) {
         results.push(anchored);
     }
 
@@ -259,7 +276,7 @@ fn locate_schemas_in_obj<'v>(
         }
         let mut new_path = path.clone();
         new_path.push_back(key.into());
-        let mut located_schemas = dialect.locate_schemas(new_path, value, dialects, base_uri)?;
+        let mut located_schemas = dialect.locate_schemas(new_path, value, dialects, &base_uri)?;
         results.append(&mut located_schemas);
     }
     Ok(results)
@@ -267,6 +284,8 @@ fn locate_schemas_in_obj<'v>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use serde_json::json;
 
     use super::*;
@@ -295,37 +314,40 @@ mod tests {
 
     #[test]
     fn test_locate_schemas() {
+        let base_uri = "https://example.com/example-schema.json";
         let tests = [
             (
+                // 0
                 json!({
                     "$schema": "https://json-schema.org/draft/2019-09/schema",
                     "$id": "https://example.com/root",
                     "properties": {
                         "foo": {
-                            "$id": "https://example.com/example/foo",
+                            "$id": "https://example.com/foo",
                             "type": "string"
                         }
                     }
                 }),
-                vec![
-                    "https://example.com/example-schema.json",
+                HashSet::from([
+                    base_uri,
                     "https://example.com/root",
-                    "https://example.com/example-schema.json#/properties/foo",
-                    "https://example.com/example/foo",
-                ],
+                    "https://example.com/root#/properties/foo",
+                    "https://example.com/foo",
+                ]),
             ),
-            (json!({}), vec![]),
+            // 1
+            (json!({}), HashSet::from([base_uri])),
+            // 2
             (
                 json!({"$schema": "https://json-schema.org/draft/2019-09/schema"}),
-                vec![],
+                HashSet::from([base_uri]),
             ),
+            // 3
             (
                 json!({"$schema": "https://json-schema.org/draft/2019-09/schema", "$id": "https://example.com/root"}),
-                vec![
-                    "https://example.com/example-schema.json",
-                    "https://example.com/root",
-                ],
+                HashSet::from([base_uri, "https://example.com/root"]),
             ),
+            // 4
             (
                 json!({
                     "$schema": "https://json-schema.org/draft/2019-09/schema",
@@ -337,12 +359,14 @@ mod tests {
                         }
                     }
                 }),
-                vec![
-                    "https://example.com/example-schema.json",
+                HashSet::from([
+                    base_uri,
                     "https://example.com/root",
+                    "https://example.com/root#/properties/foo",
                     "https://example.com/root#foo",
-                ],
+                ]),
             ),
+            // 5
             (
                 json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -355,13 +379,23 @@ mod tests {
                                     "$id": "https://example.com/bar.json",
                                     "$defs": {
                                         "$anchor": "anchor",
+                                        "$dynamicAnchor": "dynamicAnchor",
                                     }
                                 }
                             }
                         }
                     }
                 }),
-                vec!["https://example.com/example-schema.json", "invalid"],
+                HashSet::from([
+                    base_uri,
+                    "https://example.com/example.json",
+                    "https://example.com/example.json#/$defs/foo",
+                    "https://example.com/foo.json",
+                    "https://example.com/foo.json#/$defs/bar",
+                    "https://example.com/bar.json",
+                    "https://example.com/bar.json#anchor",
+                    "https://example.com/bar.json#dynamicAnchor",
+                ]),
             ),
         ];
         let dialect = dialect();
@@ -370,12 +404,26 @@ mod tests {
         let base_uri = "https://example.com/example-schema.json"
             .parse::<AbsoluteUri>()
             .unwrap();
-        for (schema, expected) in tests {
+        for (idx, (schema, mut expected)) in tests.into_iter().enumerate() {
             let located = dialect
                 .locate_schemas(Pointer::default(), &schema, dialects, &base_uri)
                 .unwrap();
-            let located = located.iter().map(|ls| ls.uri.as_str()).collect::<Vec<_>>();
-            assert_eq!(located, expected);
+            println!(
+                "{idx}: \nexpected: {expected:#?}\nlocated: {:#?}\n\n",
+                located.iter().map(|ls| ls.uri.as_str()).collect::<Vec<_>>()
+            );
+            for loc in located.iter().map(|ls| ls.uri.as_str()) {
+                assert!(
+                    expected.contains(loc),
+                    "\n\nUnexpected location found in test #{idx}: \n\t\"{loc}\"\n\n"
+                );
+                expected.remove(loc);
+            }
+            assert!(
+                expected.is_empty(),
+                "\n\nExpected: {:#?} not found on test #{idx}.\n\n",
+                expected.into_iter().collect::<Vec<_>>()
+            );
         }
     }
 

@@ -189,7 +189,6 @@ pub fn is_json_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
 /// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
 /// schema with an`"$anchor"`.
 ///
-#[must_use]
 pub fn locate_schemas<'v>(
     path: Pointer,
     value: &'v Value,
@@ -227,7 +226,7 @@ fn ident_schema_location_by_dynamic_anchor<'v>(
         uri,
         value,
         path,
-        keyword: Keyword::DYNAMIC_ANCHOR,
+        keyword: Some(Keyword::DYNAMIC_ANCHOR),
     })
 }
 

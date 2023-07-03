@@ -191,7 +191,7 @@ pub struct LocatedSchema<'v> {
     pub uri: AbsoluteUri,
     pub value: &'v Value,
     pub path: Pointer,
-    pub keyword: Keyword<'static>,
+    pub keyword: Option<Keyword<'static>>,
 }
 impl<'v> LocatedSchema<'v> {
     #[must_use]
@@ -199,7 +199,7 @@ impl<'v> LocatedSchema<'v> {
         uri: AbsoluteUri,
         value: &'v Value,
         path: Pointer,
-        keyword: Keyword<'static>,
+        keyword: Option<Keyword<'static>>,
     ) -> Self {
         Self {
             uri,
@@ -211,7 +211,7 @@ impl<'v> LocatedSchema<'v> {
 }
 
 pub(crate) struct LocatedSchemas<'v> {
-    pub(crate) schemas: HashMap<Pointer, Vec<(AbsoluteUri, &'v Value, Keyword<'static>)>>,
+    pub(crate) schemas: HashMap<Pointer, Vec<LocatedSchema<'v>>>,
 }
 impl<'v> From<Vec<LocatedSchema<'v>>> for LocatedSchemas<'v> {
     fn from(schemas: Vec<LocatedSchema<'v>>) -> Self {
@@ -219,16 +219,10 @@ impl<'v> From<Vec<LocatedSchema<'v>>> for LocatedSchemas<'v> {
             schemas: HashMap::default(),
         };
         for schema in schemas {
-            let LocatedSchema {
-                uri,
-                value,
-                path,
-                keyword,
-            } = schema;
             this.schemas
-                .entry(path)
+                .entry(schema.path.clone())
                 .or_default()
-                .push((uri, value, keyword));
+                .push(schema);
         }
         this
     }

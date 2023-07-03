@@ -38,18 +38,40 @@ pub use draft_2020_12::{
     json_hyper_schema_2020_12_url, json_schema_2020_12_absolute_uri, json_schema_2020_12_uri,
     json_schema_2020_12_url,
 };
-use jsonptr::{Pointer, Token};
+use jsonptr::Pointer;
 
+use crate::keyword::Keyword;
 use crate::{
-    dialect::{Dialect, Dialects, LocatedSchema},
-    error::{HasFragmentError, IdentifyError, LocateSchemasError, UriError},
+    dialect::{Dialects, LocatedSchema},
+    error::LocateSchemasError,
     AbsoluteUri, Array, Uri,
 };
-use crate::{keyword::Keyword, Anchor};
 use serde_json::Value;
 
-fn ident_schema_location_by_anchor<'v>(
-    path: Pointer,
+#[must_use]
+pub fn ident_schema_location_by_dynamic_anchor<'v>(
+    path: &Pointer,
+    value: &'v Value,
+    base_uri: &AbsoluteUri,
+) -> Option<LocatedSchema<'v>> {
+    let Some(Value::String(anchor)) = value.get(Keyword::DYNAMIC_ANCHOR.as_str()) else { return None };
+    if anchor.is_empty() {
+        return None;
+    }
+    let path = path.clone();
+    let mut uri = base_uri.clone();
+    uri.set_fragment(Some(anchor));
+    Some(LocatedSchema {
+        uri,
+        value,
+        path,
+        keyword: Some(Keyword::DYNAMIC_ANCHOR),
+    })
+}
+
+#[must_use]
+pub fn ident_schema_location_by_anchor<'v>(
+    path: &Pointer,
     value: &'v Value,
     base_uri: &AbsoluteUri,
 ) -> Option<LocatedSchema<'v>> {
@@ -57,13 +79,14 @@ fn ident_schema_location_by_anchor<'v>(
     if anchor.is_empty() {
         return None;
     }
+    let path = path.clone();
     let mut uri = base_uri.clone();
     uri.set_fragment(Some(anchor));
     Some(LocatedSchema {
         uri,
         value,
         path,
-        keyword: Keyword::ANCHOR,
+        keyword: Some(Keyword::ANCHOR),
     })
 }
 
@@ -115,51 +138,49 @@ fn locate_schemas_in_array<'v>(
     Ok(located)
 }
 
+fn identify_schema_location_by_path<'v>(
+    path: &Pointer,
+    value: &'v Value,
+    uri: &AbsoluteUri,
+) -> LocatedSchema<'v> {
+    let mut uri = uri.clone();
+    if !path.is_empty() {
+        uri.set_fragment(Some(path));
+    }
+
+    LocatedSchema::new(uri, value, path.clone(), None)
+}
+
 fn identify_schema_location_by_id<'v>(
     path: &Pointer,
     value: &'v Value,
-    base: &mut AbsoluteUri,
+    uri: &mut AbsoluteUri,
     dialects: &mut Dialects,
-) -> Option<(LocatedSchema<'v>, LocatedSchema<'v>)> {
+) -> Result<Option<LocatedSchema<'v>>, LocateSchemasError> {
     // Only identified schemas are indexed initially. If a handler needs an
     // unidentified schema, it will be indexed upon use as part of the `compile`
-    // step for a handler.
+    // step.
     let dialect = dialects.default_dialect();
-    let Ok(Some(id)) = dialect.identify(value) else { return None};
-    if let Some(auth_ns) = id.authority_or_namespace() {
-        // if auth_ns != base.authority_or_namespace() {
-        //     base.set_path_or_nss(path_or_nss)
-        // }
-        todo!()
+    let Ok(Some(id)) = dialect.identify(value) else { return Ok(None) };
+    match id {
+        Uri::Url(url) => {
+            *uri = AbsoluteUri::Url(url);
+        }
+        Uri::Urn(urn) => {
+            *uri = AbsoluteUri::Urn(urn);
+        }
+        Uri::Relative(rel) => {
+            uri.set_path_or_nss(rel.path())?;
+            uri.set_fragment(rel.fragment());
+        }
     }
     let path = path.clone();
-    let mut uri = base.clone();
-    if !path.is_empty() {
-        uri.set_fragment(Some(&path));
-    }
-    let by_ptr = LocatedSchema {
-        keyword: Keyword::ID,
-        path: path.clone(),
-        uri,
-        value,
-    };
-    let uri = match id {
-        Uri::Url(url) => AbsoluteUri::Url(url),
-        Uri::Urn(urn) => AbsoluteUri::Urn(urn),
-        Uri::Relative(rel) => {
-            let mut base = base.clone();
-            base.set_path_or_nss(rel.path()).unwrap();
-            base.set_fragment(None);
-            base
-        }
-    };
-    let by_id = LocatedSchema {
-        keyword: Keyword::ID,
+    Ok(Some(LocatedSchema {
+        keyword: Some(Keyword::ID),
         path,
-        uri,
+        uri: uri.clone(),
         value,
-    };
-    Some((by_ptr, by_id))
+    }))
 }
 
 // #[derive(Default)]
