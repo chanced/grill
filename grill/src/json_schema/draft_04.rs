@@ -37,10 +37,10 @@ pub static JSON_SCHEMA_04: Lazy<Value> =
 pub static JSON_SCHEMA_04_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_04_absolute_uri().clone(),
-        [Metaschema {
-            id: JSON_SCHEMA_04_ABSOLUTE_URI.clone(),
-            schema: JSON_SCHEMA_04.as_object().unwrap().clone(),
-        }],
+        [Metaschema::new(
+            JSON_SCHEMA_04_ABSOLUTE_URI.clone(),
+            JSON_SCHEMA_04.as_object().unwrap().clone(),
+        )],
         [],                                     // TODO:
         [super::draft_07::ConstHandler::new()], // TODO: FIX,
         is_json_schema_04,

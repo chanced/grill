@@ -78,6 +78,11 @@ pub type Object = serde_json::Map<String, serde_json::Value>;
 /// Alias for `Vec<serde_json::Value>`.
 pub type Array = Vec<serde_json::Value>;
 
+new_key_type! {
+    pub struct ValueKey;
+}
+
+
 
 #[cfg(test)]
 pub mod test;

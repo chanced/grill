@@ -2,6 +2,7 @@ use std::{
     any::{self},
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
+    fmt::Debug,
     ops::Deref,
     str::FromStr,
 };
@@ -9,7 +10,7 @@ use std::{
 use either::Either;
 use jsonptr::Pointer;
 use serde_json::Value;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::SlotMap;
 use snafu::ResultExt;
 
 use crate::{
@@ -17,15 +18,15 @@ use crate::{
     dialect::Dialect,
     error::{
         build_error, resolve_error, BuildError, CompileError, DeserializeError,
-        DuplicateSourceError, EvaluateError, FragmentedDialectIdError, FragmentedUriError,
-        MissingDialectError, ResolveError, ResolveErrors, SourceError, SourceSliceError,
-        UnknownDialectError, UriError,
+        DuplicateDialectError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
+        FragmentedUriError, NoDialectsError, ResolveError, ResolveErrors, SourceError,
+        SourceSliceError, UnknownDialectError, UriError,
     },
     graph::DependencyGraph,
     json_schema,
     keyword::Keyword,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Deserializer, Handler, Output, Resolve, Schema, SchemaKey, Structure,
+    Deserializer, Metaschema, Output, Resolve, Schema, SchemaKey, Structure,
 };
 
 /// Compiles and evaluates JSON Schemas.
@@ -40,6 +41,19 @@ pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
     schema_lookup: HashMap<AbsoluteUri, Key>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     dep_graph: DependencyGraph,
+}
+
+impl<K: slotmap::Key> Debug for Interrogator<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Interrogator")
+            .field("dialects", &self.dialects)
+            .field("default_dialect", &self.default_dialect)
+            .field("sources", &self.sources)
+            .field("schemas", &self.schemas)
+            .field("schema_lookup", &self.schema_lookup)
+            .field("dep_graph", &self.dep_graph)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<Key> Interrogator<Key>
@@ -745,7 +759,7 @@ where
     pub fn build(self) -> Result<Interrogator<Key>, BuildError> {
         let Self {
             dialects,
-            sources,
+            mut sources,
             resolver_lookup: _resolver_lookup,
             resolvers,
             deserializers,
@@ -753,9 +767,9 @@ where
             _marker,
         } = self;
         let dep_graph = DependencyGraph::new();
-
         let (dialects, default_dialect) = Self::build_dialects(dialects, default_dialect)?;
         let deserializers = Self::build_deserializers(deserializers);
+        sources.append(&mut Self::collect_dialect_sources(&dialects));
         let sources = Self::build_sources(sources, &deserializers)?;
         let schemas: SlotMap<Key, Schema> = SlotMap::with_key();
         let schema_lookup = HashMap::new();
@@ -769,20 +783,22 @@ where
             deserializers,
             dep_graph,
         };
-
+        println!("{interrogator:#?}");
         Ok(interrogator)
     }
 
     fn build_sources(
         sources: Vec<Source>,
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
-    ) -> Result<HashMap<AbsoluteUri, Value>, BuildError> {
+    ) -> Result<(HashMap<AbsoluteUri, Value>), BuildError> {
         let mut res: HashMap<AbsoluteUri, Value> = HashMap::with_capacity(sources.len());
         for src in sources {
             let uri = src.uri();
             if let Some(fragment) = uri.fragment() {
                 if !fragment.is_empty() {
-                    return Err(FragmentedUriError { uri }.into());
+                    return Err(BuildError::FragmentedSourceUri {
+                        source: FragmentedUriError { uri },
+                    });
                 }
             }
             let src = src
@@ -791,9 +807,6 @@ where
 
             res.insert(uri, src);
         }
-        // if res.capacity() > res.len() {
-        //     res.shrink_to_fit();
-        // }
         Ok(res)
     }
     fn build_deserializers(
@@ -806,6 +819,19 @@ where
         }
     }
 
+    fn collect_dialect_sources(dialects: &[Dialect]) -> Vec<Source> {
+        let mut result = Vec::with_capacity(dialects.len());
+        for dialect in dialects {
+            for metaschema in &dialect.meta_schemas {
+                result.push(Source::Value(
+                    metaschema.0.clone(),
+                    metaschema.1.clone().into(),
+                ));
+            }
+        }
+        result
+    }
+
     #[allow(clippy::type_complexity)]
     fn build_dialects(
         dialects: Vec<Dialect>,
@@ -813,11 +839,14 @@ where
     ) -> Result<(Vec<Dialect>, usize), BuildError> {
         let queue = Self::dialect_queue(dialects)?;
         if queue.is_empty() {
-            return Err(MissingDialectError.into());
+            return Err(NoDialectsError.into());
         }
         let mut dialects = Vec::with_capacity(queue.len());
         let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(queue.len());
         for dialect in queue.into_iter().rev() {
+            if lookup.contains_key(&dialect.id) {
+                return Err(DuplicateDialectError::new(dialect).into());
+            }
             lookup.insert(dialect.id.clone(), dialects.len());
             dialects.push(dialect);
         }
@@ -880,6 +909,12 @@ enum Source {
     Value(AbsoluteUri, Value),
 }
 
+impl From<&Metaschema> for Source {
+    fn from(value: &Metaschema) -> Self {
+        Self::Value(value.id.clone(), value.schema.clone().into())
+    }
+}
+
 impl Source {
     fn uri(&self) -> AbsoluteUri {
         match self {
@@ -933,5 +968,25 @@ fn parse_pointer_or_anchor(
         Ok(Either::Left(ptr))
     } else {
         Ok(Either::Right(fragment))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::prelude::*;
+    #[test]
+    fn test_build() {
+        let interrogator = Builder::default()
+            .json_schema_2020_12()
+            .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut file = File::create("foo.txt").unwrap();
+        file.write_all(format!("{interrogator:#?}").as_bytes())
+            .unwrap();
     }
 }

@@ -1,7 +1,8 @@
 pub use super::draft_2019_09::identify_schema;
 
 use super::{
-    ident_schema_location_by_anchor, identify_schema_location_by_id, locate_schemas_in_array,
+    ident_schema_location_by_anchor, ident_schema_location_by_dynamic_anchor,
+    identify_schema_location_by_id, identify_schema_location_by_path, locate_schemas_in_array,
 };
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
@@ -60,17 +61,80 @@ pub const JSON_SCHEMA_2020_12_UNEVALUATED_BYTES: &[u8] =
 pub const JSON_SCHEMA_2020_12_VALIDATION_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/validation.json");
 
-pub static JSON_SCHEMA_2020_12: Lazy<Value> =
-    Lazy::new(|| serde_json::from_slice(JSON_SCHEMA_2020_12_BYTES).unwrap());
+pub static JSON_SCHEMA_2020_12_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_BYTES).unwrap(),
+    )
+});
+pub static JSON_SCHEMA_2020_12_CONTENT_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/content").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_CONTENT_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_CORE_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/core").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_CORE_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-annotation").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-assertion").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_FORMAT_ASSERTION_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_META_DATA_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/meta-data").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_META_DATA_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/unevaluated").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/validation").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_VALIDATION_BYTES).unwrap(),
+    )
+});
+
+pub static JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/applicator").unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_APPLICATOR_BYTES).unwrap(),
+    )
+});
 
 pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_2020_12_absolute_uri().clone(),
         [
-            Metaschema {
-                id: JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-                schema: JSON_SCHEMA_2020_12.as_object().unwrap().clone(),
-            }, // TODO: add other schemas
+            Lazy::force(&JSON_SCHEMA_2020_12_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_CORE_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_META_DATA_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA),
+            Lazy::force(&JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA),
         ],
         SCHEMA_KEYWORDS,
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
@@ -190,44 +254,74 @@ pub fn is_json_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
 /// schema with an`"$anchor"`.
 ///
 pub fn locate_schemas<'v>(
-    path: Pointer,
+    ptr: Pointer,
     value: &'v Value,
-    mut dialects: Dialects,
+    dialects: Dialects,
     base_uri: &AbsoluteUri,
 ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
     match value {
-        Value::Array(arr) => locate_schemas_in_array(path, arr, dialects, base_uri),
-        Value::Object(_) => locate_schemas_in_obj(path, value, dialects, base_uri),
+        Value::Array(arr) => locate_schemas_in_array(ptr, arr, dialects, base_uri),
+        Value::Object(_) => locate_schemas_in_obj(ptr, value, dialects, base_uri),
         _ => Ok(Vec::new()),
     }
 }
 
 fn locate_schemas_in_obj<'v>(
-    path: Pointer,
+    mut path: Pointer,
     value: &'v Value,
     mut dialects: Dialects,
     base_uri: &AbsoluteUri,
 ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    todo!()
-}
+    let mut results: Vec<LocatedSchema> = Vec::new();
+    let default_dialect = dialects.default_dialect();
+    let dialect_idx = dialects.dialect_index_for(value);
+    dialects.set_default_dialect_index(dialect_idx);
+    let dialect = dialects
+        .get(dialect_idx)
+        .expect("dialect index out of bounds");
 
-fn ident_schema_location_by_dynamic_anchor<'v>(
-    path: Pointer,
-    value: &'v Value,
-    base_uri: &AbsoluteUri,
-) -> Option<LocatedSchema<'v>> {
-    let Some(Value::String(anchor)) = value.get(Keyword::DYNAMIC_ANCHOR.as_str()) else { return None };
-    if anchor.is_empty() {
-        return None;
+    if default_dialect != dialect {
+        return dialect.locate_schemas(path, value, dialects, base_uri);
     }
-    let mut uri = base_uri.clone();
-    uri.set_fragment(Some(anchor));
-    Some(LocatedSchema {
-        uri,
-        value,
-        path,
-        keyword: Some(Keyword::DYNAMIC_ANCHOR),
-    })
+    if path.is_empty() || default_dialect.is_schema_property(&path, value) {
+        results.push(identify_schema_location_by_path(&path, value, base_uri));
+    }
+
+    let mut base_uri = base_uri.clone();
+
+    if let Some(located) =
+        identify_schema_location_by_id(&path, value, &mut base_uri, &mut dialects)?
+    {
+        path = Pointer::default();
+        results.push(located);
+    }
+
+    if let Some(anchored) = ident_schema_location_by_anchor(&path, value, &base_uri) {
+        results.push(anchored);
+    }
+
+    if let Some(anchored) = ident_schema_location_by_dynamic_anchor(&path, value, &base_uri) {
+        results.push(anchored);
+    }
+
+    for (key, value) in value.as_object().unwrap().iter() {
+        if !dialects
+            .get(dialects.dialect_index_for(value))
+            .expect("dialect index out of bounds")
+            .can_keyword_contain_schemas(Keyword(key))
+        {
+            let mut path = path.clone();
+            path.push_back(key.into());
+            if !dialect.is_schema_property(&path, value) {
+                continue;
+            }
+        }
+        let mut new_path = path.clone();
+        new_path.push_back(key.into());
+        let mut located_schemas = dialect.locate_schemas(new_path, value, dialects, &base_uri)?;
+        results.append(&mut located_schemas);
+    }
+    Ok(results)
 }
 
 #[cfg(test)]

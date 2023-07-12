@@ -12,6 +12,7 @@ pub use type_handler::{TypeHandler, TypeInvalid};
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
     error::{IdentifyError, LocateSchemasError},
+    keyword::SCHEMA_KEYWORDS,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
@@ -43,17 +44,18 @@ pub const JSON_HYPER_SCHEMA_07_LINKS_BYTES: &[u8] =
 pub const JSON_HYPER_SCHEMA_07_OUTPUT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/07/hyper-schema-output.json");
 
-pub static JSON_SCHEMA_07: Lazy<Value> =
-    Lazy::new(|| serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap());
+pub static JSON_SCHEMA_07_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
+    Metaschema::new(
+        json_schema_07_absolute_uri().clone(),
+        serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap(),
+    )
+});
 
 pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_07_absolute_uri().clone(),
-        [Metaschema {
-            id: JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
-            schema: JSON_SCHEMA_07.as_object().unwrap().clone(),
-        }],
-        [], // TODO
+        [Lazy::force(&JSON_SCHEMA_07_METASCHEMA)],
+        SCHEMA_KEYWORDS,
         [ConstHandler::new()],
         is_json_schema_07,
         identify_schema,

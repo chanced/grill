@@ -4,6 +4,30 @@ use serde::{Deserialize, Serialize};
 
 use SchemaKeyword::*;
 
+pub const SCHEMA_KEYWORDS: [SchemaKeyword; 21] = [
+    Single(Keyword::ADDITIONAL_ITEMS),
+    Single(Keyword::ADDITIONAL_PROPERTIES),
+    Single(Keyword::PREFIX_ITEMS),
+    SingleOrArray(Keyword::ITEMS),
+    Array(Keyword::ALL_OF),
+    Array(Keyword::ANY_OF),
+    Array(Keyword::ONE_OF),
+    Single(Keyword::CONTAINS),
+    Single(Keyword::NOT),
+    Single(Keyword::IF),
+    Single(Keyword::ELSE),
+    Single(Keyword::THEN),
+    Map(Keyword::DEFINITIONS_LEGACY),
+    Map(Keyword::DEFS),
+    Map(Keyword::PROPERTIES),
+    Map(Keyword::DEPENDENT_SCHEMAS),
+    Array(Keyword::PREFIX_ITEMS),
+    Single(Keyword::PROPERTY_NAMES),
+    Single(Keyword::UNEVALUATED_ITEMS),
+    Single(Keyword::UNEVALUATED_PROPERTIES),
+    Single(Keyword::CONTENT_SCHEMA),
+];
+
 /// A wrapper type used to distinguish between keywords and other strings as
 /// parameters to functions.
 ///
@@ -1140,27 +1164,3 @@ impl SchemaKeyword<'static> {
         }
     }
 }
-
-pub const SCHEMA_KEYWORDS: [SchemaKeyword; 21] = [
-    Single(Keyword::ADDITIONAL_ITEMS),
-    Single(Keyword::ADDITIONAL_PROPERTIES),
-    Single(Keyword::PREFIX_ITEMS),
-    SingleOrArray(Keyword::ITEMS),
-    Array(Keyword::ALL_OF),
-    Array(Keyword::ANY_OF),
-    Array(Keyword::ONE_OF),
-    Single(Keyword::CONTAINS),
-    Single(Keyword::NOT),
-    Single(Keyword::IF),
-    Single(Keyword::ELSE),
-    Single(Keyword::THEN),
-    Map(Keyword::DEFINITIONS_LEGACY),
-    Map(Keyword::DEFS),
-    Map(Keyword::PROPERTIES),
-    Map(Keyword::DEPENDENT_SCHEMAS),
-    Array(Keyword::PREFIX_ITEMS),
-    Single(Keyword::PROPERTY_NAMES),
-    Single(Keyword::UNEVALUATED_ITEMS),
-    Single(Keyword::UNEVALUATED_PROPERTIES),
-    Single(Keyword::CONTENT_SCHEMA),
-];

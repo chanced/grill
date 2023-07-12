@@ -2,14 +2,14 @@
 //!
 //! Validation errors are defined within their respective keyword's module.
 
-use crate::{keyword::Keyword, uri::AbsoluteUri, Location, Output, Uri};
+use crate::{dialect::Dialect, keyword::Keyword, uri::AbsoluteUri, Location, Output, Uri};
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
 use snafu::Snafu;
 use std::{
     collections::HashMap,
     error::Error,
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
     string::FromUtf8Error,
 };
 
@@ -23,6 +23,26 @@ pub struct DuplicateSourceError {
     pub uri: AbsoluteUri,
     pub source: Value,
 }
+
+#[derive(Debug)]
+pub struct DuplicateDialectError {
+    pub dialect: Dialect,
+}
+
+impl DuplicateDialectError {
+    #[must_use]
+    pub fn new(dialect: Dialect) -> Self {
+        Self { dialect }
+    }
+}
+
+impl Display for DuplicateDialectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "duplicate dialect provided: {}", self.dialect.id)
+    }
+}
+
+impl std::error::Error for DuplicateDialectError {}
 
 #[derive(Debug, Snafu)]
 pub enum LocateSchemasError {
@@ -129,30 +149,47 @@ impl Error for FragmentedDialectIdError {}
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum BuildError {
     #[snafu(display("failed to compile schema: {}", source), context(false))]
-    Compile { source: CompileError },
-    #[snafu(display("duplicate dialect id: {}", source), context(false))]
-    DuplicateSource { source: DuplicateSourceError },
+    Compile {
+        source: CompileError,
+    },
     #[snafu(display("{}", source), context(false))]
-    FragmentedSourceUri { source: FragmentedUriError },
+    DuplicateSource {
+        source: DuplicateSourceError,
+    },
     #[snafu(display("{}", source), context(false))]
-    FragmentedDialectId { source: FragmentedDialectIdError },
+    DuplicateDialect {
+        source: DuplicateDialectError,
+    },
+    FragmentedSourceUri {
+        source: FragmentedUriError,
+    },
+    #[snafu(display("{}", source), context(false))]
+    FragmentedDialectId {
+        source: FragmentedDialectIdError,
+    },
     #[snafu(display("failed to parse uri: {}", source), context(false))]
-    MalformedAbsoluteUri { source: UriError },
+    MalformedAbsoluteUri {
+        source: UriError,
+    },
     #[snafu(display("failed to deserialize source: {}", uri))]
     DeserializeSource {
         source: DeserializeError,
         uri: AbsoluteUri,
     },
     #[snafu(display("{}", source), context(false))]
-    MissingDialects { source: MissingDialectError },
+    MissingDialects {
+        source: NoDialectsError,
+    },
     #[snafu(display("{}", uri))]
-    DefaultDialectNotFound { uri: AbsoluteUri },
+    DefaultDialectNotFound {
+        uri: AbsoluteUri,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MissingDialectError;
+pub struct NoDialectsError;
 
-impl Display for MissingDialectError {
+impl Display for NoDialectsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -160,7 +197,7 @@ impl Display for MissingDialectError {
         )
     }
 }
-impl std::error::Error for MissingDialectError {}
+impl std::error::Error for NoDialectsError {}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]

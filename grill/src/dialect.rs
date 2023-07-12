@@ -17,14 +17,10 @@ use crate::{
     Handler, Metaschema, Object, Uri,
 };
 use serde_json::Value;
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, HashSet},
-    convert::Into,
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{borrow::Borrow, collections::HashMap, convert::Into, fmt::Debug, hash::Hash};
 
+/// A `Dialect` is a set of keywords and semantics that can be used to evaluate
+/// a value against a schema.
 #[derive(Clone)]
 pub struct Dialect {
     /// Identifier of the `Dialect`
@@ -107,16 +103,20 @@ impl Dialect {
         self.schema_properties.contains_key(&keyword)
     }
 
-    /// Returns `true` if the path may contain one or more schemas. This assumes
-    /// that the path starts at the root of a schema.
+    /// Determines whether an element in an array or a property on an object, at
+    /// `path`, can contain one or more schemas. `value` is the containing array
+    /// or object one level above the leaf of `path`.
     #[must_use]
-    pub fn is_schema_property(&self, path: &Pointer) -> bool {
+    pub fn is_schema_property(&self, path: &Pointer, value: &Value) -> bool {
         let mut iter = path.into_iter().peekable();
         while let Some(tok) = iter.next() {
             let Some(prop) = self.schema_properties.get(&Keyword(tok.decoded())) else { return false };
             match prop {
                 SchemaKeyword::Array(_) => {
-                    let Some(next) = iter.next() else { return false};
+                    let Some(next) = iter.next() else { return false };
+                    if !value.is_array() {
+                        return false;
+                    }
                     if next.parse::<usize>().is_err() {
                         return false;
                     }
@@ -299,17 +299,22 @@ pub(crate) struct Parts {
 // }
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use crate::json_schema::draft_2019_09::JSON_SCHEMA_2019_09_DIALECT;
 
     #[test]
     fn test_is_is_schema_property() {
         let d = JSON_SCHEMA_2019_09_DIALECT.clone();
         let ptr = |s: &str| s.try_into().unwrap();
-        assert!(d.is_schema_property(&ptr("/properties/prop/items/0/$defs/nested")));
-        assert!(d.is_schema_property(&ptr("/properties/prop/items/$defs/nested")));
-        assert!(d.is_schema_property(&ptr("/anyOf/3/if/$defs/nested/prefixItems/0")));
-        assert!(!d.is_schema_property(&ptr("/anyOf/invalid/if/$defs/nested/prefixItems/34")));
-        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested/prefixItems/21")));
-        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested///")));
+        assert!(d.is_schema_property(&ptr("/properties/prop/items/0/$defs/nested"), &json!({})));
+        assert!(d.is_schema_property(&ptr("/properties/prop/items/$defs/nested"), &json!({})));
+        assert!(d.is_schema_property(&ptr("/anyOf/3/if/$defs/nested/prefixItems/0"), &json!([{}])));
+        assert!(!d.is_schema_property(
+            &ptr("/anyOf/invalid/if/$defs/nested/prefixItems/34"),
+            &json!({})
+        ));
+        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested/prefixItems/21"), &json!({})));
+        assert!(!d.is_schema_property(&ptr("/invalid/if/$defs/nested///"), &json!({})));
     }
 }
