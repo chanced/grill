@@ -82,7 +82,8 @@ new_key_type! {
     pub struct ValueKey;
 }
 
-
+mod source;
+pub use source::Source;
 
 #[cfg(test)]
 pub mod test;

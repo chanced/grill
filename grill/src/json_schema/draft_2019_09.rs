@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
     error::{HasFragmentError, IdentifyError, LocateSchemasError},
-    keyword::{Keyword, SCHEMA_KEYWORDS},
+    keyword::Keyword,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
@@ -145,7 +145,6 @@ pub static JSON_SCHEMA_2019_09_DIALECT: Lazy<Dialect> = Lazy::new(|| {
             Lazy::force(&JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA),
             Lazy::force(&JSON_SCHEMA_2019_09_METASCHEMA),
         ],
-        SCHEMA_KEYWORDS,
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
         is_json_schema_2019_09,
         identify_schema,

@@ -1,6 +1,6 @@
 use std::{
-    any::{self},
-    borrow::{Borrow, Cow},
+    any,
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     fmt::Debug,
     ops::Deref,
@@ -8,25 +8,26 @@ use std::{
 };
 
 use either::Either;
-use jsonptr::Pointer;
+use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::SlotMap;
 use snafu::ResultExt;
 
 use crate::{
     deserialize::deserialize_json,
-    dialect::Dialect,
+    dialect::{Dialect, Dialects, Parts},
     error::{
-        build_error, resolve_error, BuildError, CompileError, DeserializeError,
-        DuplicateDialectError, DuplicateSourceError, EvaluateError, FragmentedDialectIdError,
-        FragmentedUriError, NoDialectsError, ResolveError, ResolveErrors, SourceError,
-        SourceSliceError, UnknownDialectError, UriError,
+        build_error,
+        resolve_error::{self, NestedSchemaNotFound},
+        BuildError, CompileError, DeserializeError, DuplicateDialectError, DuplicateSourceError,
+        EvaluateError, FragmentedDialectIdError, FragmentedUriError, NoDialectsError, PointerError,
+        ResolveError, ResolveErrors, SourceError, SourceSliceError, UnknownDialectError, UriError,
     },
     graph::DependencyGraph,
     json_schema,
     keyword::Keyword,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Deserializer, Metaschema, Output, Resolve, Schema, SchemaKey, Structure,
+    Deserializer, Output, Resolve, Schema, SchemaKey, Source, Structure,
 };
 
 /// Compiles and evaluates JSON Schemas.
@@ -74,14 +75,78 @@ where
             return Ok(key);
         }
         let value = self.resolve(&uri).await?;
-        let dialect = self.identify_dialect(&value)?;
+        let dialect = self
+            .identify_dialect(&value)?
+            .unwrap_or(self.default_dialect());
+        let Parts {
+            locate_schemas,
+            is_schema,
+            handlers,
+            id,
+            identify_schema,
+        } = dialect.parts();
         todo!()
     }
 
-    fn identify_dialect(&self, schema: &Value) -> Result<&Dialect, UnknownDialectError> {
+    /// Attempts to resolve, deserialize, and store the schema at the given URI
+    /// using either local in-mem storage or resolved with any of the attached
+    /// implementations of [`Resolve`]s.
+    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, ResolveErrors> {
+        let uri = uri.borrow();
+
+        // if the value has already been indexed, return a clone of the local copy
+        if let Some(schema) = self.resolve_local(uri) {
+            return Ok(schema.clone());
+        }
+
+        // checking to see if the root resource has already been stored
+        let mut base_uri = uri.clone();
+        base_uri.set_fragment(None);
+
+        // resolving the base uri
+        let resolved = self.try_resolvers(&base_uri).await?;
+
+        // add the base value to the local store
+        let root = self
+            .source(Source::Value(base_uri, resolved.clone()))?
+            .clone(); // need to clone to avoid borrow checker constraints.
+
+        let uri_fragment = uri.fragment().unwrap_or_default();
+
+        // if the uri does not have a fragment, we are done and can return the root-level schema
+        if uri_fragment.is_empty() {
+            return Ok(resolved);
+        }
+        // if the uri does have a fragment then there is more work to do
+
+        // first, lookup again to see if add_source was able to index the schema
+        if let Some(schema) = self.resolve_local(uri) {
+            return Ok(schema.clone());
+        }
+
+        // if not, the fragment must be a json pointer as all anchors and
+        // schemas with fragmented ids should have been located
+        let ptr = Pointer::from_str(uri_fragment)
+            .map_err(|e| PointerError::from(e))
+            .context(NestedSchemaNotFound { uri, uri_fragment })?;
+        root.resolve(&ptr)
+            .cloned()
+            .map_err(|e| PointerError::from(e))
+            .context(NestedSchemaNotFound { uri, uri_fragment })
+            .map_err(Into::into)
+    }
+    fn default_dialect(&self) -> &Dialect {
+        &self.dialects[self.default_dialect]
+    }
+
+    pub fn dialects(&self) -> Dialects {
+        Dialects::new(self.dialects.as_ref(), self.default_dialect())
+    }
+
+    fn identify_dialect(&self, schema: &Value) -> Result<Option<&Dialect>, UnknownDialectError> {
         for dialect in &self.dialects {
             if dialect.matches(schema) {
-                return Ok(dialect);
+                return Ok(Some(dialect));
             }
         }
         match schema
@@ -90,9 +155,10 @@ where
             .map(ToString::to_string)
         {
             Some(metaschema_id) => Err(UnknownDialectError { metaschema_id }),
-            None => Ok(&self.dialects[self.default_dialect]),
+            None => Ok(None),
         }
     }
+
     pub fn evaluate(
         &self,
         key: Key,
@@ -106,28 +172,6 @@ where
         let key = self.schema_lookup.get(id).copied()?;
         let schema = self.schemas.get(key)?;
         Some((key, schema))
-    }
-
-    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, ResolveErrors> {
-        let uri = uri.borrow();
-        {
-            if let Some(schema) = self.resolve_local(uri) {
-                return Ok(schema.clone());
-            }
-        }
-        let mut uri_without_fragment = uri.clone();
-        uri_without_fragment.set_fragment(None);
-        let resolved = self.try_resolvers(&uri_without_fragment).await?;
-        // self.add_schema_source(&uri_without_fragment, resolved.clone());
-        let frag = uri.fragment().unwrap_or_default();
-        if frag.is_empty() {
-            return Ok(resolved);
-        }
-        let ptr = Pointer::try_from(frag);
-
-        // I don't want to recurse into the object and seek an anchor... hm.
-        //
-        todo!()
     }
 
     async fn try_resolvers(&self, uri: &AbsoluteUri) -> Result<Value, ResolveErrors> {
@@ -165,9 +209,8 @@ where
         self.sources.get(uri)
     }
 
-    /// Adds a source schema from a slice of bytes that will be deserialized
-    /// with avaialble [`Deserializer`] at the time of
-    /// [`build`](`Builder::build`).
+    /// Adds a schema source from a slice of bytes that will be deserialized with
+    /// avaialble [`Deserializer`] at the time of [`build`](`Builder::build`).
     ///
     /// # Example
     /// ```rust
@@ -184,30 +227,59 @@ where
         &mut self,
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
-    ) -> Result<(), SourceError> {
+    ) -> Result<&Value, SourceError> {
         let source = Source::String(
             uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
         );
 
-        self.add_source(source)
+        self.source(source)
     }
 
-    fn add_source(&mut self, source: Source) -> Result<(), SourceError> {
-        let uri = source.uri();
-        let source = source.value(&self.deserializers)?;
-
+    fn insert_source(&mut self, uri: AbsoluteUri, source: Value) -> Result<&Value, SourceError> {
         if let Some(src) = self.sources.get(&uri) {
             if src == &source {
-                return Ok(());
+                return Ok(src);
             }
+            // error out if a source with the same uri has been indexed and the
+            // values do not match
             return Err(DuplicateSourceError { uri, source }.into());
         }
         self.sources.insert(uri, source);
-        Ok(())
+        Ok(self.sources.get(&uri).unwrap())
     }
 
-    /// Adds a schema source from a `str`
+    // Adds a `Source` s
+    pub fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
+        let mut uri = source.uri().clone();
+        let frag = uri.fragment();
+        if frag.is_some() && frag != Some("") {
+            return Err(SourceError::FragmentedSourceUri {
+                source: FragmentedUriError { uri },
+            });
+        }
+        let source = source.value(&self.deserializers)?.into_owned();
+        // if the source has already been indexed, no-op
+        if let Some(src) = self.sources.get(&uri) {
+            if src == &source {
+                return Ok(src);
+            }
+            // error out if a source with the same uri has been indexed and the
+            // values do not match
+            return Err(DuplicateSourceError { uri, source }.into());
+        }
+        // checking to see if the source is a schema
+        if let Ok(Some(dialect)) = self.identify_dialect(&source) {
+            if let Ok(located_schemas) = dialect.locate_schemas(&source, self.dialects(), &uri) {
+                for located in located_schemas {
+                    self.source_value(uri, source)?;
+                }
+            }
+        }
+        self.insert_source(uri, source)
+    }
+
+    /// Adds a schema source from a `&str`
     /// # Example
     /// ```rust
     /// let mut interrogator = grill::Interrogator::json_schema_2020_12().build().unwrap();
@@ -220,8 +292,8 @@ where
         &mut self,
         uri: impl TryIntoAbsoluteUri,
         source: &str,
-    ) -> Result<(), SourceError> {
-        self.add_source(Source::String(
+    ) -> Result<&Value, SourceError> {
+        self.source(Source::String(
             uri.try_into_absolute_uri()?,
             source.to_string(),
         ))
@@ -245,8 +317,8 @@ where
         &mut self,
         uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
-    ) -> Result<(), SourceError> {
-        self.add_source(Source::Value(
+    ) -> Result<&Value, SourceError> {
+        self.source(Source::Value(
             uri.try_into_absolute_uri()?,
             source.borrow().clone(),
         ))
@@ -276,7 +348,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.add_source(Source::String(k.try_into_absolute_uri()?, v.to_string()))?;
+            self.source(Source::String(k.try_into_absolute_uri()?, v.to_string()))?;
         }
         Ok(())
     }
@@ -306,7 +378,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.add_source(Source::String(
+            self.source(Source::String(
                 k.try_into_absolute_uri()?,
                 String::from_utf8(v.as_ref().to_vec())?,
             ))?;
@@ -341,7 +413,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.add_source(Source::Value(
+            self.source(Source::Value(
                 k.try_into_absolute_uri()?,
                 v.borrow().clone(),
             ))?;
@@ -756,7 +828,7 @@ where
         self
     }
 
-    pub fn build(self) -> Result<Interrogator<Key>, BuildError> {
+    pub async fn build(self) -> Result<Interrogator<Key>, BuildError> {
         let Self {
             dialects,
             mut sources,
@@ -773,6 +845,12 @@ where
         let sources = Self::build_sources(sources, &deserializers)?;
         let schemas: SlotMap<Key, Schema> = SlotMap::with_key();
         let schema_lookup = HashMap::new();
+
+        let precompile = dialects
+            .iter()
+            .map(|d| d.id.clone())
+            .collect::<Vec<AbsoluteUri>>();
+
         let mut interrogator = Interrogator {
             dialects,
             default_dialect,
@@ -783,17 +861,24 @@ where
             deserializers,
             dep_graph,
         };
-        println!("{interrogator:#?}");
+
+        for dialect_id in precompile {
+            interrogator.compile(dialect_id).await?;
+        }
+
         Ok(interrogator)
     }
 
     fn build_sources(
         sources: Vec<Source>,
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
-    ) -> Result<(HashMap<AbsoluteUri, Value>), BuildError> {
+    ) -> Result<HashMap<AbsoluteUri, Value>, BuildError> {
         let mut res: HashMap<AbsoluteUri, Value> = HashMap::with_capacity(sources.len());
         for src in sources {
             let uri = src.uri();
+            let (uri, src) = src
+                .try_take(deserializers)
+                .context(build_error::DeserializeSource { uri: uri.clone() })?;
             if let Some(fragment) = uri.fragment() {
                 if !fragment.is_empty() {
                     return Err(BuildError::FragmentedSourceUri {
@@ -801,10 +886,6 @@ where
                     });
                 }
             }
-            let src = src
-                .value(deserializers)
-                .context(build_error::DeserializeSource { uri: uri.clone() })?;
-
             res.insert(uri, src);
         }
         Ok(res)
@@ -822,7 +903,7 @@ where
     fn collect_dialect_sources(dialects: &[Dialect]) -> Vec<Source> {
         let mut result = Vec::with_capacity(dialects.len());
         for dialect in dialects {
-            for metaschema in &dialect.meta_schemas {
+            for metaschema in &dialect.metaschemas {
                 result.push(Source::Value(
                     metaschema.0.clone(),
                     metaschema.1.clone().into(),
@@ -904,52 +985,6 @@ where
     //     Ok(self)
     // }
 }
-enum Source {
-    String(AbsoluteUri, String),
-    Value(AbsoluteUri, Value),
-}
-
-impl From<&Metaschema> for Source {
-    fn from(value: &Metaschema) -> Self {
-        Self::Value(value.id.clone(), value.schema.clone().into())
-    }
-}
-
-impl Source {
-    fn uri(&self) -> AbsoluteUri {
-        match self {
-            Self::Value(uri, _) | Self::String(uri, _) => uri.clone(),
-        }
-    }
-    fn value(
-        &self,
-        deserializers: &[(&'static str, Box<dyn Deserializer>)],
-    ) -> Result<Value, DeserializeError> {
-        match self {
-            Self::String(_, s) => {
-                let mut source = None;
-                let mut errs: HashMap<&'static str, erased_serde::Error> = HashMap::new();
-                for (fmt, de) in deserializers {
-                    match de.deserialize(s) {
-                        Ok(v) => {
-                            source = Some(v);
-                            break;
-                        }
-                        Err(e) => {
-                            errs.insert(fmt, e);
-                            continue;
-                        }
-                    }
-                }
-                let Some(source) = source  else {
-                    return Err(DeserializeError { formats: errs });
-                };
-                Ok(source)
-            }
-            Self::Value(_, source) => Ok(source.clone()),
-        }
-    }
-}
 
 fn ensure_no_fragment(uri: &AbsoluteUri) -> Result<(), FragmentedUriError> {
     if let Some(fragment) = uri.fragment() {
@@ -976,13 +1011,14 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::prelude::*;
-    #[test]
-    fn test_build() {
+    #[tokio::test]
+    async fn test_build() {
         let interrogator = Builder::default()
             .json_schema_2020_12()
             .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
             .unwrap()
             .build()
+            .await
             .unwrap();
 
         let mut file = File::create("foo.txt").unwrap();

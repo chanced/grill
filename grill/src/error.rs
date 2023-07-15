@@ -3,7 +3,7 @@
 //! Validation errors are defined within their respective keyword's module.
 
 use crate::{dialect::Dialect, keyword::Keyword, uri::AbsoluteUri, Location, Output, Uri};
-use jsonptr::Pointer;
+use jsonptr::{MalformedPointerError, Pointer};
 use serde_json::{Number, Value};
 use snafu::Snafu;
 use std::{
@@ -146,6 +146,14 @@ impl FragmentedDialectIdError {
 impl Error for FragmentedDialectIdError {}
 
 #[derive(Debug, Snafu)]
+pub enum PointerError {
+    #[snafu(display("{}", source), context(false))]
+    Malformed { source: MalformedPointerError },
+    #[snafu(display("{}", source), context(false))]
+    Resolve { source: jsonptr::Error },
+}
+
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum BuildError {
     #[snafu(display("failed to compile schema: {}", source), context(false))]
@@ -268,6 +276,7 @@ impl Error for DeserializeError {
         self.formats.iter().next().map(|(_, err)| err as _)
     }
 }
+
 #[derive(Debug)]
 pub struct ResolveErrors {
     pub errors: Vec<ResolveError>,
@@ -322,17 +331,20 @@ pub enum ResolveError {
         /// The [`std::io::Error`] which occurred
         source: std::io::Error,
     },
-    /// A [`jsonptr::Error`] occurred while attempting to resolve a schema
-    #[snafu(display(r#"error resolving pointer "{pointer}" in schema "{schema_id}": {source}"#))]
-    Pointer {
+
+    /// Indicates that a source was able to be resolved but the schema referenced by
+    /// a fragment was not able to be located.
+    #[snafu(display("{}", source))]
+    NestedSchemaNotFound {
+        source: PointerError,
+        /// The URI fragment of the schema which was not able to be resolved
+        uri_fragment: String,
         /// The URI of the schema which was not able to be resolved
-        schema_id: String,
-        /// The JSON Pointer which was not able to be resolved
-        pointer: jsonptr::Pointer,
-        /// The [`jsonptr::Error`] which occurred
-        source: jsonptr::Error,
+        uri: AbsoluteUri,
     },
-    /// The schema was not able to be parsed with the enabled formats
+
+    /// The schema was not able to be deserialized with the attached
+    /// implementations of [`Deserializer`](`crate::Deserializer`)
     #[snafu(display(r#"error deserialzing schema "{schema_id}": {source}"#))]
     Deserialize {
         /// The URI of the schema which was not able to be resolved
@@ -340,6 +352,9 @@ pub enum ResolveError {
         /// The [`DeserializeError`] which occurred
         source: DeserializeError,
     },
+    /// An error occurred while adding the value as a source
+    #[snafu(display("{}", source), context(false))]
+    Source { source: SourceError },
 
     /// A [`Resolve`] implementation returned a custom error
     #[snafu(display(r#"error resolving "{schema_id}": {source}"#))]
@@ -355,6 +370,19 @@ pub enum ResolveError {
         schema_id: String,
         source: reqwest::Error,
     },
+}
+
+impl From<ResolveError> for ResolveErrors {
+    fn from(err: ResolveError) -> Self {
+        Self { errors: vec![err] }
+    }
+}
+impl From<SourceError> for ResolveErrors {
+    fn from(err: SourceError) -> Self {
+        Self {
+            errors: vec![err.into()],
+        }
+    }
 }
 
 impl ResolveError {
@@ -498,6 +526,8 @@ pub enum SourceError {
     Deserialize { source: DeserializeError },
     #[snafu(display("{}", source), context(false))]
     DuplicateSource { source: DuplicateSourceError },
+    #[snafu(display("{}", source), context(false))]
+    FragmentedSourceUri { source: FragmentedUriError },
 }
 
 #[derive(Debug, Snafu)]

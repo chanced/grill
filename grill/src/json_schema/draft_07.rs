@@ -12,7 +12,6 @@ pub use type_handler::{TypeHandler, TypeInvalid};
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
     error::{IdentifyError, LocateSchemasError},
-    keyword::SCHEMA_KEYWORDS,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
@@ -55,7 +54,6 @@ pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     Dialect::new(
         json_schema_07_absolute_uri().clone(),
         [Lazy::force(&JSON_SCHEMA_07_METASCHEMA)],
-        SCHEMA_KEYWORDS,
         [ConstHandler::new()],
         is_json_schema_07,
         identify_schema,

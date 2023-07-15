@@ -31,13 +31,11 @@ use super::Dialects;
 /// ```
 /// may only identify following URIs:
 /// - `https://example.com/example.json`
-/// - `https://example.com/example.json#/$defs/foo`
 /// - `https://example.com/foo.json`
 /// - `https://example.com/bar.json`
-/// - `https://example.com/example.json#/$defs/foo/$defs/bar`
 /// - `https://example.com/bar.json#anchor`
-/// The remainder, such as `https://example.com/foo.json#/$defs/bar`, are
-/// resolved upon request.
+///
+/// The remainder are resolved upon use.
 ///
 /// # Examples
 /// ## [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core.html#name-schema-identification-examp)
@@ -193,6 +191,7 @@ pub struct LocatedSchema<'v> {
     pub path: Pointer,
     pub keyword: Option<Keyword<'static>>,
 }
+
 impl<'v> LocatedSchema<'v> {
     #[must_use]
     pub fn new(

@@ -7,7 +7,7 @@ use super::{
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
     error::LocateSchemasError,
-    keyword::{Keyword, SCHEMA_KEYWORDS},
+    keyword::Keyword,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
@@ -136,7 +136,6 @@ pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
             Lazy::force(&JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA),
             Lazy::force(&JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA),
         ],
-        SCHEMA_KEYWORDS,
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
         is_json_schema_2020_12,
         identify_schema,
