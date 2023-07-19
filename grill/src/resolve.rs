@@ -2,12 +2,10 @@
 
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
-use serde_json::Value;
 use snafu::ResultExt;
-use url::Url;
 
 use crate::{
-    error::{resolve_error, DeserializeError, ResolveError},
+    error::{resolve_error, ResolveError, ResolveErrors},
     uri::AbsoluteUri,
 };
 
@@ -62,5 +60,42 @@ impl Resolve for HttpResolver {
                 })
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Resolvers {
+    resolvers: Vec<Box<dyn Resolve>>,
+}
+
+impl Resolvers {
+    #[must_use]
+    pub fn new(resolvers: Vec<Box<dyn Resolve>>) -> Self {
+        Self { resolvers }
+    }
+    pub async fn resolve(&self, uri: &AbsoluteUri) -> Result<String, ResolveErrors> {
+        let mut errors = ResolveErrors::new();
+        for resolver in &self.resolvers {
+            match resolver.resolve(uri).await {
+                Ok(Some(data)) => {
+                    return Ok(data);
+                }
+                Err(err) => errors.push(err),
+                _ => continue,
+            }
+        }
+        errors.push(ResolveError::not_found(uri.to_string(), None));
+        Err(errors)
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, Box<dyn Resolve>> {
+        self.resolvers.iter()
+    }
+}
+impl<'a> IntoIterator for &'a Resolvers {
+    type Item = &'a Box<dyn Resolve>;
+    type IntoIter = std::slice::Iter<'a, Box<dyn Resolve>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.resolvers.iter()
     }
 }

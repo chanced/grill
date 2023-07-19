@@ -55,9 +55,6 @@ pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         json_schema_07_absolute_uri().clone(),
         [Lazy::force(&JSON_SCHEMA_07_METASCHEMA)],
         [ConstHandler::new()],
-        is_json_schema_07,
-        identify_schema,
-        locate_schemas,
     )
 });
 

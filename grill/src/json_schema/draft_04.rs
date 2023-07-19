@@ -42,9 +42,6 @@ pub static JSON_SCHEMA_04_DIALECT: Lazy<Dialect> = Lazy::new(|| {
             JSON_SCHEMA_04.as_object().unwrap().clone(),
         )],
         [super::draft_07::ConstHandler::new()], // TODO: FIX,
-        is_json_schema_04,
-        identify_schema,
-        locate_schemas,
     )
 });
 

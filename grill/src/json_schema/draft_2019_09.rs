@@ -1,21 +1,15 @@
 use std::collections::HashMap;
 
 use crate::{
-    dialect::{Dialect, Dialects, LocatedSchema},
-    error::{HasFragmentError, IdentifyError, LocateSchemasError},
+    dialect::Dialect,
+    error::{HasFragmentError, IdentifyError},
     keyword::Keyword,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
-use jsonptr::Pointer;
 use once_cell::sync::Lazy;
-use serde_json::{json, Value};
+use serde_json::Value;
 use url::Url;
-
-use super::{
-    ident_schema_location_by_anchor, ident_schema_location_by_dynamic_anchor,
-    identify_schema_location_by_id, identify_schema_location_by_path, locate_schemas_in_array,
-};
 
 pub const JSON_SCHEMA_2019_09_URI_STR: &str = "https://json-schema.org/draft/2019-09/schema";
 pub static JSON_SCHEMA_2019_09_URL: Lazy<Url> =
@@ -146,9 +140,6 @@ pub static JSON_SCHEMA_2019_09_DIALECT: Lazy<Dialect> = Lazy::new(|| {
             Lazy::force(&JSON_SCHEMA_2019_09_METASCHEMA),
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
-        is_json_schema_2019_09,
-        identify_schema,
-        locate_schemas,
     )
 });
 
@@ -160,13 +151,11 @@ pub fn is_json_schema_2019_09(v: &Value) -> bool {
     if v.is_boolean() {
         return true;
     }
-
     let Value::Object(obj) = v else { return false };
-    let Some(s) = obj.get("$schema").and_then(Value::as_str) else { return false };
+    let Some(s) = obj.get(Keyword::SCHEMA.as_str()).and_then(Value::as_str) else { return false };
     if s == JSON_SCHEMA_2019_09_URI_STR {
         return true;
     }
-
     let Ok(uri) = Uri::parse(s) else { return false };
     is_json_schema_2019_09_uri(&uri)
 }
@@ -287,83 +276,14 @@ pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     }
 }
 
-/// An implementation of [`LocateSchemas`](`crate::dialect::LocateSchemas`)
-/// which recursively traverses a [`Value`] and returns a [`Vec`] of
-/// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
-/// schema with an`"$anchor"`.
-///
-pub fn locate_schemas<'v>(
-    ptr: Pointer,
-    value: &'v Value,
-    dialects: Dialects,
-    base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    match value {
-        Value::Array(arr) => locate_schemas_in_array(ptr, arr, dialects, base_uri),
-        Value::Object(_) => locate_schemas_in_obj(ptr, value, dialects, base_uri),
-        _ => Ok(Vec::new()),
-    }
-}
-
-fn locate_schemas_in_obj<'v>(
-    mut path: Pointer,
-    value: &'v Value,
-    mut dialects: Dialects,
-    base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    let mut results: Vec<LocatedSchema> = Vec::new();
-    let default_dialect = dialects.default_dialect();
-    let dialect_idx = dialects.dialect_index_for(value);
-    dialects.set_default_dialect_index(dialect_idx);
-    let dialect = dialects
-        .get(dialect_idx)
-        .expect("dialect index out of bounds");
-
-    if default_dialect != dialect {
-        return dialect.locate_schemas(path, value, dialects, base_uri);
-    }
-    if path.is_empty() || default_dialect.is_schema_property(&path, value) {
-        results.push(identify_schema_location_by_path(&path, value, base_uri));
-    }
-
-    let mut base_uri = base_uri.clone();
-
-    if let Some(located) =
-        identify_schema_location_by_id(&path, value, &mut base_uri, &mut dialects)?
-    {
-        path = Pointer::default();
-        results.push(located);
-    }
-
-    if let Some(anchored) = ident_schema_location_by_anchor(&path, value, &base_uri) {
-        results.push(anchored);
-    }
-
-    for (key, value) in value.as_object().unwrap().iter() {
-        if !dialects
-            .get(dialects.dialect_index_for(value))
-            .expect("dialect index out of bounds")
-            .can_keyword_contain_schemas(Keyword(key))
-        {
-            let mut path = path.clone();
-            path.push_back(key.into());
-            if !dialect.is_schema_property(&path, value) {
-                continue;
-            }
-        }
-        let mut new_path = path.clone();
-        new_path.push_back(key.into());
-        let mut located_schemas = dialect.locate_schemas(new_path, value, dialects, &base_uri)?;
-        results.append(&mut located_schemas);
-    }
-    Ok(results)
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{borrow::Cow, collections::HashSet};
 
+    use jsonptr::Pointer;
     use serde_json::json;
+
+    use crate::dialect::Dialects;
 
     use super::*;
 
@@ -476,28 +396,29 @@ mod tests {
             ),
         ];
         let dialect = dialect();
-        let dialects = &[dialect];
-        let dialects = Dialects::new(dialects, dialect);
+
+        let dialects = Dialects::new(vec![dialect.clone()], Some(dialect.id.clone()));
         let base_uri = "https://example.com/example-schema.json"
             .parse::<AbsoluteUri>()
             .unwrap();
-        for (idx, (schema, mut expected)) in tests.into_iter().enumerate() {
-            let located = dialect
-                .locate_schemas(Pointer::default(), &schema, dialects, &base_uri)
-                .unwrap();
-            for loc in located.iter().map(|ls| ls.uri.as_str()) {
-                assert!(
-                    expected.contains(loc),
-                    "\n\nUnexpected location found in test #{idx}: \n\t\"{loc}\"\n\n"
-                );
-                expected.remove(loc);
-            }
-            assert!(
-                expected.is_empty(),
-                "\n\nExpected: {:#?} not found on test #{idx}.\n\n",
-                expected.into_iter().collect::<Vec<_>>()
-            );
-        }
+
+        // for (idx, (schema, mut expected)) in tests.into_iter().enumerate() {
+        //     let located = dialect
+        //         .locate_schemas(Pointer::default(), &schema, dialects, &base_uri)
+        //         .unwrap();
+        //     for loc in located.iter().map(|ls| ls.uri.as_str()) {
+        //         assert!(
+        //             expected.contains(loc),
+        //             "\n\nUnexpected location found in test #{idx}: \n\t\"{loc}\"\n\n"
+        //         );
+        //         expected.remove(loc);
+        //     }
+        //     assert!(
+        //         expected.is_empty(),
+        //         "\n\nExpected: {:#?} not found on test #{idx}.\n\n",
+        //         expected.into_iter().collect::<Vec<_>>()
+        //     );
+        // }
     }
 
     // fn assert_anchors_contains(anchors: &[AnchorLocation], expected: AnchorLocation<'_>) {

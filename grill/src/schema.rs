@@ -1,10 +1,41 @@
-use serde_json::Value;
-use slotmap::new_key_type;
+use std::collections::HashMap;
 
-use crate::{keyword::Keyword, AbsoluteUri, Handler};
+use slotmap::{new_key_type, SlotMap};
+
+use crate::{AbsoluteUri, Handler};
 
 new_key_type! {
     pub struct SchemaKey;
+}
+
+#[derive(Clone, Debug)]
+pub struct Schemas<Key: slotmap::Key = SchemaKey> {
+    schemas: SlotMap<Key, Schema>,
+    lookup: HashMap<AbsoluteUri, Key>,
+    dep_graph: DependencyGraph,
+}
+
+impl<Key: slotmap::Key> Schemas<Key> {
+    /// Creates a new [`Schemas<Key>`].
+    pub fn new() -> Self {
+        Self {
+            schemas: SlotMap::default(),
+            lookup: HashMap::default(),
+            dep_graph: DependencyGraph::default(),
+        }
+    }
+
+    pub fn get(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
+        let key = self.lookup.get(id).copied()?;
+        let schema = self.schemas.get(key)?;
+        Some((key, schema))
+    }
+}
+
+impl<Key: slotmap::Key> Default for Schemas<Key> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -22,3 +53,41 @@ impl PartialEq for Schema {
     }
 }
 impl Eq for Schema {}
+
+use petgraph::{prelude::NodeIndex, Directed, Graph as DirectedGraph};
+
+#[derive(Debug, Clone)]
+/// Contains a graph of schema references in order to detect cyclic
+/// dependencies.
+pub struct DependencyGraph {
+    graph: DirectedGraph<String, String, Directed>,
+    indexes: HashMap<String, NodeIndex>,
+}
+
+impl DependencyGraph {
+    pub fn new() -> Self {
+        Self {
+            indexes: HashMap::new(),
+            graph: DirectedGraph::new(),
+        }
+    }
+
+    // pub fn reference(&mut self, keyword: Keyword, from: String, to: String) {
+    //     let from = *self
+    //         .indexes
+    //         .entry(from.clone())
+    //         .or_insert_with(|| self.ext_refs_graph.add_node(from));
+
+    //     let to = *self
+    //         .indexes
+    //         .entry(to.clone())
+    //         .or_insert_with(|| self.ext_refs_graph.add_node(to));
+    //     self.ext_refs_graph.add_edge(from, to, keyword.to_string());
+    // }
+}
+
+impl Default for DependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}

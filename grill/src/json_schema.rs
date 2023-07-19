@@ -114,30 +114,6 @@ pub fn ident_schema_location_by_anchor<'v>(
 //     located_schemas.append(&mut append);
 // }
 
-fn locate_schemas_in_array<'v>(
-    path: Pointer,
-    arr: &'v Array,
-    dialects: Dialects,
-    base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    let located = arr
-        .iter()
-        .enumerate()
-        .map(|(key, value)| {
-            let tok = key.into();
-            let mut path = path.clone();
-            path.push_back(tok);
-            dialects
-                .default_dialect()
-                .locate_schemas(path, value, dialects, base_uri)
-        })
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-    Ok(located)
-}
-
 fn identify_schema_location_by_path<'v>(
     path: &Pointer,
     value: &'v Value,

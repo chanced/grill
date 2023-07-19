@@ -4,6 +4,7 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
+// TODO: enable this once I get to documenting
 // #![deny(missing_docs)]
 #![allow(
     clippy::module_name_repetitions,
@@ -52,7 +53,6 @@ pub use compile::Compile;
 pub mod state;
 pub use state::State;
 
-pub(crate) mod graph;
 
 mod metaschema;
 pub use metaschema::Metaschema;
@@ -66,7 +66,7 @@ pub use deserialize::Deserializer;
 
 pub mod keyword;
 
-mod schema;
+pub mod schema;
 pub use schema::{Schema, SchemaKey};
 
 /// A JSON object.
@@ -82,7 +82,7 @@ new_key_type! {
     pub struct ValueKey;
 }
 
-mod source;
+pub mod source;
 pub use source::Source;
 
 #[cfg(test)]

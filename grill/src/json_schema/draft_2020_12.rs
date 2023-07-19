@@ -2,7 +2,7 @@ pub use super::draft_2019_09::identify_schema;
 
 use super::{
     ident_schema_location_by_anchor, ident_schema_location_by_dynamic_anchor,
-    identify_schema_location_by_id, identify_schema_location_by_path, locate_schemas_in_array,
+    identify_schema_location_by_id, identify_schema_location_by_path,
 };
 use crate::{
     dialect::{Dialect, Dialects, LocatedSchema},
@@ -137,9 +137,6 @@ pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
             Lazy::force(&JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA),
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
-        is_json_schema_2020_12,
-        identify_schema,
-        locate_schemas,
     )
 });
 
@@ -246,81 +243,6 @@ pub fn is_json_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
     } else {
         false
     }
-}
-/// An implementation of [`LocateSchemas`](`crate::dialect::LocateSchemas`)
-/// which recursively traverses a [`Value`] and returns a [`Vec`] of
-/// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
-/// schema with an`"$anchor"`.
-///
-pub fn locate_schemas<'v>(
-    ptr: Pointer,
-    value: &'v Value,
-    dialects: Dialects,
-    base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    match value {
-        Value::Array(arr) => locate_schemas_in_array(ptr, arr, dialects, base_uri),
-        Value::Object(_) => locate_schemas_in_obj(ptr, value, dialects, base_uri),
-        _ => Ok(Vec::new()),
-    }
-}
-
-fn locate_schemas_in_obj<'v>(
-    mut path: Pointer,
-    value: &'v Value,
-    mut dialects: Dialects,
-    base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    let mut results: Vec<LocatedSchema> = Vec::new();
-    let default_dialect = dialects.default_dialect();
-    let dialect_idx = dialects.dialect_index_for(value);
-    dialects.set_default_dialect_index(dialect_idx);
-    let dialect = dialects
-        .get(dialect_idx)
-        .expect("dialect index out of bounds");
-
-    if default_dialect != dialect {
-        return dialect.locate_schemas(path, value, dialects, base_uri);
-    }
-    if path.is_empty() || default_dialect.is_schema_property(&path, value) {
-        results.push(identify_schema_location_by_path(&path, value, base_uri));
-    }
-
-    let mut base_uri = base_uri.clone();
-
-    if let Some(located) =
-        identify_schema_location_by_id(&path, value, &mut base_uri, &mut dialects)?
-    {
-        path = Pointer::default();
-        results.push(located);
-    }
-
-    if let Some(anchored) = ident_schema_location_by_anchor(&path, value, &base_uri) {
-        results.push(anchored);
-    }
-
-    if let Some(anchored) = ident_schema_location_by_dynamic_anchor(&path, value, &base_uri) {
-        results.push(anchored);
-    }
-
-    for (key, value) in value.as_object().unwrap().iter() {
-        if !dialects
-            .get(dialects.dialect_index_for(value))
-            .expect("dialect index out of bounds")
-            .can_keyword_contain_schemas(Keyword(key))
-        {
-            let mut path = path.clone();
-            path.push_back(key.into());
-            if !dialect.is_schema_property(&path, value) {
-                continue;
-            }
-        }
-        let mut new_path = path.clone();
-        new_path.push_back(key.into());
-        let mut located_schemas = dialect.locate_schemas(new_path, value, dialects, &base_uri)?;
-        results.append(&mut located_schemas);
-    }
-    Ok(results)
 }
 
 #[cfg(test)]

@@ -67,7 +67,7 @@ impl Handler {
         }
     }
 
-    fn identify_schema(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+    pub fn identify_schema(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
         match self {
             Handler::Sync(h) => h.identify_schema(schema),
             Handler::Async(h) => h.identify_schema(schema),
@@ -127,7 +127,7 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
         dialects: Dialects,
         base_uri: &mut AbsoluteUri,
     ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-        return Ok(Vec::new());
+        todo!()
     }
 }
 
@@ -175,7 +175,7 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
         dialects: Dialects,
         base_uri: &mut AbsoluteUri,
     ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-        return Ok(Vec::new());
+        todo!()
     }
 }
 clone_trait_object!(SyncHandler);

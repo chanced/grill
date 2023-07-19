@@ -155,49 +155,99 @@ pub enum PointerError {
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
+pub enum NewSourcesError {
+    #[snafu(display("failed to deserialize source: {}", uri))]
+    Deserialize {
+        source: DeserializeError,
+        uri: AbsoluteUri,
+    },
+    #[snafu(display("source URIs may not contain fragments; found: \"{}\"", source.uri), context(false))]
+    FragmentedUri { source: FragmentedUriError },
+}
+
+impl From<NewSourcesError> for BuildError {
+    fn from(err: NewSourcesError) -> Self {
+        match err {
+            NewSourcesError::Deserialize { source, uri } => {
+                BuildError::DeserializeSource { source, uri }
+            }
+            NewSourcesError::FragmentedUri { source } => BuildError::FragmentedSourceUri { source },
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DefaultDialectNotFoundError {
+    pub uri: AbsoluteUri,
+}
+
+impl Display for DefaultDialectNotFoundError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "default dialect not found: {}", self.uri)
+    }
+}
+impl Error for DefaultDialectNotFoundError {}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
+pub enum NewDialectsError {
+    #[snafu(display("{}", source), context(false))]
+    DefaultNotFound { source: DefaultDialectNotFoundError },
+    #[snafu(display("{}", source), context(false))]
+    DuplicateDialect { source: DuplicateDialectError },
+    #[snafu(display("{}", source), context(false))]
+    FragmentedDialectId { source: FragmentedDialectIdError },
+    #[snafu(display("{}", source), context(false))]
+    Empty { source: EmptyDialectsError },
+}
+
+impl From<NewDialectsError> for BuildError {
+    fn from(value: NewDialectsError) -> Self {
+        match value {
+            NewDialectsError::DefaultNotFound { source } => {
+                BuildError::DefaultDialectNotFound { source }
+            }
+            NewDialectsError::DuplicateDialect { source } => {
+                BuildError::DuplicateDialect { source }
+            }
+            NewDialectsError::FragmentedDialectId { source } => {
+                BuildError::FragmentedDialectId { source }
+            }
+            NewDialectsError::Empty { source } => BuildError::EmptyDialects { source },
+        }
+    }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum BuildError {
     #[snafu(display("failed to compile schema: {}", source), context(false))]
-    Compile {
-        source: CompileError,
-    },
+    Compile { source: CompileError },
     #[snafu(display("{}", source), context(false))]
-    DuplicateSource {
-        source: DuplicateSourceError,
-    },
+    DuplicateSource { source: DuplicateSourceError },
     #[snafu(display("{}", source), context(false))]
-    DuplicateDialect {
-        source: DuplicateDialectError,
-    },
-    FragmentedSourceUri {
-        source: FragmentedUriError,
-    },
+    DuplicateDialect { source: DuplicateDialectError },
+    #[snafu(display("source URIs may not contain fragments; found: \"{}\"", source.uri))]
+    FragmentedSourceUri { source: FragmentedUriError },
     #[snafu(display("{}", source), context(false))]
-    FragmentedDialectId {
-        source: FragmentedDialectIdError,
-    },
+    FragmentedDialectId { source: FragmentedDialectIdError },
     #[snafu(display("failed to parse uri: {}", source), context(false))]
-    MalformedAbsoluteUri {
-        source: UriError,
-    },
+    MalformedAbsoluteUri { source: UriError },
     #[snafu(display("failed to deserialize source: {}", uri))]
     DeserializeSource {
         source: DeserializeError,
         uri: AbsoluteUri,
     },
     #[snafu(display("{}", source), context(false))]
-    MissingDialects {
-        source: NoDialectsError,
-    },
-    #[snafu(display("{}", uri))]
-    DefaultDialectNotFound {
-        uri: AbsoluteUri,
-    },
+    EmptyDialects { source: EmptyDialectsError },
+    #[snafu(display("{}", source), context(false))]
+    DefaultDialectNotFound { source: DefaultDialectNotFoundError },
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct NoDialectsError;
+pub struct EmptyDialectsError;
 
-impl Display for NoDialectsError {
+impl Display for EmptyDialectsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -205,7 +255,7 @@ impl Display for NoDialectsError {
         )
     }
 }
-impl std::error::Error for NoDialectsError {}
+impl std::error::Error for EmptyDialectsError {}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
@@ -244,6 +294,7 @@ pub enum EvaluateError<'v> {
 pub struct DeserializeError {
     pub formats: HashMap<&'static str, erased_serde::Error>,
 }
+
 impl DeserializeError {
     #[must_use]
     pub fn new() -> Self {
