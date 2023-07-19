@@ -31,9 +31,9 @@ impl Source {
             }
         }
     }
-    pub fn uri(&self) -> &AbsoluteUri {
+    #[must_use] pub fn uri(&self) -> &AbsoluteUri {
         match self {
-            Self::Value(uri, _) | Self::String(uri, _) => &uri,
+            Self::Value(uri, _) | Self::String(uri, _) => uri,
         }
     }
 
@@ -104,7 +104,7 @@ impl Sources {
         }
         Ok(Self { sources })
     }
-    pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
+    #[must_use] pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
         self.sources.get(uri)
     }
 
@@ -120,7 +120,7 @@ impl Sources {
                 source: FragmentedUriError { uri },
             });
         }
-        let source = source.value(&deserializers)?.into_owned();
+        let source = source.value(deserializers)?.into_owned();
         // if the source has already been indexed, no-op
         if self.sources.contains_key(&uri) {
             // safe, see check above.
@@ -150,9 +150,9 @@ impl Sources {
             // values do not match
             return Err(DuplicateSourceError { uri, source });
         }
-        Ok(self.sources.entry(uri.clone()).or_insert(source))
+        Ok(self.sources.entry(uri).or_insert(source))
     }
-    pub fn entry<'e>(&'e mut self, key: AbsoluteUri) -> Entry<'e, AbsoluteUri, Value> {
+    pub fn entry(&mut self, key: AbsoluteUri) -> Entry<'_, AbsoluteUri, Value> {
         self.sources.entry(key)
     }
 

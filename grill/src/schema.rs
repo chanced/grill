@@ -17,7 +17,7 @@ pub struct Schemas<Key: slotmap::Key = SchemaKey> {
 
 impl<Key: slotmap::Key> Schemas<Key> {
     /// Creates a new [`Schemas<Key>`].
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             schemas: SlotMap::default(),
             lookup: HashMap::default(),
@@ -25,7 +25,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
         }
     }
 
-    pub fn get(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
+    #[must_use] pub fn get(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
         let key = self.lookup.get(id).copied()?;
         let schema = self.schemas.get(key)?;
         Some((key, schema))
@@ -65,7 +65,7 @@ pub struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             indexes: HashMap::new(),
             graph: DirectedGraph::new(),
