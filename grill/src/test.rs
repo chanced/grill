@@ -1,10 +1,10 @@
-use crate::{handler::SyncHandler, Compile, Handler, Location};
-use std::{collections::HashMap, error::Error};
+use crate::{handler::SyncHandler};
+use std::{error::Error};
 
 pub fn sync_handler<F>(
-    schema: serde_json::Value,
-    mut handler: impl 'static + SyncHandler,
-    f: F,
+    _schema: serde_json::Value,
+    _handler: impl 'static + SyncHandler,
+    _f: F,
 ) -> Result<(), Box<dyn Error>>
 where
     F: FnOnce(&dyn SyncHandler, &mut crate::Scope) -> Result<(), Box<dyn Error>>,

@@ -3,7 +3,6 @@ use std::{borrow::Cow, fmt::Display};
 use crate::{
     error::CompileError,
     handler::SyncHandler,
-    json_schema::Keyword,
     output::{self, ValidationError},
     Compile, Handler,
 };
@@ -19,16 +18,16 @@ impl From<MultipleOfHandler> for Handler {
 impl SyncHandler for MultipleOfHandler {
     fn compile<'s>(
         &mut self,
-        compile: &mut Compile<'s>,
-        schema: &'s Value,
+        _compile: &mut Compile<'s>,
+        _schema: &'s Value,
     ) -> Result<bool, CompileError> {
         todo!()
     }
 
     fn evaluate<'v>(
         &self,
-        scope: &mut crate::Scope,
-        value: &'v Value,
+        _scope: &mut crate::Scope,
+        _value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()

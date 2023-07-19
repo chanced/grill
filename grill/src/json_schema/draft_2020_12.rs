@@ -1,17 +1,12 @@
 pub use super::draft_2019_09::identify_schema;
 
-use super::{
-    ident_schema_location_by_anchor, ident_schema_location_by_dynamic_anchor,
-    identify_schema_location_by_id, identify_schema_location_by_path,
-};
+
 use crate::{
-    dialect::{Dialect, Dialects, LocatedSchema},
-    error::LocateSchemasError,
-    keyword::Keyword,
+    dialect::{Dialect},
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
-use jsonptr::Pointer;
+
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;

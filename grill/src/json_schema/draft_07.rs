@@ -64,10 +64,10 @@ pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
 /// schema with an`"$anchor"`.
 ///
 pub fn locate_schemas<'v>(
-    ptr: Pointer,
-    value: &'v Value,
-    mut dialects: Dialects,
-    base_uri: &AbsoluteUri,
+    _ptr: Pointer,
+    _value: &'v Value,
+    _dialects: Dialects,
+    _base_uri: &AbsoluteUri,
 ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
     // match value {
     //     Value::Array(arr) => ident_locations_from_arr(ptr, arr, dialects, base_uri),
@@ -95,7 +95,7 @@ pub fn locate_schemas<'v>(
 /// Returns [`IdentifyError`] if `schema`:
 ///   * has an `"$id"` field which can not be parsed as a [`Uri`]
 ///   * The [`Uri`] parsed from`"$id"` contains a non-empty fragment (i.e. `"https://example.com/example#fragment"`)
-pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+pub fn identify_schema(_schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     todo!()
 }
 

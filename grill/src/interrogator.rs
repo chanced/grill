@@ -1,25 +1,23 @@
-use std::{any, borrow::Borrow, collections::HashMap, fmt::Debug, ops::Deref, str::FromStr};
+use std::{any, borrow::Borrow, fmt::Debug, ops::Deref, str::FromStr};
 
 use either::Either;
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
-use slotmap::SlotMap;
+
 use snafu::ResultExt;
 
 use crate::{
     deserialize::{deserialize_json, Deserializers},
     dialect::{Dialect, Dialects},
     error::{
-        build_error,
         resolve_error::{self, NestedSchemaNotFound},
-        BuildError, CompileError, DeserializeError, DuplicateSourceError, EvaluateError,
+        BuildError, CompileError, DeserializeError, EvaluateError,
         FragmentedUriError, PointerError, ResolveError, ResolveErrors, SourceError,
         SourceSliceError, UnknownDialectError, UriError,
     },
     json_schema,
     keyword::Keyword,
     resolve::Resolvers,
-    schema::DependencyGraph,
     schema::Schemas,
     source::Sources,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -65,7 +63,7 @@ where
             return Ok(key);
         }
         let value = self.resolve(&uri).await?;
-        let dialect = self
+        let _dialect = self
             .determine_dialect(&value)?
             .unwrap_or(self.default_dialect());
 
@@ -146,9 +144,9 @@ where
 
     pub fn evaluate(
         &self,
-        key: Key,
-        value: &Value,
-        structure: Structure,
+        _key: Key,
+        _value: &Value,
+        _structure: Structure,
     ) -> Result<Output, EvaluateError> {
         todo!()
     }
@@ -715,7 +713,7 @@ where
     where
         R: 'static + Resolve,
     {
-        let id = any::TypeId::of::<R>();
+        let _id = any::TypeId::of::<R>();
         self.resolvers.push(Box::new(resolver));
         self
     }

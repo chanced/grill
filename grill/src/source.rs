@@ -1,6 +1,5 @@
 use crate::{
     deserialize::Deserializers,
-    dialect::{Dialect, Dialects},
     error::{
         new_sources_error, DeserializeError, DuplicateSourceError, FragmentedUriError,
         NewSourcesError, SourceError,
@@ -25,8 +24,8 @@ impl Source {
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
     ) -> Result<Value, DeserializeError> {
         match self {
-            Self::Value(uri, val) => Ok(val),
-            Self::String(uri, str) => {
+            Self::Value(_uri, val) => Ok(val),
+            Self::String(_uri, str) => {
                 let val = deserialize(&str, deserializers)?;
                 Ok(val)
             }
@@ -114,7 +113,7 @@ impl Sources {
         source: Source,
         deserializers: &Deserializers,
     ) -> Result<&Value, SourceError> {
-        let mut uri = source.uri().clone();
+        let uri = source.uri().clone();
         let frag = uri.fragment();
         if frag.is_some() && frag != Some("") {
             return Err(SourceError::FragmentedSourceUri {

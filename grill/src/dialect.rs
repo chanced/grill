@@ -12,7 +12,7 @@ pub use locate_schemas::{LocateSchemas, LocatedSchema};
 
 use crate::{
     error::{
-        BuildError, DefaultDialectNotFoundError, DuplicateDialectError, EmptyDialectsError,
+        DefaultDialectNotFoundError, DuplicateDialectError, EmptyDialectsError,
         FragmentedDialectIdError, IdentifyError, LocateSchemasError, NewDialectsError,
     },
     uri::AbsoluteUri,
@@ -20,7 +20,7 @@ use crate::{
 };
 use serde_json::Value;
 use std::{
-    borrow::{Borrow, Cow},
+    borrow::{Borrow},
     collections::{HashMap, HashSet},
     convert::Into,
     fmt::Debug,
@@ -229,16 +229,16 @@ impl Dialect {
     ///     -   `http://example.com/root.json#/definitions/C`
     pub fn locate_schemas<'v>(
         &self,
-        path: Pointer,
-        value: &'v Value,
-        dialects: Dialects,
-        base_uri: &AbsoluteUri,
+        _path: Pointer,
+        _value: &'v Value,
+        _dialects: Dialects,
+        _base_uri: &AbsoluteUri,
     ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
         todo!()
     }
 
     #[must_use]
-    pub fn matches(&self, schema: &Value) -> bool {
+    pub fn matches(&self, _schema: &Value) -> bool {
         todo!()
     }
 }

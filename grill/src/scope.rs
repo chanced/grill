@@ -1,7 +1,7 @@
 use big_rational_str::ParseError;
 
 use inherent::inherent;
-use jsonptr::Pointer;
+
 use num_rational::BigRational;
 use serde_json::{Number, Value};
 use slotmap::SlotMap;
@@ -25,7 +25,7 @@ impl<'s> Scope<'s> {
     pub fn new(
         location: Location,
         state: &'s mut State,
-        schemas: SlotMap<SchemaKey, Value>,
+        _schemas: SlotMap<SchemaKey, Value>,
     ) -> Self {
         Self {
             state,
@@ -63,9 +63,9 @@ impl<'s> Scope<'s> {
     /// `absolute_keyword_location`'s pointer is malformed.
     pub fn nested(
         &mut self,
-        instance: &str,
-        keyword: &str,
-        absolute_keyword_location: Option<String>,
+        _instance: &str,
+        _keyword: &str,
+        _absolute_keyword_location: Option<String>,
     ) -> Result<Scope, jsonptr::MalformedPointerError> {
         // let mut keyword_location = self.keyword_location().clone();
         // keyword_location.push_back(keyword.into());

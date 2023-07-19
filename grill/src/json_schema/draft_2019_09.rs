@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+
 
 use crate::{
     dialect::Dialect,
@@ -278,9 +278,9 @@ pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, collections::HashSet};
+    use std::{collections::HashSet};
 
-    use jsonptr::Pointer;
+    
     use serde_json::json;
 
     use crate::dialect::Dialects;
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn test_locate_schemas() {
         let base_uri = "https://example.com/example-schema.json";
-        let tests = [
+        let _tests = [
             (
                 // 0
                 json!({
@@ -397,8 +397,8 @@ mod tests {
         ];
         let dialect = dialect();
 
-        let dialects = Dialects::new(vec![dialect.clone()], Some(dialect.id.clone()));
-        let base_uri = "https://example.com/example-schema.json"
+        let _dialects = Dialects::new(vec![dialect.clone()], Some(dialect.id.clone()));
+        let _base_uri = "https://example.com/example-schema.json"
             .parse::<AbsoluteUri>()
             .unwrap();
 

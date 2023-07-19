@@ -14,7 +14,7 @@ pub struct Basic<'v> {
 }
 impl<'v> Basic<'v> {
     #[must_use]
-    pub fn new(node: super::Node<'v>) -> Self {
+    pub fn new(_node: super::Node<'v>) -> Self {
         todo!()
     }
     #[must_use]
@@ -24,7 +24,7 @@ impl<'v> Basic<'v> {
 }
 
 impl<'v> Serialize for Basic<'v> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -52,7 +52,7 @@ impl<'v> Node<'v> {
 impl TryFrom<Unit<'_>> for Node<'static> {
     type Error = String;
 
-    fn try_from(value: Unit) -> Result<Self, Self::Error> {
+    fn try_from(_value: Unit) -> Result<Self, Self::Error> {
         todo!()
     }
 }

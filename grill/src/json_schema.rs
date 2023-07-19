@@ -44,7 +44,7 @@ use crate::keyword::Keyword;
 use crate::{
     dialect::{Dialects, LocatedSchema},
     error::LocateSchemasError,
-    AbsoluteUri, Array, Uri,
+    AbsoluteUri, Uri,
 };
 use serde_json::Value;
 

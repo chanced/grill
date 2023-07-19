@@ -56,11 +56,11 @@ impl<'v> Output<'v> {
     #[must_use]
     pub fn absolute_keyword_location(&self) -> Option<&Uri> {
         match self {
-            Output::Flag(flag) => None,
-            Output::Basic(basic) => todo!(),
-            Output::Detailed(detailed) => todo!(),
-            Output::Verbose(verbose) => todo!(),
-            Output::Complete(complete) => todo!(),
+            Output::Flag(_flag) => None,
+            Output::Basic(_basic) => todo!(),
+            Output::Detailed(_detailed) => todo!(),
+            Output::Verbose(_verbose) => todo!(),
+            Output::Complete(_complete) => todo!(),
         }
     }
     #[must_use]
@@ -116,13 +116,13 @@ impl<'v> From<Complete<'v>> for Output<'v> {
 
 #[cfg(test)]
 mod tests {
-    use std::{assert_eq, collections::BTreeMap};
+    
 
-    use jsonptr::Pointer;
+    
 
-    use crate::Location;
+    
 
-    use super::*;
+    
 
     // #[test]
     // fn test_annotiation_serde() {

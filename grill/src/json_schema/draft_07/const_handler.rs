@@ -27,16 +27,16 @@ impl ConstHandler {
 impl SyncHandler for ConstHandler {
     fn compile<'s>(
         &mut self,
-        compile: &mut crate::Compile<'s>,
-        schema: &'s serde_json::Value,
+        _compile: &mut crate::Compile<'s>,
+        _schema: &'s serde_json::Value,
     ) -> Result<bool, crate::error::CompileError> {
         todo!()
     }
 
     fn evaluate<'v>(
         &self,
-        scope: &mut crate::Scope,
-        value: &'v serde_json::Value,
+        _scope: &mut crate::Scope,
+        _value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()

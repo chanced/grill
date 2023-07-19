@@ -117,15 +117,15 @@ pub trait AsyncHandler: Send + Sync + DynClone + fmt::Debug {
         None
     }
 
-    fn identify_schema(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+    fn identify_schema(&self, _schema: &Value) -> Result<Option<Uri>, IdentifyError> {
         Ok(None)
     }
     fn locate_schemas<'v>(
         &self,
-        path: Pointer,
-        value: &'v Value,
-        dialects: Dialects,
-        base_uri: &mut AbsoluteUri,
+        _path: Pointer,
+        _value: &'v Value,
+        _dialects: Dialects,
+        _base_uri: &mut AbsoluteUri,
     ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
         todo!()
     }
@@ -165,15 +165,15 @@ pub trait SyncHandler: Send + Sync + DynClone + fmt::Debug {
         None
     }
 
-    fn identify_schema(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+    fn identify_schema(&self, _schema: &Value) -> Result<Option<Uri>, IdentifyError> {
         Ok(None)
     }
     fn locate_schemas<'v>(
         &self,
-        path: Pointer,
-        value: &'v Value,
-        dialects: Dialects,
-        base_uri: &mut AbsoluteUri,
+        _path: Pointer,
+        _value: &'v Value,
+        _dialects: Dialects,
+        _base_uri: &mut AbsoluteUri,
     ) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
         todo!()
     }

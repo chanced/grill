@@ -1,7 +1,7 @@
 use super::ValidationError;
-use crate::{location::Locate, Location, Uri};
+use crate::{location::Locate, Location};
 use inherent::inherent;
-use jsonptr::Pointer;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, error::Error, fmt::Display};
@@ -95,7 +95,7 @@ impl<'v> Node<'v> {
         }
     }
 
-    pub(crate) fn new(location: Location, value: &Value) -> Node<'_> {
+    pub(crate) fn new(_location: Location, _value: &Value) -> Node<'_> {
         todo!()
     }
 }
