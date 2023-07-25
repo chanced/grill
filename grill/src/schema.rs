@@ -1,18 +1,15 @@
-use crate::{
-    deserialize::Deserializers,
-    dialect::Dialects,
-    error::{CompileError, UnknownKeyError},
-    resolve::Resolvers,
-    source::Sources,
-    uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Handler,
-};
+use crate::{error::UnknownKeyError, source::Sources, AbsoluteUri, Handler};
 use jsonptr::Pointer;
 use petgraph::{algo, prelude::NodeIndex, Directed, Graph as DirectedGraph};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use slotmap::{new_key_type, Key, SlotMap};
+use slotmap::{new_key_type, SlotMap};
 use std::{collections::HashMap, marker::PhantomData, ops::Deref};
+
+const INVALID_KEY_ERR_MSG: &str = "Schema Key not found. 
+This is most likely caused by there being multiple Interrogators using the same Key type.
+To avoid this error, use a different Key type for each Interrogator.
+If that is not the issue, please report it to https://github.com/chanced/grill/issues/new";
 
 new_key_type! {
     pub struct SchemaKey;
@@ -39,35 +36,55 @@ pub(crate) struct CompiledSchema {
 
 #[derive(Clone, Debug)]
 pub struct Schema<'i, Key: slotmap::Key> {
+    /// Key of the `Schema`
+    pub key: Key,
     /// The URI of the schema.
     pub id: &'i AbsoluteUri,
     /// The URI of the schema's `Metaschema`.
     pub metaschema: &'i AbsoluteUri,
-    /// URI of the source.
-    pub source_uri: &'i AbsoluteUri,
     /// The source of the schema.
     pub source: &'i Value,
-    /// Path to the schema within the source.
-    pub source_path: &'i Pointer,
-    /// Key of the `Schema`
-    pub key: Key,
     /// `Schema`s which dependent upon this `Schema`.
     pub dependents: Vec<Key>,
     /// Dependencies of this `Schema`.
     pub dependencies: Vec<Key>,
     /// Compiled handlers.
     pub handlers: &'i [Handler],
+    /// URI of the source.
+    pub source_uri: &'i AbsoluteUri,
+    /// Path to the schema within the source.
+    pub source_path: &'i Pointer,
 }
-impl<'i, Key: slotmap::Key> Into<Key> for Schema<'i, Key> {
-    fn into(self) -> Key {
-        self.key
+
+impl<'i, Key: slotmap::Key> Schema<'i, Key> {
+    pub(crate) fn new(
+        key: Key,
+        compiled: &'i CompiledSchema,
+        dependents: Vec<Key>,
+        dependencies: Vec<Key>,
+        sources: &'i Sources,
+    ) -> Self {
+        let source = sources
+            .get(&compiled.source_uri)
+            .expect("source_uri not found in Sources");
+        let source = compiled
+            .source_path
+            .resolve(source)
+            .expect("sourece_path not found in Sources");
+        Self {
+            key,
+            id: &compiled.id,
+            metaschema: &compiled.metaschema,
+            source,
+            dependents,
+            dependencies,
+            handlers: &compiled.handlers,
+            source_uri: &compiled.source_uri,
+            source_path: &compiled.source_path,
+        }
     }
 }
-impl<'i, Key: slotmap::Key> Into<Key> for &Schema<'i, Key> {
-    fn into(self) -> Key {
-        self.key.clone()
-    }
-}
+
 impl<'i, Key: slotmap::Key> Schema<'i, Key> {
     pub fn value(&self) -> &Value {
         self.source_path.resolve(self.source).unwrap()
@@ -88,8 +105,6 @@ impl<'i, K: slotmap::Key> Eq for Schema<'i, K> {}
 pub struct DependencyGraph<Key: slotmap::Key> {
     graph: DirectedGraph<AbsoluteUri, AbsoluteUri, Directed>,
     indexes: HashMap<AbsoluteUri, NodeIndex>,
-    // uris: HashMap<Key, AbsoluteUri>,
-    // keys: HashMap<AbsoluteUri, Key>,
     _marker: PhantomData<Key>,
 }
 
@@ -100,22 +115,15 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
         Self {
             graph: DirectedGraph::new(),
             indexes: HashMap::new(),
-            // uris: HashMap::new(),
-            // keys: HashMap::new(),
-            _marker: Default::default(),
+            _marker: PhantomData,
         }
     }
     fn node_index(&self, uri: &AbsoluteUri) -> Result<NodeIndex, UnknownKeyError> {
         self.indexes.get(uri).copied().ok_or(UnknownKeyError)
     }
 
-    fn uri(&self, key: Key) -> Result<&AbsoluteUri, UnknownKeyError> {
-        self.uris.get(&key).ok_or(UnknownKeyError)
-    }
-
-    pub(crate) fn add(&mut self, uri: AbsoluteUri, key: Key) {
-        let idx = self.graph.add_node(uri);
-        self.uris.insert(key, uri.clone());
+    pub(crate) fn insert(&mut self, uri: AbsoluteUri) {
+        let idx = self.graph.add_node(uri.clone());
         self.indexes.insert(uri, idx);
     }
     /// Check if there exists a path starting at from and reaching to.
@@ -123,7 +131,7 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
     /// If from and to are equal, this function returns true.
     ///
     /// If space is not None, it is used instead of creating a new workspace for graph traversal.
-    pub fn has_path_connecting<G>(
+    pub fn has_path_connecting(
         &self,
         from: &AbsoluteUri,
         to: &AbsoluteUri,
@@ -143,31 +151,29 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
     /// `key`.
     pub fn dependencies<'a>(
         &'a self,
-        key: Key,
+        uri: &'a AbsoluteUri,
         keys: &'a HashMap<AbsoluteUri, Key>,
     ) -> Result<impl 'a + Iterator<Item = Key>, UnknownKeyError> {
-        let uri = self.uri(key)?;
         let idx = self.node_index(uri)?;
-
         Ok(self
             .graph
             .neighbors_directed(idx, petgraph::Direction::Outgoing)
             .map(|n| self.graph[n].clone())
-            .map(|n| keys.get(&n).unwrap().clone()))
+            .map(|n| keys.get(&n).copied().unwrap()))
     }
 
     /// Returns an [`Iterator`] of direct dependents of the schema with given `key`.
     pub fn dependents<'a>(
         &'a self,
-        key: Key,
+        uri: &AbsoluteUri,
         keys: &'a HashMap<AbsoluteUri, Key>,
     ) -> Result<impl '_ + Iterator<Item = Key>, UnknownKeyError> {
-        let idx = self.node_index(self.uri(key)?)?;
+        let idx = self.node_index(uri)?;
         Ok(self
             .graph
             .neighbors_directed(idx, petgraph::Direction::Incoming)
             .map(|n| self.graph[n].clone())
-            .map(|n| keys.get(&n).unwrap().clone()))
+            .map(|n| *(keys.get(&n).unwrap())))
     }
 }
 
@@ -198,9 +204,10 @@ impl<Key: slotmap::Key> Schemas<Key> {
     pub fn get<'i>(&'i self, key: Key, sources: &'i Sources) -> Option<Schema<'i, Key>> {
         let schema = self.schemas.get(key)?;
         let source = sources.get(&schema.source_uri)?;
+        let uri = &schema.id;
         // SAFETY: if `key` exists in self.schemas, then it has a node index
-        let dependencies = self.graph.dependencies(key, &self.keys).unwrap().collect();
-        let dependents = self.graph.dependents(key, &self.keys).unwrap().collect();
+        let dependencies = self.graph.dependencies(uri, &self.keys).unwrap().collect();
+        let dependents = self.graph.dependents(uri, &self.keys).unwrap().collect();
 
         Some(Schema {
             id: &schema.id,
@@ -214,27 +221,37 @@ impl<Key: slotmap::Key> Schemas<Key> {
             dependents,
         })
     }
+
     /// returns an [`Iter`] of all dependencies of the [`Schema`] with the given `Key`.
     ///
     /// # Errors
     /// Returns [`UnknownKeyError`] if `key` is not a key in `self`.
-    #[must_use]
-    pub fn dependencies(&self, key: Key, sources: &Sources) -> Result<Iter<Key>, UnknownKeyError> {
-        self.graph
-            .dependencies(key, &self.keys)
-            .map(|iter| Iter::new(iter, sources))
+    pub(crate) fn dependencies<'a>(
+        &'a self,
+        key: Key,
+        sources: &'a Sources,
+    ) -> Result<Iter<'a, Key>, UnknownKeyError> {
+        let schema = self.schemas.get(key).ok_or(UnknownKeyError)?;
+        let inner = self.graph.dependencies(&schema.id, &self.keys)?;
+        Ok(Iter::new(
+            inner,
+            sources,
+            &self.schemas,
+            &self.graph,
+            &self.keys,
+        ))
     }
 
     pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Key {
         let id = schema.id.clone();
         let key = self.schemas.insert(schema);
-        self.graph.add(id.clone(), key.clone());
+        self.graph.insert(id.clone());
         self.keys.insert(id, key);
         key
     }
 
     #[must_use]
-    pub fn get_by_id<'i>(
+    pub(crate) fn get_by_id<'i>(
         &'i self,
         id: &AbsoluteUri,
         sources: &'i Sources,
@@ -244,11 +261,10 @@ impl<Key: slotmap::Key> Schemas<Key> {
         Some((key, schema))
     }
 
-    pub fn has_path_connecting(&self, from: Key, to: Key) -> Result<bool, UnknownKeyError> {
-        let from = self.schemas.get(from);
-        let to = self.schemas.get(to);
-        self.graph.has_path_connecting(from, to);
-        todo!()
+    pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> Result<bool, UnknownKeyError> {
+        let from = self.schemas.get(from).ok_or(UnknownKeyError)?;
+        let to = self.schemas.get(to).ok_or(UnknownKeyError)?;
+        self.graph.has_path_connecting(&from.id, &to.id)
     }
 }
 
@@ -296,17 +312,57 @@ pub struct LocatedSchemas<'v> {
     pub located: HashMap<Pointer, Vec<LocatedSchema<'v>>>,
 }
 
-pub struct Iter<'a, Key: slotmap::Key> {
-    inner: Box<dyn Iterator<Item = &'a CompiledSchema>>,
-    sources: &'a Sources,
+pub struct Iter<'i, Key: slotmap::Key> {
+    inner: Box<dyn 'i + Iterator<Item = Key>>,
+    sources: &'i Sources,
+    schemas: &'i SlotMap<Key, CompiledSchema>,
+    graph: &'i DependencyGraph<Key>,
+    keys: &'i HashMap<AbsoluteUri, Key>,
 }
 
-impl<'a, Key: slotmap::Key> Iter<'a, Key> {
-    pub fn new(inner: impl Iterator<Item = Key> + 'a, sources: &'a Sources) -> Self {
+impl<'i, Key: slotmap::Key> Iter<'i, Key> {
+    pub(crate) fn new(
+        inner: impl 'i + Iterator<Item = Key>,
+        sources: &'i Sources,
+        schemas: &'i SlotMap<Key, CompiledSchema>,
+        graph: &'i DependencyGraph<Key>,
+        keys: &'i HashMap<AbsoluteUri, Key>,
+    ) -> Self {
         Self {
             inner: Box::new(inner),
             sources,
+            schemas,
+            graph,
+            keys,
         }
+    }
+}
+
+impl<'i, Key: slotmap::Key> Iterator for Iter<'i, Key> {
+    type Item = Schema<'i, Key>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let key = self.inner.next()?;
+        // safety: if the Key exists, it should be in this slotmap.
+        // If it isn't, that is a developer error.
+        let schema = self.schemas.get(key).expect(INVALID_KEY_ERR_MSG);
+        let dependents = self
+            .graph
+            .dependents(&schema.id, self.keys)
+            .expect(INVALID_KEY_ERR_MSG)
+            .collect();
+        let dependencies = self
+            .graph
+            .dependencies(&schema.id, self.keys)
+            .expect(INVALID_KEY_ERR_MSG)
+            .collect();
+        Some(Schema::new(
+            key,
+            schema,
+            dependents,
+            dependencies,
+            self.sources,
+        ))
     }
 }
 

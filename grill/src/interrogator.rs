@@ -71,11 +71,7 @@ where
         if let Some((key, _)) = self.schemas.get_by_id(&id, &self.sources) {
             return Ok(key);
         }
-        let located = dialect.locate_schemas(Pointer::default(), &id, &value, &self.dialects)?;
-        
-        
-
-
+        let located = dialect.locate_schemas(&Pointer::default(), &id, &value, &self.dialects)?;
 
         todo!()
     }

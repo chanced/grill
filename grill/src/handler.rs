@@ -128,7 +128,7 @@ impl Handler {
     /// Locates nested schemas within the given schema.
     pub fn locate_schemas<'v>(
         &self,
-        path: Pointer,
+        path: &Pointer,
         base_uri: &AbsoluteUri,
         value: &'v Value,
         dialects: &Dialects,
@@ -174,7 +174,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
 
     fn locate_schemas<'v>(
         &self,
-        path: Pointer,
+        path: &Pointer,
         base_uri: &AbsoluteUri,
         value: &'v Value,
         dialects: &Dialects,
@@ -356,7 +356,7 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     #[allow(unused_variables)]
     fn locate_schemas<'v>(
         &self,
-        path: Pointer,
+        path: &Pointer,
         base_uri: &AbsoluteUri,
         value: &'v Value,
         dialects: &Dialects,

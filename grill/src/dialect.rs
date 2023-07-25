@@ -228,7 +228,7 @@ impl Dialect {
     ///     -   `http://example.com/root.json#/definitions/C`
     pub fn locate_schemas<'v>(
         &self,
-        path: Pointer,
+        path: &Pointer,
         base_uri: &AbsoluteUri,
         value: &'v Value,
         dialects: &Dialects,
@@ -238,16 +238,19 @@ impl Dialect {
                 return dialect.locate_schemas(path, base_uri, value, dialects);
             }
         }
-        let id = self.identify(base_uri, value)?.unwrap_or(base_uri.clone());
+        let uri = self
+            .identify(base_uri, value)?
+            .unwrap_or(base_uri.clone());
+
         let mut located = vec![LocatedSchema {
             keyword: None,
             path: path.clone(),
-            uri: id.clone(),
-            value: &value,
+            uri: uri.clone(),
+            value,
         }];
 
         for handler in &self.handlers {
-            located.append(&mut handler.locate_schemas(path, &id, value, dialects)?);
+            located.append(&mut handler.locate_schemas(path, &uri, value, dialects)?);
         }
 
         Ok(located.into())
@@ -339,13 +342,14 @@ impl<'d> Dialects<'d> {
         if self.lookup.contains_key(&dialect.id) {
             return Err(DuplicateDialectError::new(dialect));
         }
-        let id = dialect.id.clone();
-        let idx = self.dialects.len();
-        self.lookup.to_mut().insert(dialect.id.clone(), idx);
+        self.lookup
+            .to_mut()
+            .insert(dialect.id.clone(), self.dialects.len());
         self.dialects.to_mut().push(dialect);
         Ok(())
     }
 
+    #[must_use]
     pub fn with_default(&'d self, default: &Dialect) -> Dialects<'d> {
         Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
@@ -397,8 +401,7 @@ impl<'d> Dialects<'d> {
         self.default
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
-    #[must_use]
-    pub fn iter(&self) -> std::slice::Iter<'d, Dialect> {
+    pub fn iter(&'d self) -> std::slice::Iter<'d, Dialect> {
         self.dialects.iter()
     }
 
