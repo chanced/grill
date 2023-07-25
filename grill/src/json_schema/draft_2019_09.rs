@@ -1,9 +1,7 @@
-
-
 use crate::{
     dialect::Dialect,
     error::{HasFragmentError, IdentifyError},
-    keyword::Keyword,
+    schema::Keyword,
     uri::AbsoluteUri,
     Metaschema, Uri,
 };
@@ -278,9 +276,8 @@ pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet};
+    use std::collections::HashSet;
 
-    
     use serde_json::json;
 
     use crate::dialect::Dialects;

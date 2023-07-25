@@ -31,7 +31,8 @@ impl Source {
             }
         }
     }
-    #[must_use] pub fn uri(&self) -> &AbsoluteUri {
+    #[must_use]
+    pub fn uri(&self) -> &AbsoluteUri {
         match self {
             Self::Value(uri, _) | Self::String(uri, _) => uri,
         }
@@ -83,6 +84,14 @@ pub struct Sources {
 }
 
 impl Sources {
+    /// Returns a new [`Sources`] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`NewSourcesError`] if any of the following conditions are met:
+    /// - a [`Source`]'s [`AbsoluteUri`] has a fragment.
+    /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
+    /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
     pub fn new(
         sources: Vec<Source>,
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
@@ -104,11 +113,29 @@ impl Sources {
         }
         Ok(Self { sources })
     }
-    #[must_use] pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
+    #[must_use]
+    pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
         self.sources.get(uri)
     }
+    pub fn source_value(
+        &mut self,
+        uri: AbsoluteUri,
+        source: Value,
+        deserializers: &Deserializers,
+    ) -> Result<&Value, SourceError> {
+        self.source(Source::Value(uri, source), deserializers)
+    }
 
-    pub fn insert(
+    pub fn source_string(
+        &mut self,
+        uri: AbsoluteUri,
+        source: String,
+        deserializers: &Deserializers,
+    ) -> Result<&Value, SourceError> {
+        self.source(Source::String(uri, source), deserializers)
+    }
+
+    pub fn source(
         &mut self,
         source: Source,
         deserializers: &Deserializers,
@@ -156,7 +183,8 @@ impl Sources {
         self.sources.entry(key)
     }
 
-    pub(crate) fn contains(&self, uri: &AbsoluteUri) -> bool {
+    #[must_use]
+    pub fn contains(&self, uri: &AbsoluteUri) -> bool {
         self.sources.contains_key(uri)
     }
 }

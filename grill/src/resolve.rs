@@ -73,6 +73,7 @@ impl Resolvers {
     pub fn new(resolvers: Vec<Box<dyn Resolve>>) -> Self {
         Self { resolvers }
     }
+
     pub async fn resolve(&self, uri: &AbsoluteUri) -> Result<String, ResolveErrors> {
         let mut errors = ResolveErrors::new();
         for resolver in &self.resolvers {
@@ -87,6 +88,7 @@ impl Resolvers {
         errors.push(ResolveError::not_found(uri.to_string(), None));
         Err(errors)
     }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Box<dyn Resolve>> {
         self.resolvers.iter()
     }

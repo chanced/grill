@@ -7,7 +7,8 @@ use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
 use crate::{location::Locate, output::Node, Location, SchemaKey, State};
-/// Contains state and location information needed to perform an [`evaluation`](`crate::Interrogator::evaluate`).
+/// Contains state and location information needed to perform an
+/// [`evaluation`](`crate::Interrogator::evaluate`).
 pub struct Scope<'s> {
     pub state: &'s mut State,
     location: Location,
@@ -21,6 +22,7 @@ impl Locate for Scope<'_> {
         &self.location
     }
 }
+
 impl<'s> Scope<'s> {
     pub fn new(
         location: Location,

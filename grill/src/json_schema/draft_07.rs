@@ -5,16 +5,10 @@ mod type_handler;
 
 pub use const_handler::{ConstHandler, ConstInvalid};
 pub use enum_handler::{EnumHandler, EnumInvalid};
-use jsonptr::Pointer;
 pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
-use crate::{
-    dialect::{Dialect, Dialects, LocatedSchema},
-    error::{IdentifyError, LocateSchemasError},
-    uri::AbsoluteUri,
-    Metaschema, Uri,
-};
+use crate::{dialect::Dialect, error::IdentifyError, uri::AbsoluteUri, Metaschema, Uri};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
@@ -58,25 +52,6 @@ pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
     )
 });
 
-/// An implementation of [`LocateSchemas`](`crate::dialect::LocateSchemas`)
-/// which recursively traverses a [`Value`] and returns a [`Vec`] of
-/// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
-/// schema with an`"$anchor"`.
-///
-pub fn locate_schemas<'v>(
-    _ptr: Pointer,
-    _value: &'v Value,
-    _dialects: Dialects,
-    _base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    // match value {
-    //     Value::Array(arr) => ident_locations_from_arr(ptr, arr, dialects, base_uri),
-    //     Value::Object(_) => ident_locations_from_obj(ptr, value, dialects, base_uri),
-    //     _ => Vec::new(),
-    // }
-    todo!()
-}
-
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.
 ///
 ///
@@ -98,49 +73,6 @@ pub fn locate_schemas<'v>(
 pub fn identify_schema(_schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     todo!()
 }
-
-// #[must_use]
-// pub fn locate_schemas<'v>(ptr: Pointer, value: &'v Value) -> Vec<SchemaLocation<'v>> {
-//     let recurse = |(tok, value): (Token, &'v Value)| {
-//         let mut ptr = ptr.clone();
-//         ptr.push_back(tok);
-//         locate_schemas(ptr, value)
-//     };
-//     match value {
-//         Value::Array(arr) => arr
-//             .iter()
-//             .enumerate()
-//             .map(|(k, v)| (k.into(), v))
-//             .flat_map(recurse)
-//             .collect(),
-//         Value::Object(obj) => {
-//             let mut results = Vec::new();
-//             if let Some(Value::String(id)) = obj.get(Keyword::ID.as_str()) {
-//                 let Ok(uri) = Uri::parse(id) else { return Vec::new() };
-//                 if uri.path_or_nss().is_empty() && uri.authority_or_namespace().is_none() {
-//                     if let Some(fragment) = uri.fragment() {
-//                         if !fragment.is_empty() && !fragment.starts_with("/") {
-//                             results.push(AnchorLocation::new(
-//                                 Keyword::ID,
-//                                 ptr.clone(),
-//                                 anchor,
-//                                 value,
-//                             ));
-//                         }
-//                     }
-//                 }
-//             }
-//             results.extend(
-//                 obj.iter()
-//                     .filter(|(_, v)| matches!(v, Value::Object(_) | Value::Array(_)))
-//                     .map(|(k, v)| (k.into(), v))
-//                     .flat_map(recurse),
-//             );
-//             results
-//         }
-//         _ => Vec::new(),
-//     }
-// }
 
 #[must_use]
 pub fn is_json_schema_07(v: &Value) -> bool {

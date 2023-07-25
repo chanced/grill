@@ -3,7 +3,7 @@
     "$id": "https://json-schema.org/draft/2019-09/links",
     "title": "Link Description Object",
     "allOf": [
-        { "required": [ "rel", "href" ] },
+        { "required": ["rel", "href"] },
         { "$ref": "#/$defs/noRequiredFields" }
     ],
     "$defs": {
@@ -69,7 +69,7 @@
                 "targetMediaType": {
                     "type": "string"
                 },
-                "targetHints": { },
+                "targetHints": {},
                 "headerSchema": {
                     "$ref": "https://json-schema.org/draft/2019-09/hyper-schema",
                     "default": true

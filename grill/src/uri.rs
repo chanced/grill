@@ -1,10 +1,15 @@
 //! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
 
-use crate::error::{UriError, UrnError};
+use crate::error::{RelativeUriError, UriError, UrnError};
+use inherent::inherent;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Cow, convert::Infallible, fmt::Display, ops::Deref, str::FromStr, string::ToString,
+    borrow::{Borrow, Cow},
+    fmt::Display,
+    ops::Deref,
+    str::FromStr,
+    string::ToString,
 };
 use url::Url;
 use urn::{
@@ -56,15 +61,6 @@ impl AbsoluteUri {
             Self::Urn(urn) => set_urn_fragment(urn, fragment),
         }
     }
-    /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the
-    /// `AbsoluteUri`.
-    #[must_use]
-    pub fn as_uri(&self) -> Uri {
-        match self {
-            Self::Url(url) => Uri::Url(url.clone()),
-            Self::Urn(urn) => Uri::Urn(urn.clone()),
-        }
-    }
 
     /// Returns the authority (`Url`) or namespace (`Urn`)
     #[must_use]
@@ -75,8 +71,7 @@ impl AbsoluteUri {
         }
     }
 
-    /// Sets the
-
+    /// Returns the path (url) or Name Specific String (urn)
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
         match self {
@@ -109,7 +104,7 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns `true` if the absolute uri is [`Url`].
+    /// Returns `true` if the `AbsoluteUri` is a [`Url`](`url::Url`).
     ///
     /// [`Url`]: AbsoluteUri::Url
     #[must_use]
@@ -126,7 +121,7 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns `true` if the absolute uri is [`Urn`].
+    /// Returns `true` if the `AbsoluteUri` is a [`Urn`](`urn::Urn`).
     ///
     /// [`Urn`]: AbsoluteUri::Urn
     #[must_use]
@@ -141,8 +136,48 @@ impl AbsoluteUri {
             None
         }
     }
+
+    /// Returns the query component if it exists.
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        match self {
+            Self::Url(url) => url.query(),
+            Self::Urn(urn) => urn.q_component(),
+        }
+    }
+
+    /// Sets the query component of the [`Url`] or [`Urn`] and returns the
+    /// previous query, if it existed.
+    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UrnError> {
+        let prev = self.query().map(ToString::to_string);
+        match self {
+            Self::Url(url) => {
+                url.set_query(query);
+            }
+            Self::Urn(urn) => {
+                urn.set_q_component(query)?;
+            }
+        }
+        Ok(prev)
+    }
 }
 
+impl Borrow<str> for AbsoluteUri {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+impl Borrow<[u8]> for AbsoluteUri {
+    fn borrow(&self) -> &[u8] {
+        self.as_str().as_bytes()
+    }
+}
+
+impl AsRef<str> for AbsoluteUri {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 impl From<&AbsoluteUri> for AbsoluteUri {
     fn from(value: &AbsoluteUri) -> Self {
         value.clone()
@@ -377,19 +412,31 @@ impl TryIntoAbsoluteUri for Uri {
     }
 }
 
+// TODO: consider whether or not the idxs in RelativeUri should be u32
+// Likely but this would muddy up the API a bit.
+// is it worth the savings in memory?
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "String", into = "String")]
+#[serde(try_from = "String", into = "String")]
 pub struct RelativeUri {
     path: String,
-    hash_idx: Option<usize>,
+    fragment_idx: Option<usize>,
+    query_idx: Option<usize>,
 }
 
 impl RelativeUri {
-    #[must_use]
-    pub fn parse(value: &str) -> Self {
+    pub fn parse(value: &str) -> Result<Self, RelativeUriError> {
         let hash_idx = value.find('#');
+        let query_idx = value.find('?');
+        if hash_idx < query_idx {
+            return Err(RelativeUriError::Malformed(value.to_string()));
+        }
         let path = value.to_string();
-        Self { path, hash_idx }
+        Ok(Self {
+            path,
+            fragment_idx: hash_idx,
+            query_idx,
+        })
     }
     #[must_use]
     pub fn as_str(&self) -> &str {
@@ -397,72 +444,101 @@ impl RelativeUri {
     }
     #[must_use]
     pub fn path(&self) -> &str {
-        let Some(hash_idx) = self.hash_idx else { return &self.path };
-        &self.path[..hash_idx]
+        if let Some(query_idx) = self.query_idx {
+            return &self.path[..query_idx];
+        }
+        if let Some(hash_idx) = self.fragment_idx {
+            return &self.path[..hash_idx];
+        }
+        &self.path
     }
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
-        let hash_idx = self.hash_idx?;
-        if hash_idx + 1 == self.path.len() {
-            Some("")
-        } else {
-            Some(&self.path[hash_idx + 1..])
+        let fragment_idx = self.fragment_idx?;
+        if fragment_idx + 1 == self.path.len() {
+            return Some("");
         }
+
+        Some(&self.path[fragment_idx + 1..])
     }
 
+    /// Returns the query string segment of the `PartialUri`, if it exists.
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        let query_idx = self.query_idx?;
+        if query_idx + 1 == self.path.len() {
+            return Some("");
+        }
+        let last = self.fragment_idx.unwrap_or(self.path.len());
+        Some(&self.path[query_idx + 1..last])
+    }
+    pub fn set_query(&mut self, mut query: Option<&str>) -> Option<String> {
+        query = query.map(|q| q.strip_prefix('?').unwrap_or(q));
+
+        // TODO: refactor this; cloning, by means of owned_parts, is not ideal.
+        let (path, prev_query, fragment) = self.owned_parts();
+        self.path = path;
+        self.fragment_idx = None;
+        self.query_idx = None;
+        if let Some(query) = query {
+            self.query_idx = Some(self.path.len());
+            self.path += "?";
+            self.path += query;
+        }
+        if fragment.is_some() {
+            self.set_fragment(fragment.as_deref());
+        }
+        prev_query
+    }
     /// Sets the path of the `PartialUri` and returns the previous path.
     ///
     /// Note, fragments are left intact. Use `set_fragment` to change the fragment.
     pub fn set_path(&mut self, path: &str) -> String {
-        let (prev_path, fragment) = self.owned_parts();
+        let (prev_path, query, fragment) = self.owned_parts();
         self.path = utf8_percent_encode(path, URL_PATH).to_string();
+        if let Some(query) = query {
+            self.query_idx = Some(self.path.len());
+            self.path += "?";
+            self.path += &query;
+        }
         if let Some(fragment) = fragment {
-            self.hash_idx = Some(self.path.len());
+            self.fragment_idx = Some(self.path.len());
             self.path += "#";
             self.path += &fragment;
         }
+
         prev_path
     }
-    fn owned_parts(&self) -> (String, Option<String>) {
-        let Some(hash_idx) = self.hash_idx else { return (self.path.to_string(), None) };
-        (
-            self.path[..hash_idx].to_string(),
-            Some(self.path[hash_idx + 1..].to_string()),
-        )
+    fn owned_parts(&self) -> (String, Option<String>, Option<String>) {
+        let query = self.query().map(ToString::to_string);
+        let fragment = self.fragment().map(ToString::to_string);
+        let path = self.path().to_string();
+        (path, query, fragment)
     }
     /// Sets the fragment of the `PartialUri` and returns the previous fragment, if
     /// present.
-    pub fn set_fragment(&mut self, mut fragment: Option<&str>) -> Option<String> {
-        if let Some(frag) = &fragment {
-            if frag.is_empty() {
-                fragment = None;
-            }
+    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
+        let fragment = fragment
+            .map(|f| f.strip_prefix('#').unwrap_or(f))
+            .map(|f| utf8_percent_encode(f, URL_FRAGMENT).to_string());
+
+        // TODO: refactor this; cloning, by means of owned_parts, is not ideal.
+        let (path, query, prev_fragment) = self.owned_parts();
+        self.fragment_idx = None;
+        self.query_idx = None;
+        self.path = path;
+
+        if let Some(query) = query {
+            self.query_idx = Some(self.path.len());
+            self.path = format!("{}?{}", self.path, query);
         }
-        let fragment = fragment.map(|f| utf8_percent_encode(f, URL_FRAGMENT).to_string());
-        if let Some(hash_idx) = self.hash_idx {
-            let previous = if hash_idx + 1 == self.path.len() {
-                ""
-            } else {
-                &self.path[hash_idx + 1..]
-            };
-            let previous = previous.to_string();
-            self.hash_idx = None;
-            if hash_idx == 0 {
-                self.path = String::new();
-            } else {
-                self.path.truncate(hash_idx);
-            }
-            let Some(fragment) = fragment else { return Some(previous) };
-            self.hash_idx = Some(hash_idx);
-            self.path += "#";
-            self.path += &fragment;
-            Some(previous)
-        } else {
-            let Some(fragment) = fragment else { return None };
-            self.hash_idx = Some(self.path.len() - 1);
-            self.path = format!("#{fragment}");
-            None
+
+        if let Some(fragment) = fragment {
+            self.fragment_idx = Some(self.path.len());
+            self.path = format!("{}#{}", self.path, fragment);
         }
+
+        prev_fragment
     }
 }
 
@@ -472,30 +548,27 @@ impl Display for RelativeUri {
     }
 }
 
-impl From<String> for RelativeUri {
-    fn from(value: String) -> Self {
-        Self {
-            path: value,
-            hash_idx: None,
-        }
-    }
-}
-
 impl FromStr for RelativeUri {
-    type Err = Infallible;
+    type Err = RelativeUriError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::parse(s))
+        Self::parse(s)
     }
 }
 
-impl From<&String> for RelativeUri {
-    fn from(value: &String) -> Self {
-        Self {
-            path: value.clone(),
-            hash_idx: None,
-        }
+impl TryFrom<String> for RelativeUri {
+    type Error = RelativeUriError;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(&value)
     }
 }
+
+impl TryFrom<&str> for RelativeUri {
+    type Error = RelativeUriError;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
 impl From<RelativeUri> for Uri {
     fn from(value: RelativeUri) -> Self {
         Uri::Relative(value)
@@ -561,7 +634,7 @@ impl Uri {
         } else if matches_url(value) {
             Ok(Url::parse(value)?.into())
         } else {
-            Ok(RelativeUri::parse(value).into())
+            Ok(RelativeUri::parse(value)?.into())
         }
     }
     #[must_use]
@@ -589,6 +662,32 @@ impl Uri {
             Uri::Url(url) => set_url_fragment(url, fragment),
             Uri::Urn(urn) => set_urn_fragment(urn, fragment),
             Uri::Relative(rel) => rel.set_fragment(fragment),
+        }
+    }
+
+    /// Sets the query component of the [`Url`] or [`Urn`] and returns the
+    /// previous query, if it existed.
+    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UrnError> {
+        let prev = self.query().map(ToString::to_string);
+        match self {
+            Self::Url(url) => {
+                url.set_query(query);
+                Ok(prev)
+            }
+            Self::Urn(urn) => {
+                urn.set_q_component(query)?;
+                Ok(prev)
+            }
+            Uri::Relative(rel) => Ok(rel.set_query(query)),
+        }
+    }
+
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        match self {
+            Uri::Url(url) => url.query(),
+            Uri::Urn(urn) => urn.q_component(),
+            Uri::Relative(rel) => rel.query(),
         }
     }
 
@@ -672,6 +771,46 @@ impl Uri {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Returns `true` if the uri is [`Relative`].
+    ///
+    /// [`Relative`]: Uri::Relative
+    #[must_use]
+    pub fn is_relative(&self) -> bool {
+        matches!(self, Self::Relative(..))
+    }
+    #[must_use]
+    pub fn as_relative(&self) -> Option<&RelativeUri> {
+        if let Self::Relative(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_into_relative(self) -> Result<RelativeUri, Self> {
+        if let Self::Relative(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn try_into_urn(self) -> Result<Urn, Self> {
+        if let Self::Urn(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn try_into_url(self) -> Result<Url, Self> {
+        if let Self::Url(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
         }
     }
 }
@@ -893,14 +1032,82 @@ fn set_url_path(url: &mut Url, path: &str) -> String {
     existing
 }
 
+pub trait AsUri {
+    fn as_uri(&self) -> Uri;
+}
+impl AsUri for &Uri {
+    fn as_uri(&self) -> Uri {
+        (*self).clone()
+    }
+}
+impl AsUri for Uri {
+    fn as_uri(&self) -> Uri {
+        self.clone()
+    }
+}
+
+#[inherent]
+impl AsUri for AbsoluteUri {
+    /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
+    /// `AbsoluteUri`.
+    #[must_use]
+    pub fn as_uri(&self) -> Uri {
+        match self {
+            AbsoluteUri::Url(url) => Uri::Url(url.clone()),
+            AbsoluteUri::Urn(urn) => Uri::Urn(urn.clone()),
+        }
+    }
+}
+
+impl AsUri for &AbsoluteUri {
+    /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
+    /// `AbsoluteUri`.
+    #[must_use]
+    fn as_uri(&self) -> Uri {
+        match self {
+            AbsoluteUri::Url(url) => Uri::Url(url.clone()),
+            AbsoluteUri::Urn(urn) => Uri::Urn(urn.clone()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_set_query() {
+        let mut uri = RelativeUri::parse("http://example.com").unwrap();
+        assert_eq!(uri.query(), None);
+        assert_eq!(uri.fragment(), None);
+
+        uri.set_query(Some("q=str"));
+        assert_eq!(uri.as_str(), "http://example.com?q=str");
+        assert_eq!(uri.query(), Some("q=str"));
+
+        uri.set_fragment(Some("fragment"));
+        assert_eq!(uri.as_str(), "http://example.com?q=str#fragment");
+        assert_eq!(uri.fragment(), Some("fragment"));
+
+        uri.set_query(None);
+        assert_eq!(uri.query(), None);
+        assert_eq!(uri.as_str(), "http://example.com#fragment");
+
+        uri.set_query(Some("?q=str"));
+        assert_eq!(uri.as_str(), "http://example.com?q=str#fragment");
+
+        uri.set_query(Some("q=str"));
+        assert_eq!(uri.query(), Some("q=str"));
+    }
+
+    #[test]
     fn test_get_url_authority() {
         let url = Url::parse("https://user:example@example.com:8080").unwrap();
-        println!("{:?}", get_url_authority(&url));
+        let uri: AbsoluteUri = url.into();
+        assert_eq!(
+            uri.authority_or_namespace().as_deref(),
+            Some("user:example@example.com:8080")
+        );
     }
 
     #[test]

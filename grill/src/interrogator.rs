@@ -1,6 +1,5 @@
 use std::{any, borrow::Borrow, fmt::Debug, ops::Deref, str::FromStr};
 
-use either::Either;
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 
@@ -10,14 +9,13 @@ use crate::{
     deserialize::{deserialize_json, Deserializers},
     dialect::{Dialect, Dialects},
     error::{
-        resolve_error::{self, NestedSchemaNotFound},
-        BuildError, CompileError, DeserializeError, EvaluateError,
-        FragmentedUriError, PointerError, ResolveError, ResolveErrors, SourceError,
-        SourceSliceError, UnknownDialectError, UriError,
+        resolve_error::NestedSchemaNotFound, BuildError, CompileError, DeserializeError,
+        EvaluateError, PointerError, ResolveErrors, SourceError, SourceSliceError,
+        UnknownDialectError, UriError,
     },
     json_schema,
-    keyword::Keyword,
     resolve::Resolvers,
+    schema::Keyword,
     schema::Schemas,
     source::Sources,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -27,7 +25,7 @@ use crate::{
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
-    dialects: Dialects,
+    dialects: Dialects<'static>,
     sources: Sources,
     resolvers: Resolvers,
     schemas: Schemas<Key>,
@@ -51,24 +49,37 @@ where
 {
     /// Attempts to compile the schema at the given URI if not already compiled,
     /// returning the [`SchemaRef`] of either the freshly compiled [`Schema`] or
+    ///
     /// the existing [`SchemaRef`] of previously compiled, immutable [`Schema`].
     ///
     /// # Errors
     /// Returns [`CompileError`] if:
     ///   - the schema fails to compile.
+    ///   - a dependent schema fails to compile.
     ///   - the uri fails to convert to an [`AbsoluteUri`].
     pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+        // convert the uri to an absolute uri
         let uri = uri.try_into_absolute_uri()?;
-        if let Some((key, _)) = self.schema_by_id(&uri) {
+        // resolving the uri provided.
+        let value = self.resolve(&uri).await?;
+
+        // determine the dialect
+        let dialect = self.dialects.pertinent_to_or_default(&value);
+        // identifying the schema
+        let id = dialect.identify(&uri, &value)?.unwrap_or(uri);
+        // check to see if the schema has already been compiled under the id
+        if let Some((key, _)) = self.schemas.get_by_id(&id, &self.sources) {
             return Ok(key);
         }
-        let value = self.resolve(&uri).await?;
-        let _dialect = self
-            .determine_dialect(&value)?
-            .unwrap_or(self.default_dialect());
+        let located = dialect.locate_schemas(Pointer::default(), &id, &value, &self.dialects)?;
+        
+        
+
+
 
         todo!()
     }
+
     #[must_use]
     pub fn dialects(&self) -> &Dialects {
         &self.dialects
@@ -81,7 +92,7 @@ where
         let uri = uri.borrow();
 
         // if the value has already been indexed, return a clone of the local copy
-        if let Some(schema) = self.resolve_local(uri) {
+        if let Some(schema) = self.sources.get(uri) {
             return Ok(schema.clone());
         }
 
@@ -90,28 +101,31 @@ where
         base_uri.set_fragment(None);
 
         // resolving the base uri
-        let resolved = self.try_resolvers(&base_uri).await?;
+        let resolved = self.resolvers.resolve(&base_uri).await?;
 
-        // add the base value to the local store
+        // add the base value to the local store of sources
         let root = self
-            .source(Source::Value(base_uri, resolved.clone()))?
+            .sources
+            .source_string(base_uri, resolved, &self.deserializers)?
             .clone(); // need to clone to avoid borrow checker constraints.
 
         let uri_fragment = uri.fragment().unwrap_or_default();
 
-        // if the uri does not have a fragment, we are done and can return the root-level schema
+        // if the uri does not have a fragment, we are done and can return the
+        // root-level schema
         if uri_fragment.is_empty() {
-            return Ok(resolved);
+            return Ok(root);
         }
-        // if the uri does have a fragment then there is more work to do
 
-        // first, lookup again to see if add_source was able to index the schema
-        if let Some(schema) = self.resolve_local(uri) {
+        // if the uri does have a fragment then there is more work to do.
+        // first, perform lookup again to see if add_source indexed the schema
+        if let Some(schema) = self.sources.get(uri) {
             return Ok(schema.clone());
         }
 
         // if not, the fragment must be a json pointer as all anchors and
         // schemas with fragmented ids should have been located and indexed
+        // TODO: better error handling here.
         let ptr = Pointer::from_str(uri_fragment)
             .map_err(PointerError::from)
             .context(NestedSchemaNotFound { uri_fragment, uri })?;
@@ -122,16 +136,22 @@ where
             .map_err(Into::into)
     }
 
-    fn default_dialect(&self) -> &Dialect {
+    /// Returns the default [`Dialect`] for the `Interrogator`.
+    #[must_use]
+    pub fn default_dialect(&self) -> &Dialect {
         self.dialects.default_dialect()
     }
 
-    fn determine_dialect(&self, schema: &Value) -> Result<Option<&Dialect>, UnknownDialectError> {
-        for dialect in &self.dialects {
-            if dialect.matches(schema) {
-                return Ok(Some(dialect));
-            }
+    /// Returns the [`Dialect`] for the given schema, if any.
+    pub fn determine_dialect(
+        &self,
+        schema: &Value,
+    ) -> Result<Option<&Dialect>, UnknownDialectError> {
+        if let Some(schema) = self.dialects.pertinent_to(schema) {
+            return Ok(Some(schema));
         }
+        // TODO: this is the only place outside of a Handler that a specific
+        // json schema keyword is used. This should be refactored.
         match schema
             .get(Keyword::SCHEMA.as_str())
             .and_then(Value::as_str)
@@ -150,41 +170,29 @@ where
     ) -> Result<Output, EvaluateError> {
         todo!()
     }
+
+    /// Returns the `Key` and `Schema` if it exists
     #[must_use]
-    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<(Key, &Schema)> {
-        self.schemas.get(id)
+    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<(Key, Schema<Key>)> {
+        self.schemas.get_by_id(id, &self.sources)
     }
 
-    async fn try_resolvers(&self, uri: &AbsoluteUri) -> Result<Value, ResolveErrors> {
-        let mut errors = ResolveErrors::new();
-        for resolver in &self.resolvers {
-            match resolver.resolve(uri).await {
-                Ok(Some(data)) => {
-                    match self.deserialize(&data).context(resolve_error::Deserialize {
-                        schema_id: uri.clone(),
-                    }) {
-                        Ok(value) => return Ok(value),
-                        Err(err) => errors.push(err),
-                    }
-                }
-                Err(err) => errors.push(err),
-                _ => continue,
-            }
-        }
-        errors.push(ResolveError::not_found(uri.to_string(), None));
-        Err(errors)
+    /// Returns the schema's `Key` if it exists
+    #[must_use]
+    pub fn schema_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
+        let (key, _) = self.schemas.get_by_id(id, &self.sources)?;
+        Some(key)
     }
-
+    /// Returns the attached `Deserializers`.
     #[must_use]
     pub fn deserializers(&self) -> &Deserializers {
         &self.deserializers
     }
+
+    /// Attempts to deserialize the given string into a [`Value`] using
+    /// available [`Deserializer`]s.
     pub fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
         self.deserializers.deserialize(data)
-    }
-
-    fn resolve_local(&self, uri: &AbsoluteUri) -> Option<&Value> {
-        self.sources.get(uri)
     }
 
     /// Adds a schema source from a slice of bytes that will be deserialized with
@@ -214,7 +222,7 @@ where
         self.source(source)
     }
     pub fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
-        self.sources.insert(source, &self.deserializers)
+        self.sources.source(source, &self.deserializers)
     }
 
     /// Adds a schema source from a `&str`
@@ -770,15 +778,13 @@ where
         } = self;
 
         let dialects = Dialects::new(dialects, default_dialect)?;
-        let deserializers = Deserializers::new(deserializers);
         sources.append(&mut dialects.sources());
+        let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(sources, &deserializers)?;
-        let precompile = dialects
-            .iter()
-            .map(|d| d.id.clone())
-            .collect::<Vec<AbsoluteUri>>();
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
+        let precompile = dialects.source_ids().cloned().collect::<Vec<AbsoluteUri>>();
+
         let mut interrogator = Interrogator {
             dialects,
             sources,
@@ -787,8 +793,8 @@ where
             deserializers,
         };
 
-        for dialect_id in precompile {
-            interrogator.compile(dialect_id).await?;
+        for id in precompile {
+            interrogator.compile(id).await?;
         }
 
         Ok(interrogator)
@@ -818,26 +824,6 @@ where
     //     }
     //     Ok(self)
     // }
-}
-
-fn ensure_no_fragment(uri: &AbsoluteUri) -> Result<(), FragmentedUriError> {
-    if let Some(fragment) = uri.fragment() {
-        if !fragment.is_empty() {
-            return Err(FragmentedUriError { uri: uri.clone() });
-        }
-    }
-    Ok(())
-}
-
-fn parse_pointer_or_anchor(
-    fragment: &str,
-) -> Result<Either<Pointer, &str>, jsonptr::MalformedPointerError> {
-    if fragment.starts_with('/') {
-        let ptr = Pointer::from_str(fragment)?;
-        Ok(Either::Left(ptr))
-    } else {
-        Ok(Either::Right(fragment))
-    }
 }
 
 #[cfg(test)]

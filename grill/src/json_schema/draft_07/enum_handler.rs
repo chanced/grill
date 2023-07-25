@@ -15,7 +15,7 @@
 ///   `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
 #[derive(Debug, Clone, Default)]
 pub struct EnumHandler {
-    expected: Vec<serde_json::Value>,
+    _expected: Vec<serde_json::Value>,
 }
 
 // impl SyncHandler for EnumHandler {
@@ -55,8 +55,8 @@ pub struct EnumHandler {
 /// [`ValidationError`] for the `enum` keyword, produced by [`EnumHandler`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
-    expected: Vec<serde_json::Value>,
-    actual: &'v serde_json::Value,
+    _expected: Vec<serde_json::Value>,
+    _actual: &'v serde_json::Value,
 }
 
 // impl<'v> ValidationError<'v> for EnumInvalid<'v> {}

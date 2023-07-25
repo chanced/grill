@@ -1,10 +1,4 @@
-use crate::{
-    dialect::{Dialect, Dialects, LocatedSchema},
-    error::{IdentifyError, LocateSchemasError},
-    uri::AbsoluteUri,
-    Metaschema, Uri,
-};
-use jsonptr::Pointer;
+use crate::{dialect::Dialect, error::IdentifyError, uri::AbsoluteUri, Metaschema, Uri};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
@@ -44,25 +38,6 @@ pub static JSON_SCHEMA_04_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         [super::draft_07::ConstHandler::new()], // TODO: FIX,
     )
 });
-
-/// An implementation of [`LocateSchemas`](`crate::dialect::LocateSchemas`)
-/// which recursively traverses a [`Value`] and returns a [`Vec`] of
-/// [`LocatedSchema`]s for each identified (via `$id`) subschema and for each
-/// schema with an`"$anchor"`.
-///
-pub fn locate_schemas<'v>(
-    _ptr: Pointer,
-    _value: &'v Value,
-    _dialects: Dialects,
-    _base_uri: &AbsoluteUri,
-) -> Result<Vec<LocatedSchema<'v>>, LocateSchemasError> {
-    // match value {
-    //     Value::Array(arr) => ident_locations_from_arr(ptr, arr, dialects, base_uri),
-    //     Value::Object(_) => ident_locations_from_obj(ptr, value, dialects, base_uri),
-    //     _ => Vec::new(),
-    // }
-    todo!()
-}
 
 #[must_use]
 pub fn is_json_schema_04(v: &Value) -> bool {

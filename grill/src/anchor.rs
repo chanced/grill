@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::keyword::Keyword;
+use crate::schema::Keyword;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Anchor<'v> {
@@ -9,5 +9,5 @@ pub struct Anchor<'v> {
     /// The containing `Value`
     pub container: &'v Value,
     /// The keyword of the anchor
-    pub keyword: Keyword<'static>,
+    pub keyword: Keyword<'v>,
 }

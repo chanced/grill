@@ -2,8 +2,9 @@
 //!
 //! Validation errors are defined within their respective keyword's module.
 
-use crate::{dialect::Dialect, keyword::Keyword, uri::AbsoluteUri, Location, Output, Uri};
+use crate::{dialect::Dialect, schema::Keyword, uri::AbsoluteUri, Location, Output, Uri};
 use jsonptr::{MalformedPointerError, Pointer};
+use petgraph::data::Build;
 use serde_json::{Number, Value};
 use snafu::Snafu;
 use std::{
@@ -18,12 +19,14 @@ pub use crate::output::ValidationError;
 pub type UrnError = urn::Error;
 pub type UrlError = url::ParseError;
 
+/// Multiple sources with the same URI were provided.
 #[derive(Debug)]
 pub struct DuplicateSourceError {
     pub uri: AbsoluteUri,
     pub source: Value,
 }
 
+/// Multiple [`Dialect`](crate::dialect::Dialect)s with the same ID were provided.
 #[derive(Debug)]
 pub struct DuplicateDialectError {
     pub dialect: Dialect,
@@ -49,7 +52,7 @@ pub enum LocateSchemasError {
     #[snafu(display("{}", source), context(false))]
     Anchor { source: AnchorError },
     #[snafu(display("{}", source), context(false))]
-    Urn { source: UrnError },
+    Identify { source: IdentifyError },
 }
 
 /// The inner error of a [`MalformedAnchorError`].
@@ -231,8 +234,6 @@ pub enum BuildError {
     FragmentedSourceUri { source: FragmentedUriError },
     #[snafu(display("{}", source), context(false))]
     FragmentedDialectId { source: FragmentedDialectIdError },
-    #[snafu(display("failed to parse uri: {}", source), context(false))]
-    MalformedAbsoluteUri { source: UriError },
     #[snafu(display("failed to deserialize source: {}", uri))]
     DeserializeSource {
         source: DeserializeError,
@@ -242,6 +243,26 @@ pub enum BuildError {
     EmptyDialects { source: EmptyDialectsError },
     #[snafu(display("{}", source), context(false))]
     DefaultDialectNotFound { source: DefaultDialectNotFoundError },
+    #[snafu(display("{}", source), context(false))]
+    InvalidAnchor { source: AnchorError },
+    #[snafu(display("failed to parse uri: {}", source), context(false))]
+    InvalidUri { source: UriError },
+}
+
+impl From<UrnError> for BuildError {
+    fn from(source: UrnError) -> Self {
+        BuildError::InvalidUri {
+            source: source.into(),
+        }
+    }
+}
+
+impl From<LocateSchemasError> for BuildError {
+    fn from(value: LocateSchemasError) -> Self {
+        BuildError::Compile {
+            source: value.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -520,6 +541,23 @@ pub enum CompileError {
     },
 }
 
+impl From<UrnError> for CompileError {
+    fn from(err: UrnError) -> Self {
+        CompileError::FailedToIdentifySchema {
+            source: IdentifyError::from(err),
+        }
+    }
+}
+
+impl From<LocateSchemasError> for CompileError {
+    fn from(value: LocateSchemasError) -> Self {
+        match value {
+            LocateSchemasError::Anchor { source } => todo!(),
+            LocateSchemasError::Identify { source } => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SchemaNotFoundError {
     pub schema_id: String,
@@ -545,15 +583,15 @@ impl Display for UnknownDialectError {
 impl std::error::Error for UnknownDialectError {}
 
 #[derive(Debug, Clone)]
-pub struct UnkownMetaSchemaError {
+pub struct UnkownMetaschemaError {
     pub schema_id: String,
 }
-impl Display for UnkownMetaSchemaError {
+impl Display for UnkownMetaschemaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unknown meta schema: {}", self.schema_id)
     }
 }
-impl Error for UnkownMetaSchemaError {}
+impl Error for UnkownMetaschemaError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UriNotAbsoluteError {
@@ -590,13 +628,27 @@ pub enum SourceSliceError {
     ParseAbsoluteUri { source: UriError },
 }
 
+/// Errors that can occur when parsing or interacting with
+/// [`Uri`](`crate::uri::Uri`), [`AbsoluteUri`](`crate::uri::AbsoluteUri`), or
+/// [`RelativeUri`](`crate::uri::RelativeUri`).
 #[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum UriError {
+    /// an issue occurred parsing a [`Url`](`url::Url`)
     #[snafu(display("{}", source), context(false))]
     Url { source: UrlError },
+
+    /// an issue occurred parsing a [`Urn`](`urn::Urn`)
     #[snafu(display("{}", source), context(false))]
     Urn { source: urn::Error },
+
+    /// an issue occurred parsing a [`RelativeUri`](`crate::uri::RelativeUri`)
+    #[snafu(display("{}", source), context(false))]
+    Relative { source: RelativeUriError },
+
+    /// Indicates that the [`AbsoluteUri`](crate::uri::AbsoluteUri) is not
+    /// absolute. This is not applicable when dealing with
+    /// [`Uri`](crate::uri::Uri) as they can be relative.
     #[snafu(display("{}", source))]
     NotAbsolute { source: UriNotAbsoluteError },
 }
@@ -634,6 +686,25 @@ impl UriError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RelativeUriError {
+    /// The length of the input exceeds `u32::MAX`
+    Overflow(String),
+    /// This currently only represents the case where the query seperator (`?`)
+    /// precedes the fragment seperator (`#`)
+    Malformed(String),
+}
+
+impl Display for RelativeUriError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Overflow(uri) => write!(f, "relative uri too long: \"{uri}\""),
+            Self::Malformed(uri) => write!(f, "malformed relative uri: \"{uri}\""),
+        }
+    }
+}
+impl Error for RelativeUriError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Snafu)]
 #[snafu(visibility(pub), context(suffix(false)), module)]
 pub enum IdentifyError {
@@ -641,6 +712,13 @@ pub enum IdentifyError {
     Parse { source: UriError },
     #[snafu(display("{}", source), context(false))]
     HasFragment { source: HasFragmentError<Uri> },
+}
+impl From<UrnError> for IdentifyError {
+    fn from(value: UrnError) -> Self {
+        Self::Parse {
+            source: UriError::from(value),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -677,3 +755,13 @@ impl DialectNotFoundError {
         Self { dialect_id }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct UnknownKeyError;
+
+impl std::fmt::Display for UnknownKeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the provided key could not be found")
+    }
+}
+impl Error for UnknownKeyError {}

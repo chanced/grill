@@ -38,57 +38,48 @@ pub use draft_2020_12::{
     json_hyper_schema_2020_12_url, json_schema_2020_12_absolute_uri, json_schema_2020_12_uri,
     json_schema_2020_12_url,
 };
-use jsonptr::Pointer;
 
-use crate::keyword::Keyword;
-use crate::{
-    dialect::{Dialects, LocatedSchema},
-    error::LocateSchemasError,
-    AbsoluteUri, Uri,
-};
-use serde_json::Value;
+// #[must_use]
+// pub fn ident_schema_location_by_dynamic_anchor<'v>(
+//     path: &Pointer,
+//     value: &'v Value,
+//     base_uri: &AbsoluteUri,
+// ) -> Option<LocatedSchema<'v>> {
+//     let Some(Value::String(anchor)) = value.get(Keyword::DYNAMIC_ANCHOR.as_str()) else { return None };
+//     if anchor.is_empty() {
+//         return None;
+//     }
+//     let path = path.clone();
+//     let mut uri = base_uri.clone();
+//     uri.set_fragment(Some(anchor));
+//     Some(Subschema {
+//         uri,
+//         value,
+//         path,
+//         keyword: Some(Keyword::DYNAMIC_ANCHOR),
+//     })
+// }
 
-#[must_use]
-pub fn ident_schema_location_by_dynamic_anchor<'v>(
-    path: &Pointer,
-    value: &'v Value,
-    base_uri: &AbsoluteUri,
-) -> Option<LocatedSchema<'v>> {
-    let Some(Value::String(anchor)) = value.get(Keyword::DYNAMIC_ANCHOR.as_str()) else { return None };
-    if anchor.is_empty() {
-        return None;
-    }
-    let path = path.clone();
-    let mut uri = base_uri.clone();
-    uri.set_fragment(Some(anchor));
-    Some(LocatedSchema {
-        uri,
-        value,
-        path,
-        keyword: Some(Keyword::DYNAMIC_ANCHOR),
-    })
-}
-
-#[must_use]
-pub fn ident_schema_location_by_anchor<'v>(
-    path: &Pointer,
-    value: &'v Value,
-    base_uri: &AbsoluteUri,
-) -> Option<LocatedSchema<'v>> {
-    let Some(Value::String(anchor)) = value.get(Keyword::ANCHOR.as_str()) else { return None };
-    if anchor.is_empty() {
-        return None;
-    }
-    let path = path.clone();
-    let mut uri = base_uri.clone();
-    uri.set_fragment(Some(anchor));
-    Some(LocatedSchema {
-        uri,
-        value,
-        path,
-        keyword: Some(Keyword::ANCHOR),
-    })
-}
+// #[must_use]
+// pub fn ident_schema_location_by_anchor<'v>(
+//     path: &Pointer,
+//     value: &'v Value,
+//     base_uri: &AbsoluteUri,
+// ) -> Option<Subschema<'v>> {
+//     let Some(Value::String(anchor)) = value.get(Keyword::ANCHOR.as_str()) else { return None };
+//     if anchor.is_empty() {
+//         return None;
+//     }
+//     let path = path.clone();
+//     let mut uri = base_uri.clone();
+//     uri.set_fragment(Some(anchor));
+//     Some(Subschema {
+//         uri,
+//         value,
+//         path,
+//         keyword: Some(Keyword::ANCHOR),
+//     })
+// }
 
 // removed for now: https://json-schema.slack.com/archives/CT8QRGTK5/p1687528273221999
 // fn append_nested_named_locations(located_schemas: &mut Vec<LocatedSchema>, base_uri: &AbsoluteUri) {
@@ -114,50 +105,50 @@ pub fn ident_schema_location_by_anchor<'v>(
 //     located_schemas.append(&mut append);
 // }
 
-fn identify_schema_location_by_path<'v>(
-    path: &Pointer,
-    value: &'v Value,
-    uri: &AbsoluteUri,
-) -> LocatedSchema<'v> {
-    let mut uri = uri.clone();
-    if !path.is_empty() {
-        uri.set_fragment(Some(path));
-    }
+// fn identify_schema_location_by_path<'v>(
+//     path: &Pointer,
+//     value: &'v Value,
+//     uri: &AbsoluteUri,
+// ) -> Subschema<'v> {
+//     let mut uri = uri.clone();
+//     if !path.is_empty() {
+//         uri.set_fragment(Some(path));
+//     }
 
-    LocatedSchema::new(uri, value, path.clone(), None)
-}
+//     Subschema::new(uri, value, path.clone(), None)
+// }
 
-fn identify_schema_location_by_id<'v>(
-    path: &Pointer,
-    value: &'v Value,
-    uri: &mut AbsoluteUri,
-    dialects: &mut Dialects,
-) -> Result<Option<LocatedSchema<'v>>, LocateSchemasError> {
-    // Only identified schemas are indexed initially. If a handler needs an
-    // unidentified schema, it will be indexed upon use as part of the `compile`
-    // step.
-    let dialect = dialects.default_dialect();
-    let Ok(Some(id)) = dialect.identify(value) else { return Ok(None) };
-    match id {
-        Uri::Url(url) => {
-            *uri = AbsoluteUri::Url(url);
-        }
-        Uri::Urn(urn) => {
-            *uri = AbsoluteUri::Urn(urn);
-        }
-        Uri::Relative(rel) => {
-            uri.set_path_or_nss(rel.path())?;
-            uri.set_fragment(rel.fragment());
-        }
-    }
-    let path = path.clone();
-    Ok(Some(LocatedSchema {
-        keyword: Some(Keyword::ID),
-        path,
-        uri: uri.clone(),
-        value,
-    }))
-}
+// fn identify_schema_location_by_id<'v>(
+//     path: &Pointer,
+//     value: &'v Value,
+//     uri: &mut AbsoluteUri,
+//     dialects: &mut Dialects,
+// ) -> Result<Option<Subschema<'v>>, IdentifyError> {
+//     // Only identified schemas are indexed initially. If a handler needs an
+//     // unidentified schema, it will be indexed upon use as part of the `compile`
+//     // step.
+//     let dialect = dialects.default_dialect();
+//     let Ok(Some(id)) = dialect.identify(value) else { return Ok(None) };
+//     match id {
+//         Uri::Url(url) => {
+//             *uri = AbsoluteUri::Url(url);
+//         }
+//         Uri::Urn(urn) => {
+//             *uri = AbsoluteUri::Urn(urn);
+//         }
+//         Uri::Relative(rel) => {
+//             uri.set_path_or_nss(rel.path())?;
+//             uri.set_fragment(rel.fragment());
+//         }
+//     }
+//     let path = path.clone();
+//     Ok(Some(Subschema {
+//         keyword: Some(Keyword::ID),
+//         path,
+//         uri: uri.clone(),
+//         value,
+//     }))
+// }
 
 // #[derive(Default)]
 // pub struct JsonSchema<'instance, 'schema, 'state> {
