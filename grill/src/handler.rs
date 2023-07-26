@@ -1,17 +1,24 @@
-use std::fmt;
-
 use crate::{
     dialect::Dialects,
     error::{CompileError, EvaluateError, IdentifyError, UriError},
     output::{self, Structure},
     schema::{LocatedSchema, Reference},
-    AbsoluteUri, Compile, Scope, Uri,
+    AbsoluteUri, Compile, Uri,
 };
-
 use async_trait::async_trait;
+use big_rational_str::ParseError as BigRatParseError;
 use dyn_clone::{clone_trait_object, DynClone};
+use inherent::inherent;
 use jsonptr::Pointer;
-use serde_json::Value;
+use num_rational::BigRational;
+use serde_json::{Number, Value};
+use slotmap::SlotMap;
+use std::{
+    any::{Any, TypeId},
+    collections::{hash_map, HashMap},
+    fmt,
+    hash::{BuildHasherDefault, Hasher},
+};
 
 /// A handler that performs logic for a given condition in a JSON Schema.
 #[derive(Debug, Clone)]
@@ -60,7 +67,7 @@ impl Handler {
     /// Attempts to identify the schema based on the [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `identify` for a given `Dialect`. It **must** be the
+    /// Exactly one `Handler` must implement the method `identify` for a given `Dialect`. It **must** be the
     /// **second** (index: `1`) `Handler` in the [`Dialect`](`crate::dialect::Dialect`)'s [`Handlers`](`crate::dialect::Handlers`)
     ///
     /// # Example
@@ -80,7 +87,7 @@ impl Handler {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `is_pertinent_to` for a given `Dialect`.
+    /// Exactly one `Handler` must implement the method `is_pertinent_to` for a given `Dialect`.
     /// It **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
@@ -105,7 +112,7 @@ impl Handler {
     /// the schema.
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `dialect` for a given `Dialect`. It
+    /// Exactly one `Handler` must implement the method `dialect` for a given `Dialect`. It
     /// **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
@@ -125,8 +132,9 @@ impl Handler {
         }
     }
 
-    /// Locates nested schemas within the given schema.
-    pub fn locate_schemas<'v>(
+    /// Returns a list of [`LocatedSchema`] for each embedded schema within
+    /// `value`.
+    pub fn schemas<'v>(
         &self,
         path: &Pointer,
         base_uri: &AbsoluteUri,
@@ -134,8 +142,8 @@ impl Handler {
         dialects: &Dialects,
     ) -> Result<Vec<LocatedSchema<'v>>, IdentifyError> {
         match self {
-            Handler::Sync(h) => h.locate_schemas(path, base_uri, value, dialects),
-            Handler::Async(h) => h.locate_schemas(path, base_uri, value, dialects),
+            Handler::Sync(h) => h.schemas(path, base_uri, value, dialects),
+            Handler::Async(h) => h.schemas(path, base_uri, value, dialects),
         }
     }
 
@@ -172,7 +180,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
         structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
 
-    fn locate_schemas<'v>(
+    fn schemas<'v>(
         &self,
         path: &Pointer,
         base_uri: &AbsoluteUri,
@@ -185,7 +193,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `identify` for a given `Dialect`.
+    /// Exactly one `Handler` must implement the method `identify` for a given `Dialect`.
     /// It **must** be the **second** (index: `1`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
@@ -206,8 +214,8 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// the schema.
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `dialect` for a given `Dialect`. It
-    /// **must** be the **first** (index: `0`) `Handler` in the
+    /// Exactly one `Handler` must implement the `dialect` method for a given
+    /// `Dialect`. It **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
     ///
@@ -228,7 +236,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `is_pertinent_to` for a given `Dialect`.
+    /// Exactly one `Handler` must implement the method `is_pertinent_to` for a given `Dialect`.
     /// It **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
@@ -289,8 +297,8 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `identify` for a given `Dialect`.
-    /// It **must** be the **second** (index: `1`) `Handler` in the
+    /// Exactly one `Handler` must implement the method `identify` for a given
+    /// `Dialect`. It **must** be the **second** (index: `1`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
     ///
@@ -310,7 +318,7 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// the schema.
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `dialect` for a given `Dialect`. It
+    /// Exactly one `Handler` must implement the method `dialect` for a given `Dialect`. It
     /// **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
@@ -332,9 +340,9 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `is_pertinent_to` for a given `Dialect`.
-    /// It **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
+    /// Exactly one `Handler` must implement the method `is_pertinent_to` for a
+    /// given `Dialect`. It **must** be the **first** (index: `0`) `Handler` in
+    /// the [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`)
     ///
     /// # Example
@@ -353,8 +361,10 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     fn is_pertinent_to(&self, schema: &Value) -> bool {
         unimplemented!("is_pertinent_to must be implemented by the first Handler in a Dialect")
     }
+
+    /// Returns a list of [`LocatedSchema`] for each subschema in `value`.
     #[allow(unused_variables)]
-    fn locate_schemas<'v>(
+    fn schemas<'v>(
         &self,
         path: &Pointer,
         base_uri: &AbsoluteUri,
@@ -383,5 +393,360 @@ where
 {
     fn into_handler(self) -> Handler {
         self.into()
+    }
+}
+
+// AnyMap, TypIdHasher, and Downcast was sourced (and modified) from the anymap
+// crate:
+// https://github.com/chris-morgan/anymap/blob/2e9a570491664eea18ad61d98aa1c557d5e23e67/src/any.rs
+// The anymap crate is licensed under BlueOak-1.0.0 OR MIT OR Apache-2.0
+// The reason this was lifted rather than using anymap directly is due to `Downcast` not being exposed.
+// unsafe code can be removed once dyn upcasting is stable: https://github.com/rust-lang/rust/issues/65991
+
+trait Item: Any + std::fmt::Debug + DynClone + Send + Sync {}
+clone_trait_object!(Item);
+
+impl<T> Item for T where T: 'static + Any + std::fmt::Debug + Send + Sync + DynClone {}
+trait Downcast {
+    unsafe fn downcast_ref_unchecked<T: 'static>(&self) -> &T;
+
+    unsafe fn downcast_mut_unchecked<T: 'static>(&mut self) -> &mut T;
+
+    unsafe fn downcast_unchecked<T: 'static>(self: Box<Self>) -> Box<T>;
+}
+
+#[allow(clippy::ptr_as_ptr)]
+impl Downcast for dyn Item {
+    unsafe fn downcast_ref_unchecked<T: 'static>(&self) -> &T {
+        &*(self as *const Self as *const T)
+    }
+    unsafe fn downcast_mut_unchecked<T: 'static>(&mut self) -> &mut T {
+        &mut *(self as *mut Self as *mut T)
+    }
+    #[inline]
+    unsafe fn downcast_unchecked<T: 'static>(self: Box<Self>) -> Box<T> {
+        Box::from_raw(Box::into_raw(self) as *mut T)
+    }
+}
+
+type AnyMap = HashMap<TypeId, Box<dyn Item>, BuildHasherDefault<TypeIdHasher>>;
+
+#[derive(Default)]
+struct TypeIdHasher(u64);
+impl Hasher for TypeIdHasher {
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("TypeId calls write_u64");
+    }
+
+    #[inline]
+    fn write_u64(&mut self, id: u64) {
+        self.0 = id;
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct State {
+    map: AnyMap,
+}
+impl State {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn entry<T>(&mut self) -> Entry<'_, T>
+    where
+        T: 'static + Clone + Send + Sync,
+    {
+        self.map.entry(TypeId::of::<T>()).into()
+    }
+
+    #[must_use]
+    pub fn contains<T>(&self) -> bool
+    where
+        T: 'static + Clone + Send + Sync,
+    {
+        self.map.contains_key(&TypeId::of::<T>())
+    }
+
+    #[must_use]
+    pub fn get<T>(&self) -> Option<&T>
+    where
+        T: Any + std::fmt::Debug + Clone + Send + Sync,
+    {
+        let v = self.map.get(&TypeId::of::<T>());
+        v.map(|v| unsafe { v.downcast_ref_unchecked::<T>() })
+    }
+
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: 'static + Clone + Send + Sync,
+    {
+        self.map
+            .get_mut(&TypeId::of::<T>())
+            .map(|v| unsafe { v.downcast_mut_unchecked() })
+    }
+
+    pub fn insert<T>(&mut self, value: T) -> Option<T>
+    where
+        T: 'static + Clone + std::fmt::Debug + Send + Sync,
+    {
+        self.map
+            .insert(TypeId::of::<T>(), Box::new(value))
+            .map(|v| *unsafe { v.downcast_unchecked() })
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+}
+
+pub struct OccupiedEntry<'a, T> {
+    inner: hash_map::OccupiedEntry<'a, TypeId, Box<dyn Item>>,
+    _marker: std::marker::PhantomData<T>,
+}
+impl<'a, T: 'static> OccupiedEntry<'a, T> {
+    /// Gets a reference to the value in the entry.
+    #[inline]
+    #[must_use]
+    pub fn get(&self) -> &T {
+        unsafe { self.inner.get().downcast_ref_unchecked() }
+    }
+
+    /// Gets a mutable reference to the value in the entry
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe { self.inner.get_mut().downcast_mut_unchecked() }
+    }
+
+    /// Converts the `OccupiedEntry` into a mutable reference to the value in the entry
+    /// with a lifetime bound to the collection itself
+    #[inline]
+    #[must_use]
+    pub fn into_mut(self) -> &'a mut T {
+        unsafe { self.inner.into_mut().downcast_mut_unchecked() }
+    }
+
+    /// Sets the value of the entry, and returns the entry's old value
+    #[inline]
+    pub fn insert(&mut self, value: T) -> T
+    where
+        T: 'static + Clone + std::fmt::Debug + Send + Sync,
+    {
+        unsafe { *self.inner.insert(Box::new(value)).downcast_unchecked() }
+    }
+
+    /// Takes the value out of the entry, and returns it
+    #[inline]
+    #[must_use]
+    pub fn remove(self) -> T {
+        unsafe { *self.inner.remove().downcast_unchecked() }
+    }
+}
+
+pub struct VacantEntry<'a, T> {
+    inner: hash_map::VacantEntry<'a, TypeId, Box<dyn Item>>,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<'a, T> VacantEntry<'a, T> {
+    pub fn insert(self, value: T) -> &'a mut T
+    where
+        T: 'static + Clone + std::fmt::Debug + Send + Sync,
+    {
+        unsafe {
+            self.inner
+                .insert(Box::new(value))
+                .downcast_mut_unchecked::<T>()
+        }
+    }
+}
+pub enum Entry<'a, T> {
+    Occupied(OccupiedEntry<'a, T>),
+    Vacant(VacantEntry<'a, T>),
+}
+
+impl<'a, T> Entry<'a, T>
+where
+    T: 'static + Any + std::fmt::Debug + Send + Sync + Clone,
+{
+    /// Ensures a value is in the entry by inserting the default if empty, and returns
+    /// a mutable reference to the value in the entry.
+    #[inline]
+    pub fn or_insert(self, default: T) -> &'a mut T {
+        match self {
+            Entry::Occupied(inner) => inner.into_mut(),
+            Entry::Vacant(inner) => inner.insert(default),
+        }
+    }
+
+    /// Ensures a value is in the entry by inserting the result of the default function if
+    /// empty, and returns a mutable reference to the value in the entry.
+    #[inline]
+    pub fn or_insert_with<F: FnOnce() -> T>(self, default: F) -> &'a mut T {
+        match self {
+            Entry::Occupied(inner) => inner.into_mut(),
+            Entry::Vacant(inner) => inner.insert(default()),
+        }
+    }
+
+    /// Ensures a value is in the entry by inserting the default value if empty,
+    /// and returns a mutable reference to the value in the entry.
+    #[must_use]
+    #[inline]
+    pub fn or_default(self) -> &'a mut T
+    where
+        T: Default,
+    {
+        match self {
+            Entry::Occupied(inner) => inner.into_mut(),
+            Entry::Vacant(inner) => inner.insert(Default::default()),
+        }
+    }
+
+    /// Provides in-place mutable access to an occupied entry before any potential inserts
+    /// into the map.
+    #[must_use]
+    #[inline]
+    pub fn and_modify<F: FnOnce(&mut T)>(self, f: F) -> Self {
+        match self {
+            Entry::Occupied(mut inner) => {
+                f(inner.get_mut());
+                Entry::Occupied(inner)
+            }
+            Entry::Vacant(inner) => Entry::Vacant(inner),
+        }
+    }
+}
+
+impl<'a, T> From<hash_map::Entry<'a, TypeId, Box<dyn Item>>> for Entry<'a, T> {
+    fn from(value: hash_map::Entry<'a, TypeId, Box<dyn Item>>) -> Self {
+        match value {
+            hash_map::Entry::Occupied(entry) => Entry::Occupied(OccupiedEntry {
+                inner: entry,
+                _marker: std::marker::PhantomData,
+            }),
+            hash_map::Entry::Vacant(entry) => Entry::Vacant(VacantEntry {
+                inner: entry,
+                _marker: std::marker::PhantomData,
+            }),
+        }
+    }
+}
+
+use crate::{location::Locate, output::Node, Location, SchemaKey};
+/// Contains state and location information needed to perform an
+/// [`evaluation`](`crate::Interrogator::evaluate`).
+pub struct Scope<'s> {
+    pub state: &'s mut State,
+    location: Location,
+    number: Option<BigRational>,
+}
+
+#[inherent]
+impl Locate for Scope<'_> {
+    #[must_use]
+    pub fn location(&self) -> &Location {
+        &self.location
+    }
+}
+
+impl<'s> Scope<'s> {
+    pub fn new(
+        location: Location,
+        state: &'s mut State,
+        _schemas: SlotMap<SchemaKey, Value>,
+    ) -> Self {
+        Self {
+            state,
+            location,
+            number: None,
+        }
+    }
+    #[must_use]
+    pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Node<'v> {
+        let mut location = self.location.clone();
+        location.push_keyword_location(keyword);
+        Node::new(location, value)
+    }
+
+    /// # Errors
+    /// Returns a [`ParseError`](`big_rational_str::ParseError`) if `number` cannot be parsed as a [`BigRational`].
+    #[allow(clippy::missing_panics_doc)]
+    pub fn number(&mut self, number: &Number) -> Result<&BigRational, BigRatParseError> {
+        let n = &mut self.number;
+        if let Some(number) = n {
+            Ok(number)
+        } else {
+            let number = big_rational_str::str_to_big_rational(&number.to_string())?;
+            n.replace(number);
+            Ok(n.as_ref().unwrap())
+        }
+    }
+
+    /// Returns a new, nested [`Scope`], where `instance` should be the name of
+    /// field or index within the value being evaluated and `keyword` is the
+    /// keyword being executed.
+    ///
+    /// # Errors
+    /// Returns a [`jsonptr::Error`](`jsonptr::Error`) if the
+    /// `absolute_keyword_location`'s pointer is malformed.
+    pub fn nested(
+        &mut self,
+        _instance: &str,
+        _keyword: &str,
+        _absolute_keyword_location: Option<String>,
+    ) -> Result<Scope, jsonptr::MalformedPointerError> {
+        // let mut keyword_location = self.keyword_location().clone();
+        // keyword_location.push_back(keyword.into());
+        // let absolute_keyword_location =
+        //     if let Some(absolute_keyword_location) = absolute_keyword_location {
+        //         absolute_keyword_location
+        //     } else {
+        //         let v = self.location.absolute_keyword_location.clone();
+        //         let (uri, ptr) = v.split_once('#').unwrap_or((&v, ""));
+        //         let mut ptr: Pointer = Pointer::try_from(ptr)?;
+        //         ptr.push_back(keyword.into());
+        //         format!("{uri}#{ptr}")
+        //     };
+        // let mut instance_location = self.instance_location().clone();
+        // instance_location.push_back(instance.into());
+        // Ok(Scope {
+        //     location: Location {
+        //         keyword_location,
+        //         absolute_keyword_location,
+        //         instance_location,
+        //     },
+        //     state: self.state,
+        //     number: None,
+        // })
+        todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get() {
+        let mut state = State::new();
+        let i: i32 = 1;
+        state.insert(i);
+        let x = state.get_mut::<i32>().unwrap();
+        *x += 1;
+
+        assert_eq!(state.get::<i32>(), Some(&2));
     }
 }

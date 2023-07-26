@@ -26,7 +26,7 @@ impl SyncHandler for MultipleOfHandler {
 
     fn evaluate<'v>(
         &self,
-        _scope: &mut crate::Scope,
+        _scope: &mut crate::handler::Scope,
         _value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {

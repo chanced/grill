@@ -25,14 +25,15 @@ pub struct Reference {
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompiledSchema {
-    /// The URI of the schema.
+    /// Abs URI of the schema.
     pub(crate) id: AbsoluteUri,
-    /// The URI of the schema's `Metaschema`.
+    /// Abs URI of the schema's `Metaschema`.
     pub(crate) metaschema: AbsoluteUri,
-    /// URI of the source.
+    /// Abs URI of the source.
     pub(crate) source_uri: AbsoluteUri,
-    /// Path to the schema within the source.
+    /// Path to the schema within the source as a JSON pointer.
     pub(crate) source_path: Pointer,
+    // Compiled handlers.
     pub(crate) handlers: Box<[Handler]>,
 }
 
@@ -48,13 +49,13 @@ pub struct Schema<'i, Key: slotmap::Key> {
     pub source: &'i Value,
     /// `Schema`s which dependent upon this `Schema`.
     pub dependents: Vec<Key>,
-    /// Dependencies of this `Schema`.
+    ///  Dependencies of this `Schema`.
     pub dependencies: Vec<Key>,
-    /// Compiled handlers.
+    /// Compiled [`Handler`]s.
     pub handlers: &'i [Handler],
-    /// URI of the source.
+    /// [`AbsoluteUri`] of the source.
     pub source_uri: &'i AbsoluteUri,
-    /// Path to the schema within the source.
+    /// Path to the schema within the source as a JSON [`Pointer`].
     pub source_path: &'i Pointer,
 }
 
@@ -104,7 +105,7 @@ impl<'i, K: slotmap::Key> Eq for Schema<'i, K> {}
 #[derive(Debug, Clone)]
 /// Contains a graph of schema references in order to detect cyclic
 /// dependencies.
-pub struct DependencyGraph<Key: slotmap::Key> {
+pub(crate) struct DependencyGraph<Key: slotmap::Key> {
     graph: DirectedGraph<AbsoluteUri, AbsoluteUri, Directed>,
     indexes: HashMap<AbsoluteUri, NodeIndex>,
     _marker: PhantomData<Key>,
@@ -120,8 +121,8 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
             _marker: PhantomData,
         }
     }
-    fn node_index(&self, uri: &AbsoluteUri) -> Result<NodeIndex, UnknownKeyError> {
-        self.indexes.get(uri).copied().ok_or(UnknownKeyError)
+    fn index(&self, uri: &AbsoluteUri) -> Option<NodeIndex> {
+        self.indexes.get(uri).copied()
     }
 
     pub(crate) fn insert(&mut self, uri: AbsoluteUri) {
@@ -133,15 +134,11 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
     /// If from and to are equal, this function returns true.
     ///
     /// If space is not None, it is used instead of creating a new workspace for graph traversal.
-    pub fn has_path_connecting(
-        &self,
-        from: &AbsoluteUri,
-        to: &AbsoluteUri,
-    ) -> Result<bool, UnknownKeyError> {
+    pub(crate) fn has_path_connecting(&self, from: &AbsoluteUri, to: &AbsoluteUri) -> Option<bool> {
         let mut space = algo::DfsSpace::new(&self.graph);
-        let from = self.node_index(from)?;
-        let to = self.node_index(to)?;
-        Ok(algo::has_path_connecting(
+        let from = self.index(from)?;
+        let to = self.index(to)?;
+        Some(algo::has_path_connecting(
             &self.graph,
             from,
             to,
@@ -151,17 +148,18 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
 
     /// Returns an [`Iterator`] of direct dependencies of the schema with given
     /// `key`.
-    pub fn dependencies<'a>(
+    pub(crate) fn dependencies<'a>(
         &'a self,
         uri: &'a AbsoluteUri,
         keys: &'a HashMap<AbsoluteUri, Key>,
-    ) -> Result<impl 'a + Iterator<Item = Key>, UnknownKeyError> {
-        let idx = self.node_index(uri)?;
-        Ok(self
-            .graph
-            .neighbors_directed(idx, petgraph::Direction::Outgoing)
-            .map(|n| self.graph[n].clone())
-            .map(|n| keys.get(&n).copied().unwrap()))
+    ) -> Option<impl 'a + Iterator<Item = Key>> {
+        let idx = self.index(uri)?;
+        Some(
+            self.graph
+                .neighbors_directed(idx, petgraph::Direction::Outgoing)
+                .map(|n| self.graph[n].clone())
+                .map(|n| keys.get(&n).copied().unwrap()),
+        )
     }
 
     /// Returns an [`Iterator`] of direct dependents of the schema with given `key`.
@@ -169,13 +167,14 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
         &'a self,
         uri: &AbsoluteUri,
         keys: &'a HashMap<AbsoluteUri, Key>,
-    ) -> Result<impl '_ + Iterator<Item = Key>, UnknownKeyError> {
-        let idx = self.node_index(uri)?;
-        Ok(self
-            .graph
-            .neighbors_directed(idx, petgraph::Direction::Incoming)
-            .map(|n| self.graph[n].clone())
-            .map(|n| *(keys.get(&n).unwrap())))
+    ) -> Option<impl '_ + Iterator<Item = Key>> {
+        let idx = self.index(uri)?;
+        Some(
+            self.graph
+                .neighbors_directed(idx, petgraph::Direction::Incoming)
+                .map(|n| self.graph[n].clone())
+                .map(|n| *(keys.get(&n).unwrap())),
+        )
     }
 }
 
@@ -232,10 +231,10 @@ impl<Key: slotmap::Key> Schemas<Key> {
         &'a self,
         key: Key,
         sources: &'a Sources,
-    ) -> Result<Iter<'a, Key>, UnknownKeyError> {
-        let schema = self.schemas.get(key).ok_or(UnknownKeyError)?;
+    ) -> Option<Iter<'a, Key>> {
+        let schema = self.schemas.get(key)?;
         let inner = self.graph.dependencies(&schema.id, &self.keys)?;
-        Ok(Iter::new(
+        Some(Iter::new(
             inner,
             sources,
             &self.schemas,
@@ -263,9 +262,9 @@ impl<Key: slotmap::Key> Schemas<Key> {
         Some((key, schema))
     }
 
-    pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> Result<bool, UnknownKeyError> {
-        let from = self.schemas.get(from).ok_or(UnknownKeyError)?;
-        let to = self.schemas.get(to).ok_or(UnknownKeyError)?;
+    pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> Option<bool> {
+        let from = self.schemas.get(from)?;
+        let to = self.schemas.get(to)?;
         self.graph.has_path_connecting(&from.id, &to.id)
     }
 }

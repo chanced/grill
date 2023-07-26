@@ -33,11 +33,8 @@ pub use slotmap::new_key_type;
 
 pub mod dialect;
 
-mod scope;
-pub use scope::Scope;
-
 mod handler;
-pub use handler::Handler;
+pub use handler::{Scope, Handler};
 
 pub mod error;
 
@@ -49,10 +46,6 @@ pub use resolve::Resolve;
 
 mod compile;
 pub use compile::Compile;
-
-pub mod state;
-pub use state::State;
-
 
 mod metaschema;
 pub use metaschema::Metaschema;

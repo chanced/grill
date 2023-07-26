@@ -238,9 +238,7 @@ impl Dialect {
                 return dialect.locate_schemas(path, base_uri, value, dialects);
             }
         }
-        let uri = self
-            .identify(base_uri, value)?
-            .unwrap_or(base_uri.clone());
+        let uri = self.identify(base_uri, value)?.unwrap_or(base_uri.clone());
 
         let mut located = vec![LocatedSchema {
             keyword: None,
@@ -250,7 +248,7 @@ impl Dialect {
         }];
 
         for handler in &self.handlers {
-            located.append(&mut handler.locate_schemas(path, &uri, value, dialects)?);
+            located.append(&mut handler.schemas(path, &uri, value, dialects)?);
         }
 
         Ok(located.into())
