@@ -6,10 +6,12 @@ use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::{collections::HashMap, marker::PhantomData, ops::Deref};
 
-const INVALID_KEY_ERR_MSG: &str = "Schema Key not found. 
-This is most likely caused by there being multiple Interrogators using the same Key type.
-To avoid this error, use a different Key type for each Interrogator.
-If that is not the issue, please report it to https://github.com/chanced/grill/issues/new";
+const INVALID_KEY_ERR_MSG: &str = "SchemaKey not found. 
+This is likely caused by there being multiple Interrogators using the same Key type.
+To avoid this error, use a different Key type for each Interrogator. \
+To create a new Key type, see the macro new_key_type, re-exported from slotmap.
+
+If that is not the issue, please open a ticket at https://github.com/chanced/grill/issues/new";
 
 new_key_type! {
     pub struct SchemaKey;
