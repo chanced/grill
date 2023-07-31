@@ -3,15 +3,12 @@ use std::{any, borrow::Borrow, fmt::Debug, ops::Deref, str::FromStr};
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 
-use snafu::ResultExt;
-
 use crate::{
     deserialize::{deserialize_json, Deserializers},
     dialect::{Dialect, Dialects},
     error::{
-        resolve_error::NestedSchemaNotFound, BuildError, CompileError, DeserializeError,
-        EvaluateError, PointerError, ResolveErrors, SourceError, SourceSliceError,
-        UnknownDialectError, UriError,
+        BuildError, CompileError, DeserializeError, DialectUnknownError, EvaluateError,
+        ResolveError, SourceError, UriError,
     },
     json_schema,
     resolve::Resolvers,
@@ -62,12 +59,11 @@ where
         let uri = uri.try_into_absolute_uri()?;
         // resolving the uri provided.
         let value = self.resolve(&uri).await?;
-
         // determine the dialect
         let dialect = self.dialects.pertinent_to_or_default(&value);
         // identifying the schema
         let id = dialect.identify(&uri, &value)?.unwrap_or(uri);
-        // check to see if the schema has already been compiled under the id
+        // checking to see if the schema has already been compiled under the id
         if let Some((key, _)) = self.schemas.get_by_id(&id, &self.sources) {
             return Ok(key);
         }
@@ -81,10 +77,10 @@ where
         &self.dialects
     }
 
-    /// Attempts to resolve, deserialize, and store the schema at the given URI
+    /// Attempts to resolve deserialize, and store the schema at the given URI
     /// using either local in-mem storage or resolved with any of the attached
     /// implementations of [`Resolve`]s.
-    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, ResolveErrors> {
+    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, SourceError> {
         let uri = uri.borrow();
 
         // if the value has already been indexed, return a clone of the local copy
@@ -122,14 +118,12 @@ where
         // if not, the fragment must be a json pointer as all anchors and
         // schemas with fragmented ids should have been located and indexed
         // TODO: better error handling here.
-        let ptr = Pointer::from_str(uri_fragment)
-            .map_err(PointerError::from)
-            .context(NestedSchemaNotFound { uri_fragment, uri })?;
+        let ptr =
+            Pointer::from_str(uri_fragment).map_err(|err| ResolveError::new(err, uri.clone()))?;
+
         root.resolve(&ptr)
             .cloned()
-            .map_err(PointerError::from)
-            .context(NestedSchemaNotFound { uri_fragment, uri })
-            .map_err(Into::into)
+            .map_err(|err| ResolveError::new(err, uri.clone()).into())
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
@@ -142,7 +136,7 @@ where
     pub fn determine_dialect(
         &self,
         schema: &Value,
-    ) -> Result<Option<&Dialect>, UnknownDialectError> {
+    ) -> Result<Option<&Dialect>, DialectUnknownError> {
         if let Some(schema) = self.dialects.pertinent_to(schema) {
             return Ok(Some(schema));
         }
@@ -153,7 +147,7 @@ where
             .and_then(Value::as_str)
             .map(ToString::to_string)
         {
-            Some(metaschema_id) => Err(UnknownDialectError { metaschema_id }),
+            Some(metaschema_id) => Err(DialectUnknownError { metaschema_id }),
             None => Ok(None),
         }
     }
@@ -528,7 +522,7 @@ where
         mut self,
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
-    ) -> Result<Self, SourceSliceError> {
+    ) -> Result<Self, SourceError> {
         self.sources.push(Source::String(
             uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
@@ -636,7 +630,7 @@ where
     /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
     ///
-    pub fn source_slices<I, K, V>(mut self, sources: I) -> Result<Self, SourceSliceError>
+    pub fn source_slices<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
     where
         K: TryIntoAbsoluteUri,
         V: AsRef<[u8]>,

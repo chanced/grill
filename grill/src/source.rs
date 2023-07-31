@@ -1,13 +1,10 @@
 use crate::{
     deserialize::Deserializers,
-    error::{
-        new_sources_error, DeserializeError, DuplicateSourceError, FragmentedUriError,
-        NewSourcesError, SourceError,
-    },
+    error::{DeserializeError, SourceDeserializationError, SourceDuplicateError, SourceError},
     AbsoluteUri, Deserializer, Metaschema,
 };
 use serde_json::Value;
-use snafu::ResultExt;
+
 use std::{
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
@@ -45,6 +42,15 @@ impl Source {
         match self {
             Self::String(_, s) => Ok(Cow::Owned(deserialize(s, deserializers)?)),
             Self::Value(_, source) => Ok(Cow::Borrowed(source)),
+        }
+    }
+
+    /// If
+    #[must_use]
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(_, s) => Some(s),
+            Self::Value(_, _) => None,
         }
     }
 }
@@ -88,25 +94,28 @@ impl Sources {
     ///
     /// # Errors
     ///
-    /// Returns a [`NewSourcesError`] if any of the following conditions are met:
+    /// Returns a [`SourceError`] if any of the following conditions are met:
     /// - a [`Source`]'s [`AbsoluteUri`] has a fragment.
     /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
     pub fn new(
         sources: Vec<Source>,
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
-    ) -> Result<Self, NewSourcesError> {
+    ) -> Result<Self, SourceError> {
         let capacity = sources.len();
         let iter = sources.into_iter();
         let mut sources: HashMap<AbsoluteUri, Value> = HashMap::with_capacity(capacity);
         for src in iter {
             let uri = src.uri().clone(); // need the uri below for the error context
-            let src = src
-                .try_take_value(deserializers)
-                .context(new_sources_error::Deserialize { uri: uri.clone() })?;
+            let src =
+                src.try_take_value(deserializers)
+                    .map_err(|e| SourceDeserializationError {
+                        uri: uri.clone(),
+                        error: e,
+                    })?;
             if let Some(fragment) = uri.fragment() {
                 if !fragment.is_empty() {
-                    return Err(FragmentedUriError { uri }.into());
+                    return Err(SourceError::FragmentedUri(uri));
                 }
             }
             sources.insert(uri, src);
@@ -143,30 +152,36 @@ impl Sources {
         let uri = source.uri().clone();
         let frag = uri.fragment();
         if frag.is_some() && frag != Some("") {
-            return Err(SourceError::FragmentedSourceUri {
-                source: FragmentedUriError { uri },
-            });
+            return Err(SourceError::FragmentedUri(uri));
         }
-        let source = source.value(deserializers)?.into_owned();
-        // if the source has already been indexed, no-op
+        let source = source
+            .value(deserializers)
+            .map_err(|e| SourceDeserializationError { uri, error: e })?;
+
         if self.sources.contains_key(&uri) {
             // safe, see check above.
             let src = self.sources.get(&uri).unwrap();
-            if src == &source {
+            if src == source.as_ref() {
                 return Ok(self.sources.get(&uri).unwrap());
             }
+
             // error out if a source with the same uri has been indexed and the
             // values do not match
-            return Err(DuplicateSourceError { uri, source }.into());
+
+            return Err(SourceDuplicateError {
+                uri,
+                value: source.into_owned().into(),
+            }
+            .into());
         }
-        Ok(self.insert_value(uri, source)?)
+        Ok(self.insert_value(uri, source.into_owned())?)
     }
 
     fn insert_value(
         &mut self,
         uri: AbsoluteUri,
         source: Value,
-    ) -> Result<&Value, DuplicateSourceError> {
+    ) -> Result<&Value, SourceDuplicateError> {
         if self.sources.contains_key(&uri) {
             // safe, checked above
             let src = self.sources.get(&uri).unwrap();
@@ -175,7 +190,10 @@ impl Sources {
             }
             // error out if a source with the same uri has been indexed and the
             // values do not match
-            return Err(DuplicateSourceError { uri, source });
+            return Err(SourceDuplicateError {
+                uri,
+                value: source.into(),
+            });
         }
         Ok(self.sources.entry(uri).or_insert(source))
     }

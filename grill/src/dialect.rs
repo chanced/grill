@@ -2,16 +2,13 @@
 //! schema.
 
 use crate::{
-    error::{
-        DefaultDialectNotFoundError, DuplicateDialectError, EmptyDialectsError,
-        FragmentedDialectIdError, IdentifyError, LocateSchemasError, NewDialectsError,
-    },
+    error::{DialectError, IdentifyError, LocateSchemasError, UriError},
     schema::{LocatedSchema, LocatedSchemas},
     uri::AbsoluteUri,
     Handler, Metaschema, Object, Source,
 };
 use jsonptr::Pointer;
-use serde_json::{map::IntoIter, Value};
+use serde_json::Value;
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
@@ -33,6 +30,11 @@ pub struct Dialect {
     pub metaschemas: HashMap<AbsoluteUri, Object>,
     /// Set of [`Handler`]s defined by the dialect.
     pub handlers: Vec<Handler>,
+}
+impl std::fmt::Display for Dialect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.id, f)
+    }
 }
 
 impl Dialect {
@@ -78,8 +80,8 @@ impl Dialect {
             crate::Uri::Relative(rel) => {
                 let mut uri = base_uri.clone();
                 uri.set_fragment(rel.fragment());
-                uri.set_path_or_nss(rel.path())?;
-                uri.set_query(rel.query())?;
+                uri.set_path_or_nss(rel.path()).map_err(UriError::from)?;
+                uri.set_query(rel.query()).map_err(UriError::from)?;
                 Ok(Some(uri))
             }
         }
@@ -293,19 +295,17 @@ pub struct Dialects<'d> {
     default: usize,
 }
 impl<'d> Dialects<'d> {
-    pub fn new(
-        dialects: Vec<Dialect>,
-        default: Option<AbsoluteUri>,
-    ) -> Result<Self, NewDialectsError> {
+    pub fn new(dialects: Vec<Dialect>, default: Option<AbsoluteUri>) -> Result<Self, DialectError> {
         if dialects.is_empty() {
-            return Err(EmptyDialectsError.into());
+            return Err(DialectError::Empty);
         }
         let queue = Self::queue(dialects)?;
         let mut dialects = Vec::with_capacity(queue.len());
         let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(queue.len());
+
         for dialect in queue.into_iter().rev() {
             if lookup.contains_key(&dialect.id) {
-                return Err(DuplicateDialectError::new(dialect).into());
+                return Err(DialectError::Duplicate(dialect));
             }
             let id = dialect.id.clone();
             dialects.push(dialect);
@@ -336,9 +336,13 @@ impl<'d> Dialects<'d> {
             .find(|&dialect| dialect.is_pertinent_to(schema))
     }
 
-    pub(crate) fn push(&mut self, dialect: Dialect) -> Result<(), DuplicateDialectError> {
+    /// Appends a [`Dialect`].
+    ///
+    /// # Errors
+    /// Returns the `Dialect` if a `Dialect` already exists with the same `id`.
+    pub(crate) fn push(&mut self, dialect: Dialect) -> Result<(), Dialect> {
         if self.lookup.contains_key(&dialect.id) {
-            return Err(DuplicateDialectError::new(dialect));
+            return Err(dialect);
         }
         self.lookup
             .to_mut()
@@ -347,13 +351,22 @@ impl<'d> Dialects<'d> {
         Ok(())
     }
 
+    /// Returns a new `Dialects` with the default `Dialect` set to the provided
+    ///
+    /// # Errors
+    /// Returns the `&Dialect` if the `Dialect` is not currently in this `Dialects`.
     #[must_use]
-    pub fn with_default(&'d self, default: &Dialect) -> Dialects<'d> {
-        Dialects {
+    pub fn with_default(&'d self, default: &Dialect) -> Result<Dialects<'d>, &Dialect> {
+        let default = self
+            .lookup
+            .get(&default.id)
+            .copied()
+            .ok_or_else(|| default)?;
+        Ok(Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
-            default: self.default,
+            default,
             lookup: Cow::Borrowed(self.lookup.as_ref()),
-        }
+        })
     }
 
     #[must_use]
@@ -453,16 +466,13 @@ impl<'d> Dialects<'d> {
         self.default
     }
 
-    fn queue(dialects: Vec<Dialect>) -> Result<Vec<Dialect>, NewDialectsError> {
+    fn queue(dialects: Vec<Dialect>) -> Result<Vec<Dialect>, DialectError> {
         let mut queue = Vec::with_capacity(dialects.len());
         let mut indexed = HashSet::with_capacity(dialects.len());
         for dialect in dialects.into_iter().rev() {
             if let Some(fragment) = dialect.id.fragment() {
                 if !fragment.is_empty() {
-                    return Err(FragmentedDialectIdError {
-                        id: dialect.id.clone(),
-                    }
-                    .into());
+                    return Err(DialectError::FragmentedId(dialect.id.clone()));
                 }
             }
             if indexed.contains(&dialect.id) {
@@ -479,12 +489,12 @@ impl<'d> Dialects<'d> {
         dialects: &[Dialect],
         lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<AbsoluteUri>,
-    ) -> Result<usize, DefaultDialectNotFoundError> {
+    ) -> Result<usize, DialectError> {
         let uri = default.unwrap_or(dialects[0].id.clone());
         lookup
             .get(&uri)
             .copied()
-            .ok_or(DefaultDialectNotFoundError { uri })
+            .ok_or(DialectError::DefaultNotFound(uri))
     }
 }
 

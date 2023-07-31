@@ -2,10 +2,9 @@
 
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
-use snafu::ResultExt;
 
 use crate::{
-    error::{resolve_error, ResolveError, ResolveErrors},
+    error::{NotFoundError, ResolveError, ResolveErrors},
     uri::AbsoluteUri,
 };
 
@@ -42,23 +41,16 @@ impl Resolve for HttpResolver {
         if scheme != "http" && scheme != "https" {
             return Ok(None);
         }
-
         match self.client.get(url.clone()).send().await {
             Ok(resp) => {
-                let text = resp.text().await.context(resolve_error::Reqwest {
-                    schema_id: url.to_string(),
-                })?;
+                let text = resp
+                    .text()
+                    .await
+                    .map_err(|err| ResolveError::new(err, uri.clone()).into())?;
                 Ok(Some(text))
             }
-            Err(err) => {
-                if matches!(err.status(), Some(reqwest::StatusCode::NOT_FOUND)) {
-                    return Ok(None);
-                }
-                Err(ResolveError::Reqwest {
-                    schema_id: url.to_string(),
-                    source: err,
-                })
-            }
+            Err(err) if matches!(err.status(), Some(reqwest::StatusCode::NOT_FOUND)) => Ok(None),
+            Err(err) => Err(ResolveError::new(err, uri.clone())),
         }
     }
 }
@@ -75,7 +67,7 @@ impl Resolvers {
     }
 
     pub async fn resolve(&self, uri: &AbsoluteUri) -> Result<String, ResolveErrors> {
-        let mut errors = ResolveErrors::new();
+        let mut errors = ResolveErrors::default();
         for resolver in &self.resolvers {
             match resolver.resolve(uri).await {
                 Ok(Some(data)) => {
@@ -85,7 +77,9 @@ impl Resolvers {
                 _ => continue,
             }
         }
-        errors.push(ResolveError::not_found(uri.to_string(), None));
+        if errors.is_empty() {
+            errors.push_not_found(uri.clone());
+        }
         Err(errors)
     }
 

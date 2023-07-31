@@ -1,24 +1,187 @@
 //! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
 
-use crate::error::{RelativeUriError, UriError, UrnError};
+#[cfg(test)]
+mod tests;
+
+mod parse;
+mod encode;
+mod write;
+
+use crate::error::{OverflowError, UriError, UrnError, RelativeUriError};
 use inherent::inherent;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     fmt::Display,
-    ops::Deref,
-    str::FromStr,
+    iter::Peekable,
+    ops::{Deref, Index},
+    path::PathBuf,
+    str::{FromStr, Split},
     string::ToString,
 };
-use url::Url;
-use urn::{
-    percent::{encode_f_component, encode_nss},
-    Urn,
-};
+use urn::percent::{encode_f_component, encode_nss};
 
-const URL_FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
-const URL_PATH: &AsciiSet = &URL_FRAGMENT.add(b'#').add(b'?').add(b'{').add(b'}');
+pub use url::Url;
+pub use urn::Urn;
+
+
+pub trait AsUriRef {
+    fn as_uri_ref(&self) -> UriRef<'_>;
+}
+#[derive(Clone, Copy, Debug)]
+pub enum UriRef<'a> {
+    Uri(&'a Uri),
+    AbsoluteUri(&'a AbsoluteUri),
+    RelativeUri(&'a RelativeUri),
+}
+
+
+impl<'a> UriRef<'a> {
+    /// Returns the string representation of the URI reference.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Uri(uri) => uri.as_str(),
+            Self::AbsoluteUri(uri) => uri.as_str(),
+            Self::RelativeUri(uri) => uri.as_str(),
+        }
+    }
+
+    /// Returns a reference to the underlying [`Url`] if `self` is either
+    /// [`UriRef::Uri`] or [`UriRef::AbsoluteUri`] and the respective [`Uri`] or
+    /// [`AbsoluteUri`] is a [`Url`](`url::Url`).
+    #[must_use]
+    pub fn as_url(&self) -> Option<&'a Url> {
+        match self {
+            UriRef::Uri(uri) => uri.as_url(),
+            UriRef::AbsoluteUri(uri) => uri.as_url(),
+            UriRef::RelativeUri(_) => None,
+        }
+    }
+
+    /// Returns a reference to the underlying [`Urn`] if `self` is either
+    /// [`UriRef::Uri`] or [`UriRef::AbsoluteUri`] and the respective [`Uri`] or
+    /// [`AbsoluteUri`] is a [`Urn`].
+    #[must_use]
+    pub fn as_urn(&self) -> Option<&'a Urn> {
+        match self {
+            UriRef::Uri(uri) => uri.as_urn(),
+            UriRef::AbsoluteUri(uri) => uri.as_urn(),
+            UriRef::RelativeUri(_) => None,
+        }
+    }
+    /// Returns a reference to the underlying [`RelativeUri`] if `self` is a
+    /// [`UriRef::Uri`] with an underlying [`RelativeUri`] or
+    /// [`UriRef::RelativeUri`].
+    #[must_use]
+    pub fn as_relative(&self) -> Option<&'a RelativeUri> {
+        match self {
+            UriRef::Uri(uri) => uri.as_relative(),
+            UriRef::RelativeUri(rel) => Some(*rel),
+            UriRef::AbsoluteUri(_) => None,
+        }
+    }
+    /// Returns `true` if this underlying `Uri` is a [`Url`]
+    #[must_use]
+    pub fn is_url(&self) -> bool {
+        match self {
+            UriRef::Uri(_) => todo!(),
+            UriRef::AbsoluteUri(_) => todo!(),
+            UriRef::RelativeUri(_) => todo!(),
+        }
+    }
+
+    /// Returns `true` if this underlying `Uri` is a [`Urn`]
+    #[must_use]
+    pub fn is_urn(&self) -> bool {
+        match self {
+            UriRef::Uri(uri) => uri.is_urn(),
+            UriRef::AbsoluteUri(uri) => uri.is_urn(),
+            UriRef::RelativeUri(_) => false,
+        }
+    }
+
+    /// Returns `true` if the this `Uri` has a scheme.
+    #[must_use]
+    pub fn has_scheme(&self) -> bool {
+        return self.scheme().is_some();
+    }
+
+    /// Returns the scheme of this `Uri` if it exists.
+    #[must_use]
+    pub fn scheme(&self) -> Option<&str> {
+        match self {
+            UriRef::Uri(uri) => uri.scheme(),
+            UriRef::AbsoluteUri(uri) => Some(uri.scheme()),
+            UriRef::RelativeUri(_) => None,
+        }
+    }
+
+    /// Returns the path (if this `Uri` is a [`Url`]) or namespace specific
+    /// string (if this `Uri` is a [`Urn`])
+    #[must_use]
+    pub fn path_or_nss(&self) -> &str {
+        match self {
+            UriRef::Uri(uri) => uri.path_or_nss(),
+            UriRef::AbsoluteUri(uri) => uri.path_or_nss(),
+            UriRef::RelativeUri(uri) => uri.path(),
+        }
+    }
+
+    /// Returns the authority (if this `Uri` is a [`Url`]) or namespace (if this
+    /// `Uri` is a [`Urn`])
+    #[must_use]
+    pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {
+        match self {
+            UriRef::Uri(uri) => uri.authority_or_namespace(),
+            UriRef::AbsoluteUri(uri) => uri.authority_or_namespace(),
+            UriRef::RelativeUri(_) => None,
+        }
+    }
+    /// Returns the query component if it exists.
+    #[must_use]
+    pub fn fragment(&self) -> Option<&str> {
+        match self {
+            UriRef::Uri(uri) => uri.fragment(),
+            UriRef::AbsoluteUri(uri) => uri.fragment(),
+            UriRef::RelativeUri(uri) => uri.fragment(),
+        }
+    }
+
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        match self {
+            UriRef::Uri(uri) => uri.query(),
+            UriRef::AbsoluteUri(uri) => uri.query(),
+            UriRef::RelativeUri(uri) => uri.query(),
+        }
+    }
+}
+
+impl Deref for UriRef<'_> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl AsUriRef for Uri {
+    fn as_uri_ref(&self) -> UriRef<'_> {
+        UriRef::Uri(self)
+    }
+}
+impl AsUriRef for AbsoluteUri {
+    fn as_uri_ref(&self) -> UriRef<'_> {
+        UriRef::AbsoluteUri(self)
+    }
+}
+
+impl AsUriRef for RelativeUri {
+    fn as_uri_ref(&self) -> UriRef<'_> {
+        UriRef::RelativeUri(self)
+    }
+}
 
 /// A URI in the form of a fully qualified [`Url`] or [`Urn`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -32,7 +195,8 @@ impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
     ///
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
+    /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a
+    /// [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
     pub fn parse(value: &str) -> Result<Self, UriError> {
         if value.starts_with("urn:") {
             Ok(Urn::from_str(value)?.into())
@@ -160,6 +324,92 @@ impl AbsoluteUri {
         }
         Ok(prev)
     }
+
+    /// returns a new `AbsoluteUri` that is the result of resolving the given
+    /// reference against this `AbsoluteUri`.
+    ///
+    /// See [RFC3986, Section
+    /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    #[must_use]
+    pub fn resolve(&self, reference: &impl AsUriRef) -> AbsoluteUri {
+        let reference = reference.as_uri_ref();
+        if reference.scheme().is_some() {
+            match reference {
+                UriRef::Uri(uri) => {
+                    let mut result = uri.clone();
+                    result
+                        .set_path_or_nss(&normalize_path(uri.path_or_nss()))
+                        .unwrap();
+                    return result.try_into_absolute_uri().unwrap();
+                }
+                UriRef::AbsoluteUri(uri) => {
+                    let mut result = uri.clone();
+                    result
+                        .set_path_or_nss(&normalize_path(uri.path_or_nss()))
+                        .unwrap();
+                    return result;
+                }
+                UriRef::RelativeUri(_) => unreachable!(),
+            }
+        }
+
+        todo!()
+        /*
+           if defined(R.authority) then
+              T.authority = R.authority;
+              T.path      = remove_dot_segments(R.path);
+              T.query     = R.query;
+           else
+              if (R.path == "") then
+                 T.path = Base.path;
+                 if defined(R.query) then
+                    T.query = R.query;
+                 else
+                    T.query = Base.query;
+                 endif;
+              else
+                 if (R.path starts-with "/") then
+                    T.path = remove_dot_segments(R.path);
+                 else
+                    T.path = merge(Base.path, R.path);
+                    T.path = remove_dot_segments(T.path);
+                 endif;
+                 T.query = R.query;
+              endif;
+              T.authority = Base.authority;
+           endif;
+           T.scheme = Base.scheme;
+        endif;
+
+        T.fragment = R.fragment;
+        */
+    }
+
+    #[must_use]
+    pub fn scheme(&self) -> &str {
+        match self {
+            AbsoluteUri::Url(url) => url.scheme(),
+            AbsoluteUri::Urn(_) => "urn",
+        }
+    }
+}
+
+/// Normalizes a URI path by removing dot segments, i.e. `'.'`, `'..'`.
+#[must_use]
+pub fn normalize_path(path: &str) -> String {
+    let mut buf = PathBuf::new();
+
+    for segment in Segments::from_path(path) {
+        match segment {
+            Segment::PathParent => {
+                buf.pop();
+            }
+            Segment::PathNormal(c) => buf.push(c),
+            _ => {}
+        }
+    }
+    // safety: path is already in utf8
+    buf.to_str().unwrap().to_string()
 }
 
 impl Borrow<str> for AbsoluteUri {
@@ -347,6 +597,16 @@ pub trait TryIntoAbsoluteUri {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError>;
 }
 
+impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+        match self {
+            UriRef::Uri(uri) => uri.try_into_absolute_uri(),
+            UriRef::AbsoluteUri(uri) => Ok(uri.clone()),
+            UriRef::RelativeUri(uri) => uri.try_into_absolute_uri(),
+        }
+    }
+}
+
 impl TryIntoAbsoluteUri for String {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         AbsoluteUri::parse(&self)
@@ -412,160 +672,173 @@ impl TryIntoAbsoluteUri for Uri {
     }
 }
 
-// TODO: consider whether or not the idxs in RelativeUri should be u32
-// Likely but this would muddy up the API a bit.
-// is it worth the savings in memory?
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct RelativeUri {
-    path: String,
-    fragment_idx: Option<usize>,
-    query_idx: Option<usize>,
+    value: String,
+    has_authority: bool,
+    path_idx: u32,
+    query_idx: Option<u32>,
+    fragment_idx: Option<u32>,
 }
 
 impl RelativeUri {
-    pub fn parse(value: &str) -> Result<Self, RelativeUriError> {
-        let hash_idx = value.find('#');
-        let query_idx = value.find('?');
-        if hash_idx < query_idx {
-            return Err(RelativeUriError::Malformed(value.to_string()));
-        }
-        let path = value.to_string();
-        Ok(Self {
-            path,
-            fragment_idx: hash_idx,
-            query_idx,
-        })
-    }
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.path
+        &self.value
     }
     #[must_use]
     pub fn path(&self) -> &str {
-        if let Some(query_idx) = self.query_idx {
-            return &self.path[..query_idx];
+        if let Some(query_idx) = self.query_idx() {
+            return &self.value[self.path_idx()..query_idx];
         }
-        if let Some(hash_idx) = self.fragment_idx {
-            return &self.path[..hash_idx];
+        if let Some(hash_idx) = self.fragment_idx() {
+            return &self.value[self.path_idx()..hash_idx];
         }
-        &self.path
+        &self.value
     }
+
+    fn path_idx(&self) -> usize {
+        self.path_idx as usize
+    }
+    fn fragment_idx(&self) -> Option<usize> {
+        self.fragment_idx.map(|idx| idx as usize)
+    }
+    fn query_idx(&self) -> Option<usize> {
+        self.query_idx.map(|idx| idx as usize)
+    }
+
+    /// Returns the path of the `RelativeUri` if it exists.
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
-        let fragment_idx = self.fragment_idx?;
-        if fragment_idx + 1 == self.path.len() {
+        let fragment_idx = self.fragment_idx()?;
+        if fragment_idx + 1 == self.len() {
             return Some("");
         }
 
-        Some(&self.path[fragment_idx + 1..])
+        Some(&self.value[fragment_idx + 1..])
     }
 
-    /// Returns the query string segment of the `PartialUri`, if it exists.
+    /// Returns the query string segment of the `RelativeUri`, if it exists.
     #[must_use]
     pub fn query(&self) -> Option<&str> {
-        let query_idx = self.query_idx?;
-        if query_idx + 1 == self.path.len() {
+        let query_idx = self.query_idx()?;
+        if query_idx + 1 == self.len() {
             return Some("");
         }
-        let last = self.fragment_idx.unwrap_or(self.path.len());
-        Some(&self.path[query_idx + 1..last])
+        let last = self.fragment_idx().unwrap_or(self.len());
+        Some(&self.value[query_idx + 1..last])
     }
-    pub fn set_query(&mut self, mut query: Option<&str>) -> Option<String> {
-        query = query.map(|q| q.strip_prefix('?').unwrap_or(q));
-
-        // TODO: refactor this; cloning, by means of owned_parts, is not ideal.
-        let (path, prev_query, fragment) = self.owned_parts();
-        self.path = path;
-        self.fragment_idx = None;
-        self.query_idx = None;
-        if let Some(query) = query {
-            self.query_idx = Some(self.path.len());
-            self.path += "?";
-            self.path += query;
-        }
-        if fragment.is_some() {
-            self.set_fragment(fragment.as_deref());
-        }
-        prev_query
+    fn has_path(&self) -> bool {
+        self.path().len() > 0
     }
-    /// Sets the path of the `PartialUri` and returns the previous path.
+    /// Sets the query string portion of the `RelativeUri` and returns the
+    /// previous query, if it existed.
+    /// 
+    /// # Panics
+    /// Panics if setting the query string would cause the `RelativeUri` to
+    /// exceed [`u32::MAX`](core::u32::MAX) in length.
+    pub fn set_query(&mut self, mut query: Option<&str>) -> Result<Option<String>, RelativeUriError> {
+        let existing_query = self.query().map(ToString::to_string);
+        let mut buf = String::with_capacity(self.len() - existing_query.unwrap_or_default().len() + query.unwrap_or_default().len());
+        let has_authority = write::authority(self.authority(), &mut buf);
+        let path_idx:u32 = write::path(self.path(), &mut buf).expect("RelativeUri::set_query: path length exceeds u32::MAX");
+        let query_idx:Option<u32> = write::query(query.as_deref(), &mut buf, self.has_authority, self.has_path())?;
+        let fragment_idx:Option<u32> = write::fragment(self.fragment(), &mut buf).expect("RelativeUri::set_query: fragment length exceeds u32::MAX");
+        self.value = buf;
+        self.has_authority = has_authority;
+        self.path_idx = path_idx;
+        self.query_idx = query_idx;
+        self.fragment_idx = fragment_idx;
+    }
+    /// Sets the path of the `RelativeUri` and returns the previous path.
     ///
     /// Note, fragments are left intact. Use `set_fragment` to change the fragment.
     pub fn set_path(&mut self, path: &str) -> String {
+        Url::set_fragment(&mut self, fragment)
         let (prev_path, query, fragment) = self.owned_parts();
-        self.path = utf8_percent_encode(path, URL_PATH).to_string();
+        self.value = utf8_percent_encode(path, PATH).to_string();
         if let Some(query) = query {
-            self.query_idx = Some(self.path.len());
-            self.path += "?";
-            self.path += &query;
+            self.query_idx = Some(self.value.len() as u32);
+            self.value += "?";
+            self.value += &query;
         }
         if let Some(fragment) = fragment {
-            self.fragment_idx = Some(self.path.len());
-            self.path += "#";
-            self.path += &fragment;
+            self.fragment_idx = Some(self.value.len() as u32);
+            self.value += "#";
+            self.value += &fragment;
         }
 
         prev_path
     }
-    fn owned_parts(&self) -> (String, Option<String>, Option<String>) {
+    fn owned_parts(
+        &self,
+    ) -> (
+        Option<String>, /* authority */
+        String,         /* path */
+        Option<String>, /* query */
+        Option<String>, /* fragment */
+    ) {
+        let authority = self.authority().map(ToString::to_string);
         let query = self.query().map(ToString::to_string);
         let fragment = self.fragment().map(ToString::to_string);
         let path = self.path().to_string();
-        (path, query, fragment)
+        (authority, path, query, fragment)
     }
-    /// Sets the fragment of the `PartialUri` and returns the previous fragment, if
+    /// Sets the fragment of the `RelativeUri` and returns the previous fragment, if
     /// present.
     pub fn set_fragment(&mut self, fragment: Option<&str>) -> Option<String> {
         let fragment = fragment
             .map(|f| f.strip_prefix('#').unwrap_or(f))
-            .map(|f| utf8_percent_encode(f, URL_FRAGMENT).to_string());
+            .map(|f| utf8_percent_encode(f, FRAGMENT).to_string());
 
         // TODO: refactor this; cloning, by means of owned_parts, is not ideal.
-        let (path, query, prev_fragment) = self.owned_parts();
+        let (authority, path, query, prev_fragment) = self.owned_parts();
         self.fragment_idx = None;
         self.query_idx = None;
-        self.path = path;
+        self.value = path;
 
         if let Some(query) = query {
-            self.query_idx = Some(self.path.len());
-            self.path = format!("{}?{}", self.path, query);
+            self.query_idx = Some(self.value.len() as u32);
+            self.value = format!("{}?{}", self.value, query);
         }
 
         if let Some(fragment) = fragment {
-            self.fragment_idx = Some(self.path.len());
-            self.path = format!("{}#{}", self.path, fragment);
+            self.fragment_idx = Some(self.value.len() as u32);
+            self.value = format!("{}#{}", self.value, fragment);
         }
 
         prev_fragment
+    }
+
+    #[must_use]
+    /// Returns the authority of the `RelativeUri` if it exists.
+    ///
+    /// A relative URI may have an authority if it starts starts with `"//"`.
+    pub fn authority(&self) -> Option<&str> {
+        if self.has_authority {
+            Some(&self.value[2..self.path_idx()])
+        } else {
+            None
+        }
+    }
+
+    // /// Sets the authority of the `RelativeUri` and returns the previous authority, if it existed.
+    // pub fn set_authority(&self, authority: Option<&str>) -> Option<String> {
+
+    // }
+}
+
+impl Index<usize> for RelativeUri {
+    type Output = str;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.value[index..]
     }
 }
 
 impl Display for RelativeUri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.path.fmt(f)
-    }
-}
-
-impl FromStr for RelativeUri {
-    type Err = RelativeUriError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
-    }
-}
-
-impl TryFrom<String> for RelativeUri {
-    type Error = RelativeUriError;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::parse(&value)
-    }
-}
-
-impl TryFrom<&str> for RelativeUri {
-    type Error = RelativeUriError;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::parse(value)
+        self.value.fmt(f)
     }
 }
 
@@ -590,7 +863,7 @@ impl From<&RelativeUri> for String {
 impl Deref for RelativeUri {
     type Target = str;
     fn deref(&self) -> &Self::Target {
-        self.path.as_str()
+        self.value.as_str()
     }
 }
 
@@ -629,13 +902,14 @@ impl Uri {
     /// # Errors
     /// Returns `UriParseError` if `value` fails to parse as a `Uri`
     pub fn parse(value: &str) -> Result<Self, UriError> {
-        if value.starts_with("urn:") {
-            Ok(Urn::from_str(value)?.into())
-        } else if matches_url(value) {
-            Ok(Url::parse(value)?.into())
-        } else {
-            Ok(RelativeUri::parse(value)?.into())
-        }
+        todo!()
+        // if value.starts_with("urn:") {
+        //     Ok(Urn::from_str(value)?.into())
+        // } else if matches_url(value) {
+        //     Ok(Url::parse(value)?.into())
+        // } else {
+        //     Ok(RelativeUri::parse(value)?.into())
+        // }
     }
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
@@ -667,7 +941,7 @@ impl Uri {
 
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
-    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UrnError> {
+    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UriError> {
         let prev = self.query().map(ToString::to_string);
         match self {
             Self::Url(url) => {
@@ -813,6 +1087,14 @@ impl Uri {
             Err(self)
         }
     }
+    #[must_use]
+    pub fn scheme(&self) -> Option<&str> {
+        match self {
+            Uri::Url(url) => Some(url.scheme()),
+            Uri::Urn(_) => Some("urn"),
+            Uri::Relative(_) => None,
+        }
+    }
 }
 impl From<Url> for Uri {
     fn from(value: Url) -> Self {
@@ -909,21 +1191,6 @@ impl From<&Uri> for String {
     fn from(value: &Uri) -> Self {
         value.to_string()
     }
-}
-
-fn matches_url(value: &str) -> bool {
-    for (i, c) in value.chars().enumerate() {
-        if i == 0 && !c.is_ascii_alphabetic() {
-            return false;
-        }
-        if c == ':' {
-            return true;
-        }
-        if !c.is_ascii_alphanumeric() {
-            return false;
-        }
-    }
-    false
 }
 
 fn get_url_authority(u: &Url) -> Option<String> {
@@ -1032,26 +1299,26 @@ fn set_url_path(url: &mut Url, path: &str) -> String {
     existing
 }
 
-pub trait AsUri {
-    fn as_uri(&self) -> Uri;
+pub trait ToUri {
+    fn to_uri(&self) -> Uri;
 }
-impl AsUri for &Uri {
-    fn as_uri(&self) -> Uri {
+impl ToUri for &Uri {
+    fn to_uri(&self) -> Uri {
         (*self).clone()
     }
 }
-impl AsUri for Uri {
-    fn as_uri(&self) -> Uri {
+impl ToUri for Uri {
+    fn to_uri(&self) -> Uri {
         self.clone()
     }
 }
 
 #[inherent]
-impl AsUri for AbsoluteUri {
+impl ToUri for AbsoluteUri {
     /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
     /// `AbsoluteUri`.
     #[must_use]
-    pub fn as_uri(&self) -> Uri {
+    pub fn to_uri(&self) -> Uri {
         match self {
             AbsoluteUri::Url(url) => Uri::Url(url.clone()),
             AbsoluteUri::Urn(urn) => Uri::Urn(urn.clone()),
@@ -1059,11 +1326,11 @@ impl AsUri for AbsoluteUri {
     }
 }
 
-impl AsUri for &AbsoluteUri {
+impl ToUri for &AbsoluteUri {
     /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
     /// `AbsoluteUri`.
     #[must_use]
-    fn as_uri(&self) -> Uri {
+    fn to_uri(&self) -> Uri {
         match self {
             AbsoluteUri::Url(url) => Uri::Url(url.clone()),
             AbsoluteUri::Urn(urn) => Uri::Urn(urn.clone()),
@@ -1071,367 +1338,299 @@ impl AsUri for &AbsoluteUri {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Segment<'a> {
+    /// The scheme of the URI, i.e., `scheme:`.
+    Scheme(&'a str),
 
-    #[test]
-    fn test_set_query() {
-        let mut uri = RelativeUri::parse("http://example.com").unwrap();
-        assert_eq!(uri.query(), None);
-        assert_eq!(uri.fragment(), None);
+    /// The authority of the URI, i.e., `//authority`.
+    Authority(&'a str),
 
-        uri.set_query(Some("q=str"));
-        assert_eq!(uri.as_str(), "http://example.com?q=str");
-        assert_eq!(uri.query(), Some("q=str"));
+    /// The root of the path
+    PathRoot,
 
-        uri.set_fragment(Some("fragment"));
-        assert_eq!(uri.as_str(), "http://example.com?q=str#fragment");
-        assert_eq!(uri.fragment(), Some("fragment"));
+    /// A reference to the current path segment, i.e., `.`.
+    PathCurrent,
 
-        uri.set_query(None);
-        assert_eq!(uri.query(), None);
-        assert_eq!(uri.as_str(), "http://example.com#fragment");
+    /// A reference to the parent path segment, i.e., `..`.
+    PathParent,
 
-        uri.set_query(Some("?q=str"));
-        assert_eq!(uri.as_str(), "http://example.com?q=str#fragment");
+    /// A normal path segment, e.g., `a` and `b` in `a/b`.
+    PathNormal(&'a str),
 
-        uri.set_query(Some("q=str"));
-        assert_eq!(uri.query(), Some("q=str"));
-    }
+    /// The query of the URI, i.e., `?query`.
+    Query(&'a str),
 
-    #[test]
-    fn test_get_url_authority() {
-        let url = Url::parse("https://user:example@example.com:8080").unwrap();
-        let uri: AbsoluteUri = url.into();
-        assert_eq!(
-            uri.authority_or_namespace().as_deref(),
-            Some("user:example@example.com:8080")
-        );
-    }
+    /// The fragment of the URI, i.e., `#fragment`.
+    Fragment(&'a str),
+}
 
-    #[test]
-    fn test_uri_authority_or_namespace() {
-        let tests = [
-            ("https://www.example.com", Some("www.example.com")),
-            ("urn:example:resource", Some("example")),
-            (
-                "https://username:password@example.com/path",
-                Some("username:password@example.com"),
-            ),
-            ("http://127.0.0.0:3400", Some("127.0.0.0:3400")),
-            (
-                "https://username@example.com/somepath",
-                Some("username@example.com"),
-            ),
-            ("mailto:example@example.com", None),
-        ];
-
-        for (input, expected) in tests {
-            let absolute_uri = AbsoluteUri::parse(input).unwrap();
-            assert_eq!(expected, absolute_uri.authority_or_namespace().as_deref());
-        }
-
-        let tests = [
-            ("https://www.example.com", Some("www.example.com")),
-            ("urn:example:com", Some("example")),
-            (
-                "https://username:password@example.com/path",
-                Some("username:password@example.com"),
-            ),
-            ("http://127.0.0.0:3400", Some("127.0.0.0:3400")),
-            (
-                "https://username@example.com/somepath",
-                Some("username@example.com"),
-            ),
-            ("mailto:example@example.com", None),
-            ("/relative", None),
-        ];
-
-        for (input, expected) in tests {
-            let uri = Uri::parse(input).unwrap();
-            assert_eq!(expected, uri.authority_or_namespace().as_deref());
+impl<'a> Segment<'a> {
+    pub fn decode(&self) -> Result<Cow<'a, str>, std::str::Utf8Error> {
+        match self {
+            Segment::Scheme(s) | Segment::Authority(s) => Ok(Cow::Borrowed(*s)),
+            Segment::PathRoot => Ok(Cow::Borrowed("")),
+            Segment::PathCurrent => Ok(Cow::Borrowed(".")),
+            Segment::PathParent => Ok(Cow::Borrowed("..")),
+            Segment::PathNormal(val) | Segment::Query(val) | Segment::Fragment(val) => {
+                percent_decode(val.as_bytes()).decode_utf8()
+            }
         }
     }
 
-    #[test]
-    fn test_fragment() {
-        let tests = [
-            ("https://www.example.com", None),
-            ("urn:example:resource", None),
-            (
-                "https://username:password@example.com/path#fraggle-rock",
-                Some("fraggle-rock"),
-            ),
-            ("https://example.com:3400/path#with-port", Some("with-port")),
-            (
-                "https://username:password@example.com/somepath#with-credentials",
-                Some("with-credentials"),
-            ),
-            ("mailto:example@example.com", None),
-        ];
-
-        for (input, expected) in tests {
-            let absolute_uri = AbsoluteUri::parse(input).unwrap();
-            assert_eq!(expected, absolute_uri.fragment());
+    pub fn decode_lossy(&self) -> Cow<'a, str> {
+        match self {
+            Segment::Scheme(s) | Segment::Authority(s) => Cow::Borrowed(*s),
+            Segment::PathRoot => Cow::Borrowed(""),
+            Segment::PathCurrent => Cow::Borrowed("."),
+            Segment::PathParent => Cow::Borrowed(".."),
+            Segment::PathNormal(val) | Segment::Query(val) | Segment::Fragment(val) => {
+                percent_decode(val.as_bytes()).decode_utf8_lossy()
+            }
         }
-        let tests = [
-            ("https://www.example.com", None),
-            ("urn:example:resource", None),
-            (
-                "https://username:password@example.com/path#fraggle-rock",
-                Some("fraggle-rock"),
-            ),
-            ("https://example.com:3400/path#with-port", Some("with-port")),
-            (
-                "https://username:password@example.com/somepath#with-credentials",
-                Some("with-credentials"),
-            ),
-            ("mailto:example@example.com", None),
-            ("/relative#fragment", Some("fragment")),
-            ("#fragment", Some("fragment")),
-        ];
+    }
+    fn parse_root(val: &'a str, next: Option<char>) -> Self {
+        match val {
+            "" => Self::PathRoot,
+            "." | ".." => Self::resolve_dots(val, next),
+            _ => Self::PathNormal(val),
+        }
+    }
+    fn parse_path_segment(val: &'a str, next: Option<char>) -> Self {
+        match val {
+            "." | ".." => Self::resolve_dots(val, next),
+            _ => Self::PathNormal(val),
+        }
+    }
+    fn resolve_dots(val: &'a str, next: Option<char>) -> Self {
+        if next == Some('/') || next.is_none() {
+            if val == "." {
+                Self::PathCurrent
+            } else {
+                Self::PathParent
+            }
+        } else {
+            Self::PathNormal(val)
+        }
+    }
+}
 
-        for (input, expected) in tests {
-            let uri = Uri::parse(input).unwrap();
-            assert_eq!(expected, uri.fragment());
+impl<'a> Deref for Segment<'a> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Segment::Scheme(v)
+            | Segment::Authority(v)
+            | Segment::PathNormal(v)
+            | Segment::Query(v)
+            | Segment::Fragment(v) => v,
+            Segment::PathRoot => "",
+            Segment::PathCurrent => ".",
+            Segment::PathParent => "..",
+        }
+    }
+}
+
+/// An [`Iterator`] of path [`Segment`]s.
+pub struct Segments<'a> {
+    scheme: Option<&'a str>,
+    authority: Option<&'a str>,
+    path: Peekable<Split<'a, char>>,
+    query: Option<&'a str>,
+    fragment: Option<&'a str>,
+    root_sent: bool,
+}
+
+impl<'a> Segments<'a> {
+    fn peek_next_char(&mut self) -> Option<char> {
+        self.path.peek().and_then(|s| s.chars().next())
+    }
+}
+
+impl<'a> Iterator for Segments<'a> {
+    type Item = Segment<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(scheme) = self.scheme.take() {
+            return Some(Segment::Scheme(scheme));
+        }
+        if let Some(authority) = self.authority.take() {
+            return Some(Segment::Authority(authority));
+        }
+        let Some(val) = self.path.next() else {
+            // if let Some(query) = self.query.take() {
+            //     return Some(Segment::Query(query));
+            // }
+            self.query.take().map(Segment::Query)?;
+            if let Some(fragment) = self.fragment.take() {
+                return Some(Segment::Fragment(fragment));
+            }
+            return None;
+        };
+        if self.root_sent {
+            Some(Segment::parse_path_segment(val, self.peek_next_char()))
+        } else {
+            self.root_sent = true;
+            Some(Segment::parse_root(val, self.peek_next_char()))
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum PathSegment<'a> {
+    /// The root of the path
+    Root,
+
+    /// A reference to the current path segment, i.e., `.`.
+    Current,
+
+    /// A reference to the parent path segment, i.e., `..`.
+    Parent,
+
+    /// A normal path segment, e.g., `a` and `b` in `a/b`.
+    Normal(&'a str),
+}
+
+impl<'a> PathSegment<'a> {
+    /// Returns `true` if the path segment is [`Root`].
+    ///
+    /// [`Root`]: PathSegment::Root
+    #[must_use]
+    pub fn is_root(&self) -> bool {
+        matches!(self, Self::Root)
+    }
+
+    /// Returns `true` if the path segment is [`Current`].
+    ///
+    /// [`Current`]: PathSegment::Current
+    #[must_use]
+    pub fn is_current(&self) -> bool {
+        matches!(self, Self::Current)
+    }
+
+    /// Returns `true` if the path segment is [`Parent`].
+    ///
+    /// [`Parent`]: PathSegment::Parent
+    #[must_use]
+    pub fn is_parent(&self) -> bool {
+        matches!(self, Self::Parent)
+    }
+
+    /// Returns `true` if the path segment is [`Normal`].
+    ///
+    /// [`Normal`]: PathSegment::Normal
+    #[must_use]
+    pub fn is_normal(&self) -> bool {
+        matches!(self, Self::Normal(..))
+    }
+}
+
+impl<'a> PathSegment<'a> {
+    pub fn decode(&self) -> Result<Cow<'a, str>, std::str::Utf8Error> {
+        match self {
+            PathSegment::Root => Ok(Cow::Borrowed("")),
+            PathSegment::Current => Ok(Cow::Borrowed(".")),
+            PathSegment::Parent => Ok(Cow::Borrowed("..")),
+            PathSegment::Normal(val) => {
+                percent_decode(val.as_bytes()).decode_utf8()
+            }
         }
     }
 
-    #[test]
-    fn test_set_fragment() {
-        let tests = [
-            (
-                "https://www.example.com/",
-                None,
-                None,
-                "https://www.example.com/",
-            ),
-            (
-                "https://username:password@example.com/path#fragment",
-                Some("fragment/nested"),
-                Some("fragment/nested"),
-                "https://username:password@example.com/path#fragment/nested",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                None,
-                None,
-                "https://example.com/path",
-            ),
-            (
-                "urn:example:resource",
-                Some("fragment"),
-                Some("fragment"),
-                "urn:example:resource#fragment",
-            ),
-            (
-                "urn:example:resource",
-                Some("some fragment with spaces"),
-                Some("some%20fragment%20with%20spaces"),
-                "urn:example:resource#some%20fragment%20with%20spaces",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                Some("fragment with spaces"),
-                Some("fragment%20with%20spaces"),
-                "https://example.com/path#fragment%20with%20spaces",
-            ),
-        ];
-
-        for (input, fragment, expected_fragment, expected_uri) in tests {
-            let mut absolute_uri = AbsoluteUri::parse(input).unwrap();
-            absolute_uri.set_fragment(fragment);
-            assert_eq!(expected_uri, absolute_uri.to_string());
-            assert_eq!(expected_fragment, absolute_uri.fragment());
-        }
-
-        let tests = [
-            (
-                "https://www.example.com/",
-                None,
-                None,
-                "https://www.example.com/",
-            ),
-            (
-                "https://username:password@example.com/path#fragment",
-                Some("fragment/nested"),
-                Some("fragment/nested"),
-                "https://username:password@example.com/path#fragment/nested",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                None,
-                None,
-                "https://example.com/path",
-            ),
-            (
-                "urn:example:resource",
-                Some("fragment"),
-                Some("fragment"),
-                "urn:example:resource#fragment",
-            ),
-            (
-                "urn:example:resource",
-                Some("some fragment with spaces"),
-                Some("some%20fragment%20with%20spaces"),
-                "urn:example:resource#some%20fragment%20with%20spaces",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                Some("fragment with spaces"),
-                Some("fragment%20with%20spaces"),
-                "https://example.com/path#fragment%20with%20spaces",
-            ),
-            (
-                "/partial/path#existing-fragment",
-                Some("new-fragment"),
-                Some("new-fragment"),
-                "/partial/path#new-fragment",
-            ),
-            (
-                "#existing-fragment",
-                Some("new-fragment"),
-                Some("new-fragment"),
-                "#new-fragment",
-            ),
-            ("#existing-fragment", None, None, ""),
-            (
-                "/partial/path#existing-fragment",
-                None,
-                None,
-                "/partial/path",
-            ),
-            (
-                "#existing-fragment",
-                Some("new fragment with spaces"),
-                Some("new%20fragment%20with%20spaces"),
-                "#new%20fragment%20with%20spaces",
-            ),
-        ];
-        for (input, fragment, expected_fragment, expected_uri) in tests {
-            let mut uri = Uri::parse(input).unwrap();
-            uri.set_fragment(fragment);
-            assert_eq!(expected_uri, uri.to_string());
-            assert_eq!(expected_fragment, uri.fragment());
+    pub fn decode_lossy(&self) -> Cow<'a, str> {
+        match self {
+            PathSegment::Root => Cow::Borrowed(""),
+            PathSegment::Current => Cow::Borrowed("."),
+            PathSegment::Parent => Cow::Borrowed(".."),
+            PathSegment::Normal(val) => {
+                percent_decode(val.as_bytes()).decode_utf8_lossy()
+            }
         }
     }
-    #[test]
-    fn test_set_path() {
-        let tests = [
-            (
-                "https://www.example.com",
-                "/new-path",
-                "/new-path",
-                "https://www.example.com/new-path",
-            ),
-            (
-                "https://username:password@example.com/path#fraggle-rock",
-                "/new-path",
-                "/new-path",
-                "https://username:password@example.com/new-path#fraggle-rock",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                "",
-                "/",
-                "https://example.com/#with-fragment",
-            ),
-            (
-                "urn:example:resource#fragment",
-                "new-resource",
-                "new-resource",
-                "urn:example:new-resource#fragment",
-            ),
-            (
-                "urn:example:resource",
-                "new-resource",
-                "new-resource",
-                "urn:example:new-resource",
-            ),
-            (
-                "https://example.com/",
-                "new path",
-                "/new%20path",
-                "https://example.com/new%20path",
-            ),
-            (
-                "urn:example:resource#fragment",
-                "new resource",
-                "new%20resource",
-                "urn:example:new%20resource#fragment",
-            ),
-            (
-                "urn:example:resource",
-                "some path with spaces",
-                "some%20path%20with%20spaces",
-                "urn:example:some%20path%20with%20spaces",
-            ),
-        ];
-        for (input, new_path, expected_path, expected) in tests {
-            let mut absolute_uri = AbsoluteUri::parse(input).unwrap();
-            absolute_uri.set_path_or_nss(new_path).unwrap();
-            assert_eq!(expected, absolute_uri.to_string());
-            assert_eq!(expected_path, absolute_uri.path_or_nss());
+    fn parse_root(val: &'a str, next: Option<char>) -> Self {
+        match val {
+            "" => Self::Root,
+            "." | ".." => Self::resolve_dots(val, next),
+            _ => Self::Normal(val),
         }
+    }
+    fn parse_path_segment(val: &'a str, next: Option<char>) -> Self {
+        match val {
+            "." | ".." => Self::resolve_dots(val, next),
+            _ => Self::Normal(val),
+        }
+    }
+    fn resolve_dots(val: &'a str, next: Option<char>) -> Self {
+        if next == Some('/') || next.is_none() {
+            if val == "." {
+                Self::Current
+            } else {
+                Self::Parent
+            }
+        } else {
+            Self::Normal(val)
+        }
+    }
+}
 
-        let tests = [
-            (
-                "https://www.example.com",
-                "/new-path",
-                "/new-path",
-                "https://www.example.com/new-path",
-            ),
-            (
-                "https://username:password@example.com/path#fraggle-rock",
-                "/new-path",
-                "/new-path",
-                "https://username:password@example.com/new-path#fraggle-rock",
-            ),
-            (
-                "https://example.com/path#with-fragment",
-                "",
-                "/",
-                "https://example.com/#with-fragment",
-            ),
-            (
-                "urn:example:resource#fragment",
-                "new-resource",
-                "new-resource",
-                "urn:example:new-resource#fragment",
-            ),
-            (
-                "urn:example:resource",
-                "new-resource",
-                "new-resource",
-                "urn:example:new-resource",
-            ),
-            ("", "/new-path", "/new-path", "/new-path"),
-            ("/", "/resource", "/resource", "/resource"),
-            (
-                "/path#fragment",
-                "/new-path",
-                "/new-path",
-                "/new-path#fragment",
-            ),
-            (
-                "https://example.com/",
-                "new path",
-                "/new%20path",
-                "https://example.com/new%20path",
-            ),
-            (
-                "urn:example:resource#fragment",
-                "new resource",
-                "new%20resource",
-                "urn:example:new%20resource#fragment",
-            ),
-        ];
-        for (input, new_path, expected_path, expected) in tests {
-            let mut uri = Uri::parse(input).unwrap();
-            uri.set_path_or_nss(new_path).unwrap();
-            assert_eq!(expected, uri.to_string());
-            assert_eq!(expected_path, uri.path_or_nss());
+
+/// An [`Iterator`] of path [`PathSegment`]s.
+pub struct PathSegments<'a> {
+    path: Peekable<Split<'a, char>>,
+    root_sent: bool,
+}
+
+impl<'a> PathSegments<'a> {
+    pub fn new(path: &'a str) -> Self {
+        Self {
+            path: path.split('/').peekable(),
+            root_sent: false,
         }
+    }
+    fn peek_next_char(&mut self) -> Option<char> {
+        self.path.peek().and_then(|s| s.chars().next())
+    }
+    
+}
+impl<'a> From<&'a str> for PathSegments<'a> {
+    fn from(path: &'a str) -> Self {
+        Self {
+            path: path.split('/').peekable(),
+            root_sent: false,
+        }
+    }
+}
+impl<'a> FromStr for PathSegments<'a> {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from(s))
+    }
+}
+
+
+impl<'a> Iterator for PathSegments<'a> {
+    type Item = PathSegment<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let val = self.path.next()?;
+        if self.root_sent {
+            Some(PathSegment::parse_path_segment(val, self.peek_next_char()))
+        } else {
+            self.root_sent = true;
+            Some(PathSegment::parse_root(val, self.peek_next_char()))
+        }
+    }
+}
+
+
+
+#[inline]
+fn to_u32(v: usize) -> Result<u32, OverflowError> {
+    if v > u32::MAX as usize {
+        Err(OverflowError)
+    } else {
+        Ok(v as u32)
     }
 }

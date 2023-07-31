@@ -1,9 +1,5 @@
 use crate::{
-    dialect::Dialect,
-    error::{HasFragmentError, IdentifyError},
-    schema::Keyword,
-    uri::AbsoluteUri,
-    Metaschema, Uri,
+    dialect::Dialect, error::IdentifyError, schema::Keyword, uri::AbsoluteUri, Metaschema, Uri,
 };
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -268,9 +264,7 @@ pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     if fragment.is_empty() {
         Ok(Some(uri))
     } else {
-        Err(IdentifyError::HasFragment {
-            source: HasFragmentError { uri },
-        })
+        Err(IdentifyError::FragmentedId(uri.into()))
     }
 }
 

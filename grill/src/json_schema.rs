@@ -5,10 +5,10 @@ pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
 
-pub use draft_04::dialect as draft_04_dialect;
-pub use draft_07::dialect as draft_07_dialect;
-pub use draft_2019_09::dialect as draft_2019_09_dialect;
-pub use draft_2020_12::dialect as draft_2020_12_dialect;
+pub use draft_04::dialect as json_schema_04_dialect;
+pub use draft_07::dialect as json_schema_07_dialect;
+pub use draft_2019_09::dialect as json_schema_2019_09_dialect;
+pub use draft_2020_12::dialect as json_schema_2020_12_dialect;
 
 pub use draft_04::{
     is_json_hyper_schema_04_absolute_uri, is_json_hyper_schema_04_uri, is_json_schema_04,
