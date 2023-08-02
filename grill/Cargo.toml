@@ -41,9 +41,9 @@ url              = { workspace = true }
 urn              = { workspace = true }
 
 [dev-dependencies]
-criterion      = { version = "0.4" }
-prettytable-rs = { version = "^0.10" }
-tokio          = { version = "1.28", features = ["full"] }
+criterion = { version = "0.4" }
+proptest  = { version = "1.2" }
+tokio     = { version = "1.28", features = ["full"] }
 
 [features]
 default = ["http", "toml", "yaml"]

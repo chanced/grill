@@ -264,7 +264,7 @@ pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     if fragment.is_empty() {
         Ok(Some(uri))
     } else {
-        Err(IdentifyError::FragmentedId(uri.into()))
+        Err(IdentifyError::FragmentedId(uri))
     }
 }
 

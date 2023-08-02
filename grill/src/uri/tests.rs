@@ -19,9 +19,9 @@ fn test_relative_uri_parse() {
     ];
 
     for (input, authority, path, query, fragment) in tests {
-        let uri = RelativeUri::parse(input).unwrap();
-        assert_eq!(authority, uri.authority());
-        assert_eq!(path, uri.path());
+        let uri = Uri::parse(input).unwrap();
+        assert_eq!(authority, uri.authority_or_namespace().as_deref());
+        assert_eq!(path, uri.path_or_nss());
         assert_eq!(query, uri.query());
         assert_eq!(fragment, uri.fragment());
     }
@@ -29,26 +29,26 @@ fn test_relative_uri_parse() {
 
 #[test]
 fn test_set_query() {
-    let mut uri = RelativeUri::parse("/path").unwrap();
+    let mut uri = Uri::parse("/path").unwrap();
     assert_eq!(uri.query(), None);
     assert_eq!(uri.fragment(), None);
 
-    uri.set_query(Some("q=str"));
+    uri.set_query(Some("q=str")).unwrap();
     assert_eq!(uri.as_str(), "/path?q=str");
     assert_eq!(uri.query(), Some("q=str"));
 
-    uri.set_fragment(Some("fragment"));
+    uri.set_fragment(Some("fragment")).unwrap();
     assert_eq!(uri.as_str(), "/path?q=str#fragment");
     assert_eq!(uri.fragment(), Some("fragment"));
 
-    uri.set_query(None);
+    uri.set_query(None).unwrap();
     assert_eq!(uri.query(), None);
     assert_eq!(uri.as_str(), "/path#fragment");
 
-    uri.set_query(Some("?q=str"));
+    uri.set_query(Some("?q=str")).unwrap();
     assert_eq!(uri.as_str(), "/path?q=str#fragment");
 
-    uri.set_query(Some("q=str"));
+    uri.set_query(Some("q=str")).unwrap();
     assert_eq!(uri.query(), Some("q=str"));
 }
 
@@ -193,7 +193,7 @@ fn test_set_fragment() {
 
     for (input, fragment, expected_fragment, expected_uri) in tests {
         let mut absolute_uri = AbsoluteUri::parse(input).unwrap();
-        absolute_uri.set_fragment(fragment);
+        absolute_uri.set_fragment(fragment).unwrap();
         assert_eq!(expected_uri, absolute_uri.to_string());
         assert_eq!(expected_fragment, absolute_uri.fragment());
     }
@@ -269,7 +269,7 @@ fn test_set_fragment() {
     ];
     for (input, fragment, expected_fragment, expected_uri) in tests {
         let mut uri = Uri::parse(input).unwrap();
-        uri.set_fragment(fragment);
+        uri.set_fragment(fragment).unwrap();
         assert_eq!(expected_uri, uri.to_string());
         assert_eq!(expected_fragment, uri.fragment());
     }

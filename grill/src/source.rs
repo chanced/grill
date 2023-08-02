@@ -156,7 +156,10 @@ impl Sources {
         }
         let source = source
             .value(deserializers)
-            .map_err(|e| SourceDeserializationError { uri, error: e })?;
+            .map_err(|e| SourceDeserializationError {
+                uri: uri.clone(),
+                error: e,
+            })?;
 
         if self.sources.contains_key(&uri) {
             // safe, see check above.

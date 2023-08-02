@@ -32,3 +32,6 @@ thiserror        = { version = "1.0.25" }
 toml             = { version = "0.7.4" }
 url              = { version = "2.2.2" }
 urn              = { version = "0.7.0" }
+
+[workspace.dev-dependencies]
+proptest = "1.2.0"

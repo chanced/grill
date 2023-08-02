@@ -90,7 +90,7 @@ where
 
         // checking to see if the root resource has already been stored
         let mut base_uri = uri.clone();
-        base_uri.set_fragment(None);
+        base_uri.set_fragment(None).unwrap();
 
         // resolving the base uri
         let resolved = self.resolvers.resolve(&base_uri).await?;

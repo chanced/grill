@@ -46,7 +46,7 @@ impl Resolve for HttpResolver {
                 let text = resp
                     .text()
                     .await
-                    .map_err(|err| ResolveError::new(err, uri.clone()).into())?;
+                    .map_err(|err| ResolveError::new(err, uri.clone()))?;
                 Ok(Some(text))
             }
             Err(err) if matches!(err.status(), Some(reqwest::StatusCode::NOT_FOUND)) => Ok(None),

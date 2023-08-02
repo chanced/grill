@@ -258,8 +258,8 @@ pub enum EvaluateError {
     },
 }
 
-/// An error occurred with a regular expression, evaluated with either the regex
-/// or fancy_regex crate.
+/// An error occurred with a regular expression, evaluated with either the `regex`
+/// or `fancy_regex` crate.
 #[derive(Debug, Error)]
 pub enum RegexError {
     #[error(transparent)]
@@ -417,6 +417,8 @@ impl ResolveError {
             referring_location: None,
         }
     }
+
+    #[must_use]
     pub fn not_found(uri: AbsoluteUri) -> Self {
         Self {
             source: NotFoundError(uri.clone()).into(),
@@ -424,6 +426,7 @@ impl ResolveError {
             referring_location: None,
         }
     }
+
     pub fn set_referring_location(&mut self, referring_location: AbsoluteUri) {
         self.referring_location = Some(referring_location);
     }
@@ -548,6 +551,12 @@ pub enum UriError {
     NotAbsolute(#[from] UriNotAbsoluteError),
 }
 
+impl From<OverflowError> for UriError {
+    fn from(err: OverflowError) -> Self {
+        Self::Relative(err.into())
+    }
+}
+
 impl UriError {
     /// Returns `true` if the uri parse error is [`Url`].
     ///
@@ -603,6 +612,7 @@ impl UriError {
         }
     }
 
+    #[must_use]
     /// If the error is [`UriError::Relative`], returns a reference to the underlying
     /// [`RelativeUriError`].
     pub fn as_relative(&self) -> Option<&RelativeUriError> {
@@ -613,6 +623,7 @@ impl UriError {
         }
     }
 
+    #[must_use]
     /// If the error is [`UriError::NotAbsolute`], returns a reference to the underlying
     /// [`UriNotAbsoluteError`].
     pub fn as_not_absolute(&self) -> Option<&UriNotAbsoluteError> {
@@ -624,6 +635,8 @@ impl UriError {
     }
 }
 
+/// A port of a [`RelativeUri`] exceeded the maximum value of `u16`.
+
 /// Errors which can occur when parsing or modifying a
 /// [`RelativeUri`](crate::uri::RelativeUri).
 #[derive(Debug, Clone, Error)]
@@ -631,6 +644,14 @@ pub enum RelativeUriError {
     /// The length of the input exceeds `u32::MAX`
     #[error(transparent)]
     Overflow(#[from] OverflowError),
+
+    /// The decoded string is not valid UTF-8
+    #[error(transparent)]
+    Utf8Encoding(#[from] std::str::Utf8Error),
+
+    /// The port of a [`RelativeUri`] exceeded the maximum value of 65535.
+    #[error("port exceeds maximum value of 65535")]
+    PortOverflow(String),
 }
 
 #[derive(Debug, Error)]
@@ -681,4 +702,8 @@ pub struct UnknownKeyError;
 /// A slice or string overflowed an allowed length limit `L`.
 #[derive(Debug, Clone, Copy, Error)]
 #[error("the length of a string or slice overflows the maximum of {M}, received {0}")]
-pub struct OverflowError<const M: usize = { u32::MAX as usize }, V = u64>(pub V);
+pub struct OverflowError<const M: usize = { u32::MAX as usize }, V = usize>(pub V);
+impl<const M: usize, V> OverflowError<M, V> {
+    /// The maximum allowed size.
+    pub const MAX: usize = M;
+}

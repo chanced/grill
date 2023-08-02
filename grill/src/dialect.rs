@@ -79,7 +79,7 @@ impl Dialect {
             crate::Uri::Urn(urn) => Ok(Some(AbsoluteUri::Urn(urn))),
             crate::Uri::Relative(rel) => {
                 let mut uri = base_uri.clone();
-                uri.set_fragment(rel.fragment());
+                uri.set_fragment(rel.fragment())?;
                 uri.set_path_or_nss(rel.path()).map_err(UriError::from)?;
                 uri.set_query(rel.query()).map_err(UriError::from)?;
                 Ok(Some(uri))
@@ -355,13 +355,8 @@ impl<'d> Dialects<'d> {
     ///
     /// # Errors
     /// Returns the `&Dialect` if the `Dialect` is not currently in this `Dialects`.
-    #[must_use]
-    pub fn with_default(&'d self, default: &Dialect) -> Result<Dialects<'d>, &Dialect> {
-        let default = self
-            .lookup
-            .get(&default.id)
-            .copied()
-            .ok_or_else(|| default)?;
+    pub fn with_default<'o>(&'d self, default: &'o Dialect) -> Result<Dialects<'d>, &'o Dialect> {
+        let default = self.lookup.get(&default.id).copied().ok_or(default)?;
         Ok(Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
             default,
