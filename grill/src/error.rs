@@ -2,10 +2,15 @@
 //!
 //! Validation errors are defined within their respective keyword's module.
 
+#[doc(no_inline)]
 pub use crate::output::ValidationError;
+#[doc(no_inline)]
 pub use big_rational_str::ParseError as BigRationalParseStrError;
+#[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
+#[doc(no_inline)]
 pub use url::ParseError as UrlError;
+
 pub use urn::Error as UrnError;
 
 use crate::{dialect::Dialect, schema::Keyword, uri::AbsoluteUri, Output, Uri};
@@ -178,6 +183,7 @@ impl From<ResolveError> for SourceError {
     }
 }
 
+/// An error occurred while attempting to deserialize a source.
 #[derive(Debug, Error)]
 #[error("failed to deserialize source \"{uri}\":\n\t{error}")]
 pub struct SourceDeserializationError {
@@ -229,6 +235,7 @@ pub enum BuildError {
     Source(#[from] SourceError),
 }
 
+/// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
 #[derive(Debug, Error)]
 #[error("failed to parse number \"{number}\":\n\t{source}")]
 pub struct BigRationalParseError {
@@ -271,6 +278,7 @@ pub enum RegexError {
     FancyRegex(#[from] fancy_regex::Error),
 }
 
+/// A regular expression failed to evaluate against a [`Value`].
 #[derive(Debug, Error)]
 #[error("failed to evaluate regex \"{regex}\" against value \"{value:?}\":\n\t{source}")]
 pub struct EvaluateRegexError {
@@ -311,6 +319,11 @@ impl StdError for DeserializeError {
         self.formats.iter().next().map(|(_, err)| err as _)
     }
 }
+
+/// A list of errors, one per implementation of
+/// [`Resolve`](crate::resolve::Resolve) attached to the
+/// [`Interrogator`](crate::Interrogator), indicating why a source failed to
+/// resolve.
 #[derive(Debug, Default)]
 pub struct ResolveErrors {
     pub errors: Vec<ResolveError>,
@@ -505,20 +518,18 @@ pub enum CompileError {
     Custom(#[from] Box<dyn StdError + Send + Sync>),
 }
 
+/// A source or schema could not be found.
 #[derive(Debug, Clone, Error)]
 #[error("unable to resolve \"{0}\" due to not being found")]
 pub struct NotFoundError(pub AbsoluteUri);
 
-#[derive(Debug, Clone)]
+/// The schema's [`Dialect`] is not registered with the
+/// [`Interrogator`](crate::Interrogator).
+#[derive(Debug, Clone, Error)]
+#[error("metaschema dialect not found: {}", .metaschema_id)]
 pub struct DialectUnknownError {
     pub metaschema_id: String,
 }
-impl Display for DialectUnknownError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "metaschema dialect not found: {}", self.metaschema_id)
-    }
-}
-impl std::error::Error for DialectUnknownError {}
 
 /// A [`Uri`] is not absolute (e.g. a Url or an Urn) when it is expected to be.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -549,8 +560,18 @@ pub enum UriError {
     /// be relative.
     #[error(transparent)]
     NotAbsolute(#[from] UriNotAbsoluteError),
+
+    /// An issue occurred while setting the Authority of a
+    /// [`Uri`](crate::uri::Uri) or [`RelativeUri`](crate::uri::RelativeUri).
+    #[error(transparent)]
+    Authority(#[from] AuthorityError),
 }
 
+impl From<InvalidPortError> for UriError {
+    fn from(err: InvalidPortError) -> Self {
+        Self::Relative(err.into())
+    }
+}
 impl From<OverflowError> for UriError {
     fn from(err: OverflowError) -> Self {
         Self::Relative(err.into())
@@ -635,7 +656,26 @@ impl UriError {
     }
 }
 
+/// Returned from `set_authority` on [`Uri`](crate::uri::Uri), [`AbsoluteUri`](crate::uri::AbsoluteUri), and [`RelativeUri`](crate::uri::RelativeUri)
+#[derive(Debug, Clone, Error)]
+#[error("invalid authority: {0}")]
+pub enum AuthorityError {
+    ContainsPath(String),
+    ContainsQuery(String),
+    ContainsFragment(String),
+    InvalidPort(#[from] InvalidPortError),
+    Urn(UrnError),
+    /// The username cannot be set due to the scheme of the Uri (e.g. `file`)
+    UsernameNotAllowed(String),
+    /// The password cannot be set due to the scheme of the Uri (e.g. `file`)
+    PasswordNotAllowed(String),
+    PortNotAllowed(u16),
+}
+
 /// A port of a [`RelativeUri`] exceeded the maximum value of `u16`.
+#[derive(Debug, Clone, Error)]
+#[error("port \"{0}\" is malformed or exceeds maximum value of 65535")]
+pub struct InvalidPortError(pub String);
 
 /// Errors which can occur when parsing or modifying a
 /// [`RelativeUri`](crate::uri::RelativeUri).
@@ -650,10 +690,11 @@ pub enum RelativeUriError {
     Utf8Encoding(#[from] std::str::Utf8Error),
 
     /// The port of a [`RelativeUri`] exceeded the maximum value of 65535.
-    #[error("port exceeds maximum value of 65535")]
-    PortOverflow(String),
+    #[error(transparent)]
+    InvalidPort(#[from] InvalidPortError),
 }
 
+/// An error occurred while attempting to identify a schema
 #[derive(Debug, Error)]
 pub enum IdentifyError {
     /// The URI could not be parsed.
@@ -699,7 +740,7 @@ impl DialectNotFoundError {
 #[error("the provided key could not be found; if using multiple Interrogators, consider using a unique key type per")]
 pub struct UnknownKeyError;
 
-/// A slice or string overflowed an allowed length limit `L`.
+/// A slice or string overflowed an allowed length maximum of `M`.
 #[derive(Debug, Clone, Copy, Error)]
 #[error("the length of a string or slice overflows the maximum of {M}, received {0}")]
 pub struct OverflowError<const M: usize = { u32::MAX as usize }, V = usize>(pub V);

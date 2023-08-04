@@ -1,12 +1,16 @@
 use std::{ops::Range, str::FromStr};
 
 use super::{encode, to_u32, write, RelativeUri, Uri};
-use crate::error::{RelativeUriError, UriError};
+use crate::error::{AuthorityError, InvalidPortError, UriError};
 use url::Url;
 use urn::Urn;
 
 pub(super) fn uri(value: &str) -> Result<Uri, UriError> {
     Parse::uri(value)
+}
+
+pub(super) fn authority(value: &str) -> Result<super::Authority, AuthorityError> {
+    Parse::authority(value)
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -16,7 +20,6 @@ enum UrnSchemeState {
     R,
     N,
 }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AuthorityState {
     Username,
@@ -24,7 +27,6 @@ enum AuthorityState {
     Host,
     Port,
 }
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum State {
     #[default]
@@ -40,16 +42,13 @@ enum State {
     Query,
     Fragment,
 }
-
 impl State {
     #[allow(clippy::match_same_arms, clippy::too_many_lines)]
     fn next(self, next: char) -> Self {
         use AuthorityState::*;
         use State::*;
         use UrnSchemeState::{N, R, U};
-        let current = self;
-
-        let new_state = match self {
+        match self {
             Head => match next {
                 '/' => LeadingSlash,
                 '?' => Query,
@@ -140,14 +139,13 @@ impl State {
             },
             Fragment => Fragment,
             _ => panic!("invalid state tranisition: \'{next:?}\' -> {self:?}"),
-        };
-        println!("{next} -> {current:?} = {new_state:?}");
-        new_state
+        }
     }
 
     fn is_authority(self) -> bool {
         matches!(self, Self::Authority(_))
     }
+
     fn is_port(self) -> bool {
         matches!(self, Self::Authority(AuthorityState::Port))
     }
@@ -176,56 +174,44 @@ impl<'a> Parse<'a> {
         input
             .char_indices()
             .find_map(|(i, c)| parser.next(i, c))
-            .unwrap_or_else(|| parser.finalize())
+            .unwrap_or_else(|| parser.finalize_uri())
     }
 
-    fn finalize(mut self) -> Result<Uri, UriError> {
-        if self.username_idx.is_some() && self.host().is_none() && self.password().is_none() {
-            self.host_idx = self.username_idx.take();
+    fn authority(input: &'a str) -> Result<super::Authority, AuthorityError> {
+        use AuthorityState::*;
+        let mut parser = Self {
+            state: State::Authority(Password),
+            input,
+            ..Default::default()
+        };
+        for (i, c) in input.char_indices() {
+            //safety: there are no states which can error out before the authority is complete
+            parser.next(i, c).transpose().unwrap();
         }
-        let mut buf = String::with_capacity(self.input.len());
-        let username = encode::username(self.username());
-        let password = encode::password(self.password());
-        let host = encode::host(self.host());
-        let port = self.port().transpose()?;
-        let path = encode::path(self.path());
-        let query = encode::query(self.query());
-        let port_str = self.port_str();
-        let fragment = encode::fragment(self.fragment());
-
-        println!("username: {username:?}");
-        println!("password: {password:?}");
-        println!("host: {host:?}");
-        println!("port: {port:?}");
-        println!("path: {path:?}");
-        println!("query: {query:?}");
-        println!("fragment: {fragment:?}");
-
-        let has_path = !path.is_empty();
-        let has_authority = username.is_some() || host.is_some();
-        let username_idx = write::username(&mut buf, username)?;
-        let password_idx = write::password(&mut buf, password)?;
-        let host_idx = write::host(&mut buf, host)?;
-        let port_idx = write::port(&mut buf, port_str)?;
-        let path_idx = write::path(&mut buf, path)?;
-        let query_idx = write::query(&mut buf, query, has_authority, has_path)?;
-        let fragment_idx = write::fragment(&mut buf, fragment)?;
-
-        Ok(RelativeUri {
-            href: buf,
-            username_idx,
-            password_idx,
-            host_idx,
-            port,
-            port_idx,
-            path_idx,
-            query_idx,
-            fragment_idx,
+        if !parser.path().is_empty() {
+            return Err(AuthorityError::ContainsPath(parser.path().to_string()));
         }
-        .into())
+        let query = parser.query().unwrap_or_default();
+        if !query.is_empty() {
+            return Err(AuthorityError::ContainsQuery(query.to_string()));
+        }
+        let fragment = parser.fragment().unwrap_or_default();
+        if !fragment.is_empty() {
+            return Err(AuthorityError::ContainsFragment(fragment.to_string()));
+        }
+
+        Ok(super::Authority {
+            value: input.into(),
+            username_idx: parser.username_idx,
+            password_idx: parser.password_idx,
+            host_idx: parser.host_idx,
+            port_idx: parser.port_idx,
+            port: parser.port().transpose()?,
+        })
     }
 
     fn next(&mut self, index: usize, next: char) -> Option<Result<Uri, UriError>> {
+        use AuthorityState::*;
         use State::*;
         let index = match to_u32(index) {
             Ok(i) => i,
@@ -233,7 +219,10 @@ impl<'a> Parse<'a> {
         };
         let next_state = self.state.next(next);
         match next_state {
-            Authority(next_auth_state) => self.next_authority(index, next_auth_state),
+            Authority(Username) => self.set_username(index),
+            Authority(Password) => self.set_password(index),
+            Authority(Host) => self.set_host(index),
+            Authority(Port) => self.set_port(index),
             UrlSchemeComplete => return self.parse_url(),
             UrnSchemeComplete => return self.parse_urn(),
             Path => self.set_path_index(index),
@@ -246,6 +235,43 @@ impl<'a> Parse<'a> {
         None
     }
 
+    fn finalize_uri(mut self) -> Result<Uri, UriError> {
+        if self.username_idx.is_some() && self.host().is_none() {
+            self.host_idx = self.username_idx.take();
+            self.port_idx = self.password_idx.take();
+        }
+        let mut buf = String::with_capacity(self.input.len());
+        let username = encode::username(self.username());
+        let password = encode::password(self.password());
+        let host = encode::host(self.host());
+        let port = self.port().transpose()?;
+        let path = encode::path(self.path());
+        let query = encode::query(self.query());
+        let port_str = self.port_str();
+        let fragment = encode::fragment(self.fragment());
+        let has_path = !path.is_empty();
+        let has_authority = username.is_some() || host.is_some();
+        let username_idx = write::username(&mut buf, username)?;
+        let password_idx = write::password(&mut buf, password)?;
+        let host_idx = write::host(&mut buf, host)?;
+        let port_idx = write::port(&mut buf, port_str)?;
+        let path_idx = write::path(&mut buf, path)?;
+        let query_idx = write::query(&mut buf, query, has_authority, has_path)?;
+        let fragment_idx = write::fragment(&mut buf, fragment)?;
+
+        Ok(RelativeUri {
+            value: buf,
+            username_idx,
+            password_idx,
+            host_idx,
+            port,
+            port_idx,
+            path_idx,
+            query_idx,
+            fragment_idx,
+        }
+        .into())
+    }
     fn parse_url(&mut self) -> Option<Result<Uri, UriError>> {
         Url::parse(self.input)
             .map(Uri::Url)
@@ -262,13 +288,18 @@ impl<'a> Parse<'a> {
 
     fn host(&self) -> Option<&str> {
         let end = self.port_idx().unwrap_or(self.path_idx());
-        self.host_idx().map(|i| &self.input[i + 1..end])
+        self.host_idx().map(|mut i| {
+            if self.password_idx.is_some() || self.username_idx.is_some() {
+                i += 1;
+            }
+            &self.input[i..end]
+        })
     }
 
-    fn port(&self) -> Option<Result<u16, UriError>> {
+    fn port(&self) -> Option<Result<u16, InvalidPortError>> {
         let port = self.port_str()?;
         port.parse::<u16>()
-            .map_err(|_| RelativeUriError::PortOverflow(port.to_string()).into())
+            .map_err(|_| InvalidPortError(port.into()))
             .into()
     }
 
@@ -314,27 +345,19 @@ impl<'a> Parse<'a> {
         self.maybe_finalize_authority(index);
     }
 
-    fn next_authority(&mut self, index: u32, next_auth_state: AuthorityState) {
-        use AuthorityState::*;
-        match next_auth_state {
-            Username => self.set_username(index),
-            Password => self.set_password(index),
-            Host => self.set_host(index),
-            Port => self.set_port(index),
-        }
-        self.path_idx = index + 1;
-    }
-
     fn set_username(&mut self, index: u32) {
         self.username_idx.get_or_insert(index);
+        self.path_idx = index + 1;
     }
 
     fn set_password(&mut self, index: u32) {
         self.password_idx.get_or_insert(index);
+        self.path_idx = index + 1;
     }
 
     fn set_port(&mut self, index: u32) {
         self.port_idx.get_or_insert(index);
+        self.path_idx = index + 1;
     }
 
     fn set_host(&mut self, index: u32) {
@@ -342,6 +365,7 @@ impl<'a> Parse<'a> {
             self.port_idx = None;
         }
         self.host_idx.get_or_insert(index);
+        self.path_idx = index + 1;
     }
 
     fn maybe_finalize_authority(&mut self, index: u32) {
@@ -349,8 +373,8 @@ impl<'a> Parse<'a> {
             self.path_idx = index;
         }
         if self.host_idx.is_none() && self.username_idx.is_some() {
-            self.host_idx = self.username_idx;
-            self.username_idx = None;
+            self.host_idx = self.username_idx.take();
+            self.password_idx = self.password_idx.take();
         }
     }
 
@@ -488,26 +512,26 @@ mod tests {
     #[test]
     fn test_parse_uri() {
         let tests = [
-            // Test {
-            //     input: "//www.example.com",
-            //     kind: Expect::RelativeUri,
-            //     path: "",
-            //     host: Some("www.example.com"),
-            //     ..Default::default()
-            // },
-            // Test {
-            //     input: "http://www.example.com",
-            //     kind: Expect::Url,
-            //     path: "",
-            //     host: Some("www.example.com"),
-            //     ..Default::default()
-            // },
-            // Test {
-            //     input: "/example/path",
-            //     kind: Expect::RelativeUri,
-            //     path: "/example/path",
-            //     ..Default::default()
-            // },
+            Test {
+                input: "//www.example.com",
+                kind: Expect::RelativeUri,
+                path: "",
+                host: Some("www.example.com"),
+                ..Default::default()
+            },
+            Test {
+                input: "http://www.example.com",
+                kind: Expect::Url,
+                path: "",
+                host: Some("www.example.com"),
+                ..Default::default()
+            },
+            Test {
+                input: "/example/path",
+                kind: Expect::RelativeUri,
+                path: "/example/path",
+                ..Default::default()
+            },
             Test {
                 input: "//user:pass@domain:1111/path?query=string#fragment",
                 kind: Expect::RelativeUri,

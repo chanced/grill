@@ -40,14 +40,17 @@ pub(super) fn host<'a, T: Into<Cow<'a, str>>>(
 ) -> Result<Option<u32>, OverflowError> {
     let Some(host) = host else { return Ok(None) };
     let host = host.into();
+    println!("HOST: {host:?}");
     _ = buf.trim_end_matches('@');
     if buf.is_empty() {
         buf.write_str("//").unwrap();
     }
     let buf_len = to_u32(buf.len())?;
+
     if buf.len() > 2 && !host.starts_with('@') {
         buf.write_char('@').unwrap();
     }
+
     buf.write_str(&host).unwrap();
     Ok(Some(buf_len))
 }

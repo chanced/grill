@@ -7,13 +7,13 @@ mod encode;
 mod parse;
 mod write;
 
-use crate::error::{OverflowError, RelativeUriError, UriError, UrnError};
+use crate::error::{AuthorityError, OverflowError, RelativeUriError, UriError, UrnError};
 use inherent::inherent;
 use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
-    fmt::Display,
+    fmt::{Display, Write},
     iter::Peekable,
     ops::{Deref, Index},
     path::PathBuf,
@@ -22,7 +22,10 @@ use std::{
 };
 use urn::percent::{encode_f_component, encode_nss};
 
+#[doc(no_inline)]
 pub use url::Url;
+
+#[doc(no_inline)]
 pub use urn::Urn;
 
 pub trait AsUriRef {
@@ -181,49 +184,98 @@ impl AsUriRef for RelativeUri {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 /// The Authority component of a Relative URI.
 pub struct Authority<'a> {
-    href: &'a str,
+    value: Cow<'a, str>,
     username_idx: Option<u32>,
     password_idx: Option<u32>,
     host_idx: Option<u32>,
     port_idx: Option<u32>,
     port: Option<u16>,
 }
+impl Deref for Authority<'_> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
 
 impl<'a> Authority<'a> {
+    /// Returns the username component if it exists.
     #[must_use]
     pub fn username(&self) -> Option<&str> {
-        let start = self.username_idx.map(|idx| idx as usize)?;
+        let start = self.username_idx()?;
         let end = self
             .password_idx
             .or(self.host_idx)
             .or(self.port_idx)
-            .map_or(self.href.len(), |idx| idx as usize);
+            .map_or(self.value.len(), |idx| idx as usize);
 
-        Some(&self.href[start..end])
+        Some(&self.value[start..end])
     }
 
+    /// Returns the password component if it exists.
     #[must_use]
     pub fn password(&self) -> Option<&str> {
-        let start = self.password_idx.map(|idx| idx as usize)?;
+        let start = self.password_idx()?;
         let end = self
-            .host_idx
-            .or(self.port_idx)
-            .map_or(self.href.len(), |idx| idx as usize);
-        Some(&self.href[start..end])
+            .host_idx()
+            .or(self.port_idx())
+            .unwrap_or(self.value.len());
+        Some(&self.value[start..end])
     }
 
+    /// Returns the host component if it exists.
     #[must_use]
     pub fn host(&self) -> Option<&str> {
-        let start = self.host_idx.map(|idx| idx as usize + 1)?;
-        let end = self.port_idx.map_or(self.href.len(), |idx| idx as usize);
-        Some(&self.href[start..end])
+        let offset = usize::from(self.username_idx.is_some() || self.password_idx.is_some());
+        let start = self.host_idx()? + offset;
+        let end = self.port_idx().unwrap_or(self.value.len());
+        Some(&self.value[start..end])
     }
 
+    /// Returns the port component if it exists.
     #[must_use]
     pub fn port(&self) -> Option<u16> {
         self.port
+    }
+
+    /// Returns the port as an `&str` if it exists.
+    #[must_use]
+    pub fn port_str(&self) -> Option<&str> {
+        self.port_idx().map(|idx| &self.value[idx + 1..])
+    }
+
+    #[must_use]
+    pub fn to_owned(&self) -> Authority<'static> {
+        Authority {
+            value: Cow::Owned(self.value.to_string()),
+            username_idx: self.username_idx,
+            password_idx: self.password_idx,
+            host_idx: self.host_idx,
+            port_idx: self.port_idx,
+            port: self.port,
+        }
+    }
+
+    /// Returns the `&str` representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
+
+    fn port_idx(&self) -> Option<usize> {
+        self.port_idx.map(|idx| idx as usize)
+    }
+    fn host_idx(&self) -> Option<usize> {
+        self.host_idx.map(|idx| idx as usize)
+    }
+    fn username_idx(&self) -> Option<usize> {
+        self.username_idx.map(|idx| idx as usize)
+    }
+    fn password_idx(&self) -> Option<usize> {
+        self.password_idx.map(|idx| idx as usize)
     }
 }
 
@@ -280,7 +332,8 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns the path (url) or Name Specific String (urn)
+    /// Returns the path ([`Url`](crate::uri::Url)) or Name Specific String
+    /// ([`Urn`](crate::uri::Urn)
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
         match self {
@@ -307,6 +360,7 @@ impl AbsoluteUri {
             Self::Urn(u) => set_urn_namespace(u, authority_or_namespace),
         }
     }
+    /// Returns the `&str` representation of the `AbsoluteUri`.
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -720,7 +774,7 @@ impl TryIntoAbsoluteUri for Uri {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct RelativeUri {
-    href: String,
+    value: String,
     username_idx: Option<u32>,
     password_idx: Option<u32>,
     host_idx: Option<u32>,
@@ -735,7 +789,7 @@ impl RelativeUri {
     /// Returns the `RelativeUri` as a `&str`.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.href
+        &self.value
     }
 
     /// Returns the path segment of the `RelativeUri`.
@@ -744,8 +798,8 @@ impl RelativeUri {
         let end = self
             .query_idx()
             .or(self.fragment_idx())
-            .unwrap_or(self.href.len());
-        &self.href[self.path_idx()..end]
+            .unwrap_or(self.value.len());
+        &self.value[self.path_idx()..end]
     }
     /// returns the username portion of the `RelativeUri` if it exists.
     ///
@@ -759,13 +813,13 @@ impl RelativeUri {
     pub fn username(&self) -> Option<&str> {
         let start = self.username_idx()?;
         let end = self.username_end_idx()?;
-        Some(&self.href[start..end])
+        Some(&self.value[start..end])
     }
     #[must_use]
     pub fn password(&self) -> Option<&str> {
         let start = self.password_idx()? + 1;
         let end = self.host_idx().unwrap_or(self.path_idx());
-        Some(&self.href[start..end])
+        Some(&self.value[start..end])
     }
 
     fn username_end_idx(&self) -> Option<usize> {
@@ -784,7 +838,7 @@ impl RelativeUri {
             return Some("");
         }
 
-        Some(&self.href[fragment_idx + 1..])
+        Some(&self.value[fragment_idx + 1..])
     }
 
     /// Returns the query string segment of the `RelativeUri`, if it exists.
@@ -795,7 +849,7 @@ impl RelativeUri {
             return Some("");
         }
         let last = self.fragment_idx().unwrap_or(self.len());
-        Some(&self.href[query_idx + 1..last])
+        Some(&self.value[query_idx + 1..last])
     }
     fn has_path(&self) -> bool {
         !self.path().is_empty()
@@ -804,9 +858,6 @@ impl RelativeUri {
     /// Sets the query string portion of the `RelativeUri` and returns the
     /// previous query, if it existed.
     ///
-    /// # Panics
-    /// Panics if setting the query string would cause the `RelativeUri` to
-    /// exceed [`u32::MAX`](core::u32::MAX) in length.
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, RelativeUriError> {
         let existing_query = self.query().map(ToString::to_string);
         let cap = self.len() - existing_query.as_ref().map(String::len).unwrap_or_default()
@@ -824,7 +875,7 @@ impl RelativeUri {
             self.has_path(),
         )?;
         let fragment_idx: Option<u32> = write::fragment(&mut buf, self.fragment())?;
-        self.href = buf;
+        self.value = buf;
         self.username_idx = username_idx;
         self.password_idx = password_idx;
         self.host_idx = host_idx;
@@ -853,7 +904,7 @@ impl RelativeUri {
             self.has_path(),
         )?;
         let fragment_idx: Option<u32> = write::fragment(&mut buf, self.fragment())?;
-        self.href = buf;
+        self.value = buf;
         self.username_idx = username_idx;
         self.password_idx = password_idx;
         self.host_idx = host_idx;
@@ -891,7 +942,7 @@ impl RelativeUri {
             self.has_path(),
         )?;
         let fragment_idx: Option<u32> = write::fragment(&mut buf, encode::fragment(fragment))?;
-        self.href = buf;
+        self.value = buf;
         self.username_idx = username_idx;
         self.password_idx = password_idx;
         self.host_idx = host_idx;
@@ -906,19 +957,26 @@ impl RelativeUri {
     /// Returns the authority of the `RelativeUri` if it exists.
     ///
     /// A relative URI may have an authority if it starts starts with `"//"`.
-    pub fn authority(&self) -> Option<&str> {
-        if self.has_authority() {
-            Some(&self.href[2..self.path_idx()])
-        } else {
-            None
-        }
+    pub fn authority(&self) -> Option<Authority> {
+        let host_idx = self.host_idx()?;
+        Some(Authority {
+            value: Cow::Borrowed(&self.value[host_idx..self.path_idx()]),
+            username_idx: self.username_idx,
+            password_idx: self.password_idx,
+            host_idx: self.host_idx,
+            port_idx: self.port_idx,
+            port: self.port,
+        })
     }
 
     #[must_use]
     pub fn host(&self) -> Option<&str> {
-        let start = self.host_idx()? + 1;
+        let mut start = self.host_idx()?;
+        if self.has_username() || self.has_password() {
+            start += 1;
+        }
         let end = self.port_idx().unwrap_or_else(|| self.path_idx());
-        Some(&self.href[start..end])
+        Some(&self.value[start..end])
     }
 
     #[must_use]
@@ -926,9 +984,46 @@ impl RelativeUri {
         self.port
     }
 
-    /// Sets the authority of the `RelativeUri` and returns the previous authority, if it existed.
-    pub fn set_authority(&self, authority: Option<&str>) -> Result<Option<String>, UriError> {
-        todo!()
+    /// Sets the authority of the `RelativeUri` and returns the previous
+    /// authority, if it existed.
+    pub fn set_authority<'a>(
+        &'a mut self,
+        authority: Option<&str>,
+    ) -> Result<Option<Authority<'a>>, UriError> {
+        let existing_authority = self.authority().map(|a| a.to_owned());
+        let new = authority
+            .map(parse::authority)
+            .transpose()?
+            .unwrap_or_default();
+        let mut buf = String::with_capacity(
+            self.len()
+                - existing_authority
+                    .as_deref()
+                    .map(str::len)
+                    .unwrap_or_default()
+                + new.len(),
+        );
+        let username_idx = write::username(&mut buf, new.username())?;
+        let password_idx = write::password(&mut buf, new.password())?;
+        let host_idx = write::host(&mut buf, new.host())?;
+        let port_idx = write::port(&mut buf, new.port_str())?;
+        let path_idx: u32 = write::path(&mut buf, self.path())?;
+        let query_idx: Option<u32> = write::query(
+            &mut buf,
+            self.query(),
+            self.has_authority(),
+            self.has_path(),
+        )?;
+        let fragment_idx = write::fragment(&mut buf, self.fragment())?;
+        self.value = buf;
+        self.username_idx = username_idx;
+        self.password_idx = password_idx;
+        self.host_idx = host_idx;
+        self.port_idx = port_idx;
+        self.path_idx = path_idx;
+        self.query_idx = query_idx;
+        self.fragment_idx = fragment_idx;
+        Ok(existing_authority)
     }
 
     #[must_use]
@@ -936,30 +1031,72 @@ impl RelativeUri {
         self.path_idx() > 2
     }
 
+    #[must_use]
+    pub fn has_username(&self) -> bool {
+        self.username_idx.is_some()
+    }
+
+    #[must_use]
+    pub fn has_password(&self) -> bool {
+        self.password_idx.is_some()
+    }
+
+    #[must_use]
+    pub fn has_host(&self) -> bool {
+        self.host_idx.is_some()
+    }
+
+    #[must_use]
+    pub fn has_port(&self) -> bool {
+        self.port_idx.is_some()
+    }
+
+    #[must_use]
+    pub fn has_query(&self) -> bool {
+        self.query_idx.is_some()
+    }
+
+    #[must_use]
+    pub fn has_fragment(&self) -> bool {
+        self.fragment_idx.is_some()
+    }
+
+    fn authority_str(&self) -> Option<&str> {
+        let start = self.username_idx().or(self.host_idx())?;
+        Some(&self.value[start..self.path_idx()])
+    }
+
     fn path_idx(&self) -> usize {
         self.path_idx as usize
     }
+
     fn fragment_idx(&self) -> Option<usize> {
         self.fragment_idx.map(|idx| idx as usize)
     }
+
     fn query_idx(&self) -> Option<usize> {
         self.query_idx.map(|idx| idx as usize)
     }
+
     fn username_idx(&self) -> Option<usize> {
         self.username_idx.map(|idx| idx as usize)
     }
+
     fn host_idx(&self) -> Option<usize> {
         self.host_idx.map(|idx| idx as usize)
     }
+
     fn port_idx(&self) -> Option<usize> {
         self.port_idx.map(|idx| idx as usize)
     }
+
     fn password_idx(&self) -> Option<usize> {
         self.password_idx.map(|idx| idx as usize)
     }
 
     fn port_str(&self) -> Option<&str> {
-        todo!()
+        self.port_idx()
+            .map(|idx| &self.value[idx + 1..self.path_idx()])
     }
 }
 
@@ -967,13 +1104,13 @@ impl Index<usize> for RelativeUri {
     type Output = str;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.href[index..]
+        &self.value[index..]
     }
 }
 
 impl Display for RelativeUri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.href.fmt(f)
+        self.value.fmt(f)
     }
 }
 
@@ -998,7 +1135,7 @@ impl From<&RelativeUri> for String {
 impl Deref for RelativeUri {
     type Target = str;
     fn deref(&self) -> &Self::Target {
-        self.href.as_str()
+        self.value.as_str()
     }
 }
 
@@ -1094,27 +1231,13 @@ impl Uri {
     }
 
     /// Returns the namespace if the absolute uri is [`Urn`], otherwise returns
-    /// the host for a [`Url`].
+    /// the authority string for a [`Url`] or [`RelativeUri`].
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {
         match self {
-            Uri::Url(url) => {
-                let host = url.host()?;
-                let mut result: Cow<'_, str> = Cow::Owned(host.to_string());
-                if let Some(port) = url.port() {
-                    result = Cow::Owned(format!("{result}:{port}"));
-                }
-                let mut authority = url.username().to_string();
-                if !authority.is_empty() {
-                    if let Some(pass) = url.password() {
-                        authority.push_str(&format!(":{pass}"));
-                    }
-                    result = Cow::Owned(format!("{authority}@{result}"));
-                }
-                Some(result)
-            }
+            Uri::Url(url) => url_authority(url),
             Uri::Urn(urn) => Some(Cow::Borrowed(urn.nid())),
-            Uri::Relative(_) => None,
+            Uri::Relative(rel) => rel.authority_str().map(Cow::Borrowed),
         }
     }
 
@@ -1362,43 +1485,33 @@ fn set_urn_namespace(u: &mut Urn, namespace: &str) -> Result<Option<String>, Uri
 
 fn set_url_authority(u: &mut Url, authority: &str) -> Result<Option<String>, UriError> {
     let prev_authority = get_url_authority(u);
-
-    let (userinfo, host_and_port) = authority
-        .split_once('@')
-        .map_or((None, authority), |(a, b)| (Some(a), b));
-
-    let (user, pass) = userinfo.map_or((None, None), |userinfo| {
-        userinfo
-            .split_once(':')
-            .map_or((Some(userinfo), None), |(user, pwd)| {
-                (Some(user), Some(pwd))
-            })
-    });
-
-    let (host, port) = host_and_port
-        .split_once(':')
-        .map_or((host_and_port, None), |(a, b)| (a, Some(b)));
-    let port = port
-        .map(str::parse)
-        .transpose()
-        .map_err(|_| url::ParseError::InvalidPort)?;
-    u.set_port(port)
-        .map_err(|_| url::ParseError::SetHostOnCannotBeABaseUrl)?;
-
-    u.set_host(Some(host))?;
-
-    if let Some(user) = user {
-        u.set_username(user)
-            .map_err(|_| url::ParseError::SetHostOnCannotBeABaseUrl)?;
-    } else {
-        // ignoring the error; internally the url crate does not check for non-empty strings
-        // and errors if the username cannot be set (e.g., in the case of file://).
+    let authority = parse::authority(authority)?;
+    if u.set_username(authority.username().unwrap_or_default())
+        .is_err()
+    {
+        // the url crate doesn't check for empty values before returning `Err(())`
         // https://github.com/servo/rust-url/issues/844
-        _ = u.set_username("");
+        let username = authority.username().unwrap_or_default();
+        if !username.is_empty() {
+            return Err(AuthorityError::UsernameNotAllowed(username.to_string()).into());
+        }
     }
-    // same as above, ignoring error
-    _ = u.set_password(pass);
-
+    if u.set_password(authority.password()).is_err() {
+        // the url crate doesn't check for empty values before returning `Err(())`
+        // https://github.com/servo/rust-url/issues/844
+        let password = authority.password().unwrap_or_default();
+        if !password.is_empty() {
+            return Err(AuthorityError::PasswordNotAllowed(password.to_string()).into());
+        }
+    }
+    u.set_host(authority.host())?;
+    if u.set_port(authority.port()).is_err() {
+        // the url crate doesn't check for empty values before returning `Err(())`
+        // https://github.com/servo/rust-url/issues/844
+        if let Some(port) = authority.port() {
+            return Err(AuthorityError::PortNotAllowed(port).into());
+        }
+    }
     Ok(prev_authority)
 }
 
@@ -1705,4 +1818,23 @@ fn to_u32(v: usize) -> Result<u32, OverflowError> {
         #[allow(clippy::cast_possible_truncation)]
         Ok(v as u32)
     }
+}
+
+fn url_authority(url: &Url) -> Option<Cow<'_, str>> {
+    let mut result = String::default();
+    let host = url.host()?;
+    if !url.username().is_empty() {
+        result.write_str(url.username()).unwrap();
+        if let Some(password) = url.password() {
+            result.write_char(':').unwrap();
+            result.write_str(password).unwrap();
+        }
+        result.write_char('@').unwrap();
+    }
+    result.write_str(&host.to_string()).unwrap();
+    if let Some(port) = url.port() {
+        result.write_char(':').unwrap();
+        result.write_str(&port.to_string()).unwrap();
+    }
+    Some(result.to_string().into())
 }
