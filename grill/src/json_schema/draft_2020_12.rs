@@ -1,10 +1,9 @@
 pub use super::draft_2019_09::identify_schema;
 
-
 use crate::{
-    dialect::{Dialect},
+    dialect::{Dialect, Metaschema},
     uri::AbsoluteUri,
-    Metaschema, Uri,
+    Uri,
 };
 
 use once_cell::sync::Lazy;

@@ -531,13 +531,6 @@ pub struct DialectUnknownError {
     pub metaschema_id: String,
 }
 
-/// A [`Uri`] is not absolute (e.g. a Url or an Urn) when it is expected to be.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("URI is not absolute: {uri}")]
-pub struct UriNotAbsoluteError {
-    pub uri: Uri,
-}
-
 /// Errors which can occur when parsing or interacting with
 /// [`Uri`](`crate::uri::Uri`), [`AbsoluteUri`](`crate::uri::AbsoluteUri`), or
 /// [`RelativeUri`](`crate::uri::RelativeUri`).
@@ -558,13 +551,18 @@ pub enum UriError {
     /// Indicates that the [`AbsoluteUri`](crate::uri::AbsoluteUri) is not
     /// absolute. This is not applicable to [`Uri`](crate::uri::Uri) as they can
     /// be relative.
-    #[error(transparent)]
-    NotAbsolute(#[from] UriNotAbsoluteError),
+    #[error("uri is not absolute: {0}")]
+    NotAbsolute(Uri),
 
     /// An issue occurred while setting the Authority of a
     /// [`Uri`](crate::uri::Uri) or [`RelativeUri`](crate::uri::RelativeUri).
     #[error(transparent)]
     Authority(#[from] AuthorityError),
+
+    /// The scheme of a [`Uri`](crate::uri::Uri) or
+    /// [`AbsoluteUri`](crate::uri::AbsoluteUri) is malformed.
+    #[error("invalid scheme: {0}")]
+    InvalidScheme(String),
 }
 
 impl From<InvalidPortError> for UriError {
@@ -647,7 +645,7 @@ impl UriError {
     #[must_use]
     /// If the error is [`UriError::NotAbsolute`], returns a reference to the underlying
     /// [`UriNotAbsoluteError`].
-    pub fn as_not_absolute(&self) -> Option<&UriNotAbsoluteError> {
+    pub fn as_not_absolute(&self) -> Option<&Uri> {
         if let Self::NotAbsolute(v) = self {
             Some(v)
         } else {

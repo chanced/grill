@@ -1,4 +1,9 @@
-use crate::{dialect::Dialect, error::IdentifyError, uri::AbsoluteUri, Metaschema, Uri};
+use crate::{
+    dialect::{Dialect, Metaschema},
+    error::IdentifyError,
+    uri::AbsoluteUri,
+    Uri,
+};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;

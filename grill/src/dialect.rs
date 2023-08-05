@@ -5,7 +5,7 @@ use crate::{
     error::{DialectError, IdentifyError, LocateSchemasError, UriError},
     schema::{LocatedSchema, LocatedSchemas},
     uri::AbsoluteUri,
-    Handler, Metaschema, Object, Source,
+    Handler, Object, Source,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -508,6 +508,18 @@ impl<'d> Deref for Dialects<'d> {
 
     fn deref(&self) -> &Self::Target {
         self.dialects.as_ref()
+    }
+}
+
+pub struct Metaschema {
+    pub id: AbsoluteUri,
+    pub schema: Object,
+}
+
+impl Metaschema {
+    #[must_use]
+    pub fn new(id: AbsoluteUri, schema: Object) -> Self {
+        Self { id, schema }
     }
 }
 

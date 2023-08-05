@@ -1,5 +1,6 @@
 use crate::{
-    dialect::Dialect, error::IdentifyError, schema::Keyword, uri::AbsoluteUri, Metaschema, Uri,
+    dialect::Dialect, dialect::Metaschema, error::IdentifyError, schema::Keyword, uri::AbsoluteUri,
+    Uri,
 };
 use once_cell::sync::Lazy;
 use serde_json::Value;

@@ -27,7 +27,7 @@ impl ConstHandler {
 impl SyncHandler for ConstHandler {
     fn compile<'s>(
         &mut self,
-        _compile: &mut crate::Compile<'s>,
+        _compile: &mut crate::handler::Compile<'s>,
         _schema: &'s serde_json::Value,
     ) -> Result<bool, crate::error::CompileError> {
         todo!()

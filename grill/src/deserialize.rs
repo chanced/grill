@@ -11,7 +11,6 @@ pub trait Deserializer: DynClone + Send + Sync + 'static {
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
 clone_trait_object!(Deserializer);
-
 impl<F> Deserializer for F
 where
     F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,

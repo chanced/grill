@@ -1502,6 +1502,17 @@ impl<'s> From<&'s str> for Keyword<'s> {
         Self(keyword)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Anchor<'v> {
+    /// Value of the anchor.  
+    pub value: &'v str,
+    /// The containing `Value`
+    pub container: &'v Value,
+    /// The keyword of the anchor
+    pub keyword: Keyword<'v>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

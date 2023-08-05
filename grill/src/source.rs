@@ -1,10 +1,10 @@
 use crate::{
     deserialize::Deserializers,
+    dialect::Metaschema,
     error::{DeserializeError, SourceDeserializationError, SourceDuplicateError, SourceError},
-    AbsoluteUri, Deserializer, Metaschema,
+    AbsoluteUri, Deserializer,
 };
 use serde_json::Value;
-
 use std::{
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},

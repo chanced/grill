@@ -20,8 +20,6 @@
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
-mod anchor;
-pub use anchor::Anchor;
 
 pub mod location;
 pub use location::Location;
@@ -34,7 +32,7 @@ pub use slotmap::new_key_type;
 pub mod dialect;
 
 
-mod handler;
+pub mod handler;
 pub use handler::{Scope, Handler};
 
 pub mod error;
@@ -45,13 +43,8 @@ pub use output::{Output, Structure};
 pub mod resolve;
 pub use resolve::Resolve;
 
-mod compile;
-pub use compile::Compile;
-
-mod metaschema;
-pub use metaschema::Metaschema;
 pub mod uri;
-pub use uri::{Uri, AbsoluteUri};
+pub use uri::{Uri, AbsoluteUri, RelativeUri};
 
 pub mod json_schema;
 

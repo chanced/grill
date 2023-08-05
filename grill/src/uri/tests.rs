@@ -1,4 +1,13 @@
 use super::*;
+
+#[test]
+fn test_uri_components() {
+    let uri = Uri::parse("http://example.com/path?query#fragment").unwrap();
+    let mut components = uri.components();
+    assert_eq!(components.next(), Some(Component::Scheme("http".into())));
+    assert!(components.next(), Some(Component::Authority("example.com".into())));
+}
+
 #[test]
 fn test_relative_uri_parse() {
     let tests = [

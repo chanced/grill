@@ -8,7 +8,9 @@ pub use enum_handler::{EnumHandler, EnumInvalid};
 pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
-use crate::{dialect::Dialect, error::IdentifyError, uri::AbsoluteUri, Metaschema, Uri};
+use crate::{
+    dialect::Dialect, dialect::Metaschema, error::IdentifyError, uri::AbsoluteUri, uri::Uri,
+};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
