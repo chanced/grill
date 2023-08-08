@@ -1,11 +1,115 @@
 use super::*;
+#[test]
+fn test_resolve() {
+    let abs_uri = AbsoluteUri::parse("http://a/b/c/d;p?q").unwrap();
+    let uri = Uri::parse("http://a/b/c/d;p?q").unwrap();
+    let tests = [
+        ("g:h", "g:h"),
+        ("g", "http://a/b/c/g"),
+        ("./g", "http://a/b/c/g"),
+        ("g/", "http://a/b/c/g/"),
+        ("/g", "http://a/g"),
+        ("//g", "http://g/"),
+        ("?y", "http://a/b/c/d;p?y"),
+        ("g?y", "http://a/b/c/g?y"),
+        ("#s", "http://a/b/c/d;p?q#s"),
+        ("g#s", "http://a/b/c/g#s"),
+        ("g?y#s", "http://a/b/c/g?y#s"),
+        (";x", "http://a/b/c/;x"),
+        ("g;x", "http://a/b/c/g;x"),
+        ("g;x?y#s", "http://a/b/c/g;x?y#s"),
+        ("", "http://a/b/c/d;p?q"),
+        (".", "http://a/b/c/"),
+        ("./", "http://a/b/c/"),
+        ("..", "http://a/b/"),
+        ("../", "http://a/b/"),
+        ("../g", "http://a/b/g"),
+        ("../..", "http://a/"),
+        ("../../", "http://a/"),
+        ("../../g", "http://a/g"),
+        ("../../../g", "http://a/g"),
+        ("../../../../g", "http://a/g"),
+        ("/./g", "http://a/g"),
+        ("/../g", "http://a/g"),
+        ("g.", "http://a/b/c/g."),
+        (".g", "http://a/b/c/.g"),
+        ("g..", "http://a/b/c/g.."),
+        ("..g", "http://a/b/c/..g"),
+        ("./../g", "http://a/b/g"),
+        ("./g/.", "http://a/b/c/g/"),
+        ("g/./h", "http://a/b/c/g/h"),
+        ("g/../h", "http://a/b/c/h"),
+        ("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+        ("g;x=1/../y", "http://a/b/c/y"),
+        ("g?y/./x", "http://a/b/c/g?y/./x"),
+        ("g?y/../x", "http://a/b/c/g?y/../x"),
+        ("g#s/./x", "http://a/b/c/g#s/./x"),
+        ("g#s/../x", "http://a/b/c/g#s/../x"),
+    ];
+    for (input, expected) in tests {
+        let input = Uri::parse(input);
+        if let Err(e) = &input {
+            println!(
+                "\n\nfailed to parse input: {:?};\n\terror: {}\n\n",
+                &input, e
+            );
+        }
+        let input = input.unwrap();
+
+        let result = abs_uri.resolve(&input);
+
+        if let Err(e) = &result {
+            println!("\n\nfailed to resolve:\n\tinput: \"{input:?}\"\n\terror: {e:?}\n\n");
+        }
+        let result = result.unwrap();
+        assert_eq!(
+            &result, expected,
+            "\n\nfailed to resolve:\n\tinput:\t\t{input},\n\tresult:\t\t{result}\n\texpected:\t{expected}\n\n"
+        );
+
+        let result = uri.resolve(&input);
+
+        if let Err(e) = &result {
+            println!("\n\nfailed to resolve:\n\tinput: \"{input:?}\"\n\terror: {e:?}\n\n");
+        }
+        let result = result.unwrap();
+        assert_eq!(
+            &result, expected,
+            "\n\nfailed to resolve:\n\tinput:\t\t{input},\n\tresult:\t\t{result}\n\texpected:\t{expected}\n\n"
+        );
+    }
+}
+
+#[test]
+fn test_base_path_segments() {
+    let uri = Uri::parse("/path/to/file").unwrap();
+    let segments = uri.base_path_segments().collect::<Vec<_>>();
+    assert_eq!(
+        segments,
+        vec![
+            PathSegment::Root,
+            PathSegment::normal("path"),
+            PathSegment::normal("to")
+        ]
+    );
+}
+
+#[test]
+fn test_join() {
+    let base = "/a/b/c";
+    assert_eq!(merge_paths(base, "x/y/z"), "/a/b/c/x/y/z");
+    assert_eq!(merge_paths(base, "/x/y/z"), "/x/y/z");
+}
 
 #[test]
 fn test_uri_components() {
     let uri = Uri::parse("http://example.com/path?query#fragment").unwrap();
     let mut components = uri.components();
     assert_eq!(components.next(), Some(Component::Scheme("http".into())));
-    assert!(components.next(), Some(Component::Authority("example.com".into())));
+    assert_eq!(
+        components.next(),
+        Some(Component::Host("example.com".into()))
+    );
 }
 
 #[test]
@@ -400,4 +504,11 @@ fn test_set_path() {
         assert_eq!(expected, uri.to_string());
         assert_eq!(expected_path, uri.path_or_nss());
     }
+}
+
+#[test]
+fn test_join_paths() {
+    let base = "/a/b/c";
+    let other = "/d/e/f";
+    // println!("{}", join_paths(base, other));
 }

@@ -13,144 +13,6 @@ pub(super) fn authority(value: &str) -> Result<super::Authority, AuthorityError>
     Parse::authority(value)
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum UrnSchemeState {
-    #[default]
-    U,
-    R,
-    N,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum AuthorityState {
-    Username,
-    Password,
-    Host,
-    Port,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum State {
-    #[default]
-    Head,
-    LeadingSlash,
-    LeadingSlash2,
-    Authority(AuthorityState),
-    UrlScheme,
-    UrlSchemeComplete,
-    UrnScheme(UrnSchemeState),
-    UrnSchemeComplete,
-    Path,
-    Query,
-    Fragment,
-}
-impl State {
-    #[allow(clippy::match_same_arms, clippy::too_many_lines)]
-    fn next(self, next: char) -> Self {
-        use AuthorityState::*;
-        use State::*;
-        use UrnSchemeState::{N, R, U};
-        match self {
-            Head => match next {
-                '/' => LeadingSlash,
-                '?' => Query,
-                '#' => Fragment,
-                'u' | 'U' => UrnScheme(U),
-                _ if next.is_ascii_alphabetic() => UrlScheme,
-                _ => Path,
-            },
-            LeadingSlash => match next {
-                '/' => LeadingSlash2,
-                '?' => Query,
-                '#' => Fragment,
-                _ => Path,
-            },
-            LeadingSlash2 => match next {
-                '/' => Path,
-                '?' => Query,
-                '#' => Fragment,
-                _ => Authority(Username),
-            },
-            Authority(Username) => match next {
-                '/' => Path,
-                '?' => Query,
-                '#' => Fragment,
-                '@' => Authority(Host),
-                ':' => Authority(Password),
-                _ => Authority(Username),
-            },
-            Authority(Password) => match next {
-                '/' => Path,
-                '?' => Query,
-                '#' => Fragment,
-                '@' => Authority(Host),
-                _ => Authority(Password),
-            },
-            Authority(Host) => match next {
-                '/' => Path,
-                '?' => Query,
-                '#' => Fragment,
-                ':' => Authority(Port),
-                _ => Authority(Host),
-            },
-            Authority(Port) => match next {
-                '/' => Path,
-                '?' => Query,
-                '#' => Fragment,
-                _ if next.is_ascii_digit() => Authority(Port),
-                _ => Authority(Host),
-            },
-            UrlScheme => match next {
-                ':' => UrlSchemeComplete,
-                '?' => Query,
-                '#' => Fragment,
-                _ if next.is_ascii_alphanumeric() => UrlScheme,
-                _ => Path,
-            },
-            UrnScheme(U) => match next {
-                'r' | 'R' => UrnScheme(R),
-                '?' => Query,
-                '#' => Fragment,
-                ':' => UrlSchemeComplete,
-                _ if next.is_ascii_alphanumeric() => UrlScheme,
-                _ => Path,
-            },
-            UrnScheme(R) => match next {
-                'n' | 'N' => UrnScheme(N),
-                '?' => Query,
-                '#' => Fragment,
-                ':' => UrlSchemeComplete,
-                _ if next.is_ascii_alphanumeric() => UrlScheme,
-                _ => Path,
-            },
-            UrnScheme(N) => match next {
-                ':' => UrnSchemeComplete,
-                '?' => Query,
-                '#' => Fragment,
-                _ if next.is_ascii_alphanumeric() => UrlScheme,
-                _ => Path,
-            },
-            Path => match next {
-                '?' => Query,
-                '#' => Fragment,
-                _ => Path,
-            },
-            Query => match next {
-                '#' => Fragment,
-                _ => Query,
-            },
-            Fragment => Fragment,
-            _ => panic!("invalid state tranisition: \'{next:?}\' -> {self:?}"),
-        }
-    }
-
-    fn is_authority(self) -> bool {
-        matches!(self, Self::Authority(_))
-    }
-
-    fn is_port(self) -> bool {
-        matches!(self, Self::Authority(AuthorityState::Port))
-    }
-}
-
 #[derive(Default, Debug)]
 struct Parse<'a> {
     state: State,
@@ -180,7 +42,7 @@ impl<'a> Parse<'a> {
     fn authority(input: &'a str) -> Result<super::Authority, AuthorityError> {
         use AuthorityState::*;
         let mut parser = Self {
-            state: State::Authority(Password),
+            state: State::Authority(Username),
             input,
             ..Default::default()
         };
@@ -188,6 +50,12 @@ impl<'a> Parse<'a> {
             //safety: there are no states which can error out before the authority is complete
             parser.next(i, c).transpose().unwrap();
         }
+
+        if parser.host_idx.is_none() && parser.username_idx.is_some() {
+            parser.port_idx = parser.password_idx.take();
+            parser.host_idx = parser.username_idx.take();
+        }
+
         if !parser.path().is_empty() {
             return Err(AuthorityError::ContainsPath(parser.path().to_string()));
         }
@@ -413,6 +281,144 @@ impl<'a> Parse<'a> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum UrnSchemeState {
+    #[default]
+    U,
+    R,
+    N,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AuthorityState {
+    Username,
+    Password,
+    Host,
+    Port,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum State {
+    #[default]
+    Head,
+    LeadingSlash,
+    LeadingSlash2,
+    Authority(AuthorityState),
+    UrlScheme,
+    UrlSchemeComplete,
+    UrnScheme(UrnSchemeState),
+    UrnSchemeComplete,
+    Path,
+    Query,
+    Fragment,
+}
+impl State {
+    #[allow(clippy::match_same_arms, clippy::too_many_lines)]
+    fn next(self, next: char) -> Self {
+        use AuthorityState::*;
+        use State::*;
+        use UrnSchemeState::{N, R, U};
+        match self {
+            Head => match next {
+                '/' => LeadingSlash,
+                '?' => Query,
+                '#' => Fragment,
+                'u' | 'U' => UrnScheme(U),
+                _ if next.is_ascii_alphabetic() => UrlScheme,
+                _ => Path,
+            },
+            LeadingSlash => match next {
+                '/' => LeadingSlash2,
+                '?' => Query,
+                '#' => Fragment,
+                _ => Path,
+            },
+            LeadingSlash2 => match next {
+                '/' => Path,
+                '?' => Query,
+                '#' => Fragment,
+                _ => Authority(Username),
+            },
+            Authority(Username) => match next {
+                '/' => Path,
+                '?' => Query,
+                '#' => Fragment,
+                '@' => Authority(Host),
+                ':' => Authority(Password),
+                _ => Authority(Username),
+            },
+            Authority(Password) => match next {
+                '/' => Path,
+                '?' => Query,
+                '#' => Fragment,
+                '@' => Authority(Host),
+                _ => Authority(Password),
+            },
+            Authority(Host) => match next {
+                '/' => Path,
+                '?' => Query,
+                '#' => Fragment,
+                ':' => Authority(Port),
+                _ => Authority(Host),
+            },
+            Authority(Port) => match next {
+                '/' => Path,
+                '?' => Query,
+                '#' => Fragment,
+                _ if next.is_ascii_digit() => Authority(Port),
+                _ => Authority(Host),
+            },
+            UrlScheme => match next {
+                ':' => UrlSchemeComplete,
+                '?' => Query,
+                '#' => Fragment,
+                _ if next.is_ascii_alphanumeric() => UrlScheme,
+                _ => Path,
+            },
+            UrnScheme(U) => match next {
+                'r' | 'R' => UrnScheme(R),
+                '?' => Query,
+                '#' => Fragment,
+                ':' => UrlSchemeComplete,
+                _ if next.is_ascii_alphanumeric() => UrlScheme,
+                _ => Path,
+            },
+            UrnScheme(R) => match next {
+                'n' | 'N' => UrnScheme(N),
+                '?' => Query,
+                '#' => Fragment,
+                ':' => UrlSchemeComplete,
+                _ if next.is_ascii_alphanumeric() => UrlScheme,
+                _ => Path,
+            },
+            UrnScheme(N) => match next {
+                ':' => UrnSchemeComplete,
+                '?' => Query,
+                '#' => Fragment,
+                _ if next.is_ascii_alphanumeric() => UrlScheme,
+                _ => Path,
+            },
+            Path => match next {
+                '?' => Query,
+                '#' => Fragment,
+                _ => Path,
+            },
+            Query => match next {
+                '#' => Fragment,
+                _ => Query,
+            },
+            Fragment => Fragment,
+            _ => panic!("invalid state tranisition: \'{next:?}\' -> {self:?}"),
+        }
+    }
+
+    fn is_authority(self) -> bool {
+        matches!(self, Self::Authority(_))
+    }
+
+    fn is_port(self) -> bool {
+        matches!(self, Self::Authority(AuthorityState::Port))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::UrnSchemeState::{N, R, U};
@@ -512,6 +518,11 @@ mod tests {
     #[test]
     fn test_parse_uri() {
         let tests = [
+            Test {
+                input: "path/to/file",
+                path: "path/to/file",
+                ..Default::default()
+            },
             Test {
                 input: "//www.example.com",
                 kind: Expect::RelativeUri,

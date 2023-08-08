@@ -1,3 +1,5 @@
+mod err_msg;
+
 use crate::{error::UnknownKeyError, source::Sources, AbsoluteUri, Handler};
 use jsonptr::Pointer;
 use petgraph::{algo, prelude::NodeIndex, Directed, Graph as DirectedGraph};
@@ -5,13 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::{collections::HashMap, marker::PhantomData, ops::Deref};
-
-const INVALID_KEY_ERR_MSG: &str = "SchemaKey not found. 
-This is likely caused by there being multiple Interrogators using the same Key type.
-To avoid this error, use a different Key type for each Interrogator. \
-To create a new Key type, see the macro new_key_type, re-exported from slotmap.
-
-If that is not the issue, please open a ticket at https://github.com/chanced/grill/issues/new";
 
 new_key_type! {
     pub struct SchemaKey;
@@ -346,16 +341,16 @@ impl<'i, Key: slotmap::Key> Iterator for Iter<'i, Key> {
         let key = self.inner.next()?;
         // safety: if the Key exists, it should be in this slotmap.
         // If it isn't, that is a developer error.
-        let schema = self.schemas.get(key).expect(INVALID_KEY_ERR_MSG);
+        let schema = self.schemas.get(key).expect(err_msg::INVALID_KEY);
         let dependents = self
             .graph
             .dependents(&schema.id, self.keys)
-            .expect(INVALID_KEY_ERR_MSG)
+            .expect(err_msg::INVALID_KEY)
             .collect();
         let dependencies = self
             .graph
             .dependencies(&schema.id, self.keys)
-            .expect(INVALID_KEY_ERR_MSG)
+            .expect(err_msg::INVALID_KEY)
             .collect();
         Some(Schema::new(
             key,

@@ -253,14 +253,17 @@ pub enum EvaluateError {
     #[error(transparent)]
     ParseNumber(#[from] BigRationalParseError),
 
+    /// Failed to evaluate a regular expression.
     #[error(transparent)]
     Regex(EvaluateRegexError),
 
     /// A custom error occurred in a [`Handler`](crate::handler::Handler).
     #[error("{source}")]
     Custom {
+        /// `Box<dyn std::error::Error>`
         #[source]
         source: Box<dyn StdError>,
+        /// The [`Value`] which failed to evaluate.
         value: Option<Box<Value>>,
     },
 }

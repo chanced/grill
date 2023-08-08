@@ -64,6 +64,7 @@ pub type Object = serde_json::Map<String, serde_json::Value>;
 pub type Array = Vec<serde_json::Value>;
 
 new_key_type! {
+    /// Default key type for value store [`SlotMap`](`slotmap::SlotMap`) containing.
     pub struct ValueKey;
 }
 

@@ -1,7 +1,148 @@
-//! Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
+//! # Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
+//!
+//! A Uniform Resource Identifier (URI) provides a simple and extensible means
+//! for identifying a resource.
+//!
+//! ## Formats
+//!
+//! URIs can come in four different formats:
+//!
+//! ### Uniform Resource Locator (URL)
+//!
+//! A URL is fully qualified reference to a web resource. For
+//! example`"https://example.com"` or `"mailto:me@example.com"`.
+//!
+//! URLs are represented using the [`url`](`url`) crate and can be  in the form
+//! of a [`Url`], [`Uri`], [`AbsoluteUri`], or [`UriRef`].
+//!
+//! ```plaintext
+//!               userinfo         host    port
+//!          ┌───────┴───────┐ ┌────┴────┐ ┌┴┐
+//! "https://john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top"
+//!  └─┬─┘   └───────────────┬───────────────┘└───────┬───────┘ └────────────┬────────────┘ └┬┘
+//! scheme               authority                   path                  query        fragment
+//! ```
+//! ```rust
+//! use grill::uri::{ Uri, AbsoluteUri };
+//!
+//! let input = "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
+//! let uri = Uri::parse(input).unwrap();
+//! assert_eq!(&uri, input);
+//! assert_eq!(uri.scheme(), "https");
+//! assert_eq!(uri.user(), Some("john.doe"));
+//! assert_eq!(uri.host_or_namespace(), "example.com");
+//! assert_eq!(uri.port(), Some(123));
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/");
+//! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+//! assert_eq!(uri.fragment(), Some("top"));
+//! assert_eq!(uri.authority().unwrap(), "john.doe@www.example.com:123");
+//! assert!(uri.is_url())
+//!
+//! let abs_uri = AbsoluteUri::parse(s).unwrap();
+//! assert_eq!(uri, abs_uri);
+//! ```
+//! Note that parsing a URL by means of a [`Uri`] or [`AbsoluteUri`] will take
+//! an additional `O(n + 1)`, where `n` is the length of the scheme, over
+//! parsing with [`url::Url`] directly.
+//!
+//! ### Uniform Resource Location (URN)
+//!
+//! A URN is fully qualified, globally unique, persistent identifier. e.g.
+//! `"urn:oasis:names:specification:docbook:dtd:xml:4.1.2"`.
+//!
+//! URNs are represented using the [`urn`](`urn`) crate and can be in the form
+//! of a [`Urn`], [`Uri`], [`AbsoluteUri`] or [`UriRef`].
+//!
+//! ```plaintext
+//! "urn:example:articles:record?category=science#fragment"
+//!  └┬┘ └─┬───┘ └──────┬──────┘ └────────────┬─┘ └──┬───┘
+//! scheme │  namespace specific string (NSS) │   fragment
+//!   namespace (NID)                       query
+//! ```
+//! ```rust
+//! use grill::uri::{ Uri, AbsoluteUri };
+//!
+//! let s = "urn:example:articles:record?category=science#fragment";
+//! let uri = Uri::parse(s).unwrap();
+//! assert_eq!(&uri, s);
+//! assert_eq!(uri.scheme(), "urn");
+//! assert_eq!(uri.user(), None);
+//! assert_eq!(uri.host_or_namespace(), "example");
+//! assert_eq!(uri.port(), None);
+//! assert_eq!(uri.path_or_nss(), "articles:record");
+//! assert_eq!(uri.query(), Some("category=science"));
+//! assert_eq!(uri.fragment(), Some("fragment"));
+//! assert_eq!(uri.authority(), None);
+//! assert!(uri.is_urn())
+//!
+//! let abs_uri = AbsoluteUri::parse(s).unwrap();
+//! assert_eq!(uri, abs_uri);
+//! ```
+//!
+//! Note that parsing a URN by means of a [`Uri`] or [`AbsoluteUri`] will take
+//! an additional `O(4)` over parsing with [`urn::Urn`] directly.
+//!
+//! ### Relative URI with authority
+//! A relative URI with an authority is indicated by the prefixed double slashes
+//! (`"//"`) and may contain user credentials, host, port, path, query, and
+//! fragment. For example: `"//user:password@example.com/path/to/resource`.
+//!
+//! Relative URIs with authority are represented using the [`RelativeUri`] type
+//! and can be in the form of a [`RelativeUri`], [`Uri`] or [`UriRef`].
+//!
+//! ```plaintext
+//!         userinfo        host    port
+//!    ┌───────┴───────┐ ┌────┴────┐ ┌┴┐
+//! "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top
+//!    └───────────────┬───────────────┘└───────┬───────┘ └────────────┬────────────┘ └┬┘
+//!                authority                   path                  query         fragment
+//! ```
+//! ```rust
+//!  use grill::uri::{ Uri };
+//! let s = "//john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
+//! let uri = Uri::parse(s).unwrap();
+//! assert_eq!(&uri, s);
+//! assert_eq!(uri.scheme(), None);
+//! assert_eq!(uri.user(), Some("jon.doe"));
+//! assert_eq!(uri.password(), "password");
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/")
+//! assert_eq!(uri.host_or_namespace(), "example.com");
+//! assert_eq!(uri.port(), None);
+//! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+//! assert_eq!(uri.fragment(), Some("top"));
+//! ```
+//!
+//! ### Relative URI without authority
+//!
+//! A relative URI without authority is a partial URI that does not contain user
+//! crednetials, host, or port. A relative URI without authority may contain a
+//! path, query, and fragment. For example:
+//! `"/path/to/resource?query=string#fragment"`.
+//!
+//! Relative URIs without authority are represented using the [`RelativeUri`]
+//! type and can be in the form of a [`RelativeUri`], [`Uri`], or a [`UriRef`].
+//!
+//! ```plaintext
+//! "/forum/questions/?tag=networking&order=newest#top"
+//!  └───────┬───────┘ └─────────────┬───────────┘ └┬┘
+//!         path                   query         fragment
+//! ```
+//! ```rust
+//!  use grill::uri::{ Uri };
+//! let s = "/forum/questions/?tag=networking&order=newest#top";
+//! let uri = Uri::parse(s).unwrap();
+//! assert_eq!(&uri, s);
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/")
+//! assert_eq!(uri.scheme(), None);
+//! assert_eq!(uri.user(), None);
+//! assert_eq!(uri.host_or_namespace(), None);
+//! assert_eq!(uri.port(), None);
+//! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+//! assert_eq!(uri.fragment(), Some("top"));
+//! ```
 
 #[cfg(test)]
-mod tests;
+mod test;
 
 mod encode;
 mod parse;
@@ -18,6 +159,7 @@ use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
+    convert::Infallible,
     fmt::{Display, Write},
     iter::Peekable,
     ops::{Deref, Index},
@@ -27,21 +169,41 @@ use std::{
 };
 use urn::percent::{encode_f_component, encode_nss};
 
+/// A trait for possibly converting a type to an [`AbsoluteUri`].
+///
 pub trait TryIntoAbsoluteUri {
+    /// Attempts to convert `self` into an [`AbsoluteUri`].
+    ///
+    /// # Errors
+    /// Returns an error if the conversion fails due to the value not being an
+    /// absolute in the sense of having a scheme and an authority (URL) or a namespace
+    /// (URN).
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError>;
 }
 
+/// A trait which facilitates creating a [`Uri`] from an [`AbsoluteUri`],
+/// [`&AbsoluteUri`](`AbsoluteUri`), [`Url`], [`&Url`](`Url`), [`Urn`], or
+/// [`&Urn`](`Urn`).
 pub trait ToUri {
+    /// Clones and converts `&self` into an owned `Uri`.
     fn to_uri(&self) -> Uri;
 }
 
+/// A trait which enables borrowing a [`Uri`], [`AbsoluteUri`], or
+/// [`RelativeUri`] as a singular type.
 pub trait AsUriRef {
+    /// Borrows `self` as a [`UriRef`].
     fn as_uri_ref(&self) -> UriRef<'_>;
 }
+
+/// A borrowed [`Uri`], [`AbsoluteUri`], or [`RelativeUri`].
 #[derive(Clone, Copy, Debug)]
 pub enum UriRef<'a> {
+    /// A borrowed [`Uri`].
     Uri(&'a Uri),
+    /// A borrowed [`AbsoluteUri`].
     AbsoluteUri(&'a AbsoluteUri),
+    /// A borrowed [`RelativeUri`].
     RelativeUri(&'a RelativeUri),
 }
 
@@ -83,7 +245,7 @@ impl<'a> UriRef<'a> {
     /// [`UriRef::Uri`] with an underlying [`RelativeUri`] or
     /// [`UriRef::RelativeUri`].
     #[must_use]
-    pub fn as_relative(&self) -> Option<&'a RelativeUri> {
+    pub fn as_relative_uri(&self) -> Option<&'a RelativeUri> {
         match self {
             UriRef::Uri(uri) => uri.as_relative_uri(),
             UriRef::RelativeUri(rel) => Some(*rel),
@@ -110,6 +272,15 @@ impl<'a> UriRef<'a> {
         }
     }
 
+    /// Returns `true` if the URI has an authority or namespace.
+    #[must_use]
+    pub fn has_authority(&self) -> bool {
+        match self {
+            UriRef::RelativeUri(rel) => rel.has_authority(),
+            _ => true,
+        }
+    }
+
     /// Returns `true` if the this `Uri` has a scheme.
     #[must_use]
     pub fn has_scheme(&self) -> bool {
@@ -126,7 +297,7 @@ impl<'a> UriRef<'a> {
         }
     }
 
-    /// Returns the path (if this `Uri` is a [`Url`]) or namespace specific
+    /// Returns the path (if this `UriRef` is a [`Url`]) or namespace specific
     /// string (if this `Uri` is a [`Urn`])
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
@@ -135,6 +306,19 @@ impl<'a> UriRef<'a> {
             UriRef::AbsoluteUri(uri) => uri.path_or_nss(),
             UriRef::RelativeUri(uri) => uri.path(),
         }
+    }
+    /// Returns the base path of the `UriRef`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap().as_uri_ref();
+    ///
+    /// assert_eq!(uri.base_path(), "/path/to");
+    /// ```
+    #[must_use]
+    pub fn base_path(&self) -> &str {
+        self.path_or_nss().rsplit_once('/').map_or("", |(a, _)| a)
     }
 
     /// Returns the authority (if this `Uri` is a [`Url`]) or namespace (if this
@@ -156,7 +340,7 @@ impl<'a> UriRef<'a> {
             UriRef::RelativeUri(uri) => uri.fragment(),
         }
     }
-
+    /// Returns the query component if it exists.
     #[must_use]
     pub fn query(&self) -> Option<&str> {
         match self {
@@ -164,6 +348,26 @@ impl<'a> UriRef<'a> {
             UriRef::AbsoluteUri(uri) => uri.query(),
             UriRef::RelativeUri(uri) => uri.query(),
         }
+    }
+    /// Returns an [`Iterator`] of [`QueryParameter`] of this `UriRef`.
+    #[must_use]
+    pub fn query_parameters(&self) -> QueryParameters<'_> {
+        QueryParameters::new(self.query()).unwrap()
+    }
+
+    /// Returns the path normalized by removing dot segments, i.e. `'.'`,
+    /// `'..'`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap().as_uri_ref();
+    /// let normalized = uri.path_normalized();
+    /// assert_eq!(normalized, "https://example.com/bar");
+    /// ```
+    #[must_use]
+    pub fn path_normalized(&self) -> Cow<'_, str> {
+        normalize_path(self.path_or_nss())
     }
 }
 
@@ -174,19 +378,26 @@ impl Deref for UriRef<'_> {
     }
 }
 
+#[inherent]
 impl AsUriRef for Uri {
-    fn as_uri_ref(&self) -> UriRef<'_> {
+    #[must_use]
+    pub fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::Uri(self)
     }
 }
+
+#[inherent]
 impl AsUriRef for AbsoluteUri {
-    fn as_uri_ref(&self) -> UriRef<'_> {
+    #[must_use]
+    pub fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::AbsoluteUri(self)
     }
 }
 
+#[inherent]
 impl AsUriRef for RelativeUri {
-    fn as_uri_ref(&self) -> UriRef<'_> {
+    #[must_use]
+    pub fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::RelativeUri(self)
     }
 }
@@ -271,8 +482,9 @@ impl<'a> Authority<'a> {
         self.port_idx().map(|idx| &self.value[idx + 1..])
     }
 
+    /// Returns the
     #[must_use]
-    pub fn to_owned(&self) -> Authority<'static> {
+    pub fn into_owned(&self) -> Authority<'static> {
         Authority {
             value: Cow::Owned(self.value.to_string()),
             username_idx: self.username_idx,
@@ -325,22 +537,22 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns a new [`Components`] iterator over all components (scheme,
-    /// username (URL), password (URL), host (URL) or namespace (URN), port (URL), path (URL) or namespace specific
-    /// string (URN), query (URL or URN), and fragment (URL or URN)) of this `AbsoluteUri`.
-    ///
+    /// Returns a new [`Components`] iterator over all components of the `AbsoluteUri`.
     /// # Example
     /// ```rust
-    /// use grill::uri::{ AbsoluteUri, Component };
-    /// let uri_str = "https://username:password@example.com/path/to/file/?query=string#fragment";
-    /// let uri = AbsoluteUri::parse(uri_str).unwrap();
+    /// use grill::uri::{ AbsoluteUri, Component, PathSegment, QueryParameter };
+    /// let s = "https://user:password@example.com/path/to/file/?query=str#fragment";
+    /// let uri = AbsoluteUri::parse(s).unwrap();
     /// let components = vec![
     ///     Component::Scheme("https".into()),
-    ///     Component::Username("username".into()),
+    ///     Component::Username("user".into()),
     ///     Component::Password("password".into()),
     ///     Component::Host("example.com".into()),
-    ///     Component::Path("/path/to/file/".into()),
-    ///     Component::Query("query=string".into()),
+    ///     Component::PathSegment(PathSegment::Root),
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
     ///     Component::Fragment("fragment".into()),
     /// ];
     /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
@@ -370,12 +582,29 @@ impl AbsoluteUri {
         PathSegments::from(self.path_or_nss())
     }
 
+    /// Returns the base path of the `AbsoluteUri`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap()
+    ///     .as_relative_uri().unwrap();
+    ///
+    /// assert_eq!(uri.base_path(), "/path/to");
+    /// ```
+    #[must_use]
+    pub fn base_path(&self) -> &str {
+        self.path_or_nss()
+            .rsplit_once('/')
+            .map_or(self.path_or_nss(), |(a, _)| a)
+    }
+
     /// Returns a [`PathSegments`] iterator over the base path segments,
     /// essentially every segment except the last.
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri };
+    /// use grill::uri::Uri;
     /// let uri = Uri::parse("/path/to/file");
     /// let relative_uri = uri.as_relative_uri().unwrap();
     /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["path", "to"]);
@@ -496,7 +725,11 @@ impl AbsoluteUri {
             Self::Urn(urn) => urn.q_component(),
         }
     }
-
+    /// Returns an [`Iterator`] of [`QueryParameter`] of this `AbsoluteUri`.
+    #[must_use]
+    pub fn query_parameters(&self) -> QueryParameters<'_> {
+        QueryParameters::new(self.query()).unwrap()
+    }
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UrnError> {
@@ -519,59 +752,50 @@ impl AbsoluteUri {
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
     pub fn resolve(&self, reference: &impl AsUriRef) -> Result<AbsoluteUri, UriError> {
         let reference = reference.as_uri_ref();
-        todo!()
-        // if let Some(scheme) = reference.scheme() {
-        //     result
-        //         .set_scheme(scheme)
-        //         .map_err(|_| UriError::InvalidScheme(scheme.to_string()))?;
-        // }
-        // if let Some(authority) = reference.authority_or_namespace() {
-        //     result.set_authority_or_namespace(&authority)?;
-        // }
 
-        // result.set_path_or_nss(reference.path_or_nss())?;
-        // result.set_query(reference.query())?;
-        // result.set_fragment(reference.fragment())?;
-        // todo!()
-        /*
-        if ((not strict) and (R.scheme == Base.scheme)) then
-           undefine(R.scheme);
-        endif;
-        if defined(R.scheme) then
-           T.scheme    = R.scheme;
-           T.authority = R.authority;
-           T.path      = remove_dot_segments(R.path);
-           T.query     = R.query;
-        else
-           if defined(R.authority) then
-              T.authority = R.authority;
-              T.path      = remove_dot_segments(R.path);
-              T.query     = R.query;
-           else
-              if (R.path == "") then
-                 T.path = Base.path;
-                 if defined(R.query) then
-                    T.query = R.query;
-                 else
-                    T.query = Base.query;
-                 endif;
-              else
-                 if (R.path starts-with "/") then
-                    T.path = remove_dot_segments(R.path);
-                 else
-                    T.path = merge(Base.path, R.path);
-                    T.path = remove_dot_segments(T.path);
-                 endif;
-                 T.query = R.query;
-              endif;
-              T.authority = Base.authority;
-           endif;
-           T.scheme = Base.scheme;
-        endif;
+        // if the reference has a scheme, normalize the path and return
+        if let Ok(mut uri) = reference.try_into_absolute_uri() {
+            uri.normalize_path();
+            return Ok(uri);
+        }
 
-        T.fragment = R.fragment;
+        // safety: urls and urns will get processed in the match above
+        let reference = reference.as_relative_uri().unwrap();
 
-          */
+        if let Some(authority) = reference.authority() {
+            let mut uri = self.clone();
+            uri.set_authority_or_namespace(&authority)?;
+            uri.set_query(reference.query())?;
+            uri.set_fragment(reference.fragment())?;
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+
+        if reference.path().is_empty() {
+            let mut uri = self.clone();
+            if let Some(fragment) = reference.fragment() {
+                if !fragment.is_empty() {
+                    uri.set_fragment(Some(fragment))?;
+                }
+            }
+            uri.set_fragment(reference.fragment().or(self.fragment()))?;
+            uri.set_query(reference.query().or(self.query()))?;
+            return Ok(uri);
+        }
+
+        let mut uri = self.clone();
+        uri.set_query(reference.query())?;
+        uri.set_fragment(reference.fragment())?;
+
+        if reference.path().starts_with('/') {
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+        let base = self.base_path();
+        let base = merge_paths(base, reference.path());
+        uri.set_path_or_nss(&base)?;
+
+        Ok(uri)
     }
 
     #[must_use]
@@ -629,23 +853,44 @@ impl AbsoluteUri {
         }
         Ok(prev)
     }
-}
 
-/// Normalizes a URI path by removing dot segments, i.e. `'.'`, `'..'`.
-#[must_use]
-pub fn normalize_path(path: &str) -> String {
-    let mut buf = PathBuf::new();
-    for segment in PathSegments::new(path) {
-        match segment {
-            PathSegment::Parent => {
-                buf.pop();
-            }
-            PathSegment::Normal(seg) => buf.push(seg.as_ref()),
-            _ => {}
-        }
+    /// Returns the normalized path which removes dot segments, i.e. `'.'`,
+    /// `'..'`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::AbsoluteUri;
+    /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
+    /// let normalized = uri.path_normalized();
+    /// assert_eq!(normalized, "https://example.com/bar");
+    /// ```
+    #[must_use]
+    pub fn path_normalized(&self) -> Cow<'_, str> {
+        normalize_path(self.path_or_nss())
     }
-    // safety: path is already in utf8
-    buf.to_str().unwrap().to_string()
+
+    /// Normalizes the path by removing dot segments, i.e. `'.'`, `'..'`.
+    ///
+    /// This method mutates the `AbsoluteUri` in place. If that is not desired, use
+    /// [`path_normalized`](AbsoluteUri::path_normalized) instead.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::AbsoluteUri;
+    /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
+    /// uri.normalize_path();
+    /// assert_eq!(uri.path_or_nss(), "/bar");
+    /// ```
+    pub fn normalize_path(&mut self) {
+        let normalized = normalize_path(self.path_or_nss()).to_string();
+        self.set_path_or_nss(&normalized).unwrap();
+    }
+
+    /// Returns `true` if this `AbsoluteUri` has a query component.
+    #[must_use]
+    pub fn has_query(&self) -> bool {
+        self.query().is_some()
+    }
 }
 
 impl Borrow<str> for AbsoluteUri {
@@ -715,6 +960,7 @@ impl Ord for AbsoluteUri {
 }
 impl PartialEq<&str> for AbsoluteUri {
     fn eq(&self, other: &&str) -> bool {
+        println!("{} == {other} = {}", self.as_str(), self.as_str() == *other);
         self.as_str() == *other
     }
 }
@@ -829,8 +1075,9 @@ impl FromStr for AbsoluteUri {
     }
 }
 
+#[inherent]
 impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         match self {
             UriRef::Uri(uri) => uri.try_into_absolute_uri(),
             UriRef::AbsoluteUri(uri) => Ok(uri.clone()),
@@ -850,16 +1097,19 @@ impl TryIntoAbsoluteUri for &str {
         AbsoluteUri::parse(self)
     }
 }
+#[inherent]
 impl TryIntoAbsoluteUri for AbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(self)
     }
 }
+
 impl TryIntoAbsoluteUri for &AbsoluteUri {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(self.clone())
     }
 }
+
 impl TryIntoAbsoluteUri for &Url {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(AbsoluteUri::Url(self.clone()))
@@ -894,8 +1144,10 @@ impl TryIntoAbsoluteUri for &Uri {
         }
     }
 }
+
+#[inherent]
 impl TryIntoAbsoluteUri for Uri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
@@ -904,6 +1156,7 @@ impl TryIntoAbsoluteUri for Uri {
     }
 }
 
+/// A relative URI, with or without an authority.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct RelativeUri {
     value: String,
@@ -931,15 +1184,19 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri, Component };
-    /// let uri = Uri::parse("//username:password@example.com/path/to/file/?query=string#fragment").unwrap();
-    /// let uri = uri.as_relative_uri().unwrap();
+    /// use grill::uri::{ Uri, Component, PathSegment, QueryParameter };
+    /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
+    /// let uri = Uri::parse(s).unwrap();
+    /// let uri = AbsoluteUri::parse(s).unwrap();
     /// let components = vec![
-    ///     Component::Username("username".into()),
+    ///     Component::Username("user".into()),
     ///     Component::Password("password".into()),
     ///     Component::Host("example.com".into()),
-    ///     Component::Path("/path/to/file/".into()),
-    ///     Component::Query("query=string".into()),
+    ///     Component::PathSegment(PathSegment::Root),
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
     ///     Component::Fragment("fragment".into()),
     /// ];
     /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
@@ -952,7 +1209,7 @@ impl RelativeUri {
     /// `RelativeUri`'s path.
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri };
+    /// use grill::uri::Uri;
     /// let uri = Uri::parse("/path/to/file");
     /// let uri = uri.as_relative_uri().unwrap();
     /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["path", "to", "file"]);
@@ -962,20 +1219,89 @@ impl RelativeUri {
         PathSegments::from(self.path())
     }
 
+    /// returns a new `Uri` that is the result of resolving the given
+    /// reference against this `RelativeUri`.
+    ///
+    /// See [RFC3986, Section
+    /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, UriError> {
+        let reference = reference.as_uri_ref();
+
+        // if the reference has a scheme, normalize the path and return
+        if let Ok(mut uri) = reference.try_into_absolute_uri() {
+            uri.normalize_path();
+            return Ok(uri.into());
+        }
+
+        // safety: urls and urns will get processed in the match above
+        let reference = reference.as_relative_uri().unwrap();
+
+        if let Some(authority) = reference.authority() {
+            let mut uri: Uri = self.clone().into();
+            uri.set_authority_or_namespace(&authority)?;
+            uri.set_query(reference.query())?;
+            uri.set_fragment(reference.fragment())?;
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+
+        if reference.path().is_empty() {
+            let mut uri: Uri = self.clone().into();
+            if let Some(fragment) = reference.fragment() {
+                if !fragment.is_empty() {
+                    uri.set_fragment(Some(fragment))?;
+                }
+            }
+            uri.set_fragment(reference.fragment().or(self.fragment()))?;
+            uri.set_query(reference.query().or(self.query()))?;
+            return Ok(uri);
+        }
+
+        let mut uri: Uri = self.clone().into();
+        uri.set_query(reference.query())?;
+        uri.set_fragment(reference.fragment())?;
+
+        if reference.path().starts_with('/') {
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+        let base = self.base_path();
+        let base = merge_paths(base, reference.path());
+        uri.set_path_or_nss(&base)?;
+
+        Ok(uri)
+    }
+
     /// Returns a [`PathSegments`] iterator over the base path segments,
     /// essentially every segment except the last.
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri };
-    /// let uri = Uri::parse("/path/to/file");
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let relative_uri = uri.as_relative_uri().unwrap();
-    /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["path", "to"]);
+    /// let segments = relative_uri.base_path_segments().collect::<Vec<_>>();
+    /// assert_eq!(&segments, &["", "path", "to"]);
     #[must_use]
     pub fn base_path_segments(&self) -> PathSegments<'_> {
         let mut segments = self.path_segments();
         segments.base_only = true;
         segments
+    }
+
+    /// Returns the base path of the `RelativeUri`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap()
+    ///     .as_relative_uri().unwrap();
+    ///
+    /// assert_eq!(uri.base_path(), "/path/to");
+    /// ```
+    #[must_use]
+    pub fn base_path(&self) -> &str {
+        self.path().rsplit_once('/').map_or("", |(a, _)| a)
     }
 
     /// Returns the path segment of the `RelativeUri`.
@@ -1037,6 +1363,25 @@ impl RelativeUri {
         let last = self.fragment_idx().unwrap_or(self.len());
         Some(&self.value[query_idx + 1..last])
     }
+
+    /// Returns an [`Iterator`] of [`QueryParameter`] of this `RelativeUri`.
+    #[must_use]
+    pub fn query_parameters(&self) -> QueryParameters<'_> {
+        QueryParameters::new(self.query()).unwrap()
+    }
+
+    /// Returns `true` if this `Uri` has a query component.
+    #[must_use]
+    pub fn has_query(&self) -> bool {
+        self.query().is_some()
+    }
+
+    /// Returns `true` if this `Uri` has a fragment component.
+    #[must_use]
+    pub fn has_fragment(&self) -> bool {
+        self.query().is_some()
+    }
+
     fn has_path(&self) -> bool {
         !self.path().is_empty()
     }
@@ -1154,7 +1499,7 @@ impl RelativeUri {
             port: self.port,
         })
     }
-
+    /// Returns the username if it exists.
     #[must_use]
     pub fn host(&self) -> Option<&str> {
         let mut start = self.host_idx()?;
@@ -1165,18 +1510,18 @@ impl RelativeUri {
         Some(&self.value[start..end])
     }
 
+    /// Returns the port  if it exists.
     #[must_use]
     pub fn port(&self) -> Option<u16> {
         self.port
     }
 
-    /// Sets the authority of the `RelativeUri` and returns the previous
-    /// authority, if it existed.
+    /// Sets the authority and returns the previous value as an [`Authority`], if it existed.
     pub fn set_authority<'a>(
         &'a mut self,
         authority: Option<&str>,
     ) -> Result<Option<Authority<'a>>, UriError> {
-        let existing_authority = self.authority().map(|a| a.to_owned());
+        let existing_authority = self.authority().map(|a| a.into_owned());
         let new = authority
             .map(parse::authority)
             .transpose()?
@@ -1227,24 +1572,26 @@ impl RelativeUri {
         self.password_idx.is_some()
     }
 
+    /// Returns `true` if the `RelativeUri` has a host.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::Uri;
+    ///
+    /// let uri = Uri::parse("//example.com").unwrap()
+    ///     .as_relative_uri()
+    ///     .unwrap();
+    /// assert!(uri.has_host());
+    /// ```
     #[must_use]
     pub fn has_host(&self) -> bool {
         self.host_idx.is_some()
     }
 
+    /// Returns `true` if the `RelativeUri` has a port.
     #[must_use]
     pub fn has_port(&self) -> bool {
         self.port_idx.is_some()
-    }
-
-    #[must_use]
-    pub fn has_query(&self) -> bool {
-        self.query_idx.is_some()
-    }
-
-    #[must_use]
-    pub fn has_fragment(&self) -> bool {
-        self.fragment_idx.is_some()
     }
 
     fn authority_str(&self) -> Option<&str> {
@@ -1283,6 +1630,39 @@ impl RelativeUri {
     fn port_str(&self) -> Option<&str> {
         self.port_idx()
             .map(|idx| &self.value[idx + 1..self.path_idx()])
+    }
+
+    /// Returns the path normalized by removing dot segments, i.e. `'.'`, `'..'`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap()
+    ///     .as_relative_uri()
+    ///     .unwrap();
+    /// let normalized = uri.path_normalized();
+    /// assert_eq!(normalized, "https://example.com/bar");
+    /// ```
+    #[must_use]
+    pub fn path_normalized(&self) -> Cow<'_, str> {
+        normalize_path(self.path())
+    }
+
+    /// Normalizes the path by removing dot segments, i.e. `'.'`, `'..'`.
+    ///
+    /// This method mutates the `RelativeUri` in place. If that is not desired, use
+    /// [`path_normalized`](RelativeUri::path_normalized) instead.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// uri.normalize_path();
+    /// assert_eq!(uri.path(), "/bar");
+    /// ```
+    pub fn normalize_path(&mut self) {
+        let normalized = normalize_path(self.path()).to_string();
+        self.set_path(&normalized).unwrap();
     }
 }
 
@@ -1325,11 +1705,16 @@ impl Deref for RelativeUri {
     }
 }
 
+/// A relative or absolute URI in the form of a [`Url`], [`Urn`], or
+/// [`RelativeUri`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum Uri {
+    /// Uniform Resource Locator (URL)
     Url(Url),
+    /// Uniform Resource Name (URN)
     Urn(Urn),
+    /// Relative URI
     Relative(RelativeUri),
 }
 
@@ -1353,6 +1738,32 @@ impl PartialEq<Uri> for AbsoluteUri {
         self.as_str() == other.as_str()
     }
 }
+impl PartialEq<&Uri> for AbsoluteUri {
+    fn eq(&self, other: &&Uri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+impl PartialEq<RelativeUri> for AbsoluteUri {
+    fn eq(&self, other: &RelativeUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+impl PartialEq<&RelativeUri> for AbsoluteUri {
+    fn eq(&self, other: &&RelativeUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<UriRef<'_>> for AbsoluteUri {
+    fn eq(&self, other: &UriRef) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+impl PartialEq<&UriRef<'_>> for AbsoluteUri {
+    fn eq(&self, other: &&UriRef<'_>) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
 
 impl Uri {
     /// Attempts to parse `value` as a `Uri`.
@@ -1363,6 +1774,59 @@ impl Uri {
         parse::uri(value)
     }
 
+    /// returns a new `Uri` that is the result of resolving the given reference
+    /// against this `Uri`.
+    ///
+    /// See [RFC3986, Section
+    /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, UriError> {
+        let reference = reference.as_uri_ref();
+
+        // if the reference has a scheme, normalize the path and return
+        if let Ok(mut uri) = reference.try_into_absolute_uri() {
+            uri.normalize_path();
+            return Ok(uri.into());
+        }
+
+        // safety: urls and urns will get processed in the match above
+        let reference = reference.as_relative_uri().unwrap();
+
+        if let Some(authority) = reference.authority() {
+            let mut uri = self.clone();
+            uri.set_authority_or_namespace(&authority)?;
+            uri.set_query(reference.query())?;
+            uri.set_fragment(reference.fragment())?;
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+
+        if reference.path().is_empty() {
+            let mut uri = self.clone();
+            if let Some(fragment) = reference.fragment() {
+                if !fragment.is_empty() {
+                    uri.set_fragment(Some(fragment))?;
+                }
+            }
+            uri.set_fragment(reference.fragment().or(self.fragment()))?;
+            uri.set_query(reference.query().or(self.query()))?;
+            return Ok(uri);
+        }
+
+        let mut uri = self.clone();
+        uri.set_query(reference.query())?;
+        uri.set_fragment(reference.fragment())?;
+
+        if reference.path().starts_with('/') {
+            uri.set_path_or_nss(&reference.path_normalized())?;
+            return Ok(uri);
+        }
+        let base = self.base_path();
+        let base = merge_paths(base, reference.path());
+        uri.set_path_or_nss(&base)?;
+
+        Ok(uri)
+    }
+
     /// Returns a new [`Components`] iterator over all components (scheme,
     /// username (URL), password (URL), host (URL) or namespace (URN), port
     /// (URL), path (URL) or namespace specific string (URN), query (URL or
@@ -1370,16 +1834,19 @@ impl Uri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri, Component };
-    /// let uri_str = "https://username:password@example.com/path/to/file/?query=string#fragment";
-    /// let uri = Uri::parse(uri_str).unwrap();
+    /// use grill::uri::{ Uri, Component, PathSegment, QueryParameter };
+    /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
+    /// let uri = Uri::parse(s).unwrap();
+    /// let uri = AbsoluteUri::parse(s).unwrap();
     /// let components = vec![
-    ///     Component::Scheme("https".into()),
-    ///     Component::Username("username".into()),
+    ///     Component::Username("user".into()),
     ///     Component::Password("password".into()),
     ///     Component::Host("example.com".into()),
-    ///     Component::Path("/path/to/file/".into()),
-    ///     Component::Query("query=string".into()),
+    ///     Component::PathSegment(PathSegment::Root),
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
     ///     Component::Fragment("fragment".into()),
     /// ];
     /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
@@ -1391,7 +1858,7 @@ impl Uri {
     /// `Uri`'s path.
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri };
+    /// use grill::uri::Uri;
     /// let uri = Uri::parse("https://example.com/path/to/file");
     /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["path", "to", "file"]);
     /// ```
@@ -1400,13 +1867,31 @@ impl Uri {
         PathSegments::from(self.path_or_nss())
     }
 
+    /// Returns the base path, that is all path segments except for the last.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap();
+    ///
+    /// assert_eq!(uri.base_path(), "/path/to/");
+    /// let uri = Uri::parse("/file").unwrap();
+    /// assert_eq!(uri.base_path(), "/");
+    /// ```
+    #[must_use]
+    pub fn base_path(&self) -> &str {
+        self.path_or_nss()
+            .rfind('/')
+            .map_or("", |idx| &self.path_or_nss()[..=idx])
+    }
+
     /// Returns a [`PathSegments`] iterator over the base path segments,
     /// essentially every segment except the last.
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri };
-    /// let uri = Uri::parse("/path/to/file");
+    /// use grill::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap();
     /// assert_eq!(uri.base_path_segments().collect::<Vec<_>>(), vec!["path", "to"]);
     #[must_use]
     pub fn base_path_segments(&self) -> PathSegments<'_> {
@@ -1459,7 +1944,7 @@ impl Uri {
             Uri::Relative(rel) => Ok(rel.set_query(query)?),
         }
     }
-
+    /// Returns the query component of the [`Url`] or [`Urn`].
     #[must_use]
     pub fn query(&self) -> Option<&str> {
         match self {
@@ -1468,7 +1953,11 @@ impl Uri {
             Uri::Relative(rel) => rel.query(),
         }
     }
-
+    /// Returns an [`Iterator`] of [`QueryParameter`] of this `Uri`.
+    #[must_use]
+    pub fn query_parameters(&self) -> QueryParameters<'_> {
+        QueryParameters::new(self.query()).unwrap()
+    }
     /// Returns the namespace if the absolute uri is [`Urn`], otherwise returns
     /// the authority string for a [`Url`] or [`RelativeUri`].
     #[must_use]
@@ -1480,6 +1969,21 @@ impl Uri {
         }
     }
 
+    pub fn set_authority_or_namespace(
+        &mut self,
+        authority_or_namespace: &str,
+    ) -> Result<Option<String>, UriError> {
+        match self {
+            Uri::Url(url) => set_url_authority(url, authority_or_namespace),
+            Uri::Urn(urn) => set_urn_namespace(urn, authority_or_namespace),
+            Uri::Relative(rel) => Ok(rel
+                .set_authority(Some(authority_or_namespace))?
+                .map(|a| a.to_string())),
+        }
+    }
+
+    /// Returns the path (if this `Uri` is a [`Url`]) or namespace specific
+    /// string (if this `Uri` is a [`Urn`])
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
         match self {
@@ -1488,6 +1992,38 @@ impl Uri {
             Self::Relative(rel) => rel.path(),
         }
     }
+
+    /// Returns the path normalized by removing dot segments, i.e. `'.'`, `'..'`.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// let normalized = uri.path_normalized();
+    /// assert_eq!(normalized, "https://example.com/bar");
+    /// ```
+    #[must_use]
+    pub fn path_normalized(&self) -> Cow<'_, str> {
+        normalize_path(self.path_or_nss())
+    }
+
+    /// Normalizes the path by removing dot segments, i.e. `'.'`, `'..'`.
+    ///
+    /// This method mutates the `Uri` in place. If that is not desired, use
+    /// [`path_normalized`](Uri::path_normalized) instead.
+    ///
+    /// # Example
+    /// ```
+    /// use grill::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// uri.normalize_path();
+    /// assert_eq!(uri.path_or_nss(), "/bar");
+    /// ```
+    pub fn normalize_path(&mut self) {
+        let normalized = normalize_path(self.path_or_nss()).to_string();
+        self.set_path_or_nss(&normalized).unwrap();
+    }
+
     /// Sets the path for a `Uri` in the shame of a [`Url`] or [`RelativeUri`])
     /// or the namespace specific string for a [`Urn`]
     /// # Errors
@@ -1593,6 +2129,7 @@ impl From<Url> for Uri {
         Self::Url(value)
     }
 }
+
 impl From<Urn> for Uri {
     fn from(value: Urn) -> Self {
         Self::Urn(value)
@@ -1613,6 +2150,77 @@ impl From<&Urn> for Uri {
 impl PartialEq<&str> for Uri {
     fn eq(&self, other: &&str) -> bool {
         self.as_str() == *other
+    }
+}
+impl PartialEq<str> for Uri {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<AbsoluteUri> for Uri {
+    fn eq(&self, other: &AbsoluteUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<&AbsoluteUri> for Uri {
+    fn eq(&self, other: &&AbsoluteUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<RelativeUri> for Uri {
+    fn eq(&self, other: &RelativeUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<&RelativeUri> for Uri {
+    fn eq(&self, other: &&RelativeUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<UriRef<'_>> for Uri {
+    fn eq(&self, other: &UriRef<'_>) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<&UriRef<'_>> for Uri {
+    fn eq(&self, other: &&UriRef<'_>) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<Uri> for &str {
+    fn eq(&self, other: &Uri) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<String> for Uri {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<str> for &Uri {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<Uri> for str {
+    fn eq(&self, other: &Uri) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<Uri> for String {
+    fn eq(&self, other: &Uri) -> bool {
+        self.as_str() == other.as_str()
     }
 }
 
@@ -1791,6 +2399,30 @@ impl ToUri for Uri {
     }
 }
 
+impl ToUri for Url {
+    fn to_uri(&self) -> Uri {
+        Uri::Url(self.clone())
+    }
+}
+
+impl ToUri for &Url {
+    fn to_uri(&self) -> Uri {
+        Uri::Url((*self).clone())
+    }
+}
+
+impl ToUri for Urn {
+    fn to_uri(&self) -> Uri {
+        Uri::Urn(self.clone())
+    }
+}
+
+impl ToUri for &Urn {
+    fn to_uri(&self) -> Uri {
+        Uri::Urn((*self).clone())
+    }
+}
+
 #[inherent]
 impl ToUri for AbsoluteUri {
     /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
@@ -1816,21 +2448,8 @@ impl ToUri for &AbsoluteUri {
     }
 }
 
-/// A single component of a URI (i.e. scheme, authority, path, query, fragment):
-/// - [`Scheme`](Component::Scheme) (e.g., `"https"` in
-///   `"https://example.com"`),
-/// - [`Username`](Component::Username) (e.g., `"username"` in
-///   `"https://username:password@example.com"`),
-/// - [`Password`](Component::Password) (e.g., `"password"` in
-///   `"https://username:password@example.com"`),
-/// - [`Host`](Component::Host) (e.g., `"example.com"` in
-///   `"https://username:password@example.com"`),
-/// - [`Path`](Component::Path) (e.g., `"/foo/bar"` in
-///   `"https://example.com/foo/bar"`),
-/// - [`Query`](Component::Query) (e.g., `"baz=qux"` in
-///   `"https://example.com/foo/bar?baz=qux"`),
-/// - [`Fragment`](Component::Fragment) (e.g., `"quux"` in
-///   `"https://example.com/foo/bar?baz=qux#quux"`).
+/// A single component of a URI (i.e. scheme, username, password, path, query,
+/// fragment).
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Component<'a> {
     /// The scheme of the URI, e.g., `"https"` in `"https://example.com"`.
@@ -1854,14 +2473,21 @@ pub enum Component<'a> {
     /// `"https://example.com"`.
     Host(Cow<'a, str>),
 
-    /// The path of the URI, e.g., `"/path"` in `"https://example.com/path"`.
-    Path(Cow<'a, str>),
+    /// The namespace of a URN. This is not applicable to URLs.
+    Namespace(Cow<'a, str>),
 
-    /// The query of the URI, e.g., `"query=str"` in
+    /// The namespace specific string (NSS) for a URN. Not applicable to URLs.
+    Nss(Cow<'a, str>),
+
+    /// The segment of the URI's path, e.g., `"/path"` in `"https://example.com/path/to/resource"`.
+    PathSegment(PathSegment<'a>),
+
+    /// The a query paramater of the URI, e.g., `"query=str"` in
     /// `"https://example.com/?query=str"`.
-    Query(Cow<'a, str>),
+    QueryParameter(QueryParameter<'a>),
 
     /// The fragment of the URI, e.g., `"fragment"` in .
+    /// `"https://example.com/#fragment"`
     Fragment(Cow<'a, str>),
 }
 
@@ -1898,9 +2524,11 @@ impl<'a> Component<'a> {
             | Component::Username(s)
             | Component::Password(s)
             | Component::Host(s)
-            | Component::Path(s)
-            | Component::Query(s)
+            | Component::Namespace(s)
+            | Component::Nss(s)
             | Component::Fragment(s) => s,
+            Component::PathSegment(s) => s.as_str(),
+            Component::QueryParameter(s) => s.as_str(),
         }
     }
 }
@@ -1950,8 +2578,8 @@ pub struct Components<'a> {
     username: Option<Cow<'a, str>>,
     password: Option<Cow<'a, str>>,
     host: Option<Cow<'a, str>>,
-    path: Option<Cow<'a, str>>,
-    query: Option<Cow<'a, str>>,
+    path: PathSegments<'a>,
+    query: QueryParameters<'a>,
     fragment: Option<Cow<'a, str>>,
 }
 
@@ -1982,8 +2610,8 @@ impl<'a> Components<'a> {
             username: rel.username().map(Into::into),
             password: rel.password().map(Into::into),
             host: rel.host().map(Into::into),
-            path: Some(rel.path().into()),
-            query: rel.query().map(Into::into),
+            path: rel.path_segments(),
+            query: rel.query_parameters(),
             fragment: rel.fragment().map(Into::into),
         }
     }
@@ -1996,8 +2624,8 @@ impl<'a> Components<'a> {
             username: None,
             password: None,
             host: Some(urn.nid().into()),
-            path: Some(urn.nss().into()),
-            query: urn.q_component().map(Into::into),
+            path: PathSegments::default(),
+            query: QueryParameters::new(urn.q_component()).unwrap(),
             fragment: urn.f_component().map(Into::into),
         }
     }
@@ -2011,8 +2639,8 @@ impl<'a> Components<'a> {
                 .filter(|s| !s.is_empty())
                 .map(Into::into),
             password: url.password().map(Into::into),
-            path: Some(url.path().into()),
-            query: url.query().map(Into::into),
+            path: PathSegments::new(url.path()),
+            query: QueryParameters::new(url.query()).unwrap(),
             fragment: url.fragment().map(Into::into),
         }
     }
@@ -2034,11 +2662,11 @@ impl<'a> Iterator for Components<'a> {
         if let Some(host) = self.host.take() {
             return Some(Component::Host(host));
         }
-        if let Some(path) = self.path.take() {
-            return Some(Component::Path(path));
+        if let Some(path) = self.path.next() {
+            return Some(Component::PathSegment(path));
         }
-        if let Some(query) = self.query.take() {
-            return Some(Component::Query(query));
+        if let Some(query) = self.query.next() {
+            return Some(Component::QueryParameter(query));
         }
         if let Some(fragment) = self.fragment.take() {
             return Some(Component::Fragment(fragment));
@@ -2047,6 +2675,92 @@ impl<'a> Iterator for Components<'a> {
     }
 }
 
+/// A single query parameter key value pair.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct QueryParameter<'a> {
+    full: Cow<'a, str>,
+    eq_idx: Option<u32>,
+}
+impl<'a> QueryParameter<'a> {
+    pub fn new(full: &'a str) -> Result<Self, OverflowError> {
+        if full.len() > u32::MAX as usize {
+            return Err(OverflowError(full.len()));
+        }
+        let eq_idx = full.find('=').map(|i| i.try_into().unwrap());
+        let full = full.into();
+        Ok(Self { full, eq_idx })
+    }
+
+    /// Converts this `QueryParameter` into an owned version.
+    #[must_use]
+    pub fn into_owned(self) -> QueryParameter<'static> {
+        QueryParameter {
+            full: self.full.into_owned().into(),
+            eq_idx: self.eq_idx,
+        }
+    }
+
+    /// Returns the full query parameter string.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.full.as_ref()
+    }
+    /// Returns the key, i.e. anything to the left of `'='`, of the query
+    /// parameter.
+    #[must_use]
+    pub fn key(&self) -> &str {
+        self.full[..self.eq_idx().unwrap_or(self.full.len())].as_ref()
+    }
+    /// Returns the value, i.e. anything to the right of `'='`, of the query
+    /// parameter, if it exists.
+    #[must_use]
+    pub fn value(&self) -> Option<&str> {
+        self.eq_idx().map(|i| &self.full[i + 1..])
+    }
+
+    fn eq_idx(&self) -> Option<usize> {
+        self.eq_idx.map(|i| i as usize)
+    }
+}
+
+impl<'a> TryFrom<&'a str> for QueryParameter<'a> {
+    type Error = OverflowError;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct QueryParameters<'a> {
+    query: Option<Split<'a, char>>,
+}
+impl<'a> QueryParameters<'a> {
+    pub fn new(query: Option<&'a str>) -> Result<Self, OverflowError> {
+        let Some(query) = query else { return Ok(Self { query: None }) };
+        if query.len() > u32::MAX as usize {
+            return Err(OverflowError(query.len()));
+        }
+        Ok(Self {
+            query: Some(query.split('&')),
+        })
+    }
+}
+
+impl<'a> Iterator for QueryParameters<'a> {
+    type Item = QueryParameter<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.query
+            .as_mut()
+            .and_then(Iterator::next)
+            .filter(|qp| !qp.is_empty())
+            .map(QueryParameter::new)
+            .map(Result::unwrap)
+    }
+}
+
+/// A single segment of a URI's path.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum PathSegment<'a> {
     /// The root of the path
@@ -2094,6 +2808,17 @@ impl<'a> PathSegment<'a> {
     pub fn is_normal(&self) -> bool {
         matches!(self, Self::Normal(..))
     }
+
+    /// Returns the path segment as a `&str`.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Root => "",
+            Self::Current => ".",
+            Self::Parent => "..",
+            Self::Normal(val) => val.as_ref(),
+        }
+    }
 }
 
 impl<'a> PathSegment<'a> {
@@ -2122,17 +2847,17 @@ impl<'a> PathSegment<'a> {
     fn parse_root(val: &'a str, next: Option<char>) -> Self {
         match val {
             "" => Self::Root,
-            "." | ".." => Self::resolve_dots(val, next),
+            "." | ".." => Self::remove_dots(val, next),
             _ => Self::Normal(val.into()),
         }
     }
     fn parse_path_segment(val: &'a str, next: Option<char>) -> Self {
         match val {
-            "." | ".." => Self::resolve_dots(val, next),
+            "." | ".." => Self::remove_dots(val, next),
             _ => Self::Normal(val.into()),
         }
     }
-    fn resolve_dots(val: &'a str, next: Option<char>) -> Self {
+    fn remove_dots(val: &'a str, next: Option<char>) -> Self {
         if next == Some('/') || next.is_none() {
             if val == "." {
                 Self::Current
@@ -2195,8 +2920,9 @@ impl<'a> PartialEq<&PathSegment<'a>> for String {
 }
 
 /// An [`Iterator`] of path [`PathSegment`]s.
+#[derive(Debug, Default)]
 pub struct PathSegments<'a> {
-    path: Peekable<Split<'a, char>>,
+    path: Option<Peekable<Split<'a, char>>>,
     base_only: bool,
     root_sent: bool,
 }
@@ -2205,21 +2931,21 @@ impl<'a> PathSegments<'a> {
     #[must_use]
     pub fn new(path: &'a str) -> Self {
         Self {
-            path: path.split('/').peekable(),
+            path: Some(path.split('/').peekable()),
             root_sent: false,
             base_only: false,
         }
     }
 
-    fn peek_next(&mut self) -> Option<char> {
-        self.path.peek().and_then(|s| s.chars().next())
+    fn peek(&mut self) -> Option<&str> {
+        self.path.as_mut().and_then(|p| p.peek().copied())
     }
 }
 
 impl<'a> From<&'a str> for PathSegments<'a> {
     fn from(path: &'a str) -> Self {
         Self {
-            path: path.split('/').peekable(),
+            path: Some(path.split('/').peekable()),
             root_sent: false,
             base_only: false,
         }
@@ -2230,19 +2956,52 @@ impl<'a> Iterator for PathSegments<'a> {
     type Item = PathSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let val = self.path.next()?;
+        let value = self.path.as_mut()?.next()?;
         if self.root_sent {
-            Some(PathSegment::parse_path_segment(val, self.peek_next()))
-        } else {
-            self.root_sent = true;
-            let next = self.peek_next();
-            if self.base_only && next.is_none() {
-                None
-            } else {
-                Some(PathSegment::parse_root(val, next))
+            let base_only = self.base_only;
+            let next = self.peek();
+            let next_char = next.and_then(|s| s.chars().next());
+            if base_only && next.is_none() {
+                return None;
             }
+            return Some(PathSegment::parse_path_segment(value, next_char));
+        }
+        self.root_sent = true;
+        let next = self.peek();
+        let next_char = next.and_then(|s| s.chars().next());
+        Some(PathSegment::parse_root(value, next_char))
+    }
+}
+
+/// Normalizes a path by removing dot segments, i.e. `'.'`, `'..'`.
+#[must_use]
+pub fn normalize_path(path: &str) -> Cow<'_, str> {
+    let mut normalized = false;
+    let mut buf = PathBuf::new();
+    for segment in PathSegments::new(path) {
+        match segment {
+            PathSegment::Parent => {
+                normalized = true;
+                buf.pop();
+            }
+            PathSegment::Current => normalized = true,
+            PathSegment::Normal(seg) => buf.push(seg.as_ref()),
+            PathSegment::Root => {}
         }
     }
+    if normalized {
+        // safety: path is already in utf8
+        buf.to_str().unwrap().to_string().into()
+    } else {
+        path.into()
+    }
+}
+
+fn merge_paths(base: &str, path: &str) -> String {
+    let mut buf = PathBuf::from(base);
+    buf.push(path);
+    // safety: path is already in utf8
+    buf.to_str().unwrap().to_string()
 }
 
 #[inline]

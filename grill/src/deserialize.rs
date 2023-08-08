@@ -7,6 +7,26 @@ use serde_json::Value;
 
 use crate::error::DeserializeError;
 
+/// A trait implemented by functions or types which can deserialize data into a [`Value`].
+///
+///
+/// Three implementations are provided:
+/// - [`deserialize_json`](`deserialize_json`): Deserializes JSON data. Always enabled.
+/// - [`deserialize_yaml`](`deserialize_yaml`): Deserializes YAML data. Enabled with the `"yaml"` feature.
+/// - [`deserialize_toml`](`deserialize_toml`): Deserializes TOML data. Enabled with the `"toml"` feature.
+
+/// # Example
+/// Implementing a custom deserializer for a format that has serde integration
+/// is straightforward. `Deserializer` is implemented for `Fn(&str) ->
+/// Result<Value, erased_serde::Error>`, so it is as simple as a few lines of
+/// code:
+/// ```rust
+/// pub fn deserialize_yaml(data: &str) -> Result<serde_json::Value, erased_serde::Error> {
+///     use erased_serde::Deserializer;
+///     let yaml = serde_yaml::Deserializer::from_str(data);
+///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
+/// }
+/// ```
 pub trait Deserializer: DynClone + Send + Sync + 'static {
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
