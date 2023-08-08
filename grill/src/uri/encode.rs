@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_encode_authority() {
-        let s = "user:pass@host:1234";
-        let userinfo_idx = s.find('@');
+        // let s = "user:pass@host:1234";
+        // let userinfo_idx = s.find('@');
     }
 }

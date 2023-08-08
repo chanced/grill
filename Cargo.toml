@@ -1,5 +1,6 @@
 [workspace]
-members = ["grill", "tests"]
+members  = ["grill", "tests"]
+resolver = "2"
 
 [workspace.dependencies]
 grill = { path = "grill" }
