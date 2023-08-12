@@ -1,8 +1,7 @@
 use crate::{
-    dialect::Dialects,
-    error::{CompileError, EvaluateError, IdentifyError, UriError},
+    error::{AnchorError, CompileError, EvaluateError, IdentifyError, UriError},
     output::{self, Structure},
-    schema::{LocatedSchema, Reference},
+    schema::{Anchor, Reference},
     AbsoluteUri, Uri,
 };
 use async_trait::async_trait;
@@ -68,11 +67,12 @@ impl Handler {
     ///
     /// # Convention
     /// Exactly one `Handler` must implement the method `identify` for a given `Dialect`. It **must** be the
-    /// **second** (index: `1`) `Handler` in the [`Dialect`](`crate::dialect::Dialect`)'s [`Handlers`](`crate::dialect::Handlers`)
+    /// **second** (index: `1`) `Handler` in the [`Dialect`](`crate::dialect::Dialect`)'s `Handler`s.
     ///
     /// # Example
     /// ```rust
     /// use grill::json_schema::draft_2020_12::handlers::IdHandler;
+    /// use serde_json::json;
     ///
     /// let id = IdHandler.identify(&json!({"$id": "https://example.com/schema.json"}));
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".try_into().unwrap())));
@@ -132,18 +132,21 @@ impl Handler {
         }
     }
 
-    /// Returns a list of [`LocatedSchema`] for each embedded schema within
-    /// `value`.
-    pub fn schemas<'v>(
-        &self,
-        path: &Pointer,
-        base_uri: &AbsoluteUri,
-        value: &'v Value,
-        dialects: &Dialects,
-    ) -> Result<Vec<LocatedSchema<'v>>, IdentifyError> {
+    /// Returns a list of JSON [`Pointer`]s for each embedded schema within
+    /// `value` relevant to this `Handler`.
+    #[must_use]
+    pub fn subschemas(&self, path: &Pointer, value: &Value) -> Vec<Pointer> {
         match self {
-            Handler::Sync(h) => h.schemas(path, base_uri, value, dialects),
-            Handler::Async(h) => h.schemas(path, base_uri, value, dialects),
+            Handler::Sync(h) => h.subschemas(path, value),
+            Handler::Async(h) => h.subschemas(path, value),
+        }
+    }
+
+    /// Returns a list of [`Anchor`]s which are handled by this `Handler`
+    pub fn anchors(&self, schema: &Value) -> Result<Vec<Anchor>, AnchorError> {
+        match self {
+            Handler::Sync(h) => h.anchors(schema),
+            Handler::Async(h) => h.anchors(schema),
         }
     }
 
@@ -176,19 +179,19 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     async fn evaluate<'h, 's, 'v>(
         &'h self,
         scope: &'s mut Scope,
-        value: &'v Value,
+        schema: &'v Value,
         structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
 
-    fn schemas<'v>(
-        &self,
-        path: &Pointer,
-        base_uri: &AbsoluteUri,
-        value: &'v Value,
-        dialects: &Dialects,
-    ) -> Result<Vec<LocatedSchema<'v>>, IdentifyError> {
+    fn subschemas(&self, path: &Pointer, schema: &Value) -> Vec<Pointer> {
+        Vec::new()
+    }
+
+    /// Returns a list of [`Anchor`]s which are handled by this `Handler`
+    fn anchors(&self, schema: &Value) -> Result<Vec<Anchor>, AnchorError> {
         Ok(Vec::new())
     }
+
     /// Attempts to identify the schema based on the
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
@@ -362,16 +365,15 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
         unimplemented!("is_pertinent_to must be implemented by the first Handler in a Dialect")
     }
 
+    /// Returns a list of [`Anchor`]s which are handled by this `Handler`
+    fn anchors(&self, schema: &Value) -> Result<Vec<Anchor>, AnchorError> {
+        Ok(Vec::new())
+    }
+
     /// Returns a list of [`LocatedSchema`] for each subschema in `value`.
     #[allow(unused_variables)]
-    fn schemas<'v>(
-        &self,
-        path: &Pointer,
-        base_uri: &AbsoluteUri,
-        value: &'v Value,
-        dialects: &Dialects,
-    ) -> Result<Vec<LocatedSchema<'v>>, IdentifyError> {
-        Ok(Vec::new())
+    fn subschemas(&self, path: &Pointer, value: &Value) -> Vec<Pointer> {
+        Vec::new()
     }
 
     /// Returns a list of [`Reference`](`crate::schema::Reference`)s to other
@@ -412,6 +414,7 @@ trait Downcast {
 
     unsafe fn downcast_mut_unchecked<T: 'static>(&mut self) -> &mut T;
 
+    #[allow(clippy::unnecessary_box_returns)]
     unsafe fn downcast_unchecked<T: 'static>(self: Box<Self>) -> Box<T>;
 }
 

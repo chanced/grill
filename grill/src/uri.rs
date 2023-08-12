@@ -159,7 +159,6 @@ use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
-    convert::Infallible,
     fmt::{Display, Write},
     iter::Peekable,
     ops::{Deref, Index},
@@ -361,9 +360,10 @@ impl<'a> UriRef<'a> {
     /// # Example
     /// ```
     /// use grill::uri::Uri;
-    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap().as_uri_ref();
-    /// let normalized = uri.path_normalized();
-    /// assert_eq!(normalized, "https://example.com/bar");
+    /// let uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// let uri_ref = uri.as_uri_ref();
+    /// let normalized = uri_ref.path_normalized();
+    /// assert_eq!(normalized, "/bar");
     /// ```
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
@@ -527,7 +527,7 @@ impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
     ///
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if `value` can not be parsed as a
+    /// Returns [`UriError`] if `value` can not be parsed as a
     /// [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
     pub fn parse(value: &str) -> Result<Self, UriError> {
         if value.starts_with("urn:") {
@@ -778,8 +778,11 @@ impl AbsoluteUri {
                     uri.set_fragment(Some(fragment))?;
                 }
             }
-            uri.set_fragment(reference.fragment().or(self.fragment()))?;
-            uri.set_query(reference.query().or(self.query()))?;
+            if let Some(query) = reference.query() {
+                if !query.is_empty() {
+                    uri.set_query(Some(query))?;
+                }
+            }
             return Ok(uri);
         }
 
@@ -862,7 +865,7 @@ impl AbsoluteUri {
     /// use grill::uri::AbsoluteUri;
     /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
-    /// assert_eq!(normalized, "https://example.com/bar");
+    /// assert_eq!(normalized, "/bar");
     /// ```
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
@@ -1252,8 +1255,11 @@ impl RelativeUri {
                     uri.set_fragment(Some(fragment))?;
                 }
             }
-            uri.set_fragment(reference.fragment().or(self.fragment()))?;
-            uri.set_query(reference.query().or(self.query()))?;
+            if let Some(query) = reference.query() {
+                if !query.is_empty() {
+                    uri.set_query(Some(query))?;
+                }
+            }
             return Ok(uri);
         }
 
@@ -1641,7 +1647,7 @@ impl RelativeUri {
     ///     .as_relative_uri()
     ///     .unwrap();
     /// let normalized = uri.path_normalized();
-    /// assert_eq!(normalized, "https://example.com/bar");
+    /// assert_eq!(normalized, "/bar");
     /// ```
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
@@ -1807,8 +1813,11 @@ impl Uri {
                     uri.set_fragment(Some(fragment))?;
                 }
             }
-            uri.set_fragment(reference.fragment().or(self.fragment()))?;
-            uri.set_query(reference.query().or(self.query()))?;
+            if let Some(query) = reference.query() {
+                if !query.is_empty() {
+                    uri.set_query(Some(query))?;
+                }
+            }
             return Ok(uri);
         }
 
@@ -2000,7 +2009,7 @@ impl Uri {
     /// use grill::uri::Uri;
     /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
-    /// assert_eq!(normalized, "https://example.com/bar");
+    /// assert_eq!(normalized, "/bar");
     /// ```
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
@@ -2919,7 +2928,7 @@ impl<'a> PartialEq<&PathSegment<'a>> for String {
     }
 }
 
-/// An [`Iterator`] of path [`PathSegment`]s.
+/// An [`Iterator`] of [`PathSegment`]s.
 #[derive(Debug, Default)]
 pub struct PathSegments<'a> {
     path: Option<Peekable<Split<'a, char>>>,

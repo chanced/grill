@@ -13,7 +13,11 @@ pub use url::ParseError as UrlError;
 
 pub use urn::Error as UrnError;
 
-use crate::{dialect::Dialect, schema::Keyword, uri::AbsoluteUri, Output, Uri};
+use crate::{
+    schema::{Dialect, Keyword},
+    uri::AbsoluteUri,
+    Output, Uri,
+};
 use serde_json::{Number, Value};
 use std::{
     collections::HashMap,
@@ -30,9 +34,9 @@ use thiserror::Error;
 pub enum LocateSchemasError {
     /// An error occurred locating subschemas due to an invalid character in an
     /// anchor.
-    Anchor(#[from] AnchorError),
+    MalformedAnchor(#[from] AnchorError),
     /// An error occurred locating subschemas due to an error identifying a schema.
-    Identify(#[from] IdentifyError),
+    FailedToIdentifySchema(#[from] IdentifyError),
 }
 
 /// An anchor keyword which does not allow for empty values (e.g. `$anchor`,
@@ -106,12 +110,12 @@ pub enum AnchorError {
     /// An anchor keyword which does not allow for empty values (e.g. `$anchor`,
     /// `$dynamicAnchor`) was found with an empty string.
     #[error(transparent)]
-    Empty(#[from] AnchorEmptyError),
+    EmptyNotAllowed(#[from] AnchorEmptyError),
 
     /// An anchor keyword which does not allow for non-empty values (e.g.
     /// `$recursiveAnchor`) was found with a value.
     #[error(transparent)]
-    NotEmpty(#[from] AnchorNotEmptyError),
+    ValueNotAllowed(#[from] AnchorNotEmptyError),
 
     /// `$anchor` and `$dynamicAnchor` must start with either a letter
     /// (`([A-Za-z])`) or an underscore (`_`).
@@ -130,11 +134,11 @@ pub enum AnchorError {
 pub enum PointerError {
     #[error(transparent)]
     /// The JSON [`Pointer`] was malformed.
-    Malformed(#[from] MalformedPointerError),
+    ParsingFailed(#[from] MalformedPointerError),
 
     #[error(transparent)]
     /// The JSON [`Pointer`] could not be resolved.
-    Resolution(#[from] ResolvePointerError),
+    ResolutionFailed(#[from] ResolvePointerError),
 }
 
 /// An error occurred while attempting to add a new a schema source.
@@ -144,13 +148,9 @@ pub enum SourceError {
     #[error(transparent)]
     DeserializationFailed(#[from] SourceDeserializationError),
 
-    /// A source URI contained a non-empty fragment.
-    #[error("source URIs may not contain fragments; found: \"{0}\"")]
-    FragmentedUri(AbsoluteUri),
-
-    /// Multiple sources with the same URI were provided.
+    /// Multiple sources with the same URI but different values were provided.
     #[error(transparent)]
-    Duplicate(#[from] SourceDuplicateError),
+    ConflictingValueFound(#[from] SourceConflictError),
 
     /// Resolution of a source failed
     #[error(transparent)]
@@ -160,15 +160,19 @@ pub enum SourceError {
     #[error(transparent)]
     InvalidUtf8(#[from] FromUtf8Error),
 
-    /// The source's URI was not able to be parsed or contained a fragment
+    /// The source's URI was not able to be parsed
     #[error(transparent)]
-    InvalidUri(#[from] UriError),
+    UriFailedToParse(#[from] UriError),
+
+    /// The source URI contains a fragment which is not allowed.
+    #[error("source URIs may not contain fragments, found \"{0}\"")]
+    FragmentedUri(AbsoluteUri),
 }
 
 /// Multiple sources with the same URI were provided.
 #[derive(Debug, Error)]
 #[error("duplicate source provided: {uri}")]
-pub struct SourceDuplicateError {
+pub struct SourceConflictError {
     /// The URI of the duplicate source.
     pub uri: AbsoluteUri,
     /// The value of the duplicate source.
@@ -216,6 +220,13 @@ pub enum DialectError {
     /// [`Handler`](`crate::handler::Handler`)s (2).
     #[error("at least one dialect is required to build an Interrogator; none were provided")]
     Empty,
+
+    /// `Dialect` was constructed but a metaschema with the `Dialect`'s `id` was
+    /// not present.
+    #[error(
+        "the primary metaschema with id \"{0}\" was not found within the supplied metaschemas"
+    )]
+    PrimaryMetaschemaNotFound(AbsoluteUri),
 }
 
 /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
@@ -453,33 +464,33 @@ impl ResolveError {
 pub enum ResolveErrorSource {
     /// The [`std::io::Error`] which occurred while resolving a source.
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    IoFailed(#[from] std::io::Error),
 
     /// The [`reqwest::Error`] which occurred while resolving a source.
     #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
+    ReqwestFailed(#[from] reqwest::Error),
 
     /// The path, as a JSON [`Pointer`], failed to resolve.
     #[error(transparent)]
-    Pointer(#[from] PointerError),
+    PointerMalformed(#[from] PointerError),
 
     #[error(transparent)]
     NotFound(#[from] NotFoundError),
 
     /// Any other error which occurred while resolving a source.
     #[error(transparent)]
-    Other(#[from] Box<dyn StdError>),
+    Custom(#[from] Box<dyn StdError>),
 }
 
 impl From<MalformedPointerError> for ResolveErrorSource {
     fn from(err: MalformedPointerError) -> Self {
-        Self::Pointer(err.into())
+        Self::PointerMalformed(err.into())
     }
 }
 
 impl From<jsonptr::Error> for ResolveErrorSource {
     fn from(err: jsonptr::Error) -> Self {
-        Self::Pointer(err.into())
+        Self::PointerMalformed(err.into())
     }
 }
 
@@ -492,7 +503,7 @@ pub enum CompileError {
 
     /// Failed to identify a schema
     #[error(transparent)]
-    SchemaIdentification(#[from] IdentifyError),
+    SchemaIdentificationFailed(#[from] IdentifyError),
 
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     #[error(transparent)]
@@ -501,20 +512,20 @@ pub enum CompileError {
     /// Failed to parse a [`Uri`](crate::uri::Uri) or
     /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
     #[error(transparent)]
-    Uri(#[from] UriError),
+    UriParsingFailed(#[from] UriError),
 
     /// All attached implementations of [`Resolve`](crate::resolve::Resolve)
     /// failed to resolve a source.
     #[error(transparent)]
-    Resolve(#[from] ResolveErrors),
+    ResolveFailed(#[from] ResolveErrors),
 
-    /// Failed to deserialize and  a resolved
+    /// Failed to resolve or deserialize a source
     #[error(transparent)]
-    Source(#[from] SourceError),
+    SourcingFailed(#[from] SourceError),
 
     /// Failed to locate subschemas within a schema.
     #[error(transparent)]
-    LocateSchemas(#[from] LocateSchemasError),
+    LocateSubschemasFailed(#[from] LocateSchemasError),
 
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
@@ -541,26 +552,24 @@ pub struct DialectUnknownError {
 pub enum UriError {
     /// an issue occurred parsing a [`Url`](`url::Url`)
     #[error(transparent)]
-    Url(#[from] UrlError),
+    FailedToParseUrl(#[from] UrlError),
 
     /// an issue occurred parsing a [`Urn`](`urn::Urn`)
     #[error(transparent)]
-    Urn(#[from] UrnError),
+    FailedToParseUrn(#[from] UrnError),
 
     /// an issue occurred parsing a [`RelativeUri`](`crate::uri::RelativeUri`)
     #[error(transparent)]
-    Relative(#[from] RelativeUriError),
+    FailedToParseRelativeUri(#[from] RelativeUriError),
 
-    /// Indicates that the [`AbsoluteUri`](crate::uri::AbsoluteUri) is not
-    /// absolute. This is not applicable to [`Uri`](crate::uri::Uri) as they can
-    /// be relative.
+    /// The [`Uri`] is not absolute and cannot be made into an [`AbsoluteUri`].
     #[error("uri is not absolute: {0}")]
     NotAbsolute(Uri),
 
     /// An issue occurred while setting the Authority of a
     /// [`Uri`](crate::uri::Uri) or [`RelativeUri`](crate::uri::RelativeUri).
     #[error(transparent)]
-    Authority(#[from] AuthorityError),
+    MalformedAuthority(#[from] AuthorityError),
 
     /// The scheme of a [`Uri`](crate::uri::Uri) or
     /// [`AbsoluteUri`](crate::uri::AbsoluteUri) is malformed.
@@ -570,12 +579,12 @@ pub enum UriError {
 
 impl From<InvalidPortError> for UriError {
     fn from(err: InvalidPortError) -> Self {
-        Self::Relative(err.into())
+        Self::FailedToParseRelativeUri(err.into())
     }
 }
 impl From<OverflowError> for UriError {
     fn from(err: OverflowError) -> Self {
-        Self::Relative(err.into())
+        Self::FailedToParseRelativeUri(err.into())
     }
 }
 
@@ -585,7 +594,7 @@ impl UriError {
     /// [`Url`]: UriParseError::Url
     #[must_use]
     pub fn is_url(&self) -> bool {
-        matches!(self, Self::Url { .. })
+        matches!(self, Self::FailedToParseUrl { .. })
     }
 
     /// Returns `true` if the uri parse error is [`Urn`].
@@ -593,7 +602,7 @@ impl UriError {
     /// [`Urn`]: UriParseError::Urn
     #[must_use]
     pub fn is_urn(&self) -> bool {
-        matches!(self, Self::Urn { .. })
+        matches!(self, Self::FailedToParseUrn { .. })
     }
 
     /// Returns `true` if the uri error is [`Relative`].
@@ -601,7 +610,7 @@ impl UriError {
     /// [`Relative`]: UriError::Relative
     #[must_use]
     pub fn is_relative(&self) -> bool {
-        matches!(self, Self::Relative(..))
+        matches!(self, Self::FailedToParseRelativeUri(..))
     }
 
     /// Returns `true` if the uri error is [`NotAbsolute`].
@@ -616,7 +625,7 @@ impl UriError {
     /// [`UrlError`].
     #[must_use]
     pub fn as_url(&self) -> Option<&UrlError> {
-        if let Self::Url(err) = self {
+        if let Self::FailedToParseUrl(err) = self {
             Some(err)
         } else {
             None
@@ -627,7 +636,7 @@ impl UriError {
     /// [`UrnError`].
     #[must_use]
     pub fn as_urn(&self) -> Option<&urn::Error> {
-        if let Self::Urn(err) = self {
+        if let Self::FailedToParseUrn(err) = self {
             Some(err)
         } else {
             None
@@ -638,7 +647,7 @@ impl UriError {
     /// If the error is [`UriError::Relative`], returns a reference to the underlying
     /// [`RelativeUriError`].
     pub fn as_relative(&self) -> Option<&RelativeUriError> {
-        if let Self::Relative(v) = self {
+        if let Self::FailedToParseRelativeUri(v) = self {
             Some(v)
         } else {
             None

@@ -1,6 +1,7 @@
 use crate::{
-    dialect::Dialect, dialect::Metaschema, error::IdentifyError, schema::Keyword, uri::AbsoluteUri,
-    Uri,
+    error::IdentifyError,
+    schema::{Dialect, Keyword, Metaschema},
+    uri::{AbsoluteUri, Uri},
 };
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -136,6 +137,7 @@ pub static JSON_SCHEMA_2019_09_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
     )
+    .unwrap()
 });
 
 #[must_use]
@@ -275,7 +277,7 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::dialect::Dialects;
+    use crate::schema::Dialects;
 
     use super::*;
 
@@ -389,7 +391,7 @@ mod tests {
         ];
         let dialect = dialect();
 
-        let _dialects = Dialects::new(vec![dialect.clone()], Some(dialect.id.clone()));
+        let _dialects = Dialects::new(vec![dialect.clone()], Some(&dialect.id));
         let _base_uri = "https://example.com/example-schema.json"
             .parse::<AbsoluteUri>()
             .unwrap();

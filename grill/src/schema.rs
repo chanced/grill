@@ -1,15 +1,33 @@
+pub mod dialect;
+
 mod err_msg;
 
-use crate::{error::UnknownKeyError, source::Sources, AbsoluteUri, Handler};
+pub use dialect::Dialect;
+
+pub(crate) use dialect::Dialects;
+
+use crate::{source::Sources, AbsoluteUri, Handler, Object};
 use jsonptr::Pointer;
 use petgraph::{algo, prelude::NodeIndex, Directed, Graph as DirectedGraph};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{collections::HashMap, marker::PhantomData, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, marker::PhantomData, ops::Deref};
 
 new_key_type! {
     pub struct SchemaKey;
+}
+
+pub struct Metaschema {
+    pub id: AbsoluteUri,
+    pub schema: Object,
+}
+
+impl Metaschema {
+    #[must_use]
+    pub fn new(id: AbsoluteUri, schema: Object) -> Self {
+        Self { id, schema }
+    }
 }
 
 pub struct Reference {
@@ -21,37 +39,50 @@ pub struct Reference {
 #[derive(Clone, Debug)]
 pub(crate) struct CompiledSchema {
     /// Abs URI of the schema.
-    pub(crate) id: AbsoluteUri,
+    pub(crate) id: Option<AbsoluteUri>,
+    /// All URIs which this schema is referenced by.
+    pub(crate) uris: Vec<AbsoluteUri>,
     /// Abs URI of the schema's `Metaschema`.
     pub(crate) metaschema: AbsoluteUri,
+    // Compiled handlers.
+    pub(crate) handlers: Box<[Handler]>,
     /// Abs URI of the source.
     pub(crate) source_uri: AbsoluteUri,
     /// Path to the schema within the source as a JSON pointer.
     pub(crate) source_path: Pointer,
-    // Compiled handlers.
-    pub(crate) handlers: Box<[Handler]>,
 }
+impl PartialEq for CompiledSchema {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.metaschema == other.metaschema
+            && self.source_path == other.source_path
+            && self.source_uri == other.source_uri
+    }
+}
+impl Eq for CompiledSchema {}
 
 #[derive(Clone, Debug)]
 pub struct Schema<'i, Key: slotmap::Key> {
     /// Key of the `Schema`
     pub key: Key,
-    /// The URI of the schema.
-    pub id: &'i AbsoluteUri,
+    /// The `$id` or `id` of the schema, if any
+    pub id: Option<Cow<'i, AbsoluteUri>>,
+    /// All URIs which this schema can be referenced by.
+    pub uris: Vec<Cow<'i, AbsoluteUri>>,
     /// The URI of the schema's `Metaschema`.
-    pub metaschema: &'i AbsoluteUri,
+    pub metaschema: Cow<'i, AbsoluteUri>,
     /// The source of the schema.
-    pub source: &'i Value,
-    /// `Schema`s which dependent upon this `Schema`.
+    pub source: Cow<'i, Value>,
+    /// Dependents of this `Schema`.
     pub dependents: Vec<Key>,
     ///  Dependencies of this `Schema`.
     pub dependencies: Vec<Key>,
     /// Compiled [`Handler`]s.
-    pub handlers: &'i [Handler],
+    pub handlers: Cow<'i, [Handler]>,
     /// [`AbsoluteUri`] of the source.
-    pub source_uri: &'i AbsoluteUri,
+    pub source_uri: Cow<'i, AbsoluteUri>,
     /// Path to the schema within the source as a JSON [`Pointer`].
-    pub source_path: &'i Pointer,
+    pub source_path: Cow<'i, Pointer>,
 }
 
 impl<'i, Key: slotmap::Key> Schema<'i, Key> {
@@ -71,21 +102,36 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
             .expect("sourece_path not found in Sources");
         Self {
             key,
-            id: &compiled.id,
-            metaschema: &compiled.metaschema,
-            source,
+            id: compiled.id.as_ref().map(|id| Cow::Borrowed(id)),
+            uris: compiled.uris.iter().map(Cow::Borrowed).collect(),
+            metaschema: Cow::Borrowed(&compiled.metaschema),
+            source: Cow::Borrowed(source),
             dependents,
             dependencies,
-            handlers: &compiled.handlers,
-            source_uri: &compiled.source_uri,
-            source_path: &compiled.source_path,
+            handlers: Cow::Borrowed(&compiled.handlers),
+            source_uri: Cow::Borrowed(&compiled.source_uri),
+            source_path: Cow::Borrowed(&compiled.source_path),
+        }
+    }
+
+    pub fn into_owned(self) -> Schema<'static, Key> {
+        Schema {
+            key: self.key,
+            id: Cow::Owned(self.id.into_owned()),
+            metaschema: Cow::Owned(self.metaschema.into_owned()),
+            source: Cow::Owned(self.source.into_owned()),
+            dependents: self.dependents,
+            dependencies: self.dependencies,
+            handlers: Cow::Owned(self.handlers.into_owned()),
+            source_uri: Cow::Owned(self.source_uri.into_owned()),
+            source_path: Cow::Owned(self.source_path.into_owned()),
         }
     }
 }
 
 impl<'i, Key: slotmap::Key> Schema<'i, Key> {
     pub fn value(&self) -> &Value {
-        self.source_path.resolve(self.source).unwrap()
+        self.source_path.resolve(self.source.as_ref()).unwrap()
     }
 }
 
@@ -101,8 +147,8 @@ impl<'i, K: slotmap::Key> Eq for Schema<'i, K> {}
 /// Contains a graph of schema references in order to detect cyclic
 /// dependencies.
 pub(crate) struct DependencyGraph<Key: slotmap::Key> {
-    graph: DirectedGraph<AbsoluteUri, AbsoluteUri, Directed>,
-    indexes: HashMap<AbsoluteUri, NodeIndex>,
+    graph: DirectedGraph<Key, Key, Directed>,
+    indexes: HashMap<Key, NodeIndex>,
     _marker: PhantomData<Key>,
 }
 
@@ -116,23 +162,23 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
             _marker: PhantomData,
         }
     }
-    fn index(&self, uri: &AbsoluteUri) -> Option<NodeIndex> {
-        self.indexes.get(uri).copied()
+    fn index_of(&self, key: Key) -> Option<NodeIndex> {
+        self.indexes.get(&key).copied()
     }
 
-    pub(crate) fn insert(&mut self, uri: AbsoluteUri) {
-        let idx = self.graph.add_node(uri.clone());
-        self.indexes.insert(uri, idx);
+    pub(crate) fn insert(&mut self, key: Key) {
+        let idx = self.graph.add_node(key);
+        self.indexes.insert(key, idx);
     }
     /// Check if there exists a path starting at from and reaching to.
     ///
     /// If from and to are equal, this function returns true.
     ///
     /// If space is not None, it is used instead of creating a new workspace for graph traversal.
-    pub(crate) fn has_path_connecting(&self, from: &AbsoluteUri, to: &AbsoluteUri) -> Option<bool> {
+    pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> Option<bool> {
         let mut space = algo::DfsSpace::new(&self.graph);
-        let from = self.index(from)?;
-        let to = self.index(to)?;
+        let from = self.index_of(from)?;
+        let to = self.index_of(to)?;
         Some(algo::has_path_connecting(
             &self.graph,
             from,
@@ -143,32 +189,24 @@ impl<Key: slotmap::Key> DependencyGraph<Key> {
 
     /// Returns an [`Iterator`] of direct dependencies of the schema with given
     /// `key`.
-    pub(crate) fn dependencies<'a>(
-        &'a self,
-        uri: &'a AbsoluteUri,
-        keys: &'a HashMap<AbsoluteUri, Key>,
-    ) -> Option<impl 'a + Iterator<Item = Key>> {
-        let idx = self.index(uri)?;
+    #[allow(clippy::needless_lifetimes)]
+    pub(crate) fn dependencies<'a>(&'a self, key: Key) -> Option<impl 'a + Iterator<Item = Key>> {
+        let idx = self.index_of(key)?;
         Some(
             self.graph
                 .neighbors_directed(idx, petgraph::Direction::Outgoing)
-                .map(|n| self.graph[n].clone())
-                .map(|n| keys.get(&n).copied().unwrap()),
+                .map(|n| self.graph[n]),
         )
     }
 
     /// Returns an [`Iterator`] of direct dependents of the schema with given `key`.
-    pub fn dependents<'a>(
-        &'a self,
-        uri: &AbsoluteUri,
-        keys: &'a HashMap<AbsoluteUri, Key>,
-    ) -> Option<impl '_ + Iterator<Item = Key>> {
-        let idx = self.index(uri)?;
+    #[allow(clippy::needless_lifetimes)]
+    pub fn dependents<'a>(&'a self, key: Key) -> Option<impl '_ + Iterator<Item = Key>> {
+        let idx = self.index_of(key)?;
         Some(
             self.graph
                 .neighbors_directed(idx, petgraph::Direction::Incoming)
-                .map(|n| self.graph[n].clone())
-                .map(|n| *(keys.get(&n).unwrap())),
+                .map(|n| self.graph[n]),
         )
     }
 }
@@ -183,7 +221,8 @@ impl<Key: slotmap::Key> Default for DependencyGraph<Key> {
 pub(crate) struct Schemas<Key: slotmap::Key = SchemaKey> {
     schemas: SlotMap<Key, CompiledSchema>,
     keys: HashMap<AbsoluteUri, Key>,
-    graph: DependencyGraph<Key>,
+    dep_graph: DependencyGraph<Key>,
+    sandbox: Option<Box<Sandbox<Key>>>,
 }
 
 impl<Key: slotmap::Key> Schemas<Key> {
@@ -193,7 +232,8 @@ impl<Key: slotmap::Key> Schemas<Key> {
         Self {
             schemas: SlotMap::default(),
             keys: HashMap::default(),
-            graph: DependencyGraph::default(),
+            dep_graph: DependencyGraph::default(),
+            sandbox: None,
         }
     }
     #[must_use]
@@ -202,16 +242,16 @@ impl<Key: slotmap::Key> Schemas<Key> {
         let source = sources.get(&schema.source_uri)?;
         let uri = &schema.id;
         // SAFETY: if `key` exists in self.schemas, then it has a node index
-        let dependencies = self.graph.dependencies(uri, &self.keys).unwrap().collect();
-        let dependents = self.graph.dependents(uri, &self.keys).unwrap().collect();
+        let dependencies = self.dep_graph.dependencies(key).unwrap().collect();
+        let dependents = self.dep_graph.dependents(key).unwrap().collect();
 
         Some(Schema {
-            id: &schema.id,
-            metaschema: &schema.metaschema,
-            source_uri: &schema.source_uri,
-            source_path: &schema.source_path,
-            handlers: &schema.handlers,
-            source,
+            id: Cow::Borrowed(&schema.id),
+            metaschema: Cow::Borrowed(&schema.metaschema),
+            source_uri: Cow::Borrowed(&schema.source_uri),
+            source_path: Cow::Borrowed(&schema.source_path),
+            handlers: Cow::Borrowed(&schema.handlers),
+            source: Cow::Borrowed(source),
             key,
             dependencies,
             dependents,
@@ -227,85 +267,151 @@ impl<Key: slotmap::Key> Schemas<Key> {
         key: Key,
         sources: &'a Sources,
     ) -> Option<Iter<'a, Key>> {
-        let schema = self.schemas.get(key)?;
-        let inner = self.graph.dependencies(&schema.id, &self.keys)?;
+        let inner = self.dep_graph.dependencies(key)?;
         Some(Iter::new(
             inner,
             sources,
             &self.schemas,
-            &self.graph,
+            &self.dep_graph,
             &self.keys,
         ))
     }
 
-    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Key {
-        let id = schema.id.clone();
-        let key = self.schemas.insert(schema);
-        self.graph.insert(id.clone());
-        self.keys.insert(id, key);
-        key
+    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+        self.sandbox
+            .as_deref_mut()
+            .expect("sandbox not present")
+            .insert(schema)
     }
 
     #[must_use]
-    pub(crate) fn get_by_id<'i>(
+    pub(crate) fn get_by_uri<'i>(
         &'i self,
-        id: &AbsoluteUri,
+        uri: &AbsoluteUri,
         sources: &'i Sources,
-    ) -> Option<(Key, Schema<'i, Key>)> {
-        let key = self.keys.get(id).copied()?;
-        let schema = self.get(key, sources)?;
-        Some((key, schema))
+    ) -> Option<Schema<'i, Key>> {
+        let key = self.keys.get(uri).copied()?;
+        self.get(key, sources)
+    }
+
+    #[must_use]
+    pub(crate) fn get_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
+        self.keys.get(id).copied()
     }
 
     pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> Option<bool> {
-        let from = self.schemas.get(from)?;
-        let to = self.schemas.get(to)?;
-        self.graph.has_path_connecting(&from.id, &to.id)
+        if let Some(sandbox) = self.sandbox.as_deref() {
+            return sandbox.dep_graph.has_path_connecting(from, to);
+        }
+        self.dep_graph.has_path_connecting(from, to)
+    }
+
+    fn dep_graph(&self) -> &DependencyGraph<Key> {
+        if let Some(sandbox) = self.sandbox.as_deref() {
+            return &sandbox.dep_graph;
+        }
+        &self.dep_graph
+    }
+
+    fn dep_graph_mut(&mut self) -> &mut DependencyGraph<Key> {
+        &mut self
+            .sandbox
+            .as_deref_mut()
+            .expect("transaction not started")
+            .dep_graph
+    }
+
+    fn keys(&self) -> &HashMap<AbsoluteUri, Key> {
+        if let Some(sandbox) = self.sandbox.as_deref() {
+            return &sandbox.keys;
+        }
+        &self.keys
+    }
+
+    fn keys_mut(&mut self) -> &mut HashMap<AbsoluteUri, Key> {
+        &mut self
+            .sandbox
+            .as_deref_mut()
+            .expect("transaction not started")
+            .keys
+    }
+
+    fn schemas(&self) -> &SlotMap<Key, CompiledSchema> {
+        if let Some(sandbox) = self.sandbox.as_deref() {
+            return &sandbox.schemas;
+        }
+        &self.schemas
+    }
+
+    fn schemas_mut(&mut self) -> &mut SlotMap<Key, CompiledSchema> {
+        &mut self
+            .sandbox
+            .as_deref_mut()
+            .expect("transaction not started")
+            .schemas
+    }
+
+    /// Starts a new transaction.
+    pub(crate) fn start_txn(&mut self) {
+        assert!(self.sandbox.is_none(), "sandbox already exists\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new");
+        self.sandbox = Sandbox::new(&self.schemas, &self.keys, &self.dep_graph).into();
+    }
+
+    /// Accepts the current transaction, committing all changes.
+    pub(crate) fn accept_txn(&mut self) {
+        let sandbox = self.sandbox.take().expect("sandbox should be present");
+        self.dep_graph = sandbox.dep_graph;
+        self.keys = sandbox.keys;
+        self.schemas = sandbox.schemas;
+    }
+
+    /// Rejects the current transaction, discarding all changes.
+    pub(crate) fn rollback_txn(&mut self) {
+        self.sandbox = None;
     }
 }
-
 impl<Key: slotmap::Key> Default for Schemas<Key> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct LocatedSchema<'v> {
-    /// The Uri of the Schema
-    pub uri: AbsoluteUri,
-    pub value: &'v Value,
-    pub path: Pointer,
-    pub keyword: Option<Keyword<'v>>,
+#[derive(Debug, Clone, Default)]
+struct Sandbox<Key: slotmap::Key> {
+    schemas: SlotMap<Key, CompiledSchema>,
+    keys: HashMap<AbsoluteUri, Key>,
+    dep_graph: DependencyGraph<Key>,
 }
 
-impl<'v> LocatedSchema<'v> {
-    #[must_use]
-    pub fn new(
-        uri: AbsoluteUri,
-        value: &'v Value,
-        path: Pointer,
-        keyword: Option<Keyword<'v>>,
-    ) -> Self {
-        Self {
-            uri,
-            value,
-            path,
-            keyword,
+impl<Key: slotmap::Key> Sandbox<Key> {
+    fn new(
+        schemas: &SlotMap<Key, CompiledSchema>,
+        keys: &HashMap<AbsoluteUri, Key>,
+        dep_graph: &DependencyGraph<Key>,
+    ) -> Box<Self> {
+        Box::new(Self {
+            schemas: schemas.clone(),
+            keys: keys.clone(),
+            dep_graph: dep_graph.clone(),
+        })
+    }
+
+    fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+        let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
+        if let Some(key) = self.keys.get(id) {
+            let existing = self.schemas.get(*key).unwrap();
+            if existing != &schema {
+                return Err(id.clone());
+            }
+            return Ok(*key);
         }
+        let key = self.schemas.insert(schema);
+        self.dep_graph.insert(key);
+        for uri in schema.uris.iter().cloned() {
+            self.keys.insert(uri, key);
+        }
+        Ok(key)
     }
-}
-
-impl Deref for LocatedSchema<'_> {
-    type Target = Value;
-
-    fn deref(&self) -> &Self::Target {
-        self.value
-    }
-}
-
-pub struct LocatedSchemas<'v> {
-    pub located: HashMap<Pointer, Vec<LocatedSchema<'v>>>,
 }
 
 pub struct Iter<'i, Key: slotmap::Key> {
@@ -341,16 +447,16 @@ impl<'i, Key: slotmap::Key> Iterator for Iter<'i, Key> {
         let key = self.inner.next()?;
         // safety: if the Key exists, it should be in this slotmap.
         // If it isn't, that is a developer error.
-        let schema = self.schemas.get(key).expect(err_msg::INVALID_KEY);
+        let schema = self.schemas.get(key).expect(err_msg::INVALID_SCHEMA_KEY);
         let dependents = self
             .graph
-            .dependents(&schema.id, self.keys)
-            .expect(err_msg::INVALID_KEY)
+            .dependents(key)
+            .expect(err_msg::INVALID_SCHEMA_KEY)
             .collect();
         let dependencies = self
             .graph
-            .dependencies(&schema.id, self.keys)
-            .expect(err_msg::INVALID_KEY)
+            .dependencies(key)
+            .expect(err_msg::INVALID_SCHEMA_KEY)
             .collect();
         Some(Schema::new(
             key,
@@ -359,26 +465,6 @@ impl<'i, Key: slotmap::Key> Iterator for Iter<'i, Key> {
             dependencies,
             self.sources,
         ))
-    }
-}
-
-impl<'v> LocatedSchemas<'v> {
-    #[must_use]
-    pub fn new(located_schemas: Vec<LocatedSchema<'v>>) -> Self {
-        let mut results: HashMap<Pointer, Vec<LocatedSchema<'_>>> = HashMap::new();
-        for located_schema in located_schemas {
-            results
-                .entry(located_schema.path.clone())
-                .or_default()
-                .push(located_schema);
-        }
-        Self { located: results }
-    }
-}
-
-impl<'v> From<Vec<LocatedSchema<'v>>> for LocatedSchemas<'v> {
-    fn from(located: Vec<LocatedSchema<'v>>) -> Self {
-        Self::new(located)
     }
 }
 
@@ -1499,13 +1585,15 @@ impl<'s> From<&'s str> for Keyword<'s> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Anchor<'v> {
+pub struct Anchor {
     /// Value of the anchor.  
-    pub value: &'v str,
-    /// The containing `Value`
-    pub container: &'v Value,
-    /// The keyword of the anchor
-    pub keyword: Keyword<'v>,
+    pub value: String,
+    /// Path to the anchor
+    pub path: Pointer,
+    /// Path to the object which contains the anchor
+    pub container_path: Pointer,
+    /// The keyword of the anchor, e.g. `"$anchor"`, `"$dynamicAnchor"`, `"$recursiveAnchor"`
+    pub keyword: Keyword<'static>,
 }
 
 #[cfg(test)]

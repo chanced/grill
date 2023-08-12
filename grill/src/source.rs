@@ -1,7 +1,7 @@
 use crate::{
     deserialize::Deserializers,
-    dialect::Metaschema,
-    error::{DeserializeError, SourceDeserializationError, SourceDuplicateError, SourceError},
+    error::{DeserializeError, SourceConflictError, SourceDeserializationError, SourceError},
+    schema::Metaschema,
     AbsoluteUri, Deserializer,
 };
 use serde_json::Value;
@@ -113,10 +113,10 @@ impl Sources {
                         uri: uri.clone(),
                         error: e,
                     })?;
-            if let Some(fragment) = uri.fragment() {
-                if !fragment.is_empty() {
-                    return Err(SourceError::FragmentedUri(uri));
-                }
+
+            let fragment = uri.fragment();
+            if fragment.is_some() && fragment != Some("") {
+                return Err(SourceError::FragmentedUri(uri));
             }
             sources.insert(uri, src);
         }
@@ -171,7 +171,7 @@ impl Sources {
             // error out if a source with the same uri has been indexed and the
             // values do not match
 
-            return Err(SourceDuplicateError {
+            return Err(SourceConflictError {
                 uri,
                 value: source.into_owned().into(),
             }
@@ -184,7 +184,7 @@ impl Sources {
         &mut self,
         uri: AbsoluteUri,
         source: Value,
-    ) -> Result<&Value, SourceDuplicateError> {
+    ) -> Result<&Value, SourceConflictError> {
         if self.sources.contains_key(&uri) {
             // safe, checked above
             let src = self.sources.get(&uri).unwrap();
@@ -193,7 +193,7 @@ impl Sources {
             }
             // error out if a source with the same uri has been indexed and the
             // values do not match
-            return Err(SourceDuplicateError {
+            return Err(SourceConflictError {
                 uri,
                 value: source.into(),
             });

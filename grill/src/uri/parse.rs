@@ -143,14 +143,14 @@ impl<'a> Parse<'a> {
     fn parse_url(&mut self) -> Option<Result<Uri, UriError>> {
         Url::parse(self.input)
             .map(Uri::Url)
-            .map_err(UriError::Url)
+            .map_err(UriError::FailedToParseUrl)
             .into()
     }
 
     fn parse_urn(&mut self) -> Option<Result<Uri, UriError>> {
         Urn::from_str(self.input)
             .map(Uri::Urn)
-            .map_err(UriError::Urn)
+            .map_err(UriError::FailedToParseUrn)
             .into()
     }
 
@@ -707,7 +707,7 @@ mod tests {
             (Head, "//username:password@host:123", Authority(Port)),
             (Head, "//username:password@host:1234", Authority(Port)),
             (Head, "//username:password@host:12345", Authority(Port)),
-            (Head, "//username:password@host:123456", Authority(Host)),
+            (Head, "//username:password@host:123456", Authority(Port)),
             (Head, "///", Path),
             (Head, "?", Query),
             (Head, "#", Fragment),
@@ -726,6 +726,7 @@ mod tests {
      *                        */
 
     /// Boxes t
+    #[allow(clippy::unnecessary_box_returns)]
     fn b<T: 'static>(t: T) -> Box<T> {
         Box::new(t)
     }
@@ -745,7 +746,7 @@ mod tests {
         let result = input.chars().fold(state, State::next);
         assert_eq!(
             result, expected,
-            "input: \'{input:?}\'\nexpected: {expected:?}\nresult: {result:?}\n\n"
+            "\n\ninput:\t\t\'{input:?}\'\nexpected:\t{expected:?}\nresult:\t\t{result:?}\n\n"
         );
     }
 

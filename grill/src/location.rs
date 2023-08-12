@@ -194,7 +194,7 @@ impl PartialEq<String> for AbsoluteKeywordLocation<'_> {
     fn eq(&self, other: &String) -> bool {
         let mut uri = self.uri.clone().into_owned();
         uri.set_fragment(Some(self.pointer.as_str())).unwrap();
-        uri.to_string() == *other
+        uri == *other
     }
 }
 impl PartialEq<str> for AbsoluteKeywordLocation<'_> {

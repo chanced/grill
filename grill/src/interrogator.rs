@@ -5,15 +5,14 @@ use serde_json::Value;
 
 use crate::{
     deserialize::{deserialize_json, Deserializers},
-    dialect::{Dialect, Dialects},
     error::{
         BuildError, CompileError, DeserializeError, DialectUnknownError, EvaluateError,
-        ResolveError, SourceError, UriError,
+        ResolveError, SourceConflictError, SourceError, UriError,
     },
     json_schema,
     resolve::Resolvers,
-    schema::Keyword,
-    schema::Schemas,
+    schema::{CompiledSchema, Dialect, Keyword},
+    schema::{Dialects, Schemas},
     source::Sources,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Deserializer, Output, Resolve, Schema, SchemaKey, Source, Structure,
@@ -45,47 +44,151 @@ where
     Key: slotmap::Key,
 {
     /// Attempts to compile the schema at the given URI if not already compiled,
-    /// returning the [`SchemaRef`] of either the freshly compiled [`Schema`] or
-    ///
-    /// the existing [`SchemaRef`] of previously compiled, immutable [`Schema`].
+    /// returning the freshly or previously compiled [`Schema`].
     ///
     /// # Errors
     /// Returns [`CompileError`] if:
     ///   - the schema fails to compile.
     ///   - a dependent schema fails to compile.
     ///   - the uri fails to convert to an [`AbsoluteUri`].
+    ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+        self.schemas.start_txn();
+
         // convert the uri to an absolute uri
         let uri = uri.try_into_absolute_uri()?;
         // resolving the uri provided.
-        let value = self.resolve(&uri).await?;
-        // determine the dialect
-        let dialect = self.dialects.pertinent_to_or_default(&value);
-        // identifying the schema
-        let id = dialect.identify(&uri, &value)?.unwrap_or(uri);
-        // checking to see if the schema has already been compiled under the id
-        if let Some((key, _)) = self.schemas.get_by_id(&id, &self.sources) {
-            return Ok(key);
+        let (ptr, value) = self.resolve(&uri).await?;
+
+        // self.compile_schema(uri, &value)
+        //     .await
+        //     .tap_ok(|_| self.schemas.accept_txn())
+        //     .tap_err(|_| self.schemas.rollback_txn())
+        todo!()
+    }
+
+    /// Returns the [`Schema`] with the given `key` if it exists.
+    #[must_use]
+    pub fn schema(&self, key: Key) -> Schema<'_, Key> {
+        self.schemas.get(key, &self.sources).unwrap()
+    }
+
+    /// Returns the [`Schema`] with the given `id` if it exists.
+    #[must_use]
+    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<Schema<'_, Key>> {
+        self.schemas.get_by_uri(id, &self.sources)
+    }
+
+    /// Compiles all schemas at the given URIs if not already compiled, returning
+    /// a [`Vec`] of either the freshly or previously compiled [`Schema`]s
+    ///
+    /// # Errors
+    /// Returns [`CompileError`] if any of the schemas fail to compile.
+    ///
+    /// # Example
+    /// ```rust
+    /// use grill::{ Interrogator };
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
+    ///     interrogator.source_str("https://example.com/string.json", r#"{"type": "string"}"#).unwrap();
+    ///     interrogator.source_str("https://example.com/number.json", r#"{"type": "number"}"#).unwrap();
+    ///     let schemas = interrogator.compile_all(vec![
+    ///        "https://example.com/string.json",
+    ///        "https://example.com/number.json",
+    ///     ]).unwrap();
+    ///     assert_eq!(schemas.len(), 2);
+    /// }
+    /// ```
+    #[allow(clippy::unused_async)]
+    pub async fn compile_all<I>(
+        &mut self,
+        uris: I,
+    ) -> Result<Vec<Schema<'static, Key>>, CompileError>
+    where
+        I: IntoIterator,
+        I::Item: TryIntoAbsoluteUri,
+    {
+        self.schemas.start_txn();
+        let mut keys = Vec::new();
+        for uri in uris {
+            // let schema = self
+            //     .compile_schema(uri)
+            //     .await
+            //     .tap_err(|_| self.schemas.rollback_txn())?;
+            // keys.push(schema);
         }
-        let located = dialect.locate_schemas(&Pointer::default(), &id, &value, &self.dialects)?;
+        self.schemas.accept_txn();
+        Ok(keys
+            .into_iter()
+            .map(|key| self.schemas.get(key, &self.sources).unwrap().into_owned())
+            .collect())
+    }
+    #[allow(clippy::unused_async, dead_code)]
+    async fn compile_schema(
+        &mut self,
+        base_uri: AbsoluteUri,
+        source_uri: AbsoluteUri,
+        value: &Value,
+        path: &Pointer,
+    ) -> Result<Key, CompileError> {
+        // determining the dialect
+        let dialect = self.dialects.pertinent_to_or_default(value);
+
+        // identifying the schema
+        let (id, uris) = dialect.identify(base_uri.clone(), path, value)?;
+
+        // if identify did not find a primary id, use the uri + pointer fragment
+        // as the lookup which will be at index 0 of uris
+        let lookup_id = id.as_ref().unwrap_or(&uris[0]);
+
+        // checking to see if the schema has already been compiled under the id
+        if let Some(schema) = self.schemas.get_by_uri(lookup_id, &self.sources) {
+            // if so, return it
+            return Ok(schema.key);
+        }
+
+        // compiling this schema
+        let compiled = CompiledSchema {
+            id,
+            uris,
+            metaschema: dialect.primary_metaschema_id().clone(),
+            handlers: dialect.handlers.clone().into_boxed_slice(),
+            source_uri,
+            source_path: path.clone(),
+        };
+
+        let key = self.schemas.insert(compiled).map_err(|uri| {
+            SourceError::from(SourceConflictError {
+                uri,
+                value: value.clone().into(),
+            })
+        })?;
+
+        // gathering nested schemas
+        let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
+
+        // compiling nested schemas
 
         todo!()
     }
 
     #[must_use]
-    pub fn dialects(&self) -> &Dialects {
+    pub fn dialects(&self) -> &[Dialect] {
         &self.dialects
     }
 
     /// Attempts to resolve deserialize, and store the schema at the given URI
     /// using either local in-mem storage or resolved with any of the attached
     /// implementations of [`Resolve`]s.
-    async fn resolve(&mut self, uri: impl Borrow<AbsoluteUri>) -> Result<Value, SourceError> {
+    async fn resolve(
+        &mut self,
+        uri: impl Borrow<AbsoluteUri>,
+    ) -> Result<(Pointer, Value), SourceError> {
         let uri = uri.borrow();
-
         // if the value has already been indexed, return a clone of the local copy
         if let Some(schema) = self.sources.get(uri) {
-            return Ok(schema.clone());
+            return Ok((Pointer::default(), schema.clone()));
         }
 
         // checking to see if the root resource has already been stored
@@ -106,13 +209,13 @@ where
         // if the uri does not have a fragment, we are done and can return the
         // root-level schema
         if uri_fragment.is_empty() {
-            return Ok(root);
+            return Ok((Pointer::default(), root));
         }
 
         // if the uri does have a fragment then there is more work to do.
         // first, perform lookup again to see if add_source indexed the schema
         if let Some(schema) = self.sources.get(uri) {
-            return Ok(schema.clone());
+            return Ok((Pointer::default(), schema.clone()));
         }
 
         // if not, the fragment must be a json pointer as all anchors and
@@ -121,9 +224,10 @@ where
         let ptr =
             Pointer::from_str(uri_fragment).map_err(|err| ResolveError::new(err, uri.clone()))?;
 
-        root.resolve(&ptr)
-            .cloned()
-            .map_err(|err| ResolveError::new(err, uri.clone()).into())
+        let value = root.resolve(&ptr).cloned().map_err(|err| {
+            SourceError::ResolutionFailed(ResolveError::new(err, uri.clone()).into())
+        })?;
+        Ok((ptr, value))
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
@@ -161,17 +265,10 @@ where
         todo!()
     }
 
-    /// Returns the `Key` and `Schema` if it exists
-    #[must_use]
-    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<(Key, Schema<Key>)> {
-        self.schemas.get_by_id(id, &self.sources)
-    }
-
     /// Returns the schema's `Key` if it exists
     #[must_use]
     pub fn schema_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
-        let (key, _) = self.schemas.get_by_id(id, &self.sources)?;
-        Some(key)
+        self.schemas.get_by_uri(id, &self.sources)?.key.into()
     }
     /// Returns the attached `Deserializers`.
     #[must_use]
@@ -222,7 +319,7 @@ where
     /// interrogator.source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap();
     /// ```
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// Returns [`UriError`] if the `uri` fails to convert to an
     /// [`AbsoluteUri`](`crate::AbsoluteUri`).
     pub fn source_str(
         &mut self,
@@ -246,7 +343,7 @@ where
     /// interrogator.source_value("https://example.com/schema.json", source).unwrap();
     /// ```
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// Returns [`UriError`] if the `uri` fails to convert to an
     /// [`AbsoluteUri`](`crate::AbsoluteUri`).
     ///
     pub fn source_value(
@@ -275,7 +372,7 @@ where
     /// ```
     ///
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if a URI fails to convert to an
+    /// Returns [`UriError`] if a URI fails to convert to an
     /// [`AbsoluteUri`]
     pub fn source_strs<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
     where
@@ -540,7 +637,7 @@ where
     ///     .unwrap();
     /// ```
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// Returns [`UriError`] if the `uri` fails to convert to an
     /// [`AbsoluteUri`](`crate::AbsoluteUri`).
     pub fn source_str(
         mut self,
@@ -566,7 +663,7 @@ where
     ///     .unwrap();
     /// ```
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if the `uri` fails to convert to an
+    /// Returns [`UriError`] if the `uri` fails to convert to an
     /// [`AbsoluteUri`](`crate::AbsoluteUri`).
     ///
     pub fn source_value(
@@ -596,7 +693,7 @@ where
     ///     .unwrap();
     /// ```
     /// # Errors
-    /// Returns [`AbsoluteUriParseError`] if a URI fails to convert to an
+    /// Returns [`UriError`] if a URI fails to convert to an
     /// [`AbsoluteUri`]
     pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, UriError>
     where
@@ -767,7 +864,7 @@ where
             _marker,
         } = self;
 
-        let dialects = Dialects::new(dialects, default_dialect)?;
+        let dialects = Dialects::new(dialects, default_dialect.as_ref())?;
         sources.append(&mut dialects.sources());
         let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(sources, &deserializers)?;
@@ -802,9 +899,9 @@ where
     // ///    .unwrap();
     // /// ```
     // /// # Errors
-    // /// Returns [`AbsoluteUriParseError`] if the URI fails to convert
+    // /// Returns [`UriError`] if the URI fails to convert
     // /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
-    // pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, AbsoluteUriParseError>
+    // pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, UriError>
     // where
     //     I: IntoIterator<Item = V>,
     //     V: TryIntoAbsoluteUri,

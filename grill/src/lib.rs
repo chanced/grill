@@ -29,8 +29,6 @@ pub use interrogator::{Builder, Interrogator};
 
 pub use slotmap::new_key_type;
 
-pub mod dialect;
-
 
 pub mod handler;
 pub use handler::{Scope, Handler};

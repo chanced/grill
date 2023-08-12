@@ -1,9 +1,8 @@
 pub use super::draft_2019_09::identify_schema;
 
 use crate::{
-    dialect::{Dialect, Metaschema},
-    uri::AbsoluteUri,
-    Uri,
+    schema::{Dialect, Metaschema},
+    uri::{AbsoluteUri, Uri},
 };
 
 use once_cell::sync::Lazy;
@@ -132,6 +131,7 @@ pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
     )
+    .unwrap()
 });
 
 #[must_use]

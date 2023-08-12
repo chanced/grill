@@ -1,5 +1,5 @@
 use crate::{
-    dialect::{Dialect, Metaschema},
+    schema::{Dialect, Metaschema},
     error::IdentifyError,
     uri::AbsoluteUri,
     Uri,
@@ -42,6 +42,7 @@ pub static JSON_SCHEMA_04_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         )],
         [super::draft_07::ConstHandler::new()], // TODO: FIX,
     )
+    .unwrap()
 });
 
 #[must_use]

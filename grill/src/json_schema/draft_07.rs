@@ -9,7 +9,9 @@ pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
 use crate::{
-    dialect::Dialect, dialect::Metaschema, error::IdentifyError, uri::AbsoluteUri, uri::Uri,
+    error::IdentifyError,
+    schema::{Dialect, Metaschema},
+    uri::{AbsoluteUri, Uri},
 };
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -52,6 +54,7 @@ pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
         [Lazy::force(&JSON_SCHEMA_07_METASCHEMA)],
         [ConstHandler::new()],
     )
+    .unwrap()
 });
 
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.
