@@ -1,145 +1,177 @@
 use crate::{
     error::IdentifyError,
     schema::{Dialect, Keyword, Metaschema},
-    uri::{AbsoluteUri, Uri},
+    uri::{AbsoluteUri, AsUriRef, Uri},
 };
-use once_cell::sync::Lazy;
+use lazy_static::lazy_static;
 use serde_json::Value;
 use url::Url;
-
+/// URI for JSON Schema Draft 2019-09 in the form of a `&str`.
+///
+/// <https://json-schema.org/draft/2019-09/schema>
 pub const JSON_SCHEMA_2019_09_URI_STR: &str = "https://json-schema.org/draft/2019-09/schema";
-pub static JSON_SCHEMA_2019_09_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_SCHEMA_2019_09_URI_STR).unwrap());
-pub static JSON_SCHEMA_2019_09_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_SCHEMA_2019_09_URL).clone()));
 
+/// URI for JSON Hyper-Schema Draft 2019-09 in the form of a `&str`.
+///
+/// <https://json-schema.org/draft/2019-09/hyper-schema>
 pub const JSON_HYPER_SCHEMA_2019_09_URI_STR: &str =
     "https://json-schema.org/draft/2019-09/hyper-schema";
 
-pub static JSON_HYPER_SCHEMA_2019_09_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_HYPER_SCHEMA_2019_09_URI_STR).unwrap());
-pub static JSON_HYPER_SCHEMA_2019_09_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_HYPER_SCHEMA_2019_09_URL).clone()));
-pub static JSON_SCHEMA_2019_09_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::Url(Lazy::force(&JSON_SCHEMA_2019_09_URL).clone()));
-pub static JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::Url(Lazy::force(&JSON_HYPER_SCHEMA_2019_09_URL).clone()));
-
-// pub static JSON_SCHEMA_2019_09_FORMAT_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-//     Lazy::new(|| AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/format").unwrap());
-// pub static JSON_SCHEMA_2019_09_METADATA_ABSOLUTE_URI: Lazy<AbsoluteUri> = Lazy::new(|| {
-//     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/meta-data").unwrap()
-// });
-
+/// Bytes for JSON Schema Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/schema.json");
+
+/// Bytes for JSON Hyper-Schema Draft 2019-09.
 pub const JSON_HYPER_SCHEMA_2019_09_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/hyper-schema.json");
+
+/// Bytes for JSON Hyper Schema Links Draft 2019-09.
 pub const JSON_HYPER_SCHEMA_2019_09_LINKS_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/links.json");
+
+/// Bytes for JSON Schema Output Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_OUTPUT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/output/schema.json");
+
+/// Bytes for JSON Hyper Schema Output Draft 2019-09.
 pub const JSON_HYPER_SCHEMA_2019_09_OUTPUT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/output/hyper-schema.json");
+
+/// Bytes for JSON Schema Applicator Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_APPLICATOR_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/applicator.json");
+
+/// Bytes for JSON Schema Content Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_CONTENT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/content.json");
+
+/// Bytes for JSON Schema Core Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_CORE_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/core.json");
+
+/// Bytes for JSON Schema Format Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_FORMAT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/format.json");
+
+/// Bytes for JSON Schema Meta-Data Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_META_DATA_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/meta-data.json");
+
+/// Bytes for JSON Schema Validation Draft 2019-09.
 pub const JSON_SCHEMA_2019_09_VALIDATION_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2019-09/meta/validation.json");
 
-pub static JSON_SCHEMA_2019_09_OUTPUT_VALUE: Lazy<Value> =
-    Lazy::new(|| serde_json::from_slice(JSON_SCHEMA_2019_09_OUTPUT_BYTES).unwrap());
+lazy_static! {
+    /// [`Url`] for JSON Schema Draft 2019-09.
+    ///
+    /// <https://json-schema.org/draft/2019-09/schema>
+    pub static ref JSON_SCHEMA_2019_09_URL: Url = Url::parse(JSON_SCHEMA_2019_09_URI_STR).unwrap();
 
-pub static JSON_HYPER_SCHEMA_2019_09_OUTPUT_VALUE: Lazy<Value> =
-    Lazy::new(|| serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_OUTPUT_BYTES).unwrap());
+    /// [`Uri`] for JSON Schema Draft 2019-09.
+    ///
+    /// <https://json-schema.org/draft/2019-09/schema>
+    pub static ref JSON_SCHEMA_2019_09_URI: Uri = Uri::Url(JSON_SCHEMA_2019_09_URL.clone());
 
-pub static JSON_SCHEMA_2019_09_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Url`] for JSON Schema Hyper Draft 2019-09.
+    ///
+    pub static ref JSON_HYPER_SCHEMA_2019_09_URL: Url = Url::parse(JSON_HYPER_SCHEMA_2019_09_URI_STR).unwrap();
+
+    /// [`Uri`] for JSON Hyper Schema Draft 2019-09.
+    ///
+    /// <https://json-schema.org/draft/2019-09/hyper-schema>
+    pub static ref JSON_HYPER_SCHEMA_2019_09_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_2019_09_URL.clone());
+
+    /// [`AbsoluteUri`] for JSON Schema Draft 2019-09.
+    ///
+    /// <https://json-schema.org/draft/2019-09/schema>
+    pub static ref JSON_SCHEMA_2019_09_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_SCHEMA_2019_09_URL.clone());
+
+    /// [`AbsoluteUri`] for JSON Hyper Schema Draft 2019-09.
+    ///
+    /// <https://json-schema.org/draft/2019-09/hyper-schema>
+    pub static ref JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_HYPER_SCHEMA_2019_09_URL.clone());
+
+    /// [`Value`] for JSON Schema Output Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_OUTPUT_VALUE: Value = serde_json::from_slice(
+        JSON_SCHEMA_2019_09_OUTPUT_BYTES
+    ).unwrap();
+
+    /// [`Value`] for JSON Hyper Schema Output Draft 2019-09.
+    pub static ref JSON_HYPER_SCHEMA_2019_09_OUTPUT_VALUE: Value = serde_json::from_slice(
+        JSON_HYPER_SCHEMA_2019_09_OUTPUT_BYTES
+    ).unwrap();
+
+    /// [`Metaschema`] of JSON Schema Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_METASCHEMA: Metaschema =  Metaschema::new(
         JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_HYPER_SCHEMA_2019_09_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Hyper Schema Draft 2019-09.
+    pub static ref JSON_HYPER_SCHEMA_2019_09_METASCHEMA: Metaschema = Metaschema::new(
         JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
         serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_HYPER_SCHEMA_2019_09_LINKS_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Hyper Schema Links Draft 2019-09.
+    pub static ref JSON_HYPER_SCHEMA_2019_09_LINKS_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/links").unwrap(),
         serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_LINKS_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Applicator Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/applicator").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_APPLICATOR_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_CONTENT_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Content Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_CONTENT_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/content").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_CONTENT_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_CORE_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Core Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_CORE_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/core").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_CORE_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_FORMAT_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Format Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_FORMAT_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/format").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_FORMAT_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_META_DATA_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Meta-Data Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_META_DATA_METASCHEMA: Metaschema =  Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/meta-data").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_META_DATA_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] of JSON Schema Validation Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/validation").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2019_09_VALIDATION_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2019_09_DIALECT: Lazy<Dialect> = Lazy::new(|| {
-    Dialect::new(
-        json_schema_2019_09_absolute_uri().clone(),
+    /// [`Dialect`] for JSON Schema Draft 2019-09.
+    pub static ref JSON_SCHEMA_2019_09: Dialect = Dialect::new(
+        JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
         [
-            Lazy::force(&JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_CONTENT_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_CORE_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_FORMAT_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_META_DATA_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2019_09_METASCHEMA),
+            JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_CONTENT_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_CORE_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_FORMAT_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_META_DATA_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA.clone(),
+            JSON_SCHEMA_2019_09_METASCHEMA.clone(),
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
-    )
-    .unwrap()
-});
+    ).unwrap();
+}
 
+/// Returns `true` if the `value` is definitively JSON Schema Draft 2019-09.
 #[must_use]
 pub fn is_json_schema_2019_09(v: &Value) -> bool {
     // booleans are handled the same way across json schema dialects
@@ -153,94 +185,21 @@ pub fn is_json_schema_2019_09(v: &Value) -> bool {
     if s == JSON_SCHEMA_2019_09_URI_STR {
         return true;
     }
-    let Ok(uri) = Uri::parse(s) else { return false };
+    let Ok(uri) = AbsoluteUri::parse(s) else { return false };
     is_json_schema_2019_09_uri(&uri)
 }
 
+/// Returns `true` if `uri` is equal to JSON Schema Draft 2019-09 URI.
+///
+/// Any of the following return `true`:
+///
+/// - `"https://json-schema.org/draft/2019-09/schema"`
+/// - `"https://json-schema.org/draft/2019-09/schema#"`
+/// - `"http://json-schema.org/draft/2019-09/schema"`
+/// - `"http://json-schema.org/draft/2019-09/schema#"`
 #[must_use]
-pub fn json_schema_2019_09_url() -> &'static Url {
-    Lazy::force(&JSON_SCHEMA_2019_09_URL)
-}
-#[must_use]
-pub fn json_schema_2019_09_uri() -> &'static Uri {
-    Lazy::force(&JSON_SCHEMA_2019_09_URI)
-}
-#[must_use]
-pub fn json_schema_2019_09_absolute_uri() -> &'static AbsoluteUri {
-    Lazy::force(&JSON_SCHEMA_2019_09_ABSOLUTE_URI)
-}
-
-#[must_use]
-pub fn json_hyper_schema_2019_09_url() -> &'static Url {
-    Lazy::force(&JSON_HYPER_SCHEMA_2019_09_URL)
-}
-#[must_use]
-pub fn json_hyper_schema_2019_09_uri() -> &'static Uri {
-    Lazy::force(&JSON_HYPER_SCHEMA_2019_09_URI)
-}
-#[must_use]
-pub fn json_hyper_schema_2019_09_absolute_uri() -> &'static AbsoluteUri {
-    Lazy::force(&JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI)
-}
-
-#[must_use]
-pub fn dialect() -> &'static Dialect {
-    Lazy::force(&JSON_SCHEMA_2019_09_DIALECT)
-}
-
-pub fn is_json_hyper_schema_2019_09_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_2019_09_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_2019_09_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-pub fn is_json_hyper_schema_2019_09_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_2019_09_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_2019_09_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_2019_09_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_2019_09_URL.domain()
-                && u.path() == JSON_SCHEMA_2019_09_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_2019_09_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_2019_09_URL.domain()
-                && u.path() == JSON_SCHEMA_2019_09_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
+pub fn is_json_schema_2019_09_uri(uri: impl AsUriRef) -> bool {
+    super::is_uri_for(&JSON_SCHEMA_2019_09_URL, uri)
 }
 
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.
@@ -263,7 +222,7 @@ pub fn is_json_schema_2019_09_absolute_uri(uri: &AbsoluteUri) -> bool {
 pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
     let Some(id) = schema.get(Keyword::ID.as_ref()).and_then(Value::as_str) else { return Ok(None) };
     let uri = Uri::parse(id)?;
-    let Some(fragment) = uri.fragment() else { return Ok(Some(uri))};
+    let Some(fragment) = uri.fragment() else { return Ok(Some(uri)) };
     if fragment.is_empty() {
         Ok(Some(uri))
     } else {
@@ -389,7 +348,7 @@ mod tests {
                 ]),
             ),
         ];
-        let dialect = dialect();
+        let dialect = JSON_SCHEMA_2019_09.clone();
 
         let _dialects = Dialects::new(vec![dialect.clone()], Some(&dialect.id));
         let _base_uri = "https://example.com/example-schema.json"

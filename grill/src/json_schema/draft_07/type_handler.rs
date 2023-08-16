@@ -1,6 +1,5 @@
 use std::{collections::HashSet, fmt::Display, str::FromStr};
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -450,7 +449,7 @@ impl From<HashSet<Type>> for Types {
     fn from(ts: HashSet<Type>) -> Self {
         match ts.len() {
             1 => Types::Single(ts.into_iter().next().unwrap()),
-            _ => Types::Set(ts.into_iter().collect_vec()),
+            _ => Types::Set(ts.into_iter().collect::<Vec<_>>()),
         }
     }
 }

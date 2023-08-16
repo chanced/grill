@@ -132,19 +132,6 @@ impl Location {
     }
 }
 
-pub trait Locate {
-    fn location(&self) -> &Location;
-    fn absolute_keyword_location(&self) -> AbsoluteKeywordLocation<'_> {
-        self.location().absolute_keyword_location()
-    }
-    fn keyword_location(&self) -> &Pointer {
-        self.location().keyword_location()
-    }
-    fn instance_location(&self) -> &Pointer {
-        self.location().instance_location()
-    }
-}
-
 /// The absolute, dereferenced location of the validating keyword.
 ///
 /// The value MUST be expressed as a full URI using the canonical URI of the
@@ -204,7 +191,18 @@ impl PartialEq<str> for AbsoluteKeywordLocation<'_> {
         uri.as_str() == other
     }
 }
-
+pub trait Locate {
+    fn location(&self) -> &Location;
+    fn absolute_keyword_location(&self) -> AbsoluteKeywordLocation<'_> {
+        self.location().absolute_keyword_location()
+    }
+    fn keyword_location(&self) -> &Pointer {
+        self.location().keyword_location()
+    }
+    fn instance_location(&self) -> &Pointer {
+        self.location().instance_location()
+    }
+}
 impl<'a> AbsoluteKeywordLocation<'a> {
     #[must_use]
     pub fn new(mut uri: Uri) -> Self {

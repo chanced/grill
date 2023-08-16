@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::borrow::Cow;
 
@@ -24,6 +23,11 @@ const QUERY: &AsciiSet = &CONTROLS
     .add(b'<')
     .add(b'>')
     .add(b'\'');
+
+pub(super) use urn::percent::{
+    encode_f_component as f_component, encode_nss as nss, encode_r_component as r_component,
+    encode_q_component as q_component,
+};
 
 #[inline]
 pub(super) fn path_segment(s: &str) -> String {
@@ -54,7 +58,14 @@ pub(super) fn host(host: Option<&str>) -> Option<Cow<'static, str>> {
 
 #[inline]
 pub(super) fn path(path: &str) -> String {
-    path.split('/').map(path_segment).join("/")
+    path.split('/')
+        .map(path_segment)
+        .fold(String::new(), |mut acc, seg| {
+            acc.reserve(seg.len() + 1);
+            acc.push('/');
+            acc.push_str(&seg);
+            acc
+        })
 }
 
 #[inline]

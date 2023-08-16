@@ -14,19 +14,17 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 anymap           = { workspace = true }
 async-trait      = { workspace = true }
-big-rational-str = { workspace = true }
 dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }
 fancy-regex      = { workspace = true }
 inherent         = { workspace = true }
-itertools        = { workspace = true }
 jsonptr          = { workspace = true }
+lazy_static      = { workspace = true }
 num              = { workspace = true }
 num-rational     = { workspace = true }
 once_cell        = { workspace = true }
 percent-encoding = { workspace = true }
-petgraph         = { workspace = true }
 regex            = { workspace = true }
 reqwest          = { workspace = true, optional = true }
 serde            = { workspace = true }

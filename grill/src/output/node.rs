@@ -1,6 +1,5 @@
 use super::ValidationError;
-use crate::{location::Locate, Location};
-use inherent::inherent;
+use crate::schema::Location;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -100,20 +99,13 @@ impl<'v> Node<'v> {
     }
 }
 
-#[inherent]
-impl Locate for Node<'_> {
-    #[must_use]
-    pub fn location(&self) -> &Location {
-        &self.location
-    }
-}
-
 impl Display for Node<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(err) = &self.error {
             write!(f, "{err}")
         } else {
-            write!(f, "{} passed evaluation", self.absolute_keyword_location()) // TODO ABSOLUTE KEYWORD LOCATION
+            todo!()
+            // write!(f, "{} passed evaluation", self.absolute_keyword_location()) // TODO ABSOLUTE KEYWORD LOCATION
         }
     }
 }

@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Write};
 
 use crate::error::OverflowError;
 
-use super::to_u32;
+use crate::number::usize_to_u32;
 
 #[allow(clippy::unnecessary_unwrap, clippy::unnecessary_wraps)]
 pub(super) fn username<'a, T: Into<Cow<'a, str>>>(
@@ -28,7 +28,7 @@ pub(super) fn password<'a, T: Into<Cow<'a, str>>>(
     if password.is_empty() {
         return Ok(None);
     }
-    let buf_len = to_u32(buf.len())?;
+    let buf_len = usize_to_u32(buf.len())?;
     _ = buf.write_char(':');
     _ = buf.write_str(&password);
     Ok(Some(buf_len))
@@ -44,7 +44,7 @@ pub(super) fn host<'a, T: Into<Cow<'a, str>>>(
     if buf.is_empty() {
         buf.write_str("//").unwrap();
     }
-    let buf_len = to_u32(buf.len())?;
+    let buf_len = usize_to_u32(buf.len())?;
 
     if buf.len() > 2 && !host.starts_with('@') {
         buf.write_char('@').unwrap();
@@ -64,7 +64,7 @@ pub(super) fn port<'a, T: Into<Cow<'a, str>>>(
     if port.is_empty() {
         return Ok(None);
     }
-    let buf_len = to_u32(buf.len())?;
+    let buf_len = usize_to_u32(buf.len())?;
     buf.write_char(':').unwrap();
     buf.write_str(&port).unwrap();
 
@@ -80,14 +80,14 @@ pub(super) fn path<'a, T: Into<Cow<'a, str>>>(
         if buf.is_empty() {
             return Ok(0);
         }
-        return to_u32(buf.len());
+        return usize_to_u32(buf.len());
     }
     let buf_len = buf.len();
     if buf_len > 0 && !path.starts_with('/') {
         buf.push('/');
     }
     buf.push_str(&path);
-    to_u32(buf_len)
+    usize_to_u32(buf_len)
 }
 
 pub(super) fn query<'a, T: Into<Cow<'a, str>>>(
@@ -106,7 +106,7 @@ pub(super) fn query<'a, T: Into<Cow<'a, str>>>(
         buf.push('?');
     }
     buf.push_str(&query);
-    Ok(Some(to_u32(buf_len)?))
+    Ok(Some(usize_to_u32(buf_len)?))
 }
 
 pub(super) fn fragment<'a, T: Into<Cow<'a, str>>>(
@@ -121,5 +121,5 @@ pub(super) fn fragment<'a, T: Into<Cow<'a, str>>>(
         buf.push('#');
     }
     buf.write_str(&fragment).unwrap();
-    Ok(Some(to_u32(buf_len)?))
+    Ok(Some(usize_to_u32(buf_len)?))
 }

@@ -11,51 +11,43 @@ pub use type_handler::{TypeHandler, TypeInvalid};
 use crate::{
     error::IdentifyError,
     schema::{Dialect, Metaschema},
-    uri::{AbsoluteUri, Uri},
+    uri::{AbsoluteUri, AsUriRef, Uri},
 };
-use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
 
 pub const JSON_SCHEMA_07_URI_STR: &str = "http://json-schema.org/draft-07/schema#";
-pub static JSON_SCHEMA_07_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_SCHEMA_07_URI_STR).unwrap());
-pub static JSON_SCHEMA_07_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_SCHEMA_07_URL).clone()));
-pub static JSON_SCHEMA_07_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::Url(Lazy::force(&JSON_SCHEMA_07_URL).clone()));
-
 pub const JSON_HYPER_SCHEMA_07_URI_STR: &str = "http://json-schema.org/draft-07/hyper-schema#";
-pub static JSON_HYPER_SCHEMA_07_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_HYPER_SCHEMA_07_URI_STR).unwrap());
-pub static JSON_HYPER_SCHEMA_07_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_HYPER_SCHEMA_07_URL).clone()));
-pub static JSON_HYPER_SCHEMA_07_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::Url(Lazy::force(&JSON_HYPER_SCHEMA_07_URL).clone()));
-
 pub const JSON_SCHEMA_07_BYTES: &[u8] = include_bytes!("../../../json_schema/07/schema.json");
 pub const JSON_HYPER_SCHEMA_07_BYTES: &[u8] =
     include_bytes!("../../../json_schema/07/hyper-schema.json");
+
 pub const JSON_HYPER_SCHEMA_07_LINKS_BYTES: &[u8] =
     include_bytes!("../../../json_schema/07/links.json");
+
 pub const JSON_HYPER_SCHEMA_07_OUTPUT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/07/hyper-schema-output.json");
 
-pub static JSON_SCHEMA_07_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
-        json_schema_07_absolute_uri().clone(),
-        serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap(),
-    )
-});
+lazy_static::lazy_static! {
+    pub static ref JSON_SCHEMA_07_URL: Url = Url::parse(JSON_SCHEMA_07_URI_STR).unwrap();
+    pub static ref JSON_SCHEMA_07_URI: Uri = Uri::Url(JSON_SCHEMA_07_URL.clone());
+    pub static ref JSON_SCHEMA_07_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_SCHEMA_07_URL.clone());
+    pub static ref JSON_HYPER_SCHEMA_07_URL: Url = Url::parse(JSON_HYPER_SCHEMA_07_URI_STR).unwrap();
+    pub static ref JSON_HYPER_SCHEMA_07_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_07_URL.clone());
+    pub static ref JSON_HYPER_SCHEMA_07_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_HYPER_SCHEMA_07_URL.clone());
+    pub static ref JSON_SCHEMA_07_VALUE: Value = serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap();
+    pub static ref JSON_SCHEMA_07_METASCHEMA: Metaschema = Metaschema::new(
+        JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
+        JSON_SCHEMA_07_VALUE.as_object().unwrap().clone(),
+    );
 
-pub static JSON_SCHEMA_07_DIALECT: Lazy<Dialect> = Lazy::new(|| {
-    Dialect::new(
-        json_schema_07_absolute_uri().clone(),
-        [Lazy::force(&JSON_SCHEMA_07_METASCHEMA)],
+    pub static ref JSON_SCHEMA_07: Dialect = Dialect::new(
+        JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
+        [JSON_SCHEMA_07_METASCHEMA.clone()],
         [ConstHandler::new()],
     )
-    .unwrap()
-});
+    .unwrap();
+}
 
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.
 ///
@@ -81,107 +73,21 @@ pub fn identify_schema(_schema: &Value) -> Result<Option<Uri>, IdentifyError> {
 
 #[must_use]
 pub fn is_json_schema_07(v: &Value) -> bool {
-    // bools are handled the same way across json schema dialects
-    // so there's no need to cycle through the remaining schemas
-    // just to ultimately end up with a default dialect
-    if v.is_boolean() {
-        return true;
-    }
-
     let Value::Object(obj) = v else { return false };
     let Some(s) = obj.get("$schema").and_then(Value::as_str) else { return false };
     if s == JSON_SCHEMA_07_URI_STR {
         return true;
     }
-
     let Ok(uri) = Uri::parse(s) else { return false };
     is_json_schema_07_uri(&uri)
 }
 
-#[must_use]
-pub fn json_schema_07_url() -> &'static Url {
-    Lazy::force(&JSON_SCHEMA_07_URL)
-}
-#[must_use]
-pub fn json_schema_07_uri() -> &'static Uri {
-    Lazy::force(&JSON_SCHEMA_07_URI)
-}
-#[must_use]
-pub fn json_schema_07_absolute_uri() -> &'static AbsoluteUri {
-    Lazy::force(&JSON_SCHEMA_07_ABSOLUTE_URI)
+pub fn is_json_hyper_schema_07_uri(uri: impl AsUriRef) -> bool {
+    super::is_uri_for(&JSON_HYPER_SCHEMA_07_URL, uri)
 }
 
-#[must_use]
-pub fn json_hyper_schema_07_url() -> &'static Url {
-    Lazy::force(&JSON_HYPER_SCHEMA_07_URL)
-}
-#[must_use]
-pub fn json_hyper_schema_07_uri() -> &'static Uri {
-    Lazy::force(&JSON_HYPER_SCHEMA_07_URI)
-}
-#[must_use]
-pub fn json_hyper_schema_07_absolute_uri() -> &'static AbsoluteUri {
-    Lazy::force(&JSON_HYPER_SCHEMA_07_ABSOLUTE_URI)
-}
-
-#[must_use]
-pub fn dialect() -> &'static Dialect {
-    Lazy::force(&JSON_SCHEMA_07_DIALECT)
-}
-
-pub fn is_json_hyper_schema_07_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_07_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_07_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-pub fn is_json_hyper_schema_07_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_07_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_07_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_07_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_07_URL.domain()
-                && u.path() == JSON_SCHEMA_07_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_07_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_07_URL.domain()
-                && u.path() == JSON_SCHEMA_07_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
+pub fn is_json_schema_07_uri(uri: impl AsUriRef) -> bool {
+    super::is_uri_for(&JSON_SCHEMA_07_URL, uri)
 }
 
 #[cfg(test)]

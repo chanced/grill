@@ -7,20 +7,18 @@ grill = { path = "grill" }
 
 anymap           = { version = "1.0.0-beta.2" }
 async-trait      = { version = "0.1" }
-big-rational-str = { version = "0.1.6" }
 dyn-clone        = { version = "1.0.11" }
 either           = { version = "1.8.1" }
 erased-serde     = { version = "0.3.25" }
 fancy-regex      = { version = "0.11.0" }
 inherent         = { version = "1" }
-itertools        = { version = "0.10" }
-jsonptr          = { version = "0.4.2", features = [] }
+jsonptr          = { version = "0.4.2" }
+lazy_static      = { version = "1.4.0" }
 mockall          = { version = "0.11" }
 num              = { version = "0.4", features = ["serde"] }
 num-rational     = { version = "0.4.1" }
 once_cell        = { version = "1.10" }
 percent-encoding = { version = "2.3" }
-petgraph         = { version = "0.6" }
 regex            = { version = "1.5.4" }
 reqwest          = { version = "0.11" }
 serde            = { version = "1.0.163", features = ["derive", "rc"] }

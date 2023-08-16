@@ -1,10 +1,13 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
+use crate::handler::Handler;
+use crate::schema::Metaschema;
+
 use crate::{
     error::{DialectError, IdentifyError},
     uri::AbsoluteUri,
-    Handler, Object, Source,
+    Object, Source,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -17,9 +20,7 @@ use std::{
     iter::IntoIterator,
     ops::Deref,
 };
-use tap::{Tap, TapOptional};
-
-use super::Metaschema;
+use tap::TapOptional;
 
 /// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
 /// schema.

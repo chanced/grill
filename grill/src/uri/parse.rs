@@ -1,6 +1,8 @@
 use std::{ops::Range, str::FromStr};
 
-use super::{encode, to_u32, write, RelativeUri, Uri};
+use crate::number::usize_to_u32;
+
+use super::{encode, write, RelativeUri, Uri};
 use crate::error::{AuthorityError, InvalidPortError, UriError};
 use url::Url;
 use urn::Urn;
@@ -81,7 +83,7 @@ impl<'a> Parse<'a> {
     fn next(&mut self, index: usize, next: char) -> Option<Result<Uri, UriError>> {
         use AuthorityState::*;
         use State::*;
-        let index = match to_u32(index) {
+        let index = match usize_to_u32(index) {
             Ok(i) => i,
             Err(err) => return Some(Err(err.into())),
         };

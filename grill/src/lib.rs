@@ -21,36 +21,28 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
 
-pub mod location;
-pub use location::Location;
 
 mod interrogator;
-pub use interrogator::{Builder, Interrogator};
+pub use interrogator::{Interrogator, Builder};
 
 pub use slotmap::new_key_type;
-
-
-pub mod handler;
-pub use handler::{Scope, Handler};
 
 pub mod error;
 
 pub mod output;
 pub use output::{Output, Structure};
 
-pub mod resolve;
-pub use resolve::Resolve;
-
 pub mod uri;
 pub use uri::{Uri, AbsoluteUri, RelativeUri};
 
-pub mod json_schema;
-
-pub mod deserialize;
-pub use deserialize::Deserializer;
-
 pub mod schema;
 pub use schema::{Schema, SchemaKey};
+
+pub mod handler;
+
+pub mod json_schema;
+
+
 
 /// A JSON object.
 /// 
@@ -61,17 +53,15 @@ pub type Object = serde_json::Map<String, serde_json::Value>;
 /// Alias for `Vec<serde_json::Value>`.
 pub type Array = Vec<serde_json::Value>;
 
-new_key_type! {
-    /// Default key type for value store [`SlotMap`](`slotmap::SlotMap`) containing.
-    pub struct ValueKey;
-}
 
 pub mod source;
-pub use source::Source;
+pub(crate) use source::Source;
+
 
 #[cfg(test)]
 pub mod test;
 
+pub(crate) mod number;
 
 // mod integration;
 // pub use integration::Integration;

@@ -2,10 +2,8 @@ use std::{borrow::Cow, fmt::Display};
 
 use crate::{
     error::CompileError,
-    handler::Compile,
-    handler::SyncHandler,
+    handler::{Compile, Handler, SyncHandler},
     output::{self, ValidationError},
-    Handler,
 };
 use serde_json::{Number, Value};
 

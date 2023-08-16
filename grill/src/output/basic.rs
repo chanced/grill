@@ -1,12 +1,10 @@
-use std::{borrow::Cow, collections::BTreeMap};
-
 use jsonptr::Pointer;
 use serde::Serialize;
 use serde_json::Value;
-
-use crate::Location;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use super::ValidationError;
+use crate::schema::Location;
 
 #[derive(Debug, Clone)]
 pub struct Basic<'v> {

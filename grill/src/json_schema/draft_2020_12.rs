@@ -1,242 +1,261 @@
 pub use super::draft_2019_09::identify_schema;
-
 use crate::{
     schema::{Dialect, Metaschema},
-    uri::{AbsoluteUri, Uri},
+    uri::{AbsoluteUri, AsUriRef, Uri},
 };
-
-use once_cell::sync::Lazy;
 use serde_json::Value;
 use url::Url;
 
+/// URI for JSON Schema Draft 2020-12 in the form of a `&str`.
+///
+/// <https://json-schema.org/draft/2020-12/schema>
 pub const JSON_SCHEMA_2020_12_URI_STR: &str = "https://json-schema.org/draft/2020-12/schema";
-pub static JSON_SCHEMA_2020_12_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_SCHEMA_2020_12_URI_STR).unwrap());
-pub static JSON_SCHEMA_2020_12_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_SCHEMA_2020_12_URL).clone()));
-pub static JSON_SCHEMA_2020_12_ABSOLUTE_URI: Lazy<AbsoluteUri> =
-    Lazy::new(|| AbsoluteUri::Url(Lazy::force(&JSON_SCHEMA_2020_12_URL).clone()));
 
+/// URI for JSON Hyper-Schema Draft 2020-12 in the form of a `&str`.
+///
+/// <https://json-schema.org/draft/2020-12/hyper-schema>
 pub const JSON_HYPER_SCHEMA_2020_12_URI_STR: &str =
     "https://json-schema.org/draft/2020-12/hyper-schema";
-pub static JSON_HYPER_SCHEMA_2020_12_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse(JSON_HYPER_SCHEMA_2020_12_URI_STR).unwrap());
-pub static JSON_HYPER_SCHEMA_2020_12_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_HYPER_SCHEMA_2020_12_URL).clone()));
-pub static JSON_HYPER_SCHEMA_2020_12_ABSOLUTE_URI: Lazy<Uri> =
-    Lazy::new(|| Uri::Url(Lazy::force(&JSON_HYPER_SCHEMA_2020_12_URL).clone()));
 
+/// Bytes for JSON Schema Draft Metaschema 2020-12.
 pub const JSON_SCHEMA_2020_12_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/schema.json");
+
+/// Bytes for JSON Hyper-Schema Metaschema Draft 2020-12.
 pub const JSON_HYPER_SCHEMA_2020_12_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/hyper-schema.json");
+
+/// Bytes for JSON Hyper Schema Links Metaschema Draft 2020-12.
+///
+/// <https://json-schema.org/draft/2020-12/links>
 pub const JSON_HYPER_SCHEMA_2020_12_LINKS_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/links.json");
+
+/// Bytes for JSON Hyper Schema Output Metaschema Draft 2020-12.
+///
+/// <https://json-schema.org/draft/2019-09/output/hyper-schema>
 pub const JSON_HYPER_SCHEMA_2020_12_OUTPUT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/output/hyper-schema.json");
 
+/// Bytes for JSON Schema Applicator Metaschema Draft 2020-12.
+///
+/// <https://json-schema.org/draft/2020-12/meta/applicator>
 pub const JSON_SCHEMA_2020_12_APPLICATOR_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/applicator.json");
+
+/// Bytes for JSON Schema Content Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/content>
 pub const JSON_SCHEMA_2020_12_CONTENT_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/content.json");
+
+/// Bytes for JSON Schema Core Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/core>
 pub const JSON_SCHEMA_2020_12_CORE_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/core.json");
+
+/// Bytes for JSON Schema Format Annotation Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/format-annotation>
 pub const JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/format-annotation.json");
+
+/// Bytes for JSON Schema Format Assertion Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/format-assertion>
 pub const JSON_SCHEMA_2020_12_FORMAT_ASSERTION_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/format-annotation.json");
+
+/// Bytes for JSON Hyper Schema Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/hyper-schema>
 pub const JSON_HYPER_SCHEMA_2020_12_META_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/hyper-schema.json");
+
+/// Bytes for JSON Schema Meta Data Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/meta-data>
 pub const JSON_SCHEMA_2020_12_META_DATA_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/meta-data.json");
+
+/// Bytes for JSON Schema Unevaluated Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/unevaluated>
 pub const JSON_SCHEMA_2020_12_UNEVALUATED_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/unevaluated.json");
+
+/// Bytes for JSON Schema Validation Metaschema Draft 2020-12
+///
+/// <https://json-schema.org/draft/2020-12/meta/validation>
 pub const JSON_SCHEMA_2020_12_VALIDATION_BYTES: &[u8] =
     include_bytes!("../../../json_schema/2020-12/meta/validation.json");
 
-pub static JSON_SCHEMA_2020_12_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+lazy_static::lazy_static! {
+    /// [`Url`](`url::Url`) for JSON Schema Draft 2020-12.
+    pub static ref JSON_SCHEMA_2020_12_URL: Url = Url::parse(JSON_SCHEMA_2020_12_URI_STR).unwrap();
+    /// [`Uri`] for JSON Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/schema>
+
+    pub static ref JSON_SCHEMA_2020_12_URI: Uri = Uri::Url(JSON_SCHEMA_2020_12_URL.clone());
+    /// [`AbsoluteUri`] for JSON Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/schema>
+
+    /// [`AbsoluteUri`] for JSON Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/schema>
+
+    pub static ref JSON_SCHEMA_2020_12_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_SCHEMA_2020_12_URL.clone());
+    /// [`Url`] for JSON Hyper Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/hyper-schema>
+    pub static ref JSON_HYPER_SCHEMA_2020_12_URL: Url = Url::parse(JSON_HYPER_SCHEMA_2020_12_URI_STR).unwrap();
+
+    /// [`Uri`] for JSON Hyper Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/hyper-schema>
+    pub static ref JSON_HYPER_SCHEMA_2020_12_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_2020_12_URL.clone());
+
+    /// [`AbsoluteUri`] for JSON Hyper Schema Draft 2020-12.
+    ///
+    /// <https://json-schema.org/draft/2020-12/hyper-schema>
+    pub static ref JSON_HYPER_SCHEMA_2020_12_ABSOLUTE_URI: Uri =  Uri::Url(JSON_HYPER_SCHEMA_2020_12_URL.clone());
+
+    /// JSON [`Value`] for JSON Schema Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_VALUE: Value = serde_json::from_slice(
+        JSON_SCHEMA_2020_12_BYTES
+    ).unwrap();
+
+    /// [`Metaschema`] for JSON Schema Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_METASCHEMA: Metaschema = Metaschema::new(
         JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_BYTES).unwrap(),
-    )
-});
-pub static JSON_SCHEMA_2020_12_CONTENT_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CONTENT_BYTES).unwrap()
+            .as_object()
+            .cloned()
+            .unwrap()
+    );
+
+    /// [`Metaschema`] for JSON Hyper Schema Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_CONTENT_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/content").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_CONTENT_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CONTENT_BYTES)
+            .unwrap()
+            .as_object()
+            .cloned()
+            .unwrap(),
+    );
 
-pub static JSON_SCHEMA_2020_12_CORE_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Core Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_CORE_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/core").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_CORE_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CORE_BYTES)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
 
-pub static JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Format Annotation Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-annotation").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_BYTES)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
 
-pub static JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Format Assertion Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-assertion").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_FORMAT_ASSERTION_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_FORMAT_ASSERTION_BYTES)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
 
-pub static JSON_SCHEMA_2020_12_META_DATA_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Meta Data Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_META_DATA_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/meta-data").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_META_DATA_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice::<Value>(&JSON_SCHEMA_2020_12_META_DATA_BYTES)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
 
-pub static JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Unevaluated Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/unevaluated").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
-    )
-});
+        serde_json::from_slice(&JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
+    );
 
-pub static JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Validation Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/validation").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2020_12_VALIDATION_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA: Lazy<Metaschema> = Lazy::new(|| {
-    Metaschema::new(
+    /// [`Metaschema`] for JSON Schema Applicator Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/applicator").unwrap(),
         serde_json::from_slice(JSON_SCHEMA_2020_12_APPLICATOR_BYTES).unwrap(),
-    )
-});
+    );
 
-pub static JSON_SCHEMA_2020_12_DIALECT: Lazy<Dialect> = Lazy::new(|| {
-    Dialect::new(
-        json_schema_2020_12_absolute_uri().clone(),
+    /// [`Dialect`] for JSON Schema Draft 2020-12
+    pub static ref JSON_SCHEMA_2020_12: Dialect = Dialect::new(
+        JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
         [
-            Lazy::force(&JSON_SCHEMA_2020_12_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_CORE_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_META_DATA_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA),
-            Lazy::force(&JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA),
+           JSON_SCHEMA_2020_12_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_CORE_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_META_DATA_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA.clone(),
+           JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA.clone(),
         ],
         [super::draft_07::ConstHandler::new()], // TOOD: FIX
     )
-    .unwrap()
-});
+    .unwrap();
+}
 
+/// Returns `true` if the `value` is definitively JSON Schema Draft 2020-12.
 #[must_use]
-pub fn is_json_schema_2020_12(v: &Value) -> bool {
-    // bools are handled the same way across json schema dialects
-    // so there's no need to cycle through the remaining schemas
-    // just to ultimately end up with a default dialect
-    if v.is_boolean() {
-        return true;
-    }
-
-    let Value::Object(obj) = v else { return false };
+pub fn is_json_schema_2020_12(value: &Value) -> bool {
+    let Value::Object(obj) = value else { return false };
     let Some(s) = obj.get("$schema").and_then(Value::as_str) else { return false };
     if s == JSON_SCHEMA_2020_12_URI_STR {
         return true;
     }
 
-    let Ok(uri) = Uri::parse(s) else { return false };
+    let Ok(uri) = AbsoluteUri::parse(s) else { return false };
     is_json_schema_2020_12_uri(&uri)
 }
 
-#[must_use]
-pub fn json_schema_2020_12_url() -> &'static Url {
-    Lazy::force(&JSON_SCHEMA_2020_12_URL)
-}
-#[must_use]
-pub fn json_schema_2020_12_uri() -> &'static Uri {
-    Lazy::force(&JSON_SCHEMA_2020_12_URI)
-}
-#[must_use]
-pub fn json_schema_2020_12_absolute_uri() -> &'static AbsoluteUri {
-    Lazy::force(&JSON_SCHEMA_2020_12_ABSOLUTE_URI)
+/// Returns `true` if `uri` is equal to JSON Hyper Schema Draft 2020-12 URI.
+///
+/// Any of the following return `true`:
+/// - `"https://json-schema.org/draft/2020-12/hyper-schema"`
+/// - `"https://json-schema.org/draft/2020-12/hyper-schema#"`
+/// - `"http://json-schema.org/draft/2020-12/hyper-schema"`
+/// - `"http://json-schema.org/draft/2020-12/hyper-schema#"`
+pub fn is_json_hyper_schema_2020_12_uri(uri: impl AsUriRef) -> bool {
+    super::is_uri_for(&JSON_HYPER_SCHEMA_2020_12_URL, uri)
 }
 
-#[must_use]
-pub fn json_hyper_schema_2020_12_url() -> &'static Url {
-    Lazy::force(&JSON_HYPER_SCHEMA_2020_12_URL)
-}
-#[must_use]
-pub fn json_hyper_schema_2020_12_uri() -> &'static Uri {
-    Lazy::force(&JSON_HYPER_SCHEMA_2020_12_URI)
-}
-#[must_use]
-pub fn json_hyper_schema_2020_12_absolute_uri() -> &'static Uri {
-    Lazy::force(&JSON_HYPER_SCHEMA_2020_12_ABSOLUTE_URI)
-}
-
-#[must_use]
-pub fn dialect() -> &'static Dialect {
-    Lazy::force(&JSON_SCHEMA_2020_12_DIALECT)
-}
-
-pub fn is_json_hyper_schema_2020_12_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_2020_12_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_2020_12_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-pub fn is_json_hyper_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_HYPER_SCHEMA_2020_12_URL.domain()
-                && u.path() == JSON_HYPER_SCHEMA_2020_12_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_2020_12_uri(uri: &Uri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_2020_12_URL.domain()
-                && u.path() == JSON_SCHEMA_2020_12_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
-}
-
-pub fn is_json_schema_2020_12_absolute_uri(uri: &AbsoluteUri) -> bool {
-    if let Some(u) = uri.as_url() {
-        if u.scheme() != "http" && u.scheme() != "https" {
-            false
-        } else {
-            u.domain() == JSON_SCHEMA_2020_12_URL.domain()
-                && u.path() == JSON_SCHEMA_2020_12_URL.path()
-                && u.fragment().unwrap_or_default() == ""
-        }
-    } else {
-        false
-    }
+/// Returns `true` if `uri` is equal to JSON Schema Draft 2020-12 URI.
+///
+/// Any of the following return `true`:
+/// - `"https://json-schema.org/draft/2020-12/schema"`
+/// - `"https://json-schema.org/draft/2020-12/schema#"`
+/// - `"http://json-schema.org/draft/2020-12/schema"`
+/// - `"http://json-schema.org/draft/2020-12/schema#"`
+pub fn is_json_schema_2020_12_uri(uri: impl AsUriRef) -> bool {
+    super::is_uri_for(&JSON_HYPER_SCHEMA_2020_12_URL, uri)
 }
 
 #[cfg(test)]

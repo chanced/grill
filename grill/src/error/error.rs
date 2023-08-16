@@ -1,11 +1,5 @@
-//! Logical errors that can occur during usage of this crate.
-//!
-//! Validation errors are defined within their respective keyword's module.
-
 #[doc(no_inline)]
 pub use crate::output::ValidationError;
-#[doc(no_inline)]
-pub use big_rational_str::ParseError as BigRationalParseStrError;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 #[doc(no_inline)]
@@ -146,7 +140,7 @@ pub enum PointerError {
 pub enum SourceError {
     /// An error occurred while attempting to deserialize a source.
     #[error(transparent)]
-    DeserializationFailed(#[from] SourceDeserializationError),
+    DeserializationFailed(#[from] DeserializationError),
 
     /// Multiple sources with the same URI but different values were provided.
     #[error(transparent)]
@@ -190,7 +184,7 @@ impl From<ResolveError> for SourceError {
 /// An error occurred while attempting to deserialize a source.
 #[derive(Debug, Error)]
 #[error("failed to deserialize source \"{uri}\":\n\t{error}")]
-pub struct SourceDeserializationError {
+pub struct DeserializationError {
     /// The [`AbsoluteUri`] of the source.
     pub uri: AbsoluteUri,
 
@@ -248,11 +242,9 @@ pub enum BuildError {
 
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
 #[derive(Debug, Error)]
-#[error("failed to parse number \"{number}\":\n\t{source}")]
-pub struct BigRationalParseError {
-    #[source]
-    /// The underlying [`ParseRatioError`].
-    pub source: BigRationalParseStrError,
+#[error("failed to parse number \"{number}\":\n\t{error}")]
+pub struct NumberError {
+    pub error: String,
     /// The [`Number`] which failed to parse.
     pub number: Number,
 }
@@ -262,7 +254,7 @@ pub struct BigRationalParseError {
 pub enum EvaluateError {
     /// Failed to parse a [`Number`] in a [`].
     #[error(transparent)]
-    ParseNumber(#[from] BigRationalParseError),
+    ParseNumber(#[from] NumberError),
 
     /// Failed to evaluate a regular expression.
     #[error(transparent)]

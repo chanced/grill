@@ -1,27 +1,10 @@
 //! Output formats, annotations, and errors.
 //!
-mod node;
-mod structure;
-mod traverse;
-mod validation_error;
 
-pub mod basic;
-pub mod complete;
-pub mod detailed;
-pub mod flag;
-pub mod verbose;
-
-pub use basic::Basic;
-pub use complete::Complete;
-pub use detailed::Detailed;
-pub use flag::Flag;
-pub use node::Node;
-pub use structure::Structure;
-pub use validation_error::ValidationError;
-pub use verbose::Verbose;
-
-use crate::Uri;
+use crate::{Structure, Uri};
 use std::fmt::{self, Display};
+
+use super::{Basic, Complete, Detailed, Flag, Node, Verbose};
 
 #[derive(Debug)]
 pub enum Output<'v> {
@@ -116,13 +99,6 @@ impl<'v> From<Complete<'v>> for Output<'v> {
 
 #[cfg(test)]
 mod tests {
-    
-
-    
-
-    
-
-    
 
     // #[test]
     // fn test_annotiation_serde() {

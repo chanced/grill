@@ -4,18 +4,18 @@ use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 
 use crate::{
-    deserialize::{deserialize_json, Deserializers},
     error::{
-        BuildError, CompileError, DeserializeError, DialectUnknownError, EvaluateError,
-        ResolveError, SourceConflictError, SourceError, UriError,
+        CompileError, DeserializeError, DialectUnknownError, EvaluateError, ResolveError,
+        SourceConflictError, SourceError,
     },
     json_schema,
-    resolve::Resolvers,
-    schema::{CompiledSchema, Dialect, Keyword},
-    schema::{Dialects, Schemas},
+    output::{Output, Structure},
+    schema::{CompiledSchema, Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas},
+    source::Resolvers,
     source::Sources,
+    source::{Deserializer, Deserializers, Resolve, Source},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Deserializer, Output, Resolve, Schema, SchemaKey, Source, Structure,
+    Builder,
 };
 
 /// Compiles and evaluates JSON Schemas.
@@ -28,7 +28,7 @@ pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
     deserializers: Deserializers,
 }
 
-impl<K: slotmap::Key> Debug for Interrogator<K> {
+impl<Key: slotmap::Key> Debug for Interrogator<Key> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
@@ -148,25 +148,25 @@ where
             return Ok(schema.key);
         }
 
-        // compiling this schema
-        let compiled = CompiledSchema {
-            id,
-            uris,
-            metaschema: dialect.primary_metaschema_id().clone(),
-            handlers: dialect.handlers.clone().into_boxed_slice(),
-            source_uri,
-            source_path: path.clone(),
-        };
+        // // compiling this schema
+        // let compiled = CompiledSchema {
+        //     id,
+        //     uris,
+        //     metaschema: dialect.primary_metaschema_id().clone(),
+        //     handlers: dialect.handlers.clone().into_boxed_slice(),
+        //     source_uri,
+        //     source_path: path.clone(),
+        // };
 
-        let key = self.schemas.insert(compiled).map_err(|uri| {
-            SourceError::from(SourceConflictError {
-                uri,
-                value: value.clone().into(),
-            })
-        })?;
+        // let key = self.schemas.insert(compiled).map_err(|uri| {
+        //     SourceError::from(SourceConflictError {
+        //         uri,
+        //         value: value.clone().into(),
+        //     })
+        // })?;
 
-        // gathering nested schemas
-        let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
+        // // gathering nested schemas
+        // let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
 
         // compiling nested schemas
 
@@ -470,7 +470,7 @@ impl Interrogator {
     pub fn json_schema_2020_12() -> Builder<SchemaKey> {
         Builder::<SchemaKey>::default()
             .json_schema_2020_12()
-            .default_dialect(json_schema::json_schema_2020_12_absolute_uri())
+            .default_dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone())
             .unwrap()
     }
 
@@ -481,7 +481,7 @@ impl Interrogator {
     pub fn json_schema_2019_09() -> Builder<SchemaKey> {
         Builder::<SchemaKey>::default()
             .json_schema_2019_09()
-            .default_dialect(json_schema::json_schema_2019_09_absolute_uri())
+            .default_dialect(json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone())
             .unwrap()
     }
 
@@ -492,7 +492,7 @@ impl Interrogator {
     pub fn json_schema_07() -> Builder<SchemaKey> {
         Builder::<SchemaKey>::default()
             .json_schema_07()
-            .default_dialect(json_schema::json_schema_07_absolute_uri())
+            .default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
             .unwrap()
     }
 
@@ -504,413 +504,9 @@ impl Interrogator {
         // safety: &AbsoluteUri::try_into_absolute_uri never returns an error
         Builder::<SchemaKey>::default()
             .json_schema_04()
-            .default_dialect(json_schema::json_schema_04_absolute_uri())
+            .default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
             .unwrap()
     }
-}
-
-/// Constructs an [`Interrogator`].
-pub struct Builder<Key: slotmap::Key = SchemaKey> {
-    dialects: Vec<Dialect>,
-    sources: Vec<Source>,
-    default_dialect: Option<AbsoluteUri>,
-    resolvers: Vec<Box<dyn Resolve>>,
-    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
-    _marker: std::marker::PhantomData<Key>,
-}
-
-impl Default for Builder<SchemaKey> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl Builder<SchemaKey> {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            dialects: Vec::new(),
-            sources: Vec::new(),
-            resolvers: Vec::new(),
-            deserializers: Vec::new(),
-            default_dialect: None,
-            _marker: std::marker::PhantomData,
-        }
-    }
-}
-impl<Key> Builder<Key>
-where
-    Key: slotmap::Key,
-{
-    /// Sets a custom key type for schemas within the [`Interrogator`]. The default
-    /// key type is [`grill::SchemaKey`](`SchemaKey`).
-    ///
-    /// This is useful if you have multiple `Interrogator`s and want to ensure that
-    /// keys from one `Interrogator` are not accidentally used in another.
-    ///
-    /// # Example
-    /// ```
-    /// use grill::{Interrogator, new_key_type};
-    ///
-    /// new_key_type! {
-    ///     pub struct MySchemaKey;
-    /// }
-    /// let mut interrogator = Interrogator::json_schema_2020_12()
-    ///     .key::<MySchemaKey>()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    #[must_use]
-    pub fn key<K>(self) -> Builder<K>
-    where
-        K: slotmap::Key,
-    {
-        Builder {
-            dialects: self.dialects,
-            sources: self.sources,
-            resolvers: self.resolvers,
-            deserializers: self.deserializers,
-            default_dialect: self.default_dialect,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    #[must_use]
-    pub fn dialect(mut self, dialect: impl Borrow<Dialect>) -> Self {
-        self.dialects.push(dialect.borrow().clone());
-        self
-    }
-
-    /// Sets the default dialect to use when a `$schema` is not provided.
-    ///
-    /// If not set, the first `Dialect` added to the `Builder` is used.
-    ///
-    /// # Example
-    /// ```
-    /// use grill::{Builder, json_schema_2020_12_absolute_uri};
-    ///
-    /// let interrogator = Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .default_dialect(json_schema_2020_12_absolute_uri())
-    ///     .build()
-    ///     .unwrap()
-    /// ```
-    pub fn default_dialect(mut self, dialect: impl TryIntoAbsoluteUri) -> Result<Self, UriError> {
-        let dialect = dialect.try_into_absolute_uri()?;
-        self.default_dialect = Some(dialect);
-        Ok(self)
-    }
-
-    /// Adds a source schema from a slice of bytes that will be deserialized
-    /// with avaialble [`Deserializer`] at the time of
-    /// [`build`](`Builder::build`).
-    ///
-    /// # Example
-    /// ```rust
-    /// use grill::Builder;
-    /// let source = br#"{"type": "string"}"#;
-    /// let interrogator = Builder::default().json_schema_2020_12().build().unwrap()
-    /// interrogator.source_slice("https://example.com/schema.json", ).unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`SourceError`] if:
-    /// - the `uri` fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    pub fn source_slice(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: &[u8],
-    ) -> Result<Self, SourceError> {
-        self.sources.push(Source::String(
-            uri.try_into_absolute_uri()?,
-            String::from_utf8(source.to_vec())?,
-        ));
-        Ok(self)
-    }
-
-    /// Adds a schema source from a `str`
-    /// # Example
-    /// ```rust
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    pub fn source_str(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: &str,
-    ) -> Result<Self, UriError> {
-        self.sources.push(Source::String(
-            uri.try_into_absolute_uri()?,
-            source.to_string(),
-        ));
-        Ok(self)
-    }
-
-    /// Adds a source schema from a [`Value`]
-    /// # Example
-    /// ```rust
-    /// use serde_json::json;
-    ///
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    ///
-    pub fn source_value(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: impl Borrow<Value>,
-    ) -> Result<Self, UriError> {
-        self.sources.push(Source::Value(
-            uri.try_into_absolute_uri()?,
-            source.borrow().clone(),
-        ));
-        Ok(self)
-    }
-
-    /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryIntoAbsoluteUri, Deref<Target=str>)`
-    ///
-    /// # Example
-    /// ```rust
-    /// use std::collections::HashMap;
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_strs(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`UriError`] if a URI fails to convert to an
-    /// [`AbsoluteUri`]
-    pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, UriError>
-    where
-        K: TryIntoAbsoluteUri,
-        V: Deref<Target = str>,
-        I: IntoIterator<Item = (K, V)>,
-    {
-        for (k, v) in sources {
-            self.sources
-                .push(Source::String(k.try_into_absolute_uri()?, v.to_string()));
-        }
-        Ok(self)
-    }
-
-    /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryIntoAbsoluteUri, AsRef<[u8]>)`
-    ///
-    /// # Example
-    /// ```
-    /// use std::collections::HashMap;
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_slices(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`SourceSliceError`] if:
-    /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    ///
-    pub fn source_slices<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
-    where
-        K: TryIntoAbsoluteUri,
-        V: AsRef<[u8]>,
-        I: IntoIterator<Item = (K, V)>,
-    {
-        for (k, v) in sources {
-            self.sources.push(Source::String(
-                k.try_into_absolute_uri()?,
-                String::from_utf8(v.as_ref().to_vec())?,
-            ));
-        }
-        Ok(self)
-    }
-
-    /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryIntoAbsoluteUri, Borrow<serde_json::Value>>)`
-    ///
-    /// # Example
-    /// ```
-    /// use std::collections::HashMap;
-    /// use serde_json::json;
-    ///
-    /// let mut sources = HashMap::new();
-    /// let source = json!({"type": "string"});
-    /// sources.insert("https://example.com/schema.json", source);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_values(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    /// # Errors
-    /// Returns [`SourceError`] if:
-    /// - [`TryIntoAbsoluteUri`] fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    pub fn source_values<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
-    where
-        K: TryIntoAbsoluteUri,
-        V: Borrow<Value>,
-        I: IntoIterator<Item = (K, V)>,
-    {
-        for (k, v) in sources {
-            self.sources.push(Source::Value(
-                k.try_into_absolute_uri()?,
-                v.borrow().clone(),
-            ));
-        }
-        Ok(self)
-    }
-
-    /// Adds JSON Schema 04 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_04(self) -> Self {
-        self.dialect(json_schema::draft_04::dialect())
-    }
-
-    /// Adds JSON Schema 07 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_07(self) -> Self {
-        self.dialect(json_schema::draft_07::dialect())
-    }
-
-    /// Adds JSON Schema 2019-09 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_2019_09(self) -> Self {
-        self.dialect(json_schema::draft_2019_09::dialect())
-    }
-
-    /// Adds JSON Schema 2020-12 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_2020_12(self) -> Self {
-        self.dialect(json_schema::draft_2020_12::dialect())
-    }
-
-    /// Adds a [`Resolve`] for resolving schema references.
-    #[must_use]
-    pub fn resolver<R>(mut self, resolver: R) -> Self
-    where
-        R: 'static + Resolve,
-    {
-        let _id = any::TypeId::of::<R>();
-        self.resolvers.push(Box::new(resolver));
-        self
-    }
-
-    /// Adds JSON source [`Deserializer`] [`deserialize::json`](`crate::deserialize::json`)
-    #[must_use]
-    pub fn json(self) -> Self {
-        self.deserializer("json", deserialize_json)
-    }
-
-    /// Adds TOML source [`Deserializer`] [`deserialize::toml`](`crate::deserialize::toml`)
-    #[cfg(feature = "toml")]
-    #[must_use]
-    pub fn toml(self) -> Self {
-        self.deserializer("toml", crate::deserialize::deserialize_toml)
-    }
-
-    /// Adds YAML source [`Deserializer`] [`deserialize::yaml`](`crate::deserialize::yaml`)
-    #[cfg(feature = "yaml")]
-    #[must_use]
-    pub fn yaml(self) -> Self {
-        self.deserializer("yaml", crate::deserialize::deserialize_yaml)
-    }
-
-    /// Inserts a source [`Deserializer`]. If a [`Deserializer`] for the given
-    /// format eists, it will be replaced.
-    ///
-    /// If a `Deserializer` is not provided prior to invoking [`build`](`Builder::build`), the default
-    /// [`json`] [`Deserializer`] will be added.
-    #[must_use]
-    pub fn deserializer<R>(mut self, format: &'static str, deserializer: R) -> Self
-    where
-        R: 'static + Deserializer,
-    {
-        let f = format.to_lowercase();
-        for (idx, (fmt, _)) in self.deserializers.iter().enumerate() {
-            if fmt.to_lowercase() == f {
-                self.deserializers[idx] = (format, Box::new(deserializer));
-                return self;
-            }
-        }
-        self.deserializers.push((format, Box::new(deserializer)));
-        self
-    }
-
-    pub async fn build(self) -> Result<Interrogator<Key>, BuildError> {
-        let Self {
-            dialects,
-            mut sources,
-            resolvers,
-            deserializers,
-            default_dialect,
-            _marker,
-        } = self;
-
-        let dialects = Dialects::new(dialects, default_dialect.as_ref())?;
-        sources.append(&mut dialects.sources());
-        let deserializers = Deserializers::new(deserializers);
-        let sources = Sources::new(sources, &deserializers)?;
-        let resolvers = Resolvers::new(resolvers);
-        let schemas = Schemas::new();
-        let precompile = dialects.source_ids().cloned().collect::<Vec<AbsoluteUri>>();
-
-        let mut interrogator = Interrogator {
-            dialects,
-            sources,
-            resolvers,
-            schemas,
-            deserializers,
-        };
-
-        for id in precompile {
-            interrogator.compile(id).await?;
-        }
-
-        Ok(interrogator)
-    }
-
-    // /// Precompiles schemas at the given URIs.
-    // ///
-    // /// # Example
-    // /// ```rust
-    // /// let interrogator = grill::Builder::default()
-    // ///    .json_schema_2020_12()
-    // ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    // ///    .precompile(["https://example.com/schema.json"]).unwrap()
-    // ///    .build()
-    // ///    .unwrap();
-    // /// ```
-    // /// # Errors
-    // /// Returns [`UriError`] if the URI fails to convert
-    // /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
-    // pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, UriError>
-    // where
-    //     I: IntoIterator<Item = V>,
-    //     V: TryIntoAbsoluteUri,
-    // {
-    //     for schema in schemas {
-    //         self.precompile.insert(schema.try_into_absolute_uri()?);
-    //     }
-    //     Ok(self)
-    // }
 }
 
 #[cfg(test)]

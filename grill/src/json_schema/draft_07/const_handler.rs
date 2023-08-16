@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{handler::SyncHandler, output, Handler};
+use crate::{
+    handler::{Handler, SyncHandler, Scope},
+    output,
+};
 
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
 ///
@@ -35,7 +38,7 @@ impl SyncHandler for ConstHandler {
 
     fn evaluate<'v>(
         &self,
-        _scope: &mut crate::Scope,
+        _scope: &mut Scope,
         _value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
