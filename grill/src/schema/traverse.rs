@@ -47,7 +47,7 @@ type Slice<'i, Key, Seed> = DepthFirst<
     Key,
     Seed,
     Copied<slice::Iter<'i, Key>>,
-    fn(Schema<'i, Key>) -> Copied<std::slice::Iter<'i, Key>>,
+    for<'x> fn(&'x Schema<'i, Key>) -> Copied<std::slice::Iter<'i, Key>>,
 >;
 
 type Instance<'i, Key, Seed> = DepthFirst<
@@ -55,7 +55,7 @@ type Instance<'i, Key, Seed> = DepthFirst<
     Key,
     Seed,
     Either<Once<Key>, Empty<Key>>,
-    fn(Schema<'i, Key>) -> Either<Once<Key>, Empty<Key>>,
+    for<'x> fn(&'x Schema<'i, Key>) -> Either<Once<Key>, Empty<Key>>,
 >;
 
 struct DepthFirst<'i, Key, Seed, Iter, Func>
@@ -63,7 +63,7 @@ where
     Key: slotmap::Key,
     Seed: IntoIterator<Item = Key>,
     Iter: Iterator<Item = Key>,
-    Func: Fn(Schema<'i, Key>) -> Iter,
+    Func: for<'x> Fn(&'x Schema<'i, Key>) -> Iter,
 {
     func: Func,
     first: Option<Key>,
@@ -79,7 +79,7 @@ where
     Key: slotmap::Key,
     Seed: IntoIterator<Item = Key>,
     Iter: 'i + Iterator<Item = Key>,
-    Func: Fn(Schema<'i, Key>) -> Iter,
+    Func: for<'x> Fn(&'x Schema<'i, Key>) -> Iter,
 {
     pub(crate) fn new(
         seed: Seed,
@@ -91,7 +91,7 @@ where
         let first = seed.next();
         let queue = first.map(|first| {
             let schema = schemas.get(first, sources).unwrap();
-            handle(schema).chain(Box::new(once(first)) as Box<dyn Iterator<Item = Key>>)
+            handle(&schema).chain(Box::new(once(first)) as Box<dyn Iterator<Item = Key>>)
         });
 
         let sent = HashSet::new();
@@ -105,7 +105,7 @@ where
             schemas,
         }
     }
-    fn exec(&self, schema: Schema<'i, Key>) -> Iter {
+    fn exec<'x>(&'x self, schema: &'x Schema<'i, Key>) -> Iter {
         (self.func)(schema)
     }
 }
@@ -115,7 +115,7 @@ where
     Key: slotmap::Key,
     Seed: IntoIterator<Item = Key>,
     Iter: 'i + Iterator<Item = Key>,
-    Func: Fn(Schema<'i, Key>) -> Iter,
+    Func: for<'x> Fn(&'x Schema<'i, Key>) -> Iter,
 {
     type Item = Schema<'i, Key>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -131,7 +131,7 @@ where
         let schema = self.schemas.get(key, self.sources).unwrap();
         self.sent.insert(key);
         self.queue = self.queue.take().map(|queue| {
-            self.exec(schema.clone())
+            self.exec(&schema)
                 .chain(Box::new(queue) as Box<dyn Iterator<Item = Key>>)
         });
         Some(schema)
@@ -145,11 +145,12 @@ where
     std::iter::empty()
 }
 
-fn transitive_dependencies<'i, Key>(schema: Schema<'i, Key>) -> Copied<slice::Iter<'i, Key>>
+fn transitive_dependencies<'i, 'x, Key>(schema: &'x Schema<'i, Key>) -> Copied<slice::Iter<'i, Key>>
 where
     Key: slotmap::Key,
+    'x: 'i,
 {
-    schema.dependencies.clone().iter().copied()
+    schema.dependencies.iter().copied()
 }
 
 fn ancestors<'i, Key: slotmap::Key>(schema: Schema<'i, Key>) -> Either<Once<Key>, Empty<Key>> {
