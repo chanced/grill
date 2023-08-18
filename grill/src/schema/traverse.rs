@@ -244,7 +244,7 @@ where
 macro_rules! iter {
     (
         $(#[$($attrss:tt)*])*
-        $vis:vis $name:ident <- $iter:ident
+        $vis:vis $name:ident @ $func:ident -> $iter:ident
 
     ) => {
         $(#[$($attrss)*])*
@@ -252,9 +252,15 @@ macro_rules! iter {
             iter: Iter<'i, Key, $iter<Key>>,
         }
 
-        impl<'i, Key> $name<'i, Key> where Key: slotmap::Key {
-            #[doc=concat!("Creates a new ", stringify!($name))]
-            pub(crate) fn new(iter: $iter<Key>, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
+        impl<'i, Key> $name<'i, Key>
+        where
+            Key: slotmap::Key,
+            {
+                #[doc=concat!("Creates a new ", stringify!($name))]
+                pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self
+            {
+                let schema = schemas.get_unchecked(key, sources);
+                let iter = $func(schema);
                 let iter = Iter::new(iter, schemas, sources);
                 Self { iter }
             }
@@ -273,13 +279,21 @@ macro_rules! iter {
 }
 iter! {
     /// An [`Iterator`] over the direct dependencies of a [`Schema`]
-    pub DirectDependencies <- IntoIter
+    pub DirectDependencies @ direct_dependencies -> IntoIter
+}
+fn direct_dependencies<Key: slotmap::Key>(schema: Schema<'_, Key>) -> IntoIter<Key> {
+    #[allow(clippy::unnecessary_to_owned)]
+    schema.dependencies.into_owned().into_iter()
 }
 
 iter! {
     /// An [`Iterator`] over [`Schema`](crate::schema::Schema)s which directly
     /// depend on a specified [`Schema`](crate::schema::Schema)
-    pub DirectDependents <- IntoIter
+    pub DirectDependents @ direct_dependents -> IntoIter
+}
+fn direct_dependents<Key: slotmap::Key>(schema: Schema<'_, Key>) -> IntoIter<Key> {
+    #[allow(clippy::unnecessary_to_owned)]
+    schema.dependents.into_owned().into_iter()
 }
 
 type Slices<'i, Key> = Traverse<'i, Key, IntoIter<Key>, fn(Schema<'i, Key>) -> IntoIter<Key>>;
@@ -293,19 +307,37 @@ type Instances<'i, Key> = Traverse<
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::fmt::format;
-
-    use jsonptr::Pointer;
-    use serde_json::json;
-    use slotmap::SlotMap;
 
     use crate::{
         schema::CompiledSchema,
         source::{deserialize_json, Deserializers, Source},
         AbsoluteUri, SchemaKey,
     };
+    use jsonptr::Pointer;
+    use serde_json::json;
+    use slotmap::SlotMap;
 
-    use super::*;
+    fn id_paths<Key: slotmap::Key>(schema: Schema<'_, Key>) -> String {
+        schema.id.unwrap().path_or_nss().to_owned()
+    }
+    #[test]
+    fn test_direct_dependents() {
+        let (roots, schemas, sources) = build_graph();
+        let traverse = DirectDependencies::new(roots[0], &schemas, &sources);
+        let ids = traverse.map(id_paths).collect::<Vec<_>>();
+        assert_eq!(
+            &ids,
+            &[
+                "/a/dependency_a",
+                "/a/dependency_b",
+                "/a/dependency_c",
+                "/a/dependency_d",
+            ]
+        );
+    }
+
     #[test]
     /// This test ignores the rule surrounding identified schemas being document roots.
     fn test_ancestors() {
@@ -314,9 +346,7 @@ mod tests {
             create_test_uri("/a/subschema_a/nested_subschema_a/deeply_nested_subschema_a");
         let leaf_key = schemas.get_key_by_id(&leaf_id).unwrap();
         let traverse = Ancestors::new(leaf_key, &schemas, &sources);
-        let ids = traverse
-            .map(|schema| schema.id.unwrap().path_or_nss().to_owned())
-            .collect::<Vec<_>>();
+        let ids = traverse.map(id_paths).collect::<Vec<_>>();
 
         assert_eq!(
             &ids,
@@ -332,9 +362,7 @@ mod tests {
 
         let traverse = AllDependents::new(leaf_key, &schemas, &sources);
 
-        let ids = traverse
-            .map(|schema| schema.id.unwrap().path_or_nss().to_owned())
-            .collect::<Vec<_>>();
+        let ids = traverse.map(id_paths).collect::<Vec<_>>();
 
         assert_eq!(
             &ids,
@@ -347,7 +375,6 @@ mod tests {
         use similar::{ChangeTag, TextDiff};
 
         let (root_keys, schemas, sources) = build_graph();
-        println!("{root_keys:?}");
         let traverse = TransitiveDependencies::new(root_keys[0], &schemas, &sources);
         let ids = traverse
             .map(|schema| schema.id.unwrap().path_or_nss().to_owned())

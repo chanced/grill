@@ -6,11 +6,16 @@ use serde_json::Value;
 use crate::{
     error::{
         CompileError, DeserializeError, DialectUnknownError, EvaluateError, ResolveError,
-        SourceConflictError, SourceError,
+        SourceConflictError, SourceError, UnknownKeyError,
     },
     json_schema,
     output::{Output, Structure},
-    schema::{CompiledSchema, Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas},
+    schema::{
+        traverse::{
+            Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
+        },
+        CompiledSchema, Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas,
+    },
     source::Resolvers,
     source::Sources,
     source::{Deserializer, Deserializers, Resolve, Source},
@@ -77,6 +82,162 @@ where
     #[must_use]
     pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<Schema<'_, Key>> {
         self.schemas.get_by_uri(id, &self.sources)
+    }
+
+    /// Returns `true` if `key` belongs to this `Interrogator`
+    pub fn contains_key(&self, key: Key) -> bool {
+        self.schemas.contains_key(key)
+    }
+
+    /// Returns [`Ancestors`] which is an [`Iterator`] over the descendants,
+    /// i.e. embedded schemas, of a given [`Schema`].
+    ///
+    ///
+    /// Note that the JSON Schema specification states that if a schema is
+    /// identified (by having either an `$id` field for Draft 07 and beyond or
+    /// an `id` field for Draft 04 and earlier), then it must be the document
+    /// root. As such, embedded schemas with an id will not have a parent, even
+    /// if the [`Schema`] is embedded.
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
+    }
+    /// Returns [`Ancestors`] which is an [`Iterator`] over the descendants,
+    /// i.e. embedded schemas, of a given [`Schema`].
+    ///
+    ///
+    /// Note that the JSON Schema specification states that if a schema is
+    /// identified (by having either an `$id` field for Draft 07 and beyond or
+    /// an `id` field for Draft 04 and earlier), then it must be the document
+    /// root. As such, embedded schemas with an id will not have a parent, even
+    /// if the [`Schema`] is embedded.
+    ///
+    /// # Panics
+    /// Panics if `key` does not belong to this `Interrogator`
+    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_, Key> {
+        self.schemas.ancestors(key, &self.sources)
+    }
+
+    /// Returns [`Descendants`] which is an [`Iterator`] over the hiearchy of a
+    /// given [`Schema`].
+    ///
+    /// Note that the JSON Schema specification states that if a schema is
+    /// identified (by having either an `$id` field for Draft 07 and beyond or
+    /// an `id` field for Draft 04 and earlier), then it must be the document
+    /// root. As such, embedded schemas with an id  will not have a parent, even
+    /// if the [`Schema`] is embedded.
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn descendants(&self, key: Key) -> Result<Descendants<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
+    }
+
+    /// Returns [`Descendants`] which is an [`Iterator`] over the hiearchy of a
+    /// given [`Schema`].
+    ///
+    /// Note that the JSON Schema specification states that if a schema is
+    /// identified (by having either an `$id` field for Draft 07 and beyond or
+    /// an `id` field for Draft 04 and earlier), then it must be the document
+    /// root. As such, embedded schemas with an id  will not have a parent, even
+    /// if the [`Schema`] is embedded.
+    ///
+    /// # Panics
+    /// Panics if `key` does not belong to this `Interrogator`
+    pub fn descendants_unchecked(&self, key: Key) -> Result<Descendants<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
+    }
+
+    /// Returns [`DirectDependencies`] which is an [`Iterator`] over the direct
+    /// dependencies of a [`Schema`]
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn direct_dependencies(
+        &self,
+        key: Key,
+    ) -> Result<DirectDependencies<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
+    }
+
+    /// Returns [`DirectDependencies`] which is an [`Iterator`] over the direct
+    /// dependencies of a [`Schema`]
+    ///
+    /// # Panics
+    /// Panics if `key` does not belong to this `Interrogator`
+    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_, Key> {
+        self.schemas.direct_dependencies(key, &self.sources)
+    }
+
+    /// Returns [`TransitiveDependencies`] which is a
+    /// [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
+    /// [`Iterator`] that traverses both direct and indirect dependencies of a
+    /// [`Schema`].
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn transitive_dependencies(
+        &self,
+        key: Key,
+    ) -> Result<TransitiveDependencies<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || {
+            self.schemas.transitive_dependencies(key, &self.sources)
+        })
+    }
+
+    /// Returns [`TransitiveDependencies`] which is a
+    /// [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
+    /// [`Iterator`] that traverses both direct and indirect dependencies of a
+    /// [`Schema`].
+    ///
+    /// # Panics
+    /// Panics if `key` does not belong to this `Interrogator`
+    pub fn transitive_dependencies_unchecked(&self, key: Key) -> TransitiveDependencies<'_, Key> {
+        self.schemas.transitive_dependencies(key, &self.sources)
+    }
+
+    /// Return [`Schema`](crate::schema::Schema)s which is an [`Iterator`] over
+    /// [`Schema`]s which directly depend on a specified
+    /// [`Schema`](crate::schema::Schema)
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn direct_dependents(
+        &self,
+        key: Key,
+    ) -> Result<DirectDependents<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
+    }
+
+    /// Return [`Schema`](crate::schema::Schema)s which is an [`Iterator`] over
+    /// [`Schema`]s which directly depend on a specified
+    /// [`Schema`](crate::schema::Schema)
+    ///
+    /// # Panics
+    /// Panics if `key` does not belong to this `Interrogator`
+    pub fn direct_dependents_unchecked(
+        &self,
+        key: Key,
+    ) -> Result<DirectDependents<'_, Key>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
+    }
+
+    /// A helper method that returns `UnknownKeyError` if `key` does not belong
+    /// to this `Interrogator` and executes `f` if it does.
+    ///
+    /// # Errors
+    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    pub fn ensure_key_exists<T, F>(&self, key: Key, f: F) -> Result<T, UnknownKeyError>
+    where
+        F: FnOnce() -> T,
+    {
+        if self.schemas.contains_key(key) {
+            Ok(f())
+        } else {
+            Err(UnknownKeyError)
+        }
     }
 
     /// Compiles all schemas at the given URIs if not already compiled, returning

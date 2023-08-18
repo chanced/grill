@@ -8,9 +8,14 @@ use std::{
     iter::Copied,
     slice,
 };
-use tap::Tap;
 
-use super::Anchor;
+use super::{
+    traverse::{
+        AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
+        TransitiveDependencies,
+    },
+    Anchor,
+};
 
 new_key_type! {
     pub struct SchemaKey;
@@ -181,6 +186,46 @@ impl<Key: slotmap::Key> Schemas<Key> {
             self.store.iter()
         }
     }
+    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i, Key> {
+        Ancestors::new(key, self, sources)
+    }
+    pub(crate) fn descendants<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> Descendants<'i, Key> {
+        Descendants::new(key, self, sources)
+    }
+    pub(crate) fn direct_dependents<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> DirectDependents<'i, Key> {
+        DirectDependents::new(key, self, sources)
+    }
+    pub(crate) fn all_dependents<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> AllDependents<'i, Key> {
+        AllDependents::new(key, self, sources)
+    }
+    pub(crate) fn transitive_dependencies<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> TransitiveDependencies<'i, Key> {
+        TransitiveDependencies::new(key, self, sources)
+    }
+
+    pub(crate) fn direct_dependencies<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> DirectDependencies<'i, Key> {
+        DirectDependencies::new(key, self, sources)
+    }
+
     pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i, Key> {
         self.get(key, sources).unwrap()
     }
@@ -289,6 +334,10 @@ impl<Key: slotmap::Key> Schemas<Key> {
     /// Rejects the current transaction, discarding all changes.
     pub(crate) fn rollback_txn(&mut self) {
         self.sandbox = None;
+    }
+
+    pub(crate) fn contains_key(&self, key: Key) -> bool where Key: slotmap::Key {
+        self.store.contains_key(key)
     }
 }
 impl<Key: slotmap::Key> Default for Schemas<Key> {
