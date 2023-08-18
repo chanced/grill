@@ -24,18 +24,18 @@ pub(crate) struct CompiledSchema<Key: slotmap::Key = SchemaKey> {
     ///
     /// Note that if this schema has an `id`, `parent` will be `None` regardless of
     /// whether or not this schema is embedded.
-    pub(crate) container: Option<Key>,
+    pub(crate) parent: Option<Key>,
     /// Directly embedded subschemas, excluding those with `id`s.
-    pub(crate) subschemas: Box<[Key]>,
+    pub(crate) subschemas: Vec<Key>,
     /// Dependents of this `Schema`.
-    pub(crate) dependents: Box<[Key]>,
+    pub(crate) dependents: Vec<Key>,
     ///  Dependencies of this `Schema`.
-    pub(crate) dependencies: Box<[Key]>,
+    pub(crate) dependencies: Vec<Key>,
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
-    pub(crate) anchors: Box<[Anchor]>,
+    pub(crate) anchors: Vec<Anchor>,
     /// All URIs which this schema is referenced by.
-    pub(crate) uris: Box<[AbsoluteUri]>,
+    pub(crate) uris: Vec<AbsoluteUri>,
     /// Abs URI of the schema's `Metaschema`.
     pub(crate) metaschema: AbsoluteUri,
     // Compiled handlers.
@@ -97,11 +97,11 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
 
         Self {
             key,
-            id: compiled.id.as_ref().map(|id| Cow::Borrowed(id)),
+            id: compiled.id.as_ref().map(Cow::Borrowed),
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
             source: Cow::Borrowed(source),
-            container: compiled.container,
+            container: compiled.parent,
             dependents: Cow::Borrowed(&compiled.dependencies),
             dependencies: Cow::Borrowed(&compiled.dependencies),
             handlers: Cow::Borrowed(&compiled.handlers),
@@ -143,7 +143,7 @@ impl<'i, Key: slotmap::Key> Eq for Schema<'i, Key> {}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Schemas<Key: slotmap::Key = SchemaKey> {
-    schemas: SlotMap<Key, CompiledSchema<Key>>,
+    pub(crate) store: SlotMap<Key, CompiledSchema<Key>>,
     keys: HashMap<AbsoluteUri, Key>,
     sandbox: Option<Box<Sandbox<Key>>>,
 }
@@ -153,16 +153,37 @@ impl<Key: slotmap::Key> Schemas<Key> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            schemas: SlotMap::default(),
+            store: SlotMap::default(),
             keys: HashMap::default(),
             sandbox: None,
         }
     }
 
+    pub(crate) fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
+        self.sandbox
+            .as_deref_mut()
+            .expect("sandbox not present")
+            .insert(schema)
+    }
+    pub(crate) fn iter_compiled(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema<Key>> {
+        if let Some(sandbox) = self.sandbox.as_ref() {
+            sandbox.store.iter()
+        } else {
+            self.store.iter()
+        }
+    }
+    pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i, Key> {
+        self.get(key, sources).unwrap()
+    }
     /// Returns the [`Schema`] with the given `Key` if it exists.
     #[must_use]
     pub(crate) fn get<'i>(&'i self, key: Key, sources: &'i Sources) -> Option<Schema<'i, Key>> {
-        let schema = self.schemas.get(key)?;
+        let schema = if let Some(sandbox) = self.sandbox.as_ref() {
+            sandbox.get(key)
+        } else {
+            self.store.get(key)
+        }?;
+
         let source = sources.get(&schema.source_uri)?;
         Some(Schema {
             key,
@@ -171,7 +192,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
             source: Cow::Borrowed(source),
             uris: Cow::Borrowed(&schema.uris),
             handlers: Cow::Borrowed(&schema.handlers),
-            container: schema.container,
+            container: schema.parent,
             dependencies: Cow::Borrowed(&schema.dependencies),
             dependents: Cow::Borrowed(&schema.dependents),
             source_uri: Cow::Borrowed(&schema.source_uri),
@@ -179,11 +200,15 @@ impl<Key: slotmap::Key> Schemas<Key> {
         })
     }
 
-    pub(crate) fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
-        self.sandbox
-            .as_deref_mut()
-            .expect("sandbox not present")
-            .insert(schema)
+    pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<Key>> {
+        if let Some(sandbox) = self.sandbox.as_mut() {
+            sandbox.get_mut(key)
+        } else {
+            self.store.get_mut(key)
+        }
+    }
+    pub(crate) fn get_mut_unchecked(&mut self, key: Key) -> &mut CompiledSchema<Key> {
+        self.get_mut(key).unwrap()
     }
 
     #[must_use]
@@ -202,7 +227,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
     }
 
     pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> bool {
-        let from = self.schemas.get(from).unwrap();
+        let from = self.store.get(from).unwrap();
         todo!()
     }
 
@@ -225,9 +250,9 @@ impl<Key: slotmap::Key> Schemas<Key> {
 
     fn schemas(&self) -> &SlotMap<Key, CompiledSchema<Key>> {
         if let Some(sandbox) = self.sandbox.as_deref() {
-            return &sandbox.schemas;
+            return &sandbox.store;
         }
-        &self.schemas
+        &self.store
     }
 
     fn schemas_mut(&mut self) -> &mut SlotMap<Key, CompiledSchema<Key>> {
@@ -235,20 +260,20 @@ impl<Key: slotmap::Key> Schemas<Key> {
             .sandbox
             .as_deref_mut()
             .expect("transaction not started")
-            .schemas
+            .store
     }
 
     /// Starts a new transaction.
     pub(crate) fn start_txn(&mut self) {
         assert!(self.sandbox.is_none(), "sandbox already exists\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new");
-        self.sandbox = Sandbox::new(&self.schemas, &self.keys).into();
+        self.sandbox = Sandbox::new(&self.store, &self.keys).into();
     }
 
     /// Accepts the current transaction, committing all changes.
     pub(crate) fn accept_txn(&mut self) {
         let sandbox = self.sandbox.take().expect("sandbox should be present");
         self.keys = sandbox.keys;
-        self.schemas = sandbox.schemas;
+        self.store = sandbox.store;
     }
 
     /// Rejects the current transaction, discarding all changes.
@@ -264,37 +289,44 @@ impl<Key: slotmap::Key> Default for Schemas<Key> {
 
 #[derive(Debug, Clone, Default)]
 struct Sandbox<Key: slotmap::Key> {
-    schemas: SlotMap<Key, CompiledSchema<Key>>,
+    store: SlotMap<Key, CompiledSchema<Key>>,
     keys: HashMap<AbsoluteUri, Key>,
 }
 
+#[allow(clippy::unnecessary_box_returns)]
 impl<Key: slotmap::Key> Sandbox<Key> {
     fn new(
         schemas: &SlotMap<Key, CompiledSchema<Key>>,
         keys: &HashMap<AbsoluteUri, Key>,
     ) -> Box<Self> {
         Box::new(Self {
-            schemas: schemas.clone(),
+            store: schemas.clone(),
             keys: keys.clone(),
         })
+    }
+    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<Key>> {
+        self.store.get_mut(key)
+    }
+
+    fn get(&self, key: Key) -> Option<&CompiledSchema<Key>> {
+        self.store.get(key)
     }
 
     fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.keys.get(id) {
-            let existing = self.schemas.get(*key).unwrap();
+            let existing = self.store.get(*key).unwrap();
             if existing != &schema {
                 return Err(id.clone());
             }
             return Ok(*key);
         }
-        let key = self.schemas.insert(schema);
-        // self.dep_graph.insert(key);
-        // for uri in schema.uris.iter().cloned() {
-        //     self.keys.insert(uri, key);
-        // }
-        // Ok(key)
-        todo!()
+        let uris = schema.uris.clone();
+        let key = self.store.insert(schema);
+        for uri in uris {
+            self.keys.insert(uri, key);
+        }
+        Ok(key)
     }
 }
 

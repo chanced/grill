@@ -217,12 +217,12 @@ impl AsUriRef for Uri {
 
 impl AsUriRef for &Uri {
     fn as_uri_ref(&self) -> UriRef<'_> {
-        UriRef::Uri(*self)
+        UriRef::Uri(self)
     }
 }
 impl AsUriRef for &RelativeUri {
     fn as_uri_ref(&self) -> UriRef<'_> {
-        UriRef::RelativeUri(*self)
+        UriRef::RelativeUri(self)
     }
 }
 

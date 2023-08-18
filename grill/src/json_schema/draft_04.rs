@@ -45,7 +45,7 @@ pub fn is_json_schema_04(v: &Value) -> bool {
         return true;
     }
     let Ok(uri) = Uri::parse(s) else { return false };
-    is_json_schema_04_uri(&uri)
+    is_json_schema_04_uri(uri)
 }
 
 pub fn is_json_schema_04_uri(uri: impl AsUriRef) -> bool {

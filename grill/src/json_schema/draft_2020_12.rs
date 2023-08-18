@@ -180,7 +180,7 @@ lazy_static::lazy_static! {
     /// [`Metaschema`] for JSON Schema Meta Data Draft 2020-12
     pub static ref JSON_SCHEMA_2020_12_META_DATA_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/meta-data").unwrap(),
-        serde_json::from_slice::<Value>(&JSON_SCHEMA_2020_12_META_DATA_BYTES)
+        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_META_DATA_BYTES)
             .unwrap()
             .as_object()
             .unwrap()
@@ -190,7 +190,7 @@ lazy_static::lazy_static! {
     /// [`Metaschema`] for JSON Schema Unevaluated Draft 2020-12
     pub static ref JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA: Metaschema = Metaschema::new(
         AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/unevaluated").unwrap(),
-        serde_json::from_slice(&JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
+        serde_json::from_slice(JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
     );
 
     /// [`Metaschema`] for JSON Schema Validation Draft 2020-12
@@ -233,7 +233,7 @@ pub fn is_json_schema_2020_12(value: &Value) -> bool {
     }
 
     let Ok(uri) = AbsoluteUri::parse(s) else { return false };
-    is_json_schema_2020_12_uri(&uri)
+    is_json_schema_2020_12_uri(uri)
 }
 
 /// Returns `true` if `uri` is equal to JSON Hyper Schema Draft 2020-12 URI.

@@ -18,15 +18,15 @@ use super::{
 /// A relative URI, with or without an authority.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct RelativeUri {
-    value: String,
-    username_idx: Option<u32>,
-    password_idx: Option<u32>,
-    host_idx: Option<u32>,
-    port_idx: Option<u32>,
-    port: Option<u16>,
-    path_idx: u32,
-    query_idx: Option<u32>,
-    fragment_idx: Option<u32>,
+    pub(super) value: String,
+    pub(super) username_idx: Option<u32>,
+    pub(super) password_idx: Option<u32>,
+    pub(super) host_idx: Option<u32>,
+    pub(super) port_idx: Option<u32>,
+    pub(super) port: Option<u16>,
+    pub(super) path_idx: u32,
+    pub(super) query_idx: Option<u32>,
+    pub(super) fragment_idx: Option<u32>,
 }
 
 impl RelativeUri {

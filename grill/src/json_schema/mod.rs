@@ -47,9 +47,9 @@ pub mod draft_2020_12;
 //     is_json_schema_2020_12, is_json_schema_2020_12_absolute_uri, is_json_schema_2020_12_uri,
 // };
 
-use crate::uri::{Url, AsUriRef};
+use crate::uri::{AsUriRef, Url};
 
-fn is_uri_for<'a>(target: &Url, other: impl AsUriRef) -> bool {
+fn is_uri_for(target: &Url, other: impl AsUriRef) -> bool {
     let Some(u) = other.as_uri_ref().as_url()  else { return false };
     let scheme = u.scheme();
     (scheme == "https" || scheme == "http")

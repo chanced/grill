@@ -21,11 +21,11 @@ use crate::{
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
-    dialects: Dialects<'static>,
-    sources: Sources,
-    resolvers: Resolvers,
-    schemas: Schemas<Key>,
-    deserializers: Deserializers,
+    pub(super) dialects: Dialects<'static>,
+    pub(super) sources: Sources,
+    pub(super) resolvers: Resolvers,
+    pub(super) schemas: Schemas<Key>,
+    pub(super) deserializers: Deserializers,
 }
 
 impl<Key: slotmap::Key> Debug for Interrogator<Key> {
@@ -308,8 +308,8 @@ where
 
         self.source(source)
     }
-    pub fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
-        self.sources.source(source, &self.deserializers)
+    fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
+        self.sources.insert(source, &self.deserializers)
     }
 
     /// Adds a schema source from a `&str`

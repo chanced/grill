@@ -186,7 +186,7 @@ pub fn is_json_schema_2019_09(v: &Value) -> bool {
         return true;
     }
     let Ok(uri) = AbsoluteUri::parse(s) else { return false };
-    is_json_schema_2019_09_uri(&uri)
+    is_json_schema_2019_09_uri(uri)
 }
 
 /// Returns `true` if `uri` is equal to JSON Schema Draft 2019-09 URI.

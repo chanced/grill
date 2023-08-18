@@ -79,7 +79,7 @@ pub fn is_json_schema_07(v: &Value) -> bool {
         return true;
     }
     let Ok(uri) = Uri::parse(s) else { return false };
-    is_json_schema_07_uri(&uri)
+    is_json_schema_07_uri(uri)
 }
 
 pub fn is_json_hyper_schema_07_uri(uri: impl AsUriRef) -> bool {

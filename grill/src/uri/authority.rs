@@ -9,12 +9,12 @@ use url::Url;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 /// The Authority component of a Relative URI.
 pub struct Authority<'a> {
-    value: Cow<'a, str>,
-    username_idx: Option<u32>,
-    password_idx: Option<u32>,
-    host_idx: Option<u32>,
-    port_idx: Option<u32>,
-    port: Option<u16>,
+    pub(super) value: Cow<'a, str>,
+    pub(super) username_idx: Option<u32>,
+    pub(super) password_idx: Option<u32>,
+    pub(super) host_idx: Option<u32>,
+    pub(super) port_idx: Option<u32>,
+    pub(super) port: Option<u16>,
 }
 impl Deref for Authority<'_> {
     type Target = str;

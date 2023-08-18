@@ -16,7 +16,8 @@
     clippy::similar_names, 
     clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
     clippy::missing_errors_doc, // TODO: remove when I get around to documenting
-    clippy::wildcard_imports
+    clippy::wildcard_imports,
+    clippy::module_inception
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 

@@ -133,7 +133,7 @@ impl Sources {
         source: Value,
         deserializers: &Deserializers,
     ) -> Result<&Value, SourceError> {
-        self.source(Source::Value(uri, source), deserializers)
+        self.insert(Source::Value(uri, source), deserializers)
     }
 
     pub(crate) fn source_string(
@@ -142,10 +142,10 @@ impl Sources {
         source: String,
         deserializers: &Deserializers,
     ) -> Result<&Value, SourceError> {
-        self.source(Source::String(uri, source), deserializers)
+        self.insert(Source::String(uri, source), deserializers)
     }
 
-    pub(crate) fn source(
+    pub(crate) fn insert(
         &mut self,
         source: Source,
         deserializers: &Deserializers,
