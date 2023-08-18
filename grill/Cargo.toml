@@ -42,6 +42,7 @@ urn              = { workspace = true }
 [dev-dependencies]
 criterion = { version = "0.4" }
 proptest  = { version = "1.2" }
+similar   = { version = "2.2.1" }
 tokio     = { version = "1.28", features = ["full"] }
 
 [features]

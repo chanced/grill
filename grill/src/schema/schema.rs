@@ -69,10 +69,17 @@ pub struct Schema<'i, Key: slotmap::Key> {
     pub metaschema: Cow<'i, AbsoluteUri>,
     /// The source of the schema.
     pub source: Cow<'i, Value>,
-    /// The [`Key`] of the schema which contains this schema, if any. Note that
-    /// if this schema has an `id`, `parent` will be `None` regardless of
-    /// whether or not this schema is embedded.
-    pub container: Option<Key>,
+    /// The `Key` of the parent `Schema`, if any.
+    ///
+    /// Note that if this `Schema` has an `id`, then `parent` will be `None`
+    /// regardless of whether or not this schema is embedded.
+    pub parent: Option<Key>,
+    /// `Schema`s that are directly embedded within this `Schema`
+    ///
+    /// Note that if any embedded `Schema` has an `id`, then it will not be
+    /// be present in this list as per the specification, `Schema`s which are
+    /// identified are to be treated as root schemas.
+    pub subschemas: Cow<'i, [Key]>,
     /// Dependents of this `Schema`.
     pub dependents: Cow<'i, [Key]>,
     ///  Dependencies of this `Schema`.
@@ -101,7 +108,8 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
             source: Cow::Borrowed(source),
-            container: compiled.parent,
+            parent: compiled.parent,
+            subschemas: Cow::Borrowed(&compiled.subschemas),
             dependents: Cow::Borrowed(&compiled.dependencies),
             dependencies: Cow::Borrowed(&compiled.dependencies),
             handlers: Cow::Borrowed(&compiled.handlers),
@@ -113,6 +121,7 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
     pub fn into_owned(self) -> Schema<'static, Key> {
         Schema {
             key: self.key,
+            parent: self.parent,
             id: self.id.map(|id| Cow::Owned(id.into_owned())),
             uris: Cow::Owned(self.uris.into_owned()),
             metaschema: Cow::Owned(self.metaschema.into_owned()),
@@ -122,7 +131,7 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
             handlers: Cow::Owned(self.handlers.into_owned()),
             source_uri: Cow::Owned(self.source_uri.into_owned()),
             source_path: Cow::Owned(self.source_path.into_owned()),
-            container: self.container,
+            subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
     }
 }
@@ -192,11 +201,12 @@ impl<Key: slotmap::Key> Schemas<Key> {
             source: Cow::Borrowed(source),
             uris: Cow::Borrowed(&schema.uris),
             handlers: Cow::Borrowed(&schema.handlers),
-            container: schema.parent,
+            parent: schema.parent,
             dependencies: Cow::Borrowed(&schema.dependencies),
             dependents: Cow::Borrowed(&schema.dependents),
             source_uri: Cow::Borrowed(&schema.source_uri),
             source_path: Cow::Borrowed(&schema.source_path),
+            subschemas: Cow::Borrowed(&schema.subschemas),
         })
     }
 

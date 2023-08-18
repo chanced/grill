@@ -2,13 +2,12 @@ use super::Schemas;
 use crate::{source::Sources, Schema};
 use either::Either;
 use std::{
-    collections::HashSet,
-    iter::{once, Chain, Copied, Empty, Once},
-    marker::PhantomData,
-    slice,
+    collections::{HashSet, VecDeque},
+    iter::{empty, once, Empty, Once},
+    vec::IntoIter,
 };
 
-macro_rules! impl_iterator {
+macro_rules! impl_traverse {
     ($name:ident, $func:ident) => {
         impl<'i, Key> Iterator for $name<'i, Key>
         where
@@ -26,19 +25,46 @@ macro_rules! impl_iterator {
 /// [`Iterator`] which traverses both direct and indirect dependents of
 /// a [`Schema`].
 pub struct AllDependents<'i, Key: slotmap::Key> {
-    traverse: Slice<'i, Key, Once<Key>>,
+    traverse: Slices<'i, Key>,
 }
 
-impl_iterator!(AllDependents, all_dependents);
+impl_traverse!(AllDependents, all_dependents);
+
+fn all_dependents<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
+where
+    Key: slotmap::Key,
+{
+    #[allow(clippy::unnecessary_to_owned)]
+    schema.dependents.into_owned().into_iter()
+}
+
+impl<'i, Key> AllDependents<'i, Key>
+where
+    Key: slotmap::Key,
+{
+    pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
+        Self {
+            traverse: Traverse::new(key, schemas, sources, all_dependents),
+        }
+    }
+}
 
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependencies of
 /// a [`Schema`].
 pub struct TransitiveDependencies<'i, Key: slotmap::Key> {
-    traverse: Slice<'i, Key, Once<Key>>,
+    traverse: Slices<'i, Key>,
 }
 
-impl_iterator!(TransitiveDependencies, transitive_dependencies);
+impl_traverse!(TransitiveDependencies, transitive_dependencies);
+
+fn transitive_dependencies<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
+where
+    Key: slotmap::Key,
+{
+    #[allow(clippy::unnecessary_to_owned)]
+    schema.dependencies.into_owned().into_iter()
+}
 
 impl<'i, Key> TransitiveDependencies<'i, Key>
 where
@@ -46,7 +72,71 @@ where
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
-            traverse: DepthFirst::new(once(key), schemas, sources, transitive_dependencies),
+            traverse: Traverse::new(key, schemas, sources, transitive_dependencies),
+        }
+    }
+}
+
+/// An [`Iterator`] over the hiearchy of a given [`Schema`].
+///
+///
+/// Note that the JSON Schema specification states that if a schema is
+/// identified (by having either an `$id` field for Draft 07 and beyond or an
+/// `id` field for Draft 04 and earlier), then it must be the document root. As
+/// such, embedded schemas with an id  will not have a parent, even if the
+/// [`Schema`] is embedded.
+pub struct Ancestors<'i, Key: slotmap::Key> {
+    traverse: Instances<'i, Key>,
+}
+
+impl_traverse!(Ancestors, ancestors);
+fn ancestors<Key>(schema: Schema<'_, Key>) -> Either<Once<Key>, Empty<Key>>
+where
+    Key: slotmap::Key,
+{
+    if let Some(parent) = schema.parent {
+        Either::Left(once(parent))
+    } else {
+        Either::Right(empty())
+    }
+}
+impl<'i, Key> Ancestors<'i, Key>
+where
+    Key: slotmap::Key,
+{
+    pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
+        Self {
+            traverse: Traverse::new(key, schemas, sources, ancestors),
+        }
+    }
+}
+
+/// An [`Iterator`] over the hiearchy of a given [`Schema`].
+///
+///
+/// Note that the JSON Schema specification states that if a schema is
+/// identified (by having either an `$id` field for Draft 07 and beyond or an
+/// `id` field for Draft 04 and earlier), then it must be the document root. As
+/// such, embedded schemas with an id  will not have a parent, even if the
+/// [`Schema`] is embedded.
+pub struct Descendants<'i, Key: slotmap::Key> {
+    traverse: Slices<'i, Key>,
+}
+impl_traverse!(Descendants, descendants);
+fn descendants<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
+where
+    Key: slotmap::Key,
+{
+    #[allow(clippy::unnecessary_to_owned)]
+    schema.subschemas.into_owned().into_iter()
+}
+impl<'i, Key> Descendants<'i, Key>
+where
+    Key: slotmap::Key,
+{
+    pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
+        Self {
+            traverse: Traverse::new(key, schemas, sources, descendants),
         }
     }
 }
@@ -76,56 +166,42 @@ where
     Inner: Iterator<Item = Key>,
 {
     type Item = Schema<'i, Key>;
-
     fn next(&mut self) -> Option<Self::Item> {
         let key = self.iter.next()?;
         Some(self.schemas.get_unchecked(key, self.sources))
     }
 }
-/// An [`Iterator`] over dependencies of a given [`Schema`]
-pub struct DirectDependencies {}
 
-struct DepthFirst<'i, Key, Seed, Iter, Func>
+struct Traverse<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
-    Seed: IntoIterator<Item = Key>,
     Iter: Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
     handle: Func,
-    seed: Seed::IntoIter,
-    queue: Option<Chain<Iter, Box<dyn Iterator<Item = Key> + 'i>>>,
+    queue: VecDeque<Iter>,
     sent: HashSet<Key>,
     schemas: &'i Schemas<Key>,
     sources: &'i Sources,
 }
 
-impl<'i, Key, Seed, Iter, Func> DepthFirst<'i, Key, Seed, Iter, Func>
+impl<'i, Key, Iter, Func> Traverse<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
-    Seed: IntoIterator<Item = Key>,
     Iter: 'i + Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
     pub(crate) fn new(
-        seed: Seed,
+        key: Key,
         schemas: &'i Schemas<Key>,
         sources: &'i Sources,
         handle: Func,
     ) -> Self {
-        let mut seed = seed.into_iter();
-        let first = seed.next();
-        let queue = first.map(|first| {
-            let schema = schemas.get(first, sources).unwrap();
-            handle(schema).chain(Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Key>>)
-        });
-
-        let sent = HashSet::new();
+        let first = handle(schemas.get_unchecked(key, sources));
         Self {
             handle,
-            seed,
-            queue,
-            sent,
+            queue: VecDeque::from([first]),
+            sent: HashSet::new(),
             schemas,
             sources,
         }
@@ -135,83 +211,82 @@ where
     }
 }
 
-impl<'i, Key, Seed, Iter, Func> Iterator for DepthFirst<'i, Key, Seed, Iter, Func>
+impl<'i, Key, Iter, Func> Iterator for Traverse<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
-    Seed: IntoIterator<Item = Key>,
     Iter: 'i + Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
     type Item = Schema<'i, Key>;
+
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.queue.as_mut().and_then(Iterator::next);
-        let key = next.or_else(|| {
-            self.seed.next().and_then(|key| {
-                let schema = self.schemas.get_unchecked(key, self.sources);
-                self.queue = Some(
-                    self.exec(schema)
-                        .chain(Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Key>>),
-                );
-                self.queue.as_mut().and_then(Iterator::next)
-            })
-        })?;
-
-        if self.sent.contains(&key) {
-            return self.next();
+        loop {
+            if self.queue.is_empty() {
+                return None;
+            }
+            let front = self.queue.front_mut()?;
+            let next = front.next();
+            if next.is_none() {
+                self.queue.pop_front();
+                continue;
+            }
+            let next = next.unwrap();
+            if self.sent.contains(&next) {
+                continue;
+            }
+            let next = self.schemas.get_unchecked(next, self.sources);
+            self.queue.push_front(self.exec(next.clone()));
+            return Some(next);
         }
-        let schema = self.schemas.get(key, self.sources).unwrap();
-        self.sent.insert(key);
-        self.queue = self.queue.take().map(|queue| {
-            self.exec(schema.clone())
-                .chain(Box::new(queue) as Box<dyn Iterator<Item = Key>>)
-        });
-        Some(schema)
     }
 }
 
-fn transitive_dependencies<Key>(schema: Schema<'_, Key>) -> std::vec::IntoIter<Key>
-where
-    Key: slotmap::Key,
-{
-    #[allow(clippy::unnecessary_to_owned)]
-    schema.dependencies.into_owned().into_iter()
+macro_rules! iter {
+    (
+        $(#[$($attrss:tt)*])*
+        $vis:vis $name:ident <- $iter:ident
+
+    ) => {
+        $(#[$($attrss)*])*
+        $vis struct $name<'i, Key: slotmap::Key> {
+            iter: Iter<'i, Key, $iter<Key>>,
+        }
+
+        impl<'i, Key> $name<'i, Key> where Key: slotmap::Key {
+            #[doc=concat!("Creates a new ", stringify!($name))]
+            pub(crate) fn new(iter: $iter<Key>, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
+                let iter = Iter::new(iter, schemas, sources);
+                Self { iter }
+            }
+        }
+        impl<'i, Key> Iterator for $name<'i, Key>
+        where
+            Key: slotmap::Key,
+        {
+            type Item = Schema<'i, Key>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.iter.next()
+            }
+        }
+    };
+}
+iter! {
+    /// An [`Iterator`] over the direct dependencies of a [`Schema`]
+    pub DirectDependencies <- IntoIter
 }
 
-fn empty<Key>(_: Schema<'_, Key>) -> Empty<Key>
-where
-    Key: slotmap::Key,
-{
-    std::iter::empty()
+iter! {
+    /// An [`Iterator`] over [`Schema`](crate::schema::Schema)s which directly
+    /// depend on a specified [`Schema`](crate::schema::Schema)
+    pub DirectDependents <- IntoIter
 }
 
-fn ancestors<Key: slotmap::Key>(schema: Schema<'_, Key>) -> Either<Once<Key>, Empty<Key>> {
-    if schema.dependencies.is_empty() {
-        either::Right(std::iter::empty())
-    } else {
-        either::Left(std::iter::once(schema.key))
-    }
-}
+type Slices<'i, Key> = Traverse<'i, Key, IntoIter<Key>, fn(Schema<'i, Key>) -> IntoIter<Key>>;
 
-fn all_dependents() {}
-
-// impl_iterator!(AllDependents, all_dependents);
-
-// pub struct DirectDependents<'i, Key: slotmap::Key> {
-//     traverse: Slice<'i, Key>,
-// }
-
-type Slice<'i, Key, Seed> = DepthFirst<
+type Instances<'i, Key> = Traverse<
     'i,
     Key,
-    Seed,
-    std::vec::IntoIter<Key>,
-    fn(Schema<'i, Key>) -> std::vec::IntoIter<Key>,
->;
-
-type Instance<'i, Key, Seed> = DepthFirst<
-    'i,
-    Key,
-    Seed,
     Either<Once<Key>, Empty<Key>>,
     fn(Schema<'i, Key>) -> Either<Once<Key>, Empty<Key>>,
 >;
@@ -221,7 +296,6 @@ mod tests {
     use std::fmt::format;
 
     use jsonptr::Pointer;
-    use lazy_static::__Deref;
     use serde_json::json;
     use slotmap::SlotMap;
 
@@ -232,87 +306,138 @@ mod tests {
     };
 
     use super::*;
+    #[test]
+    /// This test ignores the rule surrounding identified schemas being document roots.
+    fn test_ancestors() {
+        let (_, schemas, sources) = build_graph();
+        let leaf_id =
+            create_test_uri("/a/subschema_a/nested_subschema_a/deeply_nested_subschema_a");
+        let leaf_key = schemas.get_key_by_id(&leaf_id).unwrap();
+        let traverse = Ancestors::new(leaf_key, &schemas, &sources);
+        let ids = traverse
+            .map(|schema| schema.id.unwrap().path_or_nss().to_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &ids,
+            &["/a/subschema_a/nested_subschema_a", "/a/subschema_a", "/a",]
+        );
+    }
+
+    #[test]
+    fn test_all_dependents() {
+        let (_, schemas, sources) = build_graph();
+        let leaf_id = create_test_uri("/a/dependency_b/transitive_b/distant_transitive_c");
+        let leaf_key = schemas.get_key_by_id(&leaf_id).unwrap();
+
+        let traverse = AllDependents::new(leaf_key, &schemas, &sources);
+
+        let ids = traverse
+            .map(|schema| schema.id.unwrap().path_or_nss().to_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &ids,
+            &["/a/dependency_b/transitive_b", "/a/dependency_b", "/a",]
+        );
+    }
 
     #[test]
     fn test_transitive_dependencies() {
+        use similar::{ChangeTag, TextDiff};
+
         let (root_keys, schemas, sources) = build_graph();
         println!("{root_keys:?}");
         let traverse = TransitiveDependencies::new(root_keys[0], &schemas, &sources);
         let ids = traverse
             .map(|schema| schema.id.unwrap().path_or_nss().to_owned())
             .collect::<Vec<_>>();
+        let expected = &[
+            "/a/dependency_a",
+            "/a/dependency_a/transitive_a",
+            "/a/dependency_a/transitive_a/distant_transitive_a",
+            "/a/dependency_a/transitive_a/distant_transitive_b",
+            "/a/dependency_a/transitive_a/distant_transitive_c",
+            "/a/dependency_a/transitive_b",
+            "/a/dependency_a/transitive_b/distant_transitive_a",
+            "/a/dependency_a/transitive_b/distant_transitive_b",
+            "/a/dependency_a/transitive_b/distant_transitive_c",
+            "/a/dependency_a/transitive_c",
+            "/a/dependency_a/transitive_c/distant_transitive_a",
+            "/a/dependency_a/transitive_c/distant_transitive_b",
+            "/a/dependency_a/transitive_c/distant_transitive_c",
+            "/a/dependency_a/transitive_d",
+            "/a/dependency_a/transitive_d/distant_transitive_a",
+            "/a/dependency_a/transitive_d/distant_transitive_b",
+            "/a/dependency_a/transitive_d/distant_transitive_c",
+            "/a/dependency_b",
+            "/a/dependency_b/transitive_a",
+            "/a/dependency_b/transitive_a/distant_transitive_a",
+            "/a/dependency_b/transitive_a/distant_transitive_b",
+            "/a/dependency_b/transitive_a/distant_transitive_c",
+            "/a/dependency_b/transitive_b",
+            "/a/dependency_b/transitive_b/distant_transitive_a",
+            "/a/dependency_b/transitive_b/distant_transitive_b",
+            "/a/dependency_b/transitive_b/distant_transitive_c",
+            "/a/dependency_b/transitive_c",
+            "/a/dependency_b/transitive_c/distant_transitive_a",
+            "/a/dependency_b/transitive_c/distant_transitive_b",
+            "/a/dependency_b/transitive_c/distant_transitive_c",
+            "/a/dependency_b/transitive_d",
+            "/a/dependency_b/transitive_d/distant_transitive_a",
+            "/a/dependency_b/transitive_d/distant_transitive_b",
+            "/a/dependency_b/transitive_d/distant_transitive_c",
+            "/a/dependency_c",
+            "/a/dependency_c/transitive_a",
+            "/a/dependency_c/transitive_a/distant_transitive_a",
+            "/a/dependency_c/transitive_a/distant_transitive_b",
+            "/a/dependency_c/transitive_a/distant_transitive_c",
+            "/a/dependency_c/transitive_b",
+            "/a/dependency_c/transitive_b/distant_transitive_a",
+            "/a/dependency_c/transitive_b/distant_transitive_b",
+            "/a/dependency_c/transitive_b/distant_transitive_c",
+            "/a/dependency_c/transitive_c",
+            "/a/dependency_c/transitive_c/distant_transitive_a",
+            "/a/dependency_c/transitive_c/distant_transitive_b",
+            "/a/dependency_c/transitive_c/distant_transitive_c",
+            "/a/dependency_c/transitive_d",
+            "/a/dependency_c/transitive_d/distant_transitive_a",
+            "/a/dependency_c/transitive_d/distant_transitive_b",
+            "/a/dependency_c/transitive_d/distant_transitive_c",
+            "/a/dependency_d",
+            "/a/dependency_d/transitive_a",
+            "/a/dependency_d/transitive_a/distant_transitive_a",
+            "/a/dependency_d/transitive_a/distant_transitive_b",
+            "/a/dependency_d/transitive_a/distant_transitive_c",
+            "/a/dependency_d/transitive_b",
+            "/a/dependency_d/transitive_b/distant_transitive_a",
+            "/a/dependency_d/transitive_b/distant_transitive_b",
+            "/a/dependency_d/transitive_b/distant_transitive_c",
+            "/a/dependency_d/transitive_c",
+            "/a/dependency_d/transitive_c/distant_transitive_a",
+            "/a/dependency_d/transitive_c/distant_transitive_b",
+            "/a/dependency_d/transitive_c/distant_transitive_c",
+            "/a/dependency_d/transitive_d",
+            "/a/dependency_d/transitive_d/distant_transitive_a",
+            "/a/dependency_d/transitive_d/distant_transitive_b",
+            "/a/dependency_d/transitive_d/distant_transitive_c",
+        ];
+
         assert_eq!(
             &ids,
-            &[
-                "/a/dependency_a",
-                "/a/dependency_a/transitive_a",
-                "/a/dependency_a/transitive_a/distant_transitive_a",
-                "/a/dependency_a/transitive_a/distant_transitive_b",
-                "/a/dependency_a/transitive_a/distant_transitive_c",
-                "/a/dependency_a/transitive_b",
-                "/a/dependency_a/transitive_b/distant_transitive_a",
-                "/a/dependency_a/transitive_b/distant_transitive_b",
-                "/a/dependency_a/transitive_b/distant_transitive_c",
-                "/a/dependency_a/transitive_c",
-                "/a/dependency_a/transitive_c/distant_transitive_a",
-                "/a/dependency_a/transitive_c/distant_transitive_b",
-                "/a/dependency_a/transitive_c/distant_transitive_c",
-                "/a/dependency_a/transitive_d",
-                "/a/dependency_a/transitive_d/distant_transitive_a",
-                "/a/dependency_a/transitive_d/distant_transitive_b",
-                "/a/dependency_a/transitive_d/distant_transitive_c",
-                "/a/dependency_b",
-                "/a/dependency_b/transitive_a",
-                "/a/dependency_b/transitive_a/distant_transitive_a",
-                "/a/dependency_b/transitive_a/distant_transitive_b",
-                "/a/dependency_b/transitive_a/distant_transitive_c",
-                "/a/dependency_b/transitive_b",
-                "/a/dependency_b/transitive_b/distant_transitive_a",
-                "/a/dependency_b/transitive_b/distant_transitive_b",
-                "/a/dependency_b/transitive_b/distant_transitive_c",
-                "/a/dependency_b/transitive_c",
-                "/a/dependency_b/transitive_c/distant_transitive_a",
-                "/a/dependency_b/transitive_c/distant_transitive_b",
-                "/a/dependency_b/transitive_c/distant_transitive_c",
-                "/a/dependency_b/transitive_d",
-                "/a/dependency_b/transitive_d/distant_transitive_a",
-                "/a/dependency_b/transitive_d/distant_transitive_b",
-                "/a/dependency_b/transitive_d/distant_transitive_c",
-                "/a/dependency_c",
-                "/a/dependency_c/transitive_a",
-                "/a/dependency_c/transitive_a/distant_transitive_a",
-                "/a/dependency_c/transitive_a/distant_transitive_b",
-                "/a/dependency_c/transitive_a/distant_transitive_c",
-                "/a/dependency_c/transitive_b",
-                "/a/dependency_c/transitive_b/distant_transitive_a",
-                "/a/dependency_c/transitive_b/distant_transitive_b",
-                "/a/dependency_c/transitive_b/distant_transitive_c",
-                "/a/dependency_c/transitive_c",
-                "/a/dependency_c/transitive_c/distant_transitive_a",
-                "/a/dependency_c/transitive_c/distant_transitive_b",
-                "/a/dependency_c/transitive_c/distant_transitive_c",
-                "/a/dependency_c/transitive_d",
-                "/a/dependency_c/transitive_d/distant_transitive_a",
-                "/a/dependency_c/transitive_d/distant_transitive_b",
-                "/a/dependency_c/transitive_d/distant_transitive_c",
-                "/a/dependency_d",
-                "/a/dependency_d/transitive_a",
-                "/a/dependency_d/transitive_a/distant_transitive_a",
-                "/a/dependency_d/transitive_a/distant_transitive_b",
-                "/a/dependency_d/transitive_a/distant_transitive_c",
-                "/a/dependency_d/transitive_b",
-                "/a/dependency_d/transitive_b/distant_transitive_a",
-                "/a/dependency_d/transitive_b/distant_transitive_b",
-                "/a/dependency_d/transitive_b/distant_transitive_c",
-                "/a/dependency_d/transitive_c",
-                "/a/dependency_d/transitive_c/distant_transitive_a",
-                "/a/dependency_d/transitive_c/distant_transitive_b",
-                "/a/dependency_d/transitive_c/distant_transitive_c",
-                "/a/dependency_d/transitive_d",
-                "/a/dependency_d/transitive_d/distant_transitive_a",
-                "/a/dependency_d/transitive_d/distant_transitive_b",
-                "/a/dependency_d/transitive_d/distant_transitive_c"
-            ],
+            expected,
+            "{}",
+            TextDiff::from_lines(&format!("{expected:#?}"), &format!("{ids:#?}"))
+                .iter_all_changes()
+                .map(|change| {
+                    let sign = match change.tag() {
+                        ChangeTag::Delete => "-",
+                        ChangeTag::Insert => "+",
+                        ChangeTag::Equal => " ",
+                    };
+                    format!("{sign}{change}")
+                })
+                .fold(String::new(), |acc, c| format!("{acc}{c}"))
         );
     }
 
@@ -419,8 +544,7 @@ mod tests {
         }
         (root_keys, schemas, sources)
     }
-
-    fn create_schema(uri: impl ToString) -> CompiledSchema<SchemaKey> {
+    fn create_test_uri(uri: impl ToString) -> AbsoluteUri {
         let mut uri = uri.to_string();
         if !uri.starts_with("https") {
             if uri.starts_with('/') {
@@ -428,10 +552,16 @@ mod tests {
             }
             uri = format!("https://test.com/{uri}");
         }
-        let uri: AbsoluteUri = uri.parse().unwrap();
-        let metaschema: AbsoluteUri = "https://json-schema.org/draft/2020-12/schema"
+        AbsoluteUri::parse(&uri).unwrap()
+    }
+    fn metaschema() -> AbsoluteUri {
+        "https://json-schema.org/draft/2020-12/schema"
             .parse()
-            .unwrap();
+            .unwrap()
+    }
+    fn create_schema(uri: impl ToString) -> CompiledSchema<SchemaKey> {
+        let uri: AbsoluteUri = create_test_uri(uri);
+        let metaschema = metaschema();
         CompiledSchema {
             id: Some(uri.clone()),
             anchors: Vec::default(),
