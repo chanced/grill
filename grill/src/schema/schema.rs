@@ -1,4 +1,4 @@
-use crate::{handler::Handler, source::Sources, AbsoluteUri};
+use crate::{error::UnknownKeyError, handler::Handler, source::Sources, AbsoluteUri};
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -230,16 +230,20 @@ impl<Key: slotmap::Key> Schemas<Key> {
         self.get(key, sources).unwrap()
     }
     /// Returns the [`Schema`] with the given `Key` if it exists.
-    #[must_use]
-    pub(crate) fn get<'i>(&'i self, key: Key, sources: &'i Sources) -> Option<Schema<'i, Key>> {
+    pub(crate) fn get<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> Result<Schema<'i, Key>, UnknownKeyError> {
         let schema = if let Some(sandbox) = self.sandbox.as_ref() {
             sandbox.get(key)
         } else {
             self.store.get(key)
-        }?;
+        }
+        .ok_or(UnknownKeyError)?;
 
-        let source = sources.get(&schema.source_uri)?;
-        Some(Schema {
+        let source = sources.get(&schema.source_uri).unwrap();
+        Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
             metaschema: Cow::Borrowed(&schema.metaschema),
@@ -273,7 +277,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
         sources: &'i Sources,
     ) -> Option<Schema<'i, Key>> {
         let key = self.keys.get(uri).copied()?;
-        self.get(key, sources)
+        Some(self.get_unchecked(key, sources))
     }
 
     #[must_use]
@@ -336,7 +340,10 @@ impl<Key: slotmap::Key> Schemas<Key> {
         self.sandbox = None;
     }
 
-    pub(crate) fn contains_key(&self, key: Key) -> bool where Key: slotmap::Key {
+    pub(crate) fn contains_key(&self, key: Key) -> bool
+    where
+        Key: slotmap::Key,
+    {
         self.store.contains_key(key)
     }
 }

@@ -73,9 +73,20 @@ where
     }
 
     /// Returns the [`Schema`] with the given `key` if it exists.
+    ///
+    /// # Errors
+    /// Returns [`UnknownKeyError`] if the `key` does not belong to this `Interrgator`.
+    pub fn schema(&self, key: Key) -> Result<Schema<'_, Key>, UnknownKeyError> {
+        self.schemas.get(key, &self.sources)
+    }
+
     #[must_use]
-    pub fn schema(&self, key: Key) -> Schema<'_, Key> {
-        self.schemas.get(key, &self.sources).unwrap()
+    /// Returns the [`Schema`] with the given `key` if it exists.
+    ///
+    /// # Panics
+    /// Panics if the `key` does not belong to this `Interrgator`.
+    pub fn schema_unchecked(&self, key: Key) -> Schema<'_, Key> {
+        self.schemas.get_unchecked(key, &self.sources)
     }
 
     /// Returns the [`Schema`] with the given `id` if it exists.

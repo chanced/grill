@@ -3,9 +3,84 @@ use crate::{source::Sources, Schema};
 use either::Either;
 use std::{
     collections::{HashSet, VecDeque},
-    iter::{empty, once, Empty, Once},
+    iter::{empty, once, Empty, Map, Once},
     vec::IntoIter,
 };
+
+/// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
+pub trait Traverse<'i, Key, Iter>: Iterator<Item = Schema<'i, Key>>
+where
+    Self: Sized,
+    Key: 'i + slotmap::Key,
+    Iter: Iterator<Item = Schema<'i, Key>>,
+{
+    /// Returns a new [`Keys`] [`Iterator`] which consumes this `Iterator` and
+    /// yields an `Iterator` of `Key`
+    fn keys(self) -> Keys<'i, Key, Iter>;
+    /// Returns a new [`MapIntoOwned`] [`Iterator`] which consumes this
+    /// `Iterator` of [`Schema<'i, Key>`] and yields owned copies (i.e.
+    /// [`Schema<'static, Key>`]).
+    fn map_into_owned(self) -> MapIntoOwned<'i, Key, Self>;
+}
+impl<'i, Key, Iter> Traverse<'i, Key, Iter> for Iter
+where
+    Iter: Iterator<Item = Schema<'i, Key>>,
+    Key: 'static + slotmap::Key,
+{
+    fn keys(self) -> Keys<'i, Key, Iter> {
+        Keys { iter: self }
+    }
+
+    fn map_into_owned(self) -> MapIntoOwned<'i, Key, Iter> {
+        MapIntoOwned { iter: self }
+    }
+}
+
+pub struct MapIntoOwned<'i, Key, Iter>
+where
+    Key: 'static + slotmap::Key,
+    Iter: Iterator<Item = Schema<'i, Key>>,
+{
+    iter: Iter,
+}
+impl<'i, Key, Iter> Iterator for MapIntoOwned<'i, Key, Iter>
+where
+    Key: slotmap::Key,
+    Iter: Iterator<Item = Schema<'i, Key>>,
+{
+    type Item = Schema<'static, Key>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(Schema::into_owned)
+    }
+}
+
+fn into_owned<Key: slotmap::Key>(schema: Schema<'_, Key>) -> Schema<'static, Key> {
+    schema.into_owned()
+}
+
+/// Maps an [`Iterator`] of [`Schema<'_, Key>`](crate::schema::Schema) into an [`Iterator`] of `Key`
+///
+/// See [`Traverse::keys`] for usage.
+pub struct Keys<'i, Key, Iter>
+where
+    Key: 'i + slotmap::Key,
+    Iter: Iterator<Item = Schema<'i, Key>>,
+{
+    iter: Iter,
+}
+
+impl<'i, Key, Iter> Iterator for Keys<'i, Key, Iter>
+where
+    Key: 'i + slotmap::Key,
+    Iter: Iterator<Item = Schema<'i, Key>>,
+{
+    type Item = Key;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|s| s.key)
+    }
+}
 
 macro_rules! impl_traverse {
     ($name:ident, $func:ident) => {
@@ -44,7 +119,7 @@ where
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
-            traverse: Traverse::new(key, schemas, sources, all_dependents),
+            traverse: DepthFirst::new(key, schemas, sources, all_dependents),
         }
     }
 }
@@ -72,7 +147,7 @@ where
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
-            traverse: Traverse::new(key, schemas, sources, transitive_dependencies),
+            traverse: DepthFirst::new(key, schemas, sources, transitive_dependencies),
         }
     }
 }
@@ -106,7 +181,7 @@ where
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
-            traverse: Traverse::new(key, schemas, sources, ancestors),
+            traverse: DepthFirst::new(key, schemas, sources, ancestors),
         }
     }
 }
@@ -136,7 +211,7 @@ where
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
-            traverse: Traverse::new(key, schemas, sources, descendants),
+            traverse: DepthFirst::new(key, schemas, sources, descendants),
         }
     }
 }
@@ -172,7 +247,7 @@ where
     }
 }
 
-struct Traverse<'i, Key, Iter, Func>
+struct DepthFirst<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
     Iter: Iterator<Item = Key>,
@@ -185,7 +260,7 @@ where
     sources: &'i Sources,
 }
 
-impl<'i, Key, Iter, Func> Traverse<'i, Key, Iter, Func>
+impl<'i, Key, Iter, Func> DepthFirst<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
     Iter: 'i + Iterator<Item = Key>,
@@ -211,7 +286,7 @@ where
     }
 }
 
-impl<'i, Key, Iter, Func> Iterator for Traverse<'i, Key, Iter, Func>
+impl<'i, Key, Iter, Func> Iterator for DepthFirst<'i, Key, Iter, Func>
 where
     Key: slotmap::Key,
     Iter: 'i + Iterator<Item = Key>,
@@ -296,9 +371,9 @@ fn direct_dependents<Key: slotmap::Key>(schema: Schema<'_, Key>) -> IntoIter<Key
     schema.dependents.into_owned().into_iter()
 }
 
-type Slices<'i, Key> = Traverse<'i, Key, IntoIter<Key>, fn(Schema<'i, Key>) -> IntoIter<Key>>;
+type Slices<'i, Key> = DepthFirst<'i, Key, IntoIter<Key>, fn(Schema<'i, Key>) -> IntoIter<Key>>;
 
-type Instances<'i, Key> = Traverse<
+type Instances<'i, Key> = DepthFirst<
     'i,
     Key,
     Either<Once<Key>, Empty<Key>>,

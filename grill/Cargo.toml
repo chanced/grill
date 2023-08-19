@@ -12,7 +12,6 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-anymap           = { workspace = true }
 async-trait      = { workspace = true }
 dyn-clone        = { workspace = true }
 either           = { workspace = true }
