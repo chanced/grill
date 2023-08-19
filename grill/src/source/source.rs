@@ -1,14 +1,18 @@
-use super::Deserializers;
+use super::{Deserializers, Resolvers};
 use crate::{
-    error::{DeserializationError, DeserializeError, SourceConflictError, SourceError},
+    error::{
+        DeserializationError, DeserializeError, ResolveError, SourceConflictError, SourceError,
+    },
     schema::Metaschema,
     source::Deserializer,
     uri::AbsoluteUri,
 };
+use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use std::{
-    borrow::Cow,
+    borrow::{Borrow, Cow},
     collections::{hash_map::Entry, HashMap},
+    str::FromStr,
 };
 
 pub(crate) enum Source {
@@ -103,7 +107,6 @@ impl Sources {
         deserializers: &[(&'static str, Box<dyn Deserializer>)],
     ) -> Result<Self, SourceError> {
         let mut store = HashMap::with_capacity(sources.len());
-        let capacity = sources.len();
         let iter = sources.into_iter();
         for src in iter {
             let uri = src.uri().clone(); // need the uri below for the error context
@@ -121,6 +124,54 @@ impl Sources {
             store.insert(uri, src);
         }
         Ok(Self { store })
+    }
+
+    pub(crate) async fn resolve(
+        &mut self,
+        uri: &AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(Pointer, &Value), SourceError> {
+        // if the value has already been indexed, return a clone of the local copy
+        if self.store.contains_key(uri) {
+            return Ok((Pointer::default(), self.store.get(uri).unwrap()));
+        }
+
+        // checking to see if the root resource has already been stored
+        let mut base_uri = uri.clone();
+        base_uri.set_fragment(None).unwrap();
+
+        // resolving the base uri
+        let resolved = resolvers.resolve(&base_uri).await?;
+
+        // add the base value to the local store of sources
+        let root = self.source_string(base_uri, resolved, deserializers)?;
+
+        let uri_fragment = uri.fragment().unwrap_or_default();
+
+        // if the uri does not have a fragment, we are done and can return the
+        // root-level schema
+        if uri_fragment.is_empty() {
+            return Ok((Pointer::default(), &root));
+        }
+
+        // there is more work to do if the uri has a fragmen.
+        // first, perform lookup again to see if add_source indexed the schema
+        if self.store.contains_key(uri) {
+            return Ok((Pointer::default(), self.store.get(uri).unwrap()));
+        }
+
+        // if not, the fragment must be a json pointer as all anchors and
+        // schemas with fragmented ids should have been located and indexed
+        // TODO: better error handling here.
+        let ptr =
+            Pointer::from_str(uri_fragment).map_err(|err| ResolveError::new(err, uri.clone()))?;
+
+        let value = root.resolve(&ptr).map_err(|err| {
+            SourceError::ResolutionFailed(ResolveError::new(err, uri.clone()).into())
+        })?;
+        todo!()
+        // Ok((ptr, value))
     }
 
     #[must_use]
@@ -163,11 +214,11 @@ impl Sources {
             })?;
 
         if self.store.contains_key(&uri) {
-            return self.resolve_unchecked(&uri, &source);
+            return self.get_unchecked(&uri, &source);
         }
         Ok(self.insert_value(uri, source.into_owned())?)
     }
-    /// Resolves a [`Source`] from the internal hashmap.
+    /// Resolves a source [`&Value`](`Value`) from the internal hashmap.
     ///
     /// # Errors
     /// Returns a [`SourceConflictError`] if the `uri` is present in the
@@ -176,7 +227,7 @@ impl Sources {
     /// # Panics
     /// This function panics if the `uri` is not present in the internal
     /// hashmap.
-    fn resolve_unchecked(&self, uri: &AbsoluteUri, source: &Value) -> Result<&Value, SourceError> {
+    fn get_unchecked(&self, uri: &AbsoluteUri, source: &Value) -> Result<&Value, SourceError> {
         if self.store.get(uri).unwrap() != source {
             // error out if a source with the same uri has been indexed and the
             // values do not match

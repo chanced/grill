@@ -1,4 +1,9 @@
-use crate::{error::UnknownKeyError, handler::Handler, source::Sources, AbsoluteUri};
+use crate::{
+    error::{CompileError, UnknownKeyError},
+    handler::Handler,
+    source::Sources,
+    AbsoluteUri,
+};
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -7,6 +12,7 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
     iter::Copied,
     slice,
+    str::FromStr,
 };
 
 use super::{
@@ -257,6 +263,28 @@ impl<Key: slotmap::Key> Schemas<Key> {
             source_path: Cow::Borrowed(&schema.source_path),
             subschemas: Cow::Borrowed(&schema.subschemas),
         })
+    }
+
+    pub(crate) fn locate_parent(
+        &mut self,
+        mut base: AbsoluteUri,
+    ) -> Result<Option<Key>, CompileError> {
+        let ptr = Pointer::from_str(base.fragment().unwrap()).map_err(|e| {
+            crate::error::LocatedSchemaUriPointerError {
+                source: e,
+                uri: base.clone(),
+            }
+        })?;
+        let mut path = Pointer::default();
+        base.set_fragment(None).unwrap();
+        for idx in 0..ptr.count() {
+            path.push_front(ptr.get(idx).unwrap());
+            base.set_fragment(Some(&path))?;
+            if let Some(key) = self.get_key_by_id(&base) {
+                return Ok(Some(key));
+            }
+        }
+        Ok(None)
     }
 
     pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<Key>> {

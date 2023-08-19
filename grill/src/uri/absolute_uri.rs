@@ -396,6 +396,11 @@ impl AbsoluteUri {
     pub fn has_query(&self) -> bool {
         self.query().is_some()
     }
+    /// Returns `true` if this `AbsoluteUri` has a fragment component.
+    #[must_use]
+    pub fn has_fragment(&self) -> bool {
+        self.fragment().is_some()
+    }
 }
 
 impl Borrow<str> for AbsoluteUri {

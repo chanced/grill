@@ -1,5 +1,6 @@
 #[doc(no_inline)]
 pub use crate::output::ValidationError;
+use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 #[doc(no_inline)]
@@ -519,6 +520,12 @@ pub enum CompileError {
     #[error(transparent)]
     LocateSubschemasFailed(#[from] LocateSchemasError),
 
+    /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
+    /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
+    /// schema's path as a JSON [`Pointer`](jsonptr::Pointer).
+    #[error("failed to parse JSON Pointer from ")]
+    LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
+
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
     Custom(#[from] Box<dyn StdError + Send + Sync>),
@@ -749,4 +756,12 @@ pub struct OverflowError<const M: usize = { u32::MAX as usize }, V = usize>(pub 
 impl<const M: usize, V> OverflowError<M, V> {
     /// The maximum allowed size.
     pub const MAX: usize = M;
+}
+
+#[derive(Debug, Error)]
+#[error("expected schema URI to contain path; found {uri}")]
+pub struct LocatedSchemaUriPointerError {
+    #[source]
+    pub source: MalformedPointerError,
+    pub uri: AbsoluteUri,
 }

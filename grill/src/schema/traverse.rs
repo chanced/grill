@@ -1,5 +1,5 @@
 use super::Schemas;
-use crate::{source::Sources, Schema};
+use crate::{source::Sources, AbsoluteUri, Schema};
 use either::Either;
 use std::{
     collections::{HashSet, VecDeque},
@@ -21,6 +21,10 @@ where
     /// `Iterator` of [`Schema<'i, Key>`] and yields owned copies (i.e.
     /// [`Schema<'static, Key>`]).
     fn map_into_owned(self) -> MapIntoOwned<'i, Key, Self>;
+
+    /// Searches the [`Iterator`] for a [`Schema`] with the specified
+    /// [`AbsoluteUri`] in it's set of URIs
+    fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, Key>>;
 }
 impl<'i, Key, Iter> Traverse<'i, Key, Iter> for Iter
 where
@@ -34,8 +38,18 @@ where
     fn map_into_owned(self) -> MapIntoOwned<'i, Key, Iter> {
         MapIntoOwned { iter: self }
     }
+
+    fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, Key>> {
+        for schema in self {
+            if schema.id.as_deref() == Some(uri) || schema.uris.contains(uri) {
+                return Some(schema);
+            }
+        }
+        None
+    }
 }
 
+/// Maps an [`Iterator`] of [`Schema<'i, Key>`](`Schema`) into one of [`Schema<'static, Key>`](`Schema`).
 pub struct MapIntoOwned<'i, Key, Iter>
 where
     Key: 'static + slotmap::Key,
@@ -59,7 +73,7 @@ fn into_owned<Key: slotmap::Key>(schema: Schema<'_, Key>) -> Schema<'static, Key
     schema.into_owned()
 }
 
-/// Maps an [`Iterator`] of [`Schema<'_, Key>`](crate::schema::Schema) into an [`Iterator`] of `Key`
+/// Maps an [`Iterator`] of [`Schema<'i, Key>`](crate::schema::Schema) into one of `Key`
 ///
 /// See [`Traverse::keys`] for usage.
 pub struct Keys<'i, Key, Iter>

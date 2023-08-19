@@ -64,11 +64,10 @@ where
         let uri = uri.try_into_absolute_uri()?;
         // resolving the uri provided.
         let (ptr, value) = self.resolve(&uri).await?;
-
         // self.compile_schema(uri, &value)
         //     .await
         //     .tap_ok(|_| self.schemas.accept_txn())
-        //     .tap_err(|_| self.schemas.rollback_txn())
+        //     .tap_err(|_| self.schemas.rollback_txn());
         todo!()
     }
 
@@ -296,6 +295,7 @@ where
             .map(|key| self.schemas.get(key, &self.sources).unwrap().into_owned())
             .collect())
     }
+
     #[allow(clippy::unused_async, dead_code)]
     async fn compile_schema(
         &mut self,
@@ -303,15 +303,16 @@ where
         source_uri: AbsoluteUri,
         value: &Value,
         path: &Pointer,
+        mut parent: Option<Key>,
     ) -> Result<Key, CompileError> {
         // determining the dialect
         let dialect = self.dialects.pertinent_to_or_default(value);
 
         // identifying the schema
-        let (id, uris) = dialect.identify(base_uri.clone(), path, value)?;
+        let (id, uris) = dialect.identify(base_uri, path, value)?;
 
         // if identify did not find a primary id, use the uri + pointer fragment
-        // as the lookup which will be at index 0 of uris
+        // as the lookup which will be at the first position in the uris list
         let lookup_id = id.as_ref().unwrap_or(&uris[0]);
 
         // checking to see if the schema has already been compiled under the id
@@ -320,25 +321,45 @@ where
             return Ok(schema.key);
         }
 
-        // // compiling this schema
-        // let compiled = CompiledSchema {
-        //     id,
-        //     uris,
-        //     metaschema: dialect.primary_metaschema_id().clone(),
-        //     handlers: dialect.handlers.clone().into_boxed_slice(),
-        //     source_uri,
-        //     source_path: path.clone(),
-        // };
+        // attempt to find the parent
+        if id.is_none() && parent.is_none() && lookup_id.has_fragment() {
+            parent = self.schemas.locate_parent(lookup_id.clone())?;
+        }
 
-        // let key = self.schemas.insert(compiled).map_err(|uri| {
-        //     SourceError::from(SourceConflictError {
-        //         uri,
-        //         value: value.clone().into(),
-        //     })
-        // })?;
+        let mut source = self.sources.get(&source_uri);
+        if source.is_none() {
+            todo!()
+        }
+        // let src_res = self
+        //     .sources
+        //     .get(&source_uri)
+        //     .ok_or(|| self.resolve(source_uri));
+
+        // // compiling this schema
+        let compiled = CompiledSchema {
+            id,
+            uris,
+            metaschema: dialect.primary_metaschema_id().clone(),
+            handlers: dialect.handlers.clone().into_boxed_slice(),
+            source_uri,
+            source_path: path.clone(),
+            parent,
+            subschemas: Vec::default(),
+            dependents: Vec::default(),
+            dependencies: Vec::default(),
+            anchors: Vec::default(),
+        };
+
+        let key = self.schemas.insert(compiled).map_err(|uri| {
+            SourceError::from(SourceConflictError {
+                uri,
+                value: value.clone().into(),
+            })
+        })?;
 
         // // gathering nested schemas
-        // let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
+        let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
+        for subschema_path in located_schemas {}
 
         // compiling nested schemas
 
@@ -357,49 +378,10 @@ where
         &mut self,
         uri: impl Borrow<AbsoluteUri>,
     ) -> Result<(Pointer, Value), SourceError> {
-        let uri = uri.borrow();
         // if the value has already been indexed, return a clone of the local copy
-        if let Some(schema) = self.sources.get(uri) {
+        if let Some(schema) = self.get(uri) {
             return Ok((Pointer::default(), schema.clone()));
         }
-
-        // checking to see if the root resource has already been stored
-        let mut base_uri = uri.clone();
-        base_uri.set_fragment(None).unwrap();
-
-        // resolving the base uri
-        let resolved = self.resolvers.resolve(&base_uri).await?;
-
-        // add the base value to the local store of sources
-        let root = self
-            .sources
-            .source_string(base_uri, resolved, &self.deserializers)?
-            .clone(); // need to clone to avoid borrow checker constraints.
-
-        let uri_fragment = uri.fragment().unwrap_or_default();
-
-        // if the uri does not have a fragment, we are done and can return the
-        // root-level schema
-        if uri_fragment.is_empty() {
-            return Ok((Pointer::default(), root));
-        }
-
-        // if the uri does have a fragment then there is more work to do.
-        // first, perform lookup again to see if add_source indexed the schema
-        if let Some(schema) = self.sources.get(uri) {
-            return Ok((Pointer::default(), schema.clone()));
-        }
-
-        // if not, the fragment must be a json pointer as all anchors and
-        // schemas with fragmented ids should have been located and indexed
-        // TODO: better error handling here.
-        let ptr =
-            Pointer::from_str(uri_fragment).map_err(|err| ResolveError::new(err, uri.clone()))?;
-
-        let value = root.resolve(&ptr).cloned().map_err(|err| {
-            SourceError::ResolutionFailed(ResolveError::new(err, uri.clone()).into())
-        })?;
-        Ok((ptr, value))
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
