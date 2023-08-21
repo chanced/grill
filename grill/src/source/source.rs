@@ -98,13 +98,18 @@ impl Sources {
         Ok(Self { store, index })
     }
 
-    pub(crate) fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
-        let link = self.index.get(uri).unwrap();
-        let mut src = self.store.get(link.key).unwrap();
-        if !link.path.is_empty() {
-            src = src.resolve(&link.path)?;
+    pub(crate) fn link(
+        &mut self,
+        from: AbsoluteUri,
+        to: AbsoluteUri,
+        path: Pointer,
+        key: SourceKey,
+    ) -> Result<Link, LinkError> {
+        let link = Link::new(key, to, path.clone());
+        match self.index.entry(from.clone()) {
+            Entry::Occupied(_) => self.check_existing_link(link),
+            Entry::Vacant(_) => self.try_create_link(from, link),
         }
-        Ok((link, src))
     }
     fn check_existing_link(&mut self, link: Link) -> Result<Link, LinkError> {
         let entry = self.index.get(&link.uri).unwrap();
@@ -130,18 +135,14 @@ impl Sources {
             Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
         }
     }
-    pub(crate) fn link(
-        &mut self,
-        from: AbsoluteUri,
-        to: AbsoluteUri,
-        path: Pointer,
-        key: SourceKey,
-    ) -> Result<Link, LinkError> {
-        let link = Link::new(key, to, path.clone());
-        match self.index.entry(from.clone()) {
-            Entry::Occupied(_) => self.check_existing_link(link),
-            Entry::Vacant(_) => self.try_create_link(from, link),
+
+    pub(crate) fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+        let link = self.index.get(uri).unwrap();
+        let mut src = self.store.get(link.key).unwrap();
+        if !link.path.is_empty() {
+            src = src.resolve(&link.path)?;
         }
+        Ok((link, src))
     }
 
     pub(crate) async fn resolve_remote(
