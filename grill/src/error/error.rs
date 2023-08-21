@@ -145,7 +145,7 @@ pub enum SourceError {
 
     /// Multiple sources with the same URI but different values were provided.
     #[error(transparent)]
-    ConflictingValueFound(#[from] SourceConflictError),
+    SourceConflict(#[from] SourceConflictError),
 
     /// Resolution of a source failed
     #[error(transparent)]
@@ -159,9 +159,12 @@ pub enum SourceError {
     #[error(transparent)]
     UriFailedToParse(#[from] UriError),
 
-    /// The source URI contains a fragment which is not allowed.
+    /// The source URI contains afragment which is not allowed.
     #[error("source URIs may not contain fragments, found \"{0}\"")]
-    FragmentedUri(AbsoluteUri),
+    UnexpectedUriFragment(AbsoluteUri),
+
+    #[error("failed to locate json pointer path:\n{0}")]
+    ResolvePointerFailed(#[from] jsonptr::Error),
 }
 
 /// Multiple sources with the same URI were provided.
@@ -194,6 +197,13 @@ pub struct DeserializationError {
     pub error: DeserializeError,
 }
 
+impl DeserializationError {
+    #[must_use]
+    pub fn new(uri: AbsoluteUri, error: DeserializeError) -> Self {
+        Self { uri, error }
+    }
+}
+
 /// Possible errors that may occur while creating a
 /// [`Dialects`](crate::dialect::Dialects)
 #[derive(Debug, Error)]
@@ -222,6 +232,25 @@ pub enum DialectError {
         "the primary metaschema with id \"{0}\" was not found within the supplied metaschemas"
     )]
     PrimaryMetaschemaNotFound(AbsoluteUri),
+}
+
+#[derive(Debug, Error)]
+pub enum LinkError {
+    #[error(transparent)]
+    Conflict(#[from] LinkConflictError),
+
+    #[error("failed to resolve link path: {0}")]
+    PathNotFound(#[from] jsonptr::Error),
+
+    #[error("source not found: {0}")]
+    NotFound(AbsoluteUri),
+}
+
+#[derive(Debug, Error)]
+#[error("source address {:?} @ {:?} already assigned to {:?} @ {:?}", new.0, new.1, existing.0, existing.1)]
+pub struct LinkConflictError {
+    pub existing: (AbsoluteUri, Pointer),
+    pub new: (AbsoluteUri, Pointer),
 }
 
 /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).

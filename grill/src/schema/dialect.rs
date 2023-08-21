@@ -100,7 +100,7 @@ impl Dialect {
             .tap_some(|id| uris.push(id.clone()));
 
         base_uri.set_fragment(Some(path))?;
-        uris.push(base_uri.clone());
+        uris.insert(0, base_uri.clone());
 
         // if a primary identifier was found, use it as the base_uri for
         // subschemas. Otherwise, use the base_uri provided by the caller
@@ -302,6 +302,7 @@ impl<'d> Dialects<'d> {
     pub fn default(&self) -> &Dialect {
         &self.dialects[self.primary]
     }
+
     /// Sets the default [`Dialect`] to use when no other [`Dialect`] matches.
     ///
     /// # Panics

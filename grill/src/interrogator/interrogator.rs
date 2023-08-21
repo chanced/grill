@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use crate::{
     error::{
-        CompileError, DeserializeError, DialectUnknownError, EvaluateError, ResolveError,
-        SourceConflictError, SourceError, UnknownKeyError,
+        CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceConflictError,
+        SourceError, UnknownKeyError,
     },
     json_schema,
     output::{Output, Structure},
@@ -16,9 +16,7 @@ use crate::{
         },
         CompiledSchema, Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas,
     },
-    source::Resolvers,
-    source::Sources,
-    source::{Deserializer, Deserializers, Resolve, Source},
+    source::{Deserializers, Resolvers, Source, Sources},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Builder,
 };
@@ -48,29 +46,6 @@ impl<Key> Interrogator<Key>
 where
     Key: slotmap::Key,
 {
-    /// Attempts to compile the schema at the given URI if not already compiled,
-    /// returning the freshly or previously compiled [`Schema`].
-    ///
-    /// # Errors
-    /// Returns [`CompileError`] if:
-    ///   - the schema fails to compile.
-    ///   - a dependent schema fails to compile.
-    ///   - the uri fails to convert to an [`AbsoluteUri`].
-    ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
-    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
-        self.schemas.start_txn();
-
-        // convert the uri to an absolute uri
-        let uri = uri.try_into_absolute_uri()?;
-        // resolving the uri provided.
-        let (ptr, value) = self.resolve(&uri).await?;
-        // self.compile_schema(uri, &value)
-        //     .await
-        //     .tap_ok(|_| self.schemas.accept_txn())
-        //     .tap_err(|_| self.schemas.rollback_txn());
-        todo!()
-    }
-
     /// Returns the [`Schema`] with the given `key` if it exists.
     ///
     /// # Errors
@@ -296,13 +271,36 @@ where
             .collect())
     }
 
+    /// Attempts to compile the schema at the given URI if not already compiled,
+    /// returning the freshly or previously compiled [`Schema`].
+    ///
+    /// # Errors
+    /// Returns [`CompileError`] if:
+    ///   - the schema fails to compile.
+    ///   - a dependent schema fails to compile.
+    ///   - the uri fails to convert to an [`AbsoluteUri`].
+    ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
+    #[allow(clippy::unused_async)]
+    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+        self.schemas.start_txn();
+        // convert the uri to an absolute uri
+        let uri = uri.try_into_absolute_uri()?;
+        // resolving the uri provided.
+        // let (ptr, value) = self.resolve(&uri).await?;
+        // self.compile_schema(uri, &value)
+        //     .await
+        //     .tap_ok(|_| self.schemas.accept_txn())
+        //     .tap_err(|_| self.schemas.rollback_txn());
+        todo!()
+    }
     #[allow(clippy::unused_async, dead_code)]
     async fn compile_schema(
         &mut self,
         base_uri: AbsoluteUri,
-        source_uri: AbsoluteUri,
-        value: &Value,
         path: &Pointer,
+        value: &Value,
+        src_uri: AbsoluteUri,
+        src_path: &Pointer,
         mut parent: Option<Key>,
     ) -> Result<Key, CompileError> {
         // determining the dialect
@@ -321,44 +319,43 @@ where
             return Ok(schema.key);
         }
 
-        // attempt to find the parent
-        if id.is_none() && parent.is_none() && lookup_id.has_fragment() {
+        // if parent is None and this schema is not a document root (that is,
+        // has an $id) then attempt to locate the parent using the pointer
+        // fragment.
+        if id.is_none()
+            && parent.is_none()
+            && lookup_id.has_fragment()
+            && lookup_id.fragment().unwrap().starts_with('/')
+        {
             parent = self.schemas.locate_parent(lookup_id.clone())?;
         }
 
-        let mut source = self.sources.get(&source_uri);
-        if source.is_none() {
-            todo!()
-        }
-        // let src_res = self
-        //     .sources
-        //     .get(&source_uri)
-        //     .ok_or(|| self.resolve(source_uri));
-
-        // // compiling this schema
-        let compiled = CompiledSchema {
-            id,
-            uris,
-            metaschema: dialect.primary_metaschema_id().clone(),
-            handlers: dialect.handlers.clone().into_boxed_slice(),
-            source_uri,
-            source_path: path.clone(),
-            parent,
-            subschemas: Vec::default(),
-            dependents: Vec::default(),
-            dependencies: Vec::default(),
-            anchors: Vec::default(),
-        };
-
-        let key = self.schemas.insert(compiled).map_err(|uri| {
-            SourceError::from(SourceConflictError {
-                uri,
-                value: value.clone().into(),
+        // create a new CompiledSchema and insert it. if compiling fails, the
+        // schema store will rollback to its previous state.
+        let key = self
+            .schemas
+            .insert(CompiledSchema {
+                id,
+                uris,
+                metaschema: dialect.primary_metaschema_id().clone(),
+                handlers: dialect.handlers.clone().into_boxed_slice(),
+                src_uri,
+                src_path: src_path.clone(),
+                parent,
+                subschemas: Vec::default(),
+                dependents: Vec::default(),
+                dependencies: Vec::default(),
+                anchors: Vec::default(),
             })
-        })?;
+            .map_err(|uri| {
+                SourceError::from(SourceConflictError {
+                    uri,
+                    value: value.clone().into(),
+                })
+            })?;
 
         // // gathering nested schemas
-        let mut located_schemas = dialect.locate_schemas(&Pointer::default(), value);
+        let located_schemas = dialect.locate_schemas(&Pointer::default(), value);
         for subschema_path in located_schemas {}
 
         // compiling nested schemas
@@ -369,19 +366,6 @@ where
     #[must_use]
     pub fn dialects(&self) -> &[Dialect] {
         &self.dialects
-    }
-
-    /// Attempts to resolve deserialize, and store the schema at the given URI
-    /// using either local in-mem storage or resolved with any of the attached
-    /// implementations of [`Resolve`]s.
-    async fn resolve(
-        &mut self,
-        uri: impl Borrow<AbsoluteUri>,
-    ) -> Result<(Pointer, Value), SourceError> {
-        // if the value has already been indexed, return a clone of the local copy
-        if let Some(schema) = self.get(uri) {
-            return Ok((Pointer::default(), schema.clone()));
-        }
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
@@ -463,7 +447,8 @@ where
         self.source(source)
     }
     fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
-        self.sources.insert(source, &self.deserializers)
+        // self.sources.insert(source, &self.deserializers)
+        todo!()
     }
 
     /// Adds a schema source from a `&str`

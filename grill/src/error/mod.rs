@@ -4,13 +4,4 @@
 
 mod error;
 
-pub use error::{
-    AnchorEmptyError, AnchorError, AnchorInvalidCharError, AnchorInvalidLeadCharError,
-    AnchorNotEmptyError, AuthorityError, BuildError, CompileError, DeserializationError,
-    DeserializeError, DialectError, DialectNotFoundError, DialectUnknownError, EvaluateError,
-    EvaluateRegexError, IdentifyError, InvalidPortError, LocateSchemasError,
-    LocatedSchemaUriPointerError, MalformedPointerError, NotFoundError, NumberError, OverflowError,
-    PointerError, RegexError, RelativeUriError, ResolveError, ResolveErrorSource, ResolveErrors,
-    ResolvePointerError, SourceConflictError, SourceError, UnknownKeyError, UriError, UrlError,
-    UrnError, ValidationError,
-};
+pub use error::*;

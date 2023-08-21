@@ -17,6 +17,7 @@ where
     /// Returns a new [`Keys`] [`Iterator`] which consumes this `Iterator` and
     /// yields an `Iterator` of `Key`
     fn keys(self) -> Keys<'i, Key, Iter>;
+
     /// Returns a new [`MapIntoOwned`] [`Iterator`] which consumes this
     /// `Iterator` of [`Schema<'i, Key>`] and yields owned copies (i.e.
     /// [`Schema<'static, Key>`]).
@@ -26,6 +27,7 @@ where
     /// [`AbsoluteUri`] in it's set of URIs
     fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, Key>>;
 }
+
 impl<'i, Key, Iter> Traverse<'i, Key, Iter> for Iter
 where
     Iter: Iterator<Item = Schema<'i, Key>>,
@@ -39,13 +41,8 @@ where
         MapIntoOwned { iter: self }
     }
 
-    fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, Key>> {
-        for schema in self {
-            if schema.id.as_deref() == Some(uri) || schema.uris.contains(uri) {
-                return Some(schema);
-            }
-        }
-        None
+    fn find_by_uri(mut self, uri: &AbsoluteUri) -> Option<Schema<'i, Key>> {
+        self.find(|schema| schema.id.as_deref() == Some(uri) || schema.uris.contains(uri))
     }
 }
 
@@ -67,10 +64,6 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(Schema::into_owned)
     }
-}
-
-fn into_owned<Key: slotmap::Key>(schema: Schema<'_, Key>) -> Schema<'static, Key> {
-    schema.into_owned()
 }
 
 /// Maps an [`Iterator`] of [`Schema<'i, Key>`](crate::schema::Schema) into one of `Key`
@@ -397,7 +390,6 @@ type Instances<'i, Key> = DepthFirst<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::format;
 
     use crate::{
         schema::CompiledSchema,
@@ -406,7 +398,6 @@ mod tests {
     };
     use jsonptr::Pointer;
     use serde_json::json;
-    use slotmap::SlotMap;
 
     fn id_paths<Key: slotmap::Key>(schema: Schema<'_, Key>) -> String {
         schema.id.unwrap().path_or_nss().to_owned()
@@ -651,12 +642,13 @@ mod tests {
         schemas.accept_txn();
         for (_, schema) in schemas.iter_compiled() {
             let id = schema.id.clone().unwrap();
-            sources
-                .insert(
-                    Source::Value(id.clone(), json!({"$id": id.clone()})),
-                    &deserializers,
-                )
-                .unwrap();
+            // sources
+            //     .insert(
+            //         Source::Value(id.clone(), json!({"$id": id.clone()})),
+            //         &deserializers,
+            //     )
+            //     .unwrap();
+            todo!()
         }
         (root_keys, schemas, sources)
     }
@@ -686,8 +678,8 @@ mod tests {
             dependents: vec![],
             handlers: vec![].into_boxed_slice(),
             metaschema,
-            source_path: Pointer::default(),
-            source_uri: uri.clone(),
+            src_path: Pointer::default(),
+            src_uri: uri.clone(),
             subschemas: vec![],
             uris: vec![uri],
         }

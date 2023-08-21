@@ -1,5 +1,5 @@
 mod source;
-pub(crate) use source::{Source, Sources};
+pub(crate) use source::{Source, SourceKey, Sources};
 
 mod deserialize;
 #[cfg(feature = "toml")]
@@ -14,3 +14,6 @@ mod resolve;
 pub use resolve::HttpResolver;
 pub use resolve::Resolve;
 pub(crate) use resolve::Resolvers;
+
+mod link;
+pub(crate) use link::Link;

@@ -1,19 +1,19 @@
-use super::{Deserializers, Resolvers};
+use super::{Deserializer, Deserializers, Link, Resolvers};
+use crate::error::{DeserializationError, LinkConflictError, LinkError, SourceConflictError};
 use crate::{
-    error::{
-        DeserializationError, DeserializeError, ResolveError, SourceConflictError, SourceError,
-    },
+    error::{DeserializeError, SourceError},
     schema::Metaschema,
-    source::Deserializer,
     uri::AbsoluteUri,
 };
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
-use std::{
-    borrow::{Borrow, Cow},
-    collections::{hash_map::Entry, HashMap},
-    str::FromStr,
-};
+use slotmap::{new_key_type, SlotMap};
+use std::collections::hash_map::{Entry, HashMap, VacantEntry};
+use std::default;
+
+new_key_type! {
+    pub struct SourceKey;
+}
 
 pub(crate) enum Source {
     String(AbsoluteUri, String),
@@ -21,15 +21,15 @@ pub(crate) enum Source {
 }
 
 impl Source {
-    pub(crate) fn try_take_value(
+    pub(crate) fn deserialize_or_take_value(
         self,
-        deserializers: &[(&'static str, Box<dyn Deserializer>)],
+        deserializers: &Deserializers,
     ) -> Result<Value, DeserializeError> {
         match self {
             Self::Value(_uri, val) => Ok(val),
             Self::String(_uri, str) => {
-                let val = deserialize(&str, deserializers)?;
-                Ok(val)
+                let src = deserializers.deserialize(&str)?;
+                Ok(src)
             }
         }
     }
@@ -40,17 +40,6 @@ impl Source {
         }
     }
 
-    pub fn value(
-        &self,
-        deserializers: &[(&'static str, Box<dyn Deserializer>)],
-    ) -> Result<Cow<Value>, DeserializeError> {
-        match self {
-            Self::String(_, s) => Ok(Cow::Owned(deserialize(s, deserializers)?)),
-            Self::Value(_, source) => Ok(Cow::Borrowed(source)),
-        }
-    }
-
-    /// If
     #[must_use]
     pub fn as_string(&self) -> Option<&str> {
         match self {
@@ -65,32 +54,11 @@ impl From<&Metaschema> for Source {
         Self::Value(value.id.clone(), value.schema.clone().into())
     }
 }
-fn deserialize(
-    str: &str,
-    deserializers: &[(&'static str, Box<dyn Deserializer>)],
-) -> Result<Value, DeserializeError> {
-    let mut source = None;
-    let mut errs: HashMap<&'static str, erased_serde::Error> = HashMap::new();
-    for (fmt, de) in deserializers {
-        match de.deserialize(str) {
-            Ok(v) => {
-                source = Some(v);
-                break;
-            }
-            Err(e) => {
-                errs.insert(fmt, e);
-                continue;
-            }
-        }
-    }
-    let Some(source) = source  else {
-		return Err(DeserializeError { formats: errs });
-	};
-    Ok(source)
-}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Sources {
-    store: HashMap<AbsoluteUri, Value>,
+    store: SlotMap<SourceKey, Value>,
+    index: HashMap<AbsoluteUri, Link>,
 }
 
 impl Sources {
@@ -104,26 +72,109 @@ impl Sources {
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
     pub(crate) fn new(
         sources: Vec<Source>,
-        deserializers: &[(&'static str, Box<dyn Deserializer>)],
+        deserializers: &Deserializers,
     ) -> Result<Self, SourceError> {
-        let mut store = HashMap::with_capacity(sources.len());
+        let mut store = SlotMap::with_capacity_and_key(sources.len());
         let iter = sources.into_iter();
+        let mut index = HashMap::new();
+
         for src in iter {
             let uri = src.uri().clone(); // need the uri below for the error context
             let src = src
-                .try_take_value(deserializers)
-                .map_err(|e| DeserializationError {
+                .deserialize_or_take_value(deserializers)
+                .map_err(|error| DeserializationError {
                     uri: uri.clone(),
-                    error: e,
+                    error,
                 })?;
 
             let fragment = uri.fragment();
             if fragment.is_some() && fragment != Some("") {
-                return Err(SourceError::FragmentedUri(uri));
+                return Err(SourceError::UnexpectedUriFragment(uri));
             }
-            store.insert(uri, src);
+            let key = store.insert(src);
+            index.insert(uri.clone(), Link::new(key, uri, Pointer::default()));
         }
-        Ok(Self { store })
+
+        Ok(Self { store, index })
+    }
+
+    pub(crate) fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+        let link = self.index.get(uri).unwrap();
+        let mut src = self.store.get(link.key).unwrap();
+        if !link.path.is_empty() {
+            src = src.resolve(&link.path)?;
+        }
+        Ok((link, src))
+    }
+    fn check_existing_link(&mut self, link: Link) -> Result<Link, LinkError> {
+        let entry = self.index.get(&link.uri).unwrap();
+        if &link == entry {
+            return Ok(entry.clone());
+        }
+        Err(LinkConflictError {
+            existing: entry.into(),
+            new: (&link).into(),
+        }
+        .into())
+    }
+
+    fn try_create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<Link, LinkError> {
+        match self.index.entry(link.uri.clone()) {
+            Entry::Occupied(root) => {
+                let root = root.get();
+                let root_src = self.store.get(root.key).unwrap();
+                let _ = root_src.resolve(&link.path)?;
+                let link = self.index.entry(from).or_insert(link);
+                Ok(link.clone())
+            }
+            Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
+        }
+    }
+    pub(crate) fn link(
+        &mut self,
+        from: AbsoluteUri,
+        to: AbsoluteUri,
+        path: Pointer,
+        key: SourceKey,
+    ) -> Result<Link, LinkError> {
+        let link = Link::new(key, to, path.clone());
+        match self.index.entry(from.clone()) {
+            Entry::Occupied(_) => self.check_existing_link(link),
+            Entry::Vacant(_) => self.try_create_link(from, link),
+        }
+    }
+
+    pub(crate) async fn resolve_remote(
+        &mut self,
+        uri: &AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(&Link, &Value), SourceError> {
+        let mut base_uri = uri.clone();
+        let fragment = base_uri.set_fragment(None)?.unwrap_or_default();
+        let resolved = resolvers.resolve(uri).await?;
+        let src = deserializers
+            .deserialize(&resolved)
+            .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
+        let key = self.store.insert(src);
+        let src = self.store.get(key).unwrap();
+        if !fragment.is_empty() {
+            if !fragment.starts_with('/') {
+                return Err(SourceError::UnexpectedUriFragment(uri.clone()));
+            }
+            let ptr = Pointer::parse(&fragment)
+                .map_err(|_| SourceError::UnexpectedUriFragment(uri.clone()))?;
+            let _ = src.resolve(&ptr)?;
+            self.index
+                .insert(uri.clone(), Link::new(key, base_uri.clone(), ptr));
+        }
+        let src = self.store.get(key).unwrap();
+        let link = self.index.entry(base_uri.clone()).or_insert(Link::new(
+            key,
+            base_uri.clone(),
+            Pointer::default(),
+        ));
+        Ok((link, src))
     }
 
     pub(crate) async fn resolve(
@@ -131,60 +182,46 @@ impl Sources {
         uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
-    ) -> Result<(Pointer, &Value), SourceError> {
-        // if the value has already been indexed, return a clone of the local copy
-        if self.store.contains_key(uri) {
-            return Ok((Pointer::default(), self.store.get(uri).unwrap()));
+    ) -> Result<(&Link, &Value), SourceError> {
+        // if the value has already been indexed, return it
+        match self.index.entry(uri.clone()) {
+            Entry::Occupied(_) => self.resolve_local(uri),
+            Entry::Vacant(_) => self.resolve_remote(uri, resolvers, deserializers).await,
         }
-
-        // checking to see if the root resource has already been stored
-        let mut base_uri = uri.clone();
-        base_uri.set_fragment(None).unwrap();
-
-        // resolving the base uri
-        let resolved = resolvers.resolve(&base_uri).await?;
-
-        // add the base value to the local store of sources
-        let root = self.source_string(base_uri, resolved, deserializers)?;
-
-        let uri_fragment = uri.fragment().unwrap_or_default();
-
-        // if the uri does not have a fragment, we are done and can return the
-        // root-level schema
-        if uri_fragment.is_empty() {
-            return Ok((Pointer::default(), &root));
-        }
-
-        // there is more work to do if the uri has a fragmen.
-        // first, perform lookup again to see if add_source indexed the schema
-        if self.store.contains_key(uri) {
-            return Ok((Pointer::default(), self.store.get(uri).unwrap()));
-        }
-
-        // if not, the fragment must be a json pointer as all anchors and
-        // schemas with fragmented ids should have been located and indexed
-        // TODO: better error handling here.
-        let ptr =
-            Pointer::from_str(uri_fragment).map_err(|err| ResolveError::new(err, uri.clone()))?;
-
-        let value = root.resolve(&ptr).map_err(|err| {
-            SourceError::ResolutionFailed(ResolveError::new(err, uri.clone()).into())
-        })?;
-        todo!()
-        // Ok((ptr, value))
     }
 
     #[must_use]
     pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
-        self.store.get(uri)
+        self.index
+            .get(uri)
+            .map(|link| self.store.get(link.key).unwrap())
     }
     pub(crate) fn source_value(
         &mut self,
         uri: AbsoluteUri,
         source: Value,
-        deserializers: &Deserializers,
     ) -> Result<&Value, SourceError> {
-        self.insert(Source::Value(uri, source), deserializers)
+        if uri.fragment().is_some() && uri.fragment() != Some("") {
+            return Err(SourceError::UnexpectedUriFragment(uri));
+        }
+        match self.index.entry(uri.clone()) {
+            Entry::Occupied(entry) => {
+                let src = self.store.get(entry.get().key).unwrap();
+                if src != &source {
+                    return Err(SourceConflictError {
+                        uri: uri.clone(),
+                        value: source.clone().into(),
+                    }
+                    .into());
+                }
+                Ok(src)
+            }
+            Entry::Vacant(entry) => {
+                let key = self.store.insert(source);
+                entry.insert(Link::new(key, uri.clone(), Pointer::default()));
+                Ok(self.store.get(key).unwrap())
+            }
+        }
     }
 
     pub(crate) fn source_string(
@@ -193,80 +230,14 @@ impl Sources {
         source: String,
         deserializers: &Deserializers,
     ) -> Result<&Value, SourceError> {
-        self.insert(Source::String(uri, source), deserializers)
-    }
-
-    pub(crate) fn insert(
-        &mut self,
-        source: Source,
-        deserializers: &Deserializers,
-    ) -> Result<&Value, SourceError> {
-        let uri = source.uri().clone();
-        let frag = uri.fragment();
-        if frag.is_some() && frag != Some("") {
-            return Err(SourceError::FragmentedUri(uri));
-        }
-        let source = source
-            .value(deserializers)
-            .map_err(|e| DeserializationError {
-                uri: uri.clone(),
-                error: e,
-            })?;
-
-        if self.store.contains_key(&uri) {
-            return self.get_unchecked(&uri, &source);
-        }
-        Ok(self.insert_value(uri, source.into_owned())?)
-    }
-    /// Resolves a source [`&Value`](`Value`) from the internal hashmap.
-    ///
-    /// # Errors
-    /// Returns a [`SourceConflictError`] if the `uri` is present in the
-    /// internal hashmap and `source` does not match.
-    ///
-    /// # Panics
-    /// This function panics if the `uri` is not present in the internal
-    /// hashmap.
-    fn get_unchecked(&self, uri: &AbsoluteUri, source: &Value) -> Result<&Value, SourceError> {
-        if self.store.get(uri).unwrap() != source {
-            // error out if a source with the same uri has been indexed and the
-            // values do not match
-            return Err(SourceConflictError {
-                uri: uri.clone(),
-                value: source.clone().into(),
-            }
-            .into());
-        }
-
-        Ok(self.store.get(uri).unwrap())
-    }
-
-    fn insert_value(
-        &mut self,
-        uri: AbsoluteUri,
-        source: Value,
-    ) -> Result<&Value, SourceConflictError> {
-        if self.store.contains_key(&uri) {
-            // safe, checked above
-            let src = self.store.get(&uri).unwrap();
-            if src == &source {
-                return Ok(src);
-            }
-            // error out if a source with the same uri has been indexed and the
-            // values do not match
-            return Err(SourceConflictError {
-                uri,
-                value: source.into(),
-            });
-        }
-        Ok(self.store.entry(uri).or_insert(source))
-    }
-    pub fn entry(&mut self, key: AbsoluteUri) -> Entry<'_, AbsoluteUri, Value> {
-        self.store.entry(key)
+        let src = deserializers
+            .deserialize(&source)
+            .map_err(|e| DeserializationError::new(uri.clone(), e))?;
+        self.source_value(uri, src)
     }
 
     #[must_use]
     pub fn contains(&self, uri: &AbsoluteUri) -> bool {
-        self.store.contains_key(uri)
+        self.index.contains_key(uri)
     }
 }

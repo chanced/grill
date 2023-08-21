@@ -52,17 +52,17 @@ pub(crate) struct CompiledSchema<Key: slotmap::Key = SchemaKey> {
     // Compiled handlers.
     pub(crate) handlers: Box<[Handler]>,
     /// Abs URI of the source.
-    pub(crate) source_uri: AbsoluteUri,
+    pub(crate) src_uri: AbsoluteUri,
     /// Path to the schema within the source as a JSON pointer.
-    pub(crate) source_path: Pointer,
+    pub(crate) src_path: Pointer,
 }
 
 impl<Key: slotmap::Key> PartialEq for CompiledSchema<Key> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
             && self.metaschema == other.metaschema
-            && self.source_path == other.source_path
-            && self.source_uri == other.source_uri
+            && self.src_path == other.src_path
+            && self.src_uri == other.src_uri
     }
 }
 
@@ -106,10 +106,10 @@ pub struct Schema<'i, Key: slotmap::Key> {
 impl<'i, Key: slotmap::Key> Schema<'i, Key> {
     pub(crate) fn new(key: Key, compiled: &'i CompiledSchema<Key>, sources: &'i Sources) -> Self {
         let source = sources
-            .get(&compiled.source_uri)
+            .get(&compiled.src_uri)
             .expect("source_uri not found in Sources");
         let source = compiled
-            .source_path
+            .src_path
             .resolve(source)
             .expect("sourece_path not found in Source");
 
@@ -124,8 +124,8 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
             dependents: Cow::Borrowed(&compiled.dependencies),
             dependencies: Cow::Borrowed(&compiled.dependencies),
             handlers: Cow::Borrowed(&compiled.handlers),
-            source_uri: Cow::Borrowed(&compiled.source_uri),
-            source_path: Cow::Borrowed(&compiled.source_path),
+            source_uri: Cow::Borrowed(&compiled.src_uri),
+            source_path: Cow::Borrowed(&compiled.src_path),
         }
     }
 
@@ -248,7 +248,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
         }
         .ok_or(UnknownKeyError)?;
 
-        let source = sources.get(&schema.source_uri).unwrap();
+        let source = sources.get(&schema.src_uri).unwrap();
         Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
@@ -259,8 +259,8 @@ impl<Key: slotmap::Key> Schemas<Key> {
             parent: schema.parent,
             dependencies: Cow::Borrowed(&schema.dependencies),
             dependents: Cow::Borrowed(&schema.dependents),
-            source_uri: Cow::Borrowed(&schema.source_uri),
-            source_path: Cow::Borrowed(&schema.source_path),
+            source_uri: Cow::Borrowed(&schema.src_uri),
+            source_path: Cow::Borrowed(&schema.src_path),
             subschemas: Cow::Borrowed(&schema.subschemas),
         })
     }
