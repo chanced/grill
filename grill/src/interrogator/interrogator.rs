@@ -13,7 +13,7 @@ use crate::{
         traverse::{
             Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
         },
-        Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas,
+        Dialect, Dialects, Key, Keyword, Schema, Schemas,
     },
     source::{Deserializers, Resolvers, Sources, SrcValue},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -22,21 +22,15 @@ use crate::{
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
-pub struct Interrogator<Key = SchemaKey>
-where
-    Key: 'static + slotmap::Key,
-{
-    pub(super) dialects: Dialects<'static, Key>,
+pub struct Interrogator {
+    pub(super) dialects: Dialects<'static>,
     pub(super) sources: Sources,
     pub(super) resolvers: Resolvers,
-    pub(super) schemas: Schemas<Key>,
+    pub(super) schemas: Schemas,
     pub(super) deserializers: Deserializers,
 }
 
-impl<Key> Debug for Interrogator<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl Debug for Interrogator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
@@ -47,15 +41,12 @@ where
     }
 }
 
-impl<Key> Interrogator<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl Interrogator {
     /// Returns the [`Schema`] with the given `key` if it exists.
     ///
     /// # Errors
     /// Returns [`UnknownKeyError`] if the `key` does not belong to this `Interrgator`.
-    pub fn schema(&self, key: Key) -> Result<Schema<'_, Key>, UnknownKeyError> {
+    pub fn schema(&self, key: Key) -> Result<Schema<'_>, UnknownKeyError> {
         self.schemas.get(key, &self.sources)
     }
 
@@ -64,17 +55,18 @@ where
     ///
     /// # Panics
     /// Panics if the `key` does not belong to this `Interrgator`.
-    pub fn schema_unchecked(&self, key: Key) -> Schema<'_, Key> {
+    pub fn schema_unchecked(&self, key: Key) -> Schema<'_> {
         self.schemas.get_unchecked(key, &self.sources)
     }
 
     /// Returns the [`Schema`] with the given `id` if it exists.
     #[must_use]
-    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<Schema<'_, Key>> {
+    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<Schema<'_>> {
         self.schemas.get_by_uri(id, &self.sources)
     }
 
     /// Returns `true` if `key` belongs to this `Interrogator`
+    #[must_use]
     pub fn contains_key(&self, key: Key) -> bool {
         self.schemas.contains_key(key)
     }
@@ -91,7 +83,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_, Key>, UnknownKeyError> {
+    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
     }
     /// Returns [`Ancestors`] which is an [`Iterator`] over the descendants,
@@ -106,7 +98,8 @@ where
     ///
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
-    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_, Key> {
+    #[must_use]
+    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_> {
         self.schemas.ancestors(key, &self.sources)
     }
 
@@ -121,7 +114,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn descendants(&self, key: Key) -> Result<Descendants<'_, Key>, UnknownKeyError> {
+    pub fn descendants(&self, key: Key) -> Result<Descendants<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -136,7 +129,7 @@ where
     ///
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
-    pub fn descendants_unchecked(&self, key: Key) -> Result<Descendants<'_, Key>, UnknownKeyError> {
+    pub fn descendants_unchecked(&self, key: Key) -> Result<Descendants<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -145,10 +138,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn direct_dependencies(
-        &self,
-        key: Key,
-    ) -> Result<DirectDependencies<'_, Key>, UnknownKeyError> {
+    pub fn direct_dependencies(&self, key: Key) -> Result<DirectDependencies<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
     }
 
@@ -157,7 +147,8 @@ where
     ///
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
-    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_, Key> {
+    #[must_use]
+    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_> {
         self.schemas.direct_dependencies(key, &self.sources)
     }
 
@@ -171,7 +162,7 @@ where
     pub fn transitive_dependencies(
         &self,
         key: Key,
-    ) -> Result<TransitiveDependencies<'_, Key>, UnknownKeyError> {
+    ) -> Result<TransitiveDependencies<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || {
             self.schemas.transitive_dependencies(key, &self.sources)
         })
@@ -184,7 +175,8 @@ where
     ///
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
-    pub fn transitive_dependencies_unchecked(&self, key: Key) -> TransitiveDependencies<'_, Key> {
+    #[must_use]
+    pub fn transitive_dependencies_unchecked(&self, key: Key) -> TransitiveDependencies<'_> {
         self.schemas.transitive_dependencies(key, &self.sources)
     }
 
@@ -194,10 +186,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn direct_dependents(
-        &self,
-        key: Key,
-    ) -> Result<DirectDependents<'_, Key>, UnknownKeyError> {
+    pub fn direct_dependents(&self, key: Key) -> Result<DirectDependents<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
@@ -210,7 +199,7 @@ where
     pub fn direct_dependents_unchecked(
         &self,
         key: Key,
-    ) -> Result<DirectDependents<'_, Key>, UnknownKeyError> {
+    ) -> Result<DirectDependents<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
@@ -252,10 +241,7 @@ where
     /// }
     /// ```
     #[allow(clippy::unused_async)]
-    pub async fn compile_all<I>(
-        &mut self,
-        uris: I,
-    ) -> Result<Vec<Schema<'static, Key>>, CompileError>
+    pub async fn compile_all<I>(&mut self, uris: I) -> Result<Vec<Schema<'static>>, CompileError>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
@@ -300,13 +286,13 @@ where
     }
 
     #[must_use]
-    pub fn dialects(&self) -> &[Dialect<Key>] {
+    pub fn dialects(&self) -> &[Dialect] {
         &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect<Key> {
+    pub fn default_dialect(&self) -> &Dialect {
         self.dialects.primary_dialect()
     }
 
@@ -314,7 +300,7 @@ where
     pub fn determine_dialect(
         &self,
         schema: &Value,
-    ) -> Result<Option<&Dialect<Key>>, DialectUnknownError> {
+    ) -> Result<Option<&Dialect>, DialectUnknownError> {
         if let Some(schema) = self.dialects.pertinent_to(schema) {
             return Ok(Some(schema));
         }
@@ -534,7 +520,7 @@ impl Interrogator {
     /// Returns a new, empty [`Builder`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn builder() -> Builder<SchemaKey> {
+    pub fn builder() -> Builder {
         Builder::new()
     }
 
@@ -542,8 +528,8 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2020_12() -> Builder<SchemaKey> {
-        Builder::<SchemaKey>::default()
+    pub fn json_schema_2020_12() -> Builder {
+        Builder::default()
             .json_schema_2020_12()
             .default_dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone())
             .unwrap()
@@ -553,8 +539,8 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2019_09() -> Builder<SchemaKey> {
-        Builder::<SchemaKey>::default()
+    pub fn json_schema_2019_09() -> Builder {
+        Builder::default()
             .json_schema_2019_09()
             .default_dialect(json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone())
             .unwrap()
@@ -564,8 +550,8 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_07() -> Builder<SchemaKey> {
-        Builder::<SchemaKey>::default()
+    pub fn json_schema_07() -> Builder {
+        Builder::default()
             .json_schema_07()
             .default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
             .unwrap()
@@ -575,9 +561,9 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_04() -> Builder<SchemaKey> {
+    pub fn json_schema_04() -> Builder {
         // safety: &AbsoluteUri::try_into_absolute_uri never returns an error
-        Builder::<SchemaKey>::default()
+        Builder::default()
             .json_schema_04()
             .default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
             .unwrap()

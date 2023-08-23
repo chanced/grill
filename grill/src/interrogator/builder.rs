@@ -8,28 +8,24 @@ use crate::{
     schema::{Dialect, Dialects, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, SchemaKey, SrcValue,
+    AbsoluteUri, Interrogator, SrcValue,
 };
 
 /// Constructs an [`Interrogator`].
-pub struct Builder<Key = SchemaKey>
-where
-    Key: 'static + slotmap::Key,
-{
-    dialects: Vec<Dialect<Key>>,
+pub struct Builder {
+    dialects: Vec<Dialect>,
     sources: Vec<SrcValue>,
-    default_dialect: Option<AbsoluteUri>,
+    primary_dialect: Option<AbsoluteUri>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
-    _marker: std::marker::PhantomData<Key>,
 }
 
-impl Default for Builder<SchemaKey> {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
 }
-impl Builder<SchemaKey> {
+impl Builder {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -37,48 +33,11 @@ impl Builder<SchemaKey> {
             sources: Vec::new(),
             resolvers: Vec::new(),
             deserializers: Vec::new(),
-            default_dialect: None,
-            _marker: std::marker::PhantomData,
+            primary_dialect: None,
         }
     }
 }
-impl<Key> Builder<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    /// Sets a custom key type for schemas within the [`Interrogator`]. The default
-    /// key type is [`grill::SchemaKey`](`SchemaKey`).
-    ///
-    /// This is useful if you have multiple `Interrogator`s and want to ensure that
-    /// keys from one `Interrogator` are not accidentally used in another.
-    ///
-    /// # Example
-    /// ```
-    /// use grill::{Interrogator, new_key_type};
-    ///
-    /// new_key_type! {
-    ///     pub struct MySchemaKey;
-    /// }
-    /// let mut interrogator = Interrogator::json_schema_2020_12()
-    ///     .key::<MySchemaKey>()
-    ///     .build()
-    ///     .unwrap();
-    /// ```
-    #[must_use]
-    pub fn key<CustomKey>(self) -> Builder<CustomKey>
-    where
-        CustomKey: slotmap::Key,
-    {
-        Builder {
-            dialects: self.dialects,
-            sources: self.sources,
-            resolvers: self.resolvers,
-            deserializers: self.deserializers,
-            default_dialect: self.default_dialect,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
+impl Builder {
     #[must_use]
     pub fn dialect(mut self, dialect: Dialect) -> Self {
         self.dialects.push(dialect);
@@ -101,7 +60,7 @@ where
     /// ```
     pub fn default_dialect(mut self, dialect: impl TryIntoAbsoluteUri) -> Result<Self, UriError> {
         let dialect = dialect.try_into_absolute_uri()?;
-        self.default_dialect = Some(dialect);
+        self.primary_dialect = Some(dialect);
         Ok(self)
     }
 
@@ -359,17 +318,16 @@ where
         self
     }
 
-    pub async fn build(self) -> Result<Interrogator<Key>, BuildError> {
+    pub async fn build(self) -> Result<Interrogator, BuildError> {
         let Self {
             dialects,
             mut sources,
             resolvers,
             deserializers,
-            default_dialect,
-            _marker,
+            primary_dialect,
         } = self;
 
-        let dialects = Dialects::new(dialects, default_dialect.as_ref())?;
+        let dialects = Dialects::new(dialects, primary_dialect.as_ref())?;
         sources.append(&mut dialects.sources());
         let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(sources, &deserializers)?;

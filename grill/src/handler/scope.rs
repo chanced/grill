@@ -2,7 +2,7 @@ use num_rational::BigRational;
 use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
-use crate::{error::NumberError, output::Node, schema::Location, SchemaKey};
+use crate::{error::NumberError, output::Node, schema::Location, Key};
 
 use super::State;
 /// Contains state and location information needed to perform an
@@ -14,11 +14,7 @@ pub struct Scope<'s> {
 }
 
 impl<'s> Scope<'s> {
-    pub fn new(
-        location: Location,
-        state: &'s mut State,
-        _schemas: SlotMap<SchemaKey, Value>,
-    ) -> Self {
+    pub fn new(location: Location, state: &'s mut State, _schemas: SlotMap<Key, Value>) -> Self {
         Self {
             state,
             location,

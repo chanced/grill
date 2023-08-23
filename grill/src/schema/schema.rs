@@ -14,17 +14,19 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{borrow::Cow, collections::HashMap, ops::Deref, str::FromStr};
+use std::{
+    borrow::Cow,
+    collections::{hash_map::Entry, HashMap},
+    ops::Deref,
+    str::FromStr,
+};
 
 new_key_type! {
-    pub struct SchemaKey;
+    pub struct Key;
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CompiledSchema<Key = SchemaKey>
-where
-    Key: 'static + slotmap::Key,
-{
+pub(crate) struct CompiledSchema {
     /// Abs URI of the schema.
     pub(crate) id: Option<AbsoluteUri>,
 
@@ -41,7 +43,7 @@ where
     pub(crate) dependents: Vec<Key>,
 
     ///  Referenced dependencies of this `Schema`.
-    pub(crate) references: Vec<Reference<Key>>,
+    pub(crate) references: Vec<Reference>,
 
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
@@ -54,28 +56,22 @@ where
     pub(crate) metaschema: AbsoluteUri,
 
     // Compiled handlers.
-    pub(crate) handlers: Box<[Handler<Key>]>,
+    pub(crate) handlers: Box<[Handler]>,
 
     /// Abs URI of the source.
     pub(crate) src: Link,
 }
 
-impl<Key> PartialEq for CompiledSchema<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl PartialEq for CompiledSchema {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema && self.src == other.src
     }
 }
 
-impl<Key> Eq for CompiledSchema<Key> where Key: 'static + slotmap::Key {}
+impl Eq for CompiledSchema {}
 
 #[derive(Clone, Debug)]
-pub struct Schema<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
+pub struct Schema<'i> {
     /// Key of the `Schema`
     pub key: Key,
     /// The `$id` or `id` of the schema, if any
@@ -98,19 +94,16 @@ where
     /// Dependents of this `Schema`.
     pub dependents: Cow<'i, [Key]>,
     ///  Dependencies of this `Schema`.
-    pub references: Cow<'i, [Reference<Key>]>,
+    pub references: Cow<'i, [Reference]>,
     /// Compiled [`Handler`]s.
-    pub handlers: Cow<'i, [Handler<Key>]>,
+    pub handlers: Cow<'i, [Handler]>,
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]
     pub source: Source<'i>,
 }
 
-impl<'i, Key> Schema<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    pub(crate) fn new(key: Key, compiled: &'i CompiledSchema<Key>, sources: &'i Sources) -> Self {
+impl<'i> Schema<'i> {
+    pub(crate) fn new(key: Key, compiled: &'i CompiledSchema, sources: &'i Sources) -> Self {
         Self {
             key,
             id: compiled.id.as_ref().map(Cow::Borrowed),
@@ -125,7 +118,8 @@ where
         }
     }
 
-    pub fn into_owned(self) -> Schema<'static, Key> {
+    #[must_use]
+    pub fn into_owned(self) -> Schema<'static> {
         Schema {
             key: self.key,
             parent: self.parent,
@@ -141,19 +135,14 @@ where
     }
 }
 
-impl<'i, Key> Schema<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl<'i> Schema<'i> {
+    #[must_use]
     pub fn value(&self) -> &Value {
         &self.source
     }
 }
 
-impl<'i, Key> Deref for Schema<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl<'i> Deref for Schema<'i> {
     type Target = Value;
 
     fn deref(&self) -> &Self::Target {
@@ -161,46 +150,33 @@ where
     }
 }
 
-impl<'i, Key> PartialEq for Schema<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl<'i> PartialEq for Schema<'i> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema
     }
 }
 
-impl<'i, Key> Eq for Schema<'i, Key> where Key: 'static + slotmap::Key {}
+impl<'i> Eq for Schema<'i> {}
 
 #[derive(Clone, Debug)]
-pub(crate) struct Schemas<Key = SchemaKey>
-where
-    Key: 'static + slotmap::Key,
-{
-    pub(crate) store: SlotMap<Key, CompiledSchema<Key>>,
+pub(crate) struct Schemas {
+    pub(crate) store: SlotMap<Key, CompiledSchema>,
     keys: HashMap<AbsoluteUri, Key>,
-    sandbox: Option<Box<Sandbox<Key>>>,
+    sandbox: Option<Box<Sandbox>>,
 }
 
-pub(crate) struct Params<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
+pub(crate) struct Params<'i> {
     base_uri: AbsoluteUri,
     path: &'i Pointer,
     src: Link,
     parent: Option<Key>,
     sources: &'i mut Sources,
-    dialects: &'i Dialects<'i, Key>,
+    dialects: &'i Dialects<'i>,
     deserializers: &'i Deserializers,
     resolvers: &'i Resolvers,
 }
 
-impl<Key> Schemas<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    /// Creates a new [`Schemas<Key>`].
+impl Schemas {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -210,7 +186,7 @@ where
         }
     }
 
-    pub(crate) async fn compile(&mut self, params: Params<'_, Key>) -> Result<Key, CompileError> {
+    pub(crate) async fn compile(&mut self, params: Params<'_>) -> Result<Key, CompileError> {
         let Params {
             base_uri,
             path,
@@ -221,21 +197,21 @@ where
             deserializers,
             resolvers,
         } = params;
-        let source = sources.get(src.key);
+        let source = sources.store.get(src.key).unwrap().clone();
         // determining the dialect
-        let dialect = dialects.pertinent_to_or_default(source);
+        let dialect = dialects.pertinent_to_or_default(&source);
 
         // identifying the schema
-        let (id, uris) = dialect.identify(base_uri.clone(), path, source)?;
+        let (id, uris) = dialect.identify(base_uri.clone(), path, &source)?;
 
         // if identify did not find a primary id, use the uri + pointer fragment
         // as the lookup which will be at the first position in the uris list
         let lookup_id = id.as_ref().unwrap_or(&uris[0]);
 
         // checking to see if the schema has already been compiled under the id
-        if let Some(schema) = self.get_by_uri(lookup_id, sources) {
-            // if so, return it
-            return Ok(schema.key);
+
+        if let Entry::Occupied(key) = self.keys.entry(lookup_id.clone()) {
+            return Ok(*key.get());
         }
 
         // if parent is None and this schema is not a document root (that is,
@@ -258,7 +234,7 @@ where
                 metaschema: dialect.primary_metaschema_id().clone(),
                 handlers: dialect.handlers.clone().into_boxed_slice(),
                 parent,
-                src,
+                src: src.clone(),
                 subschemas: Vec::default(),
                 dependents: Vec::default(),
                 references: Vec::default(),
@@ -284,7 +260,7 @@ where
             uri,
             key,
             src_key,
-        } in dialect.references(source)?
+        } in dialect.references(&source)?
         {
             let mut base_uri = uri.clone();
             let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
@@ -296,24 +272,23 @@ where
         let mut subschemas = Vec::new();
 
         // gathering nested schemas
-        for subschema_path in dialect.subschemas(src_path, source) {
-            // let subschema = self
-            //     .compile(
-            //         base_uri.clone(),
-            //         &subschema_path,
-            //         src,
-            //         src_uri.clone(),
-            //         src_path,
-            //         Some(key),
-            //         sources,
-            //         dialects,
-            //         deserializers,
-            //         resolvers,
-            //     )
-            //     .await?;
-            // subschemas.push(subschema);
-            todo!()
-        }
+        // for subschema_path in dialect.subschemas(src_path, source) {
+        // let subschema = self
+        //     .compile(
+        //         base_uri.clone(),
+        //         &subschema_path,
+        //         src,
+        //         src_uri.clone(),
+        //         src_path,
+        //         Some(key),
+        //         sources,
+        //         dialects,
+        //         deserializers,
+        //         resolvers,
+        //     )
+        //     .await?;
+        // subschemas.push(subschema);
+        // }
 
         let schema = self.get_mut_unchecked(key);
         schema.subschemas = subschemas;
@@ -321,48 +296,44 @@ where
         todo!()
     }
 
-    pub(crate) fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
+    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
         self.sandbox
             .as_deref_mut()
             .expect("sandbox not present")
             .insert(schema)
     }
-    pub(crate) fn iter_compiled(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema<Key>> {
+    pub(crate) fn compiled_iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
         if let Some(sandbox) = self.sandbox.as_ref() {
             sandbox.store.iter()
         } else {
             self.store.iter()
         }
     }
-    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i, Key> {
+    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i> {
         Ancestors::new(key, self, sources)
     }
-    pub(crate) fn descendants<'i>(
-        &'i self,
-        key: Key,
-        sources: &'i Sources,
-    ) -> Descendants<'i, Key> {
+    pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i> {
         Descendants::new(key, self, sources)
     }
     pub(crate) fn direct_dependents<'i>(
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> DirectDependents<'i, Key> {
+    ) -> DirectDependents<'i> {
         DirectDependents::new(key, self, sources)
     }
     pub(crate) fn all_dependents<'i>(
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> AllDependents<'i, Key> {
+    ) -> AllDependents<'i> {
         AllDependents::new(key, self, sources)
     }
     pub(crate) fn transitive_dependencies<'i>(
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> TransitiveDependencies<'i, Key> {
+    ) -> TransitiveDependencies<'i> {
         TransitiveDependencies::new(key, self, sources)
     }
 
@@ -370,11 +341,11 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> DirectDependencies<'i, Key> {
+    ) -> DirectDependencies<'i> {
         DirectDependencies::new(key, self, sources)
     }
 
-    pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i, Key> {
+    pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i> {
         self.get(key, sources).unwrap()
     }
     /// Returns the [`Schema`] with the given `Key` if it exists.
@@ -382,7 +353,7 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> Result<Schema<'i, Key>, UnknownKeyError> {
+    ) -> Result<Schema<'i>, UnknownKeyError> {
         let schema = if let Some(sandbox) = self.sandbox.as_ref() {
             sandbox.get(key)
         } else {
@@ -390,12 +361,11 @@ where
         }
         .ok_or(UnknownKeyError)?;
 
-        let source = sources.get_by_uri(&schema.src_uri).unwrap();
         Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
             metaschema: Cow::Borrowed(&schema.metaschema),
-            source: Cow::Borrowed(source),
+            source: Source::new(&schema.src, sources),
             uris: Cow::Borrowed(&schema.uris),
             handlers: Cow::Borrowed(&schema.handlers),
             parent: schema.parent,
@@ -427,14 +397,14 @@ where
         Ok(None)
     }
 
-    pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<Key>> {
+    pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
         if let Some(sandbox) = self.sandbox.as_mut() {
             sandbox.get_mut(key)
         } else {
             self.store.get_mut(key)
         }
     }
-    pub(crate) fn get_mut_unchecked(&mut self, key: Key) -> &mut CompiledSchema<Key> {
+    pub(crate) fn get_mut_unchecked(&mut self, key: Key) -> &mut CompiledSchema {
         self.get_mut(key).unwrap()
     }
 
@@ -443,7 +413,7 @@ where
         &'i self,
         uri: &AbsoluteUri,
         sources: &'i Sources,
-    ) -> Option<Schema<'i, Key>> {
+    ) -> Option<Schema<'i>> {
         let key = self.keys.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
@@ -475,14 +445,14 @@ where
             .keys
     }
 
-    fn schemas(&self) -> &SlotMap<Key, CompiledSchema<Key>> {
+    fn schemas(&self) -> &SlotMap<Key, CompiledSchema> {
         if let Some(sandbox) = self.sandbox.as_deref() {
             return &sandbox.store;
         }
         &self.store
     }
 
-    fn schemas_mut(&mut self) -> &mut SlotMap<Key, CompiledSchema<Key>> {
+    fn schemas_mut(&mut self) -> &mut SlotMap<Key, CompiledSchema> {
         &mut self
             .sandbox
             .as_deref_mut()
@@ -508,54 +478,39 @@ where
         self.sandbox = None;
     }
 
-    pub(crate) fn contains_key(&self, key: Key) -> bool
-    where
-        Key: 'static + slotmap::Key,
-    {
+    pub(crate) fn contains_key(&self, key: Key) -> bool {
         self.store.contains_key(key)
     }
 }
-impl<Key> Default for Schemas<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl Default for Schemas {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Debug, Clone, Default)]
-struct Sandbox<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    store: SlotMap<Key, CompiledSchema<Key>>,
+struct Sandbox {
+    store: SlotMap<Key, CompiledSchema>,
     keys: HashMap<AbsoluteUri, Key>,
 }
 
 #[allow(clippy::unnecessary_box_returns)]
-impl<Key> Sandbox<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    fn new(
-        schemas: &SlotMap<Key, CompiledSchema<Key>>,
-        keys: &HashMap<AbsoluteUri, Key>,
-    ) -> Box<Self> {
+impl Sandbox {
+    fn new(schemas: &SlotMap<Key, CompiledSchema>, keys: &HashMap<AbsoluteUri, Key>) -> Box<Self> {
         Box::new(Self {
             store: schemas.clone(),
             keys: keys.clone(),
         })
     }
-    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<Key>> {
+    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
         self.store.get_mut(key)
     }
 
-    fn get(&self, key: Key) -> Option<&CompiledSchema<Key>> {
+    fn get(&self, key: Key) -> Option<&CompiledSchema> {
         self.store.get(key)
     }
 
-    fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
+    fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.keys.get(id) {
             let existing = self.store.get(*key).unwrap();

@@ -23,14 +23,11 @@ impl ConstHandler {
     }
 }
 
-impl<Key> SyncHandler<Key> for ConstHandler
-where
-    Key: 'static + slotmap::Key,
-{
+impl SyncHandler for ConstHandler {
     fn compile<'i>(
         &'i mut self,
-        compile: &mut crate::handler::Compile<'i, Key>,
-        schema: crate::Schema<'i, Key>,
+        compile: &mut crate::handler::Compile<'i>,
+        schema: crate::Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
         todo!()
     }
@@ -44,12 +41,9 @@ where
         todo!()
     }
 }
-impl<Key> From<ConstHandler> for Handler<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    fn from(h: ConstHandler) -> Self {
-        Handler::Sync(Box::new(h))
+impl From<ConstHandler> for Handler {
+    fn from(h: ConstHandler) -> Handler {
+        Handler::Sync(Box::<ConstHandler>::default())
     }
 }
 // impl SyncHandler for ConstHandler {

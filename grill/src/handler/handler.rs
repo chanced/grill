@@ -14,20 +14,14 @@ use super::{Compile, Scope};
 
 /// A handler that performs logic for a given condition in a JSON Schema.
 #[derive(Debug, Clone)]
-pub enum Handler<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+pub enum Handler {
     /// A synchronous handler.
-    Sync(Box<dyn SyncHandler<Key>>),
+    Sync(Box<dyn SyncHandler>),
     /// An asynchronous handler.
-    Async(Box<dyn AsyncHandler<Key>>),
+    Async(Box<dyn AsyncHandler>),
 }
 
-impl<Key> Handler<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl Handler {
     /// Returns `true` if the handler is [`Sync`].
     ///
     /// [`Sync`]: Handler::Sync
@@ -37,7 +31,7 @@ where
     }
     #[must_use]
     #[allow(clippy::borrowed_box)]
-    pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler<Key>>> {
+    pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler>> {
         if let Self::Sync(v) = self {
             Some(v)
         } else {
@@ -55,7 +49,7 @@ where
 
     #[must_use]
     #[allow(clippy::borrowed_box)]
-    pub fn as_async(&self) -> Option<&Box<dyn AsyncHandler<Key>>> {
+    pub fn as_async(&self) -> Option<&Box<dyn AsyncHandler>> {
         if let Self::Async(v) = self {
             Some(v)
         } else {
@@ -151,7 +145,7 @@ where
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
-    pub fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
+    pub fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
         match self {
             Handler::Sync(h) => h.references(schema),
             Handler::Async(h) => h.references(schema),
@@ -161,10 +155,7 @@ where
 
 #[async_trait]
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait AsyncHandler<Key>: IntoHandler<Key> + Send + Sync + DynClone + fmt::Debug
-where
-    Key: 'static + slotmap::Key,
-{
+pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// For each `Schema` compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
@@ -173,7 +164,7 @@ where
     /// be called for the given [`Schema`].
     async fn compile<'i>(
         &'i mut self,
-        compile: &'i mut Compile<'i, Key>,
+        compile: &'i mut Compile<'i>,
         schema: &'i Value,
     ) -> Result<bool, CompileError>;
 
@@ -266,18 +257,15 @@ where
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
     #[allow(unused_variables)]
-    fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
+    fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
         Ok(Vec::new())
     }
 }
 
-clone_trait_object!(<Key> AsyncHandler<Key> where Key: 'static + slotmap::Key);
+clone_trait_object!(AsyncHandler);
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait SyncHandler<Key>: IntoHandler<Key> + Send + Sync + DynClone + fmt::Debug
-where
-    Key: 'static + slotmap::Key,
-{
+pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// For each [`Schema`] compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
@@ -286,8 +274,8 @@ where
     /// be called for the given [`Schema`].
     fn compile<'i>(
         &'i mut self,
-        compile: &'i mut Compile<'i, Key>,
-        schema: Schema<'i, Key>,
+        compile: &'i mut Compile<'i>,
+        schema: Schema<'i>,
     ) -> Result<bool, CompileError>;
 
     /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
@@ -384,25 +372,21 @@ where
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
     #[allow(unused_variables)]
-    fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
+    fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
         Ok(Vec::new())
     }
 }
-clone_trait_object!(<Key> SyncHandler<Key> where Key: 'static + slotmap::Key);
+clone_trait_object!(SyncHandler);
 
-pub trait IntoHandler<Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    fn into_handler(self) -> Handler<Key>;
+pub trait IntoHandler {
+    fn into_handler(self) -> Handler;
 }
 
-impl<T, Key> IntoHandler<Key> for T
+impl<T> IntoHandler for T
 where
-    T: Into<Handler<Key>>,
-    Key: 'static + slotmap::Key,
+    T: Into<Handler>,
 {
-    fn into_handler(self) -> Handler<Key> {
+    fn into_handler(self) -> Handler {
         self.into()
     }
 }

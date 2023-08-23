@@ -8,11 +8,7 @@ pub use url::ParseError as UrlError;
 
 pub use urn::Error as UrnError;
 
-use crate::{
-    schema::{Dialect, Keyword},
-    uri::AbsoluteUri,
-    Output, Uri,
-};
+use crate::{schema::Keyword, uri::AbsoluteUri, Output, Uri};
 use serde_json::{Number, Value};
 use std::{
     collections::HashMap,
@@ -769,17 +765,12 @@ impl DialectNotFoundError {
     }
 }
 
-/// A schema [`Key`](crate::Interrogator::Key) was not found.
+/// A schema [`Key`](crate::schema::Key) was not found.
 ///
 /// If this is encountered, odds are it is because you have two
-/// [`Interrogator`](crate::Interrogator)s and mismatched keys. Consider using a
-/// unique key type per [`Interrogator`](crate::Interrogator). See the macro
-/// [`new_key_type`](crate::new_key_type), re-exported from slotmap.
-///
-/// If this is not the case, there may be a bug. Please create an issue at:
-/// <https://github.com/chanced/grill/issues/new>
+/// [`Interrogator`](crate::Interrogator)s and mismatched keys.
 #[derive(Debug, Clone, Copy, Error)]
-#[error("the provided key could not be found; if using multiple Interrogators, consider using a unique key type per")]
+#[error("the provided key could not be found")]
 pub struct UnknownKeyError;
 
 /// A slice or string overflowed an allowed length maximum of `M`.

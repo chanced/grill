@@ -37,7 +37,7 @@ pub mod uri;
 pub use uri::{Uri, AbsoluteUri, RelativeUri};
 
 pub mod schema;
-pub use schema::{Schema, SchemaKey};
+pub use schema::{Schema, Key};
 
 pub mod handler;
 

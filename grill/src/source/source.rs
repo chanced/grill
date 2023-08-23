@@ -1,7 +1,7 @@
 use super::{Deserializers, Link, Resolvers};
 use crate::error::{DeserializationError, LinkConflictError, LinkError, SourceConflictError};
 use crate::schema::CompiledSchema;
-use crate::SchemaKey;
+use crate::Key;
 use crate::{
     error::{DeserializeError, SourceError},
     schema::Metaschema,
@@ -27,22 +27,23 @@ pub struct Source<'i> {
     pub value: Cow<'i, Value>,
 }
 
-impl Source<'_> {
-    pub(crate) fn new<'i>(src: &'i Link, sources: &Sources) -> Source<'i> {
+impl<'i> Source<'i> {
+    pub(crate) fn new(src: &'i Link, sources: &'i Sources) -> Source<'i> {
         let value = sources.store.get(src.key).unwrap();
-        Source {
+        Self {
             key: src.key,
             uri: Cow::Borrowed(&src.uri),
             path: Cow::Borrowed(&src.path),
             value: Cow::Borrowed(value),
         }
     }
+    #[must_use]
     pub fn into_owned(&self) -> Source<'static> {
         Source {
             key: self.key,
-            uri: Cow::Owned(self.uri.into_owned()),
-            path: Cow::Owned(self.path.into_owned()),
-            value: Cow::Owned(self.value.into_owned()),
+            uri: Cow::Owned(self.uri.clone().into_owned()),
+            path: Cow::Owned(self.path.clone().into_owned()),
+            value: Cow::Owned(self.value.clone().into_owned()),
         }
     }
 }
@@ -97,7 +98,7 @@ impl From<&Metaschema> for SrcValue {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Sources {
-    store: SlotMap<SourceKey, Value>,
+    pub(crate) store: SlotMap<SourceKey, Value>,
     index: HashMap<AbsoluteUri, Link>,
 }
 
@@ -234,7 +235,7 @@ impl Sources {
         }
     }
 
-    pub fn get(&self, key: SourceKey) -> &Value {
+    pub fn get(&mut self, key: SourceKey) -> &Value {
         self.store.get(key).unwrap()
     }
 
@@ -244,17 +245,18 @@ impl Sources {
             .get(uri)
             .map(|link| self.store.get(link.key).unwrap())
     }
-    pub(crate) fn source_value(
+    pub(crate) fn insert_value(
         &mut self,
         uri: AbsoluteUri,
         source: Value,
-    ) -> Result<&Value, SourceError> {
+    ) -> Result<(SourceKey, &Value), SourceError> {
         if uri.fragment().is_some() && uri.fragment() != Some("") {
             return Err(SourceError::UnexpectedUriFragment(uri));
         }
         match self.index.entry(uri.clone()) {
             Entry::Occupied(entry) => {
-                let src = self.store.get(entry.get().key).unwrap();
+                let key = entry.get().key;
+                let src = self.store.get(key).unwrap();
                 if src != &source {
                     return Err(SourceConflictError {
                         uri: uri.clone(),
@@ -262,26 +264,27 @@ impl Sources {
                     }
                     .into());
                 }
-                Ok(src)
+                Ok((key, src))
             }
             Entry::Vacant(entry) => {
                 let key = self.store.insert(source);
                 entry.insert(Link::new(key, uri.clone(), Pointer::default()));
-                Ok(self.store.get(key).unwrap())
+                let value = self.store.get(key).unwrap();
+                Ok((key, value))
             }
         }
     }
 
-    pub(crate) fn source_string(
+    pub(crate) fn insert_string(
         &mut self,
         uri: AbsoluteUri,
         source: String,
         deserializers: &Deserializers,
-    ) -> Result<&Value, SourceError> {
+    ) -> Result<(SourceKey,&Value), SourceError> {
         let src = deserializers
             .deserialize(&source)
             .map_err(|e| DeserializationError::new(uri.clone(), e))?;
-        self.source_value(uri, src)
+        self.insert_value(uri, src)
     }
 
     #[must_use]

@@ -21,4 +21,4 @@ pub use reference::Reference;
 
 mod schema;
 pub(crate) use schema::{CompiledSchema, Schemas};
-pub use schema::{Schema, SchemaKey};
+pub use schema::{Key, Schema};

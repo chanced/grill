@@ -1,7 +1,7 @@
 use jsonptr::Pointer;
 
 use super::Keyword;
-use crate::{source::SourceKey, AbsoluteUri, SchemaKey};
+use crate::{source::SourceKey, AbsoluteUri, Key};
 
 // ///
 // #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,10 +17,7 @@ use crate::{source::SourceKey, AbsoluteUri, SchemaKey};
 /// A reference to a schema. This type is almost identical to `Ref` except
 /// contains keys for the referenced schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference<Key = SchemaKey>
-where
-    Key: 'static + slotmap::Key,
-{
+pub struct Reference {
     pub(crate) src_key: SourceKey,
     /// Key to the referenced [`Schema`]
     ///
@@ -35,10 +32,7 @@ where
     pub keyword: Keyword<'static>,
 }
 
-impl<Key> Reference<Key>
-where
-    Key: 'static + slotmap::Key,
-{
+impl Reference {
     #[must_use]
     /// Creates a new reference
     pub fn new(key: Key, ref_path: Pointer, uri: AbsoluteUri, keyword: Keyword<'static>) -> Self {

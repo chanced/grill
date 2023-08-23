@@ -1,15 +1,12 @@
 use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub struct Compile<'i, Key>
-where
-    Key: 'static + slotmap::Key,
-{
-    marker: PhantomData<&'i Key>, // location: Location,
-                                  // anchors: Vec<(String, Anchor<'s>)>,
-                                  // schemas: HashMap<Keyword<'s>, Subschema<'s>>,
-                                  // numbers: HashMap<Keyword<'s>, &'s Number>,
-                                  // references: HashMap<Keyword<'s>, &'s str>,
+pub struct Compile<'i> {
+    marker: PhantomData<&'i ()>, // location: Location,
+                                 // anchors: Vec<(String, Anchor<'s>)>,
+                                 // schemas: HashMap<Keyword<'s>, Subschema<'s>>,
+                                 // numbers: HashMap<Keyword<'s>, &'s Number>,
+                                 // references: HashMap<Keyword<'s>, &'s str>,
 }
 
 // impl<'s> Compile<'s> {
