@@ -76,7 +76,7 @@ pub struct Location {
     /// - [JSON Schema Core 2020-12 # 12.3.2. Keyword Absolute
     ///   Location](https://json-schema.org/draft/2020-12/json-schema-core.html#name-keyword-absolute-location)
     #[serde(rename = "absoluteKeywordLocation")]
-    absolute_keyword_location: (Uri, Pointer),
+    absolute_keyword_location: Uri,
 
     /// The location of the JSON value within the instance being validated. The
     /// value MUST be expressed as a JSON Pointer.
@@ -106,10 +106,11 @@ impl Location {
     }
     #[must_use]
     pub fn absolute_keyword_location(&self) -> AbsoluteKeywordLocation<'_> {
-        AbsoluteKeywordLocation {
-            uri: Cow::Borrowed(&self.absolute_keyword_location.0),
-            pointer: Cow::Borrowed(&self.absolute_keyword_location.1),
-        }
+        // AbsoluteKeywordLocation {
+        //     uri: Cow::Borrowed(&self.absolute_keyword_location.0),
+        //     pointer: Cow::Borrowed(&self.absolute_keyword_location.1),
+        // }
+        todo!()
     }
     #[must_use]
     pub fn instance_locaiton(&self) -> &Pointer {
@@ -119,7 +120,8 @@ impl Location {
     pub fn push_keyword_location(&mut self, keyword: &str) {
         let tok: jsonptr::Token = keyword.into();
         self.keyword_location.push_back(tok.clone());
-        self.absolute_keyword_location.1.push_back(tok);
+        // self.absolute_keyword_location.1.push_back(tok);
+        todo!()
     }
 
     pub fn push_instance_location(&mut self, instance: &str) {

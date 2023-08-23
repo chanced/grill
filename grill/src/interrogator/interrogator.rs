@@ -1,12 +1,11 @@
-use std::{any, borrow::Borrow, fmt::Debug, ops::Deref, str::FromStr};
+use std::{borrow::Borrow, fmt::Debug, ops::Deref};
 
-use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 
 use crate::{
     error::{
-        CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceConflictError,
-        SourceError, UnknownKeyError,
+        CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceError,
+        UnknownKeyError,
     },
     json_schema,
     output::{Output, Structure},
@@ -14,24 +13,30 @@ use crate::{
         traverse::{
             Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
         },
-        CompiledSchema, Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas,
+        Dialect, Dialects, Keyword, Schema, SchemaKey, Schemas,
     },
-    source::{Deserializers, Resolvers, Source, Sources},
+    source::{Deserializers, Resolvers, Sources, SrcValue},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Builder,
 };
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
-pub struct Interrogator<Key: slotmap::Key = SchemaKey> {
-    pub(super) dialects: Dialects<'static>,
+pub struct Interrogator<Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
+    pub(super) dialects: Dialects<'static, Key>,
     pub(super) sources: Sources,
     pub(super) resolvers: Resolvers,
     pub(super) schemas: Schemas<Key>,
     pub(super) deserializers: Deserializers,
 }
 
-impl<Key: slotmap::Key> Debug for Interrogator<Key> {
+impl<Key> Debug for Interrogator<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
@@ -44,7 +49,7 @@ impl<Key: slotmap::Key> Debug for Interrogator<Key> {
 
 impl<Key> Interrogator<Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     /// Returns the [`Schema`] with the given `key` if it exists.
     ///
@@ -293,92 +298,23 @@ where
         //     .tap_err(|_| self.schemas.rollback_txn());
         todo!()
     }
-    #[allow(clippy::unused_async, dead_code)]
-    async fn compile_schema(
-        &mut self,
-        base_uri: AbsoluteUri,
-        path: &Pointer,
-        value: &Value,
-        src_uri: AbsoluteUri,
-        src_path: &Pointer,
-        mut parent: Option<Key>,
-    ) -> Result<Key, CompileError> {
-        // determining the dialect
-        let dialect = self.dialects.pertinent_to_or_default(value);
-
-        // identifying the schema
-        let (id, uris) = dialect.identify(base_uri, path, value)?;
-
-        // if identify did not find a primary id, use the uri + pointer fragment
-        // as the lookup which will be at the first position in the uris list
-        let lookup_id = id.as_ref().unwrap_or(&uris[0]);
-
-        // checking to see if the schema has already been compiled under the id
-        if let Some(schema) = self.schemas.get_by_uri(lookup_id, &self.sources) {
-            // if so, return it
-            return Ok(schema.key);
-        }
-
-        // if parent is None and this schema is not a document root (that is,
-        // has an $id) then attempt to locate the parent using the pointer
-        // fragment.
-        if id.is_none()
-            && parent.is_none()
-            && lookup_id.has_fragment()
-            && lookup_id.fragment().unwrap().starts_with('/')
-        {
-            parent = self.schemas.locate_parent(lookup_id.clone())?;
-        }
-
-        // create a new CompiledSchema and insert it. if compiling fails, the
-        // schema store will rollback to its previous state.
-        let key = self
-            .schemas
-            .insert(CompiledSchema {
-                id,
-                uris,
-                metaschema: dialect.primary_metaschema_id().clone(),
-                handlers: dialect.handlers.clone().into_boxed_slice(),
-                src_uri,
-                src_path: src_path.clone(),
-                parent,
-                subschemas: Vec::default(),
-                dependents: Vec::default(),
-                dependencies: Vec::default(),
-                anchors: Vec::default(),
-            })
-            .map_err(|uri| {
-                SourceError::from(SourceConflictError {
-                    uri,
-                    value: value.clone().into(),
-                })
-            })?;
-
-        // // gathering nested schemas
-        let located_schemas = dialect.locate_schemas(&Pointer::default(), value);
-        for subschema_path in located_schemas {}
-
-        // compiling nested schemas
-
-        todo!()
-    }
 
     #[must_use]
-    pub fn dialects(&self) -> &[Dialect] {
+    pub fn dialects(&self) -> &[Dialect<Key>] {
         &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect {
-        self.dialects.default_dialect()
+    pub fn default_dialect(&self) -> &Dialect<Key> {
+        self.dialects.primary_dialect()
     }
 
     /// Returns the [`Dialect`] for the given schema, if any.
     pub fn determine_dialect(
         &self,
         schema: &Value,
-    ) -> Result<Option<&Dialect>, DialectUnknownError> {
+    ) -> Result<Option<&Dialect<Key>>, DialectUnknownError> {
         if let Some(schema) = self.dialects.pertinent_to(schema) {
             return Ok(Some(schema));
         }
@@ -439,14 +375,14 @@ where
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
     ) -> Result<&Value, SourceError> {
-        let source = Source::String(
+        let source = SrcValue::String(
             uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
         );
 
         self.source(source)
     }
-    fn source(&mut self, source: Source) -> Result<&Value, SourceError> {
+    fn source(&mut self, source: SrcValue) -> Result<&Value, SourceError> {
         // self.sources.insert(source, &self.deserializers)
         todo!()
     }
@@ -465,7 +401,7 @@ where
         uri: impl TryIntoAbsoluteUri,
         source: &str,
     ) -> Result<&Value, SourceError> {
-        self.source(Source::String(
+        self.source(SrcValue::String(
             uri.try_into_absolute_uri()?,
             source.to_string(),
         ))
@@ -490,7 +426,7 @@ where
         uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
     ) -> Result<&Value, SourceError> {
-        self.source(Source::Value(
+        self.source(SrcValue::Value(
             uri.try_into_absolute_uri()?,
             source.borrow().clone(),
         ))
@@ -520,7 +456,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(Source::String(k.try_into_absolute_uri()?, v.to_string()))?;
+            self.source(SrcValue::String(k.try_into_absolute_uri()?, v.to_string()))?;
         }
         Ok(())
     }
@@ -550,7 +486,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(Source::String(
+            self.source(SrcValue::String(
                 k.try_into_absolute_uri()?,
                 String::from_utf8(v.as_ref().to_vec())?,
             ))?;
@@ -585,7 +521,7 @@ where
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(Source::Value(
+            self.source(SrcValue::Value(
                 k.try_into_absolute_uri()?,
                 v.borrow().clone(),
             ))?;

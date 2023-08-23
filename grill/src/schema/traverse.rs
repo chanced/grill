@@ -1,5 +1,5 @@
-use super::Schemas;
-use crate::{source::Sources, AbsoluteUri, Schema};
+use super::{Reference, Schemas};
+use crate::{source::Sources, AbsoluteUri, Schema, SchemaKey};
 use either::Either;
 use std::{
     collections::{HashSet, VecDeque},
@@ -11,7 +11,7 @@ use std::{
 pub trait Traverse<'i, Key, Iter>: Iterator<Item = Schema<'i, Key>>
 where
     Self: Sized,
-    Key: 'i + slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: Iterator<Item = Schema<'i, Key>>,
 {
     /// Returns a new [`Keys`] [`Iterator`] which consumes this `Iterator` and
@@ -56,7 +56,7 @@ where
 }
 impl<'i, Key, Iter> Iterator for MapIntoOwned<'i, Key, Iter>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: Iterator<Item = Schema<'i, Key>>,
 {
     type Item = Schema<'static, Key>;
@@ -71,7 +71,7 @@ where
 /// See [`Traverse::keys`] for usage.
 pub struct Keys<'i, Key, Iter>
 where
-    Key: 'i + slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: Iterator<Item = Schema<'i, Key>>,
 {
     iter: Iter,
@@ -79,7 +79,7 @@ where
 
 impl<'i, Key, Iter> Iterator for Keys<'i, Key, Iter>
 where
-    Key: 'i + slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: Iterator<Item = Schema<'i, Key>>,
 {
     type Item = Key;
@@ -93,7 +93,7 @@ macro_rules! impl_traverse {
     ($name:ident, $func:ident) => {
         impl<'i, Key> Iterator for $name<'i, Key>
         where
-            Key: slotmap::Key,
+            Key: 'static + slotmap::Key,
         {
             type Item = Schema<'i, Key>;
             fn next(&mut self) -> Option<Self::Item> {
@@ -106,7 +106,10 @@ macro_rules! impl_traverse {
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependents of
 /// a [`Schema`].
-pub struct AllDependents<'i, Key: slotmap::Key> {
+pub struct AllDependents<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     traverse: Slices<'i, Key>,
 }
 
@@ -114,7 +117,7 @@ impl_traverse!(AllDependents, all_dependents);
 
 fn all_dependents<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
     schema.dependents.into_owned().into_iter()
@@ -122,7 +125,7 @@ where
 
 impl<'i, Key> AllDependents<'i, Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
@@ -134,23 +137,36 @@ where
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependencies of
 /// a [`Schema`].
-pub struct TransitiveDependencies<'i, Key: slotmap::Key> {
-    traverse: Slices<'i, Key>,
+pub struct TransitiveDependencies<'i, Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
+    traverse: TransitiveDeps<'i, Key>,
 }
 
 impl_traverse!(TransitiveDependencies, transitive_dependencies);
-
-fn transitive_dependencies<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
+fn transitive_dependencies<Key>(schema: Schema<'_, Key>) -> Deps<Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
-    schema.dependencies.into_owned().into_iter()
+    schema
+        .references
+        .into_owned()
+        .into_iter()
+        .map(reference_to_key)
+}
+
+fn reference_to_key<Key>(reference: Reference<Key>) -> Key
+where
+    Key: 'static + slotmap::Key,
+{
+    reference.key
 }
 
 impl<'i, Key> TransitiveDependencies<'i, Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
@@ -167,14 +183,17 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Ancestors<'i, Key: slotmap::Key> {
+pub struct Ancestors<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     traverse: Instances<'i, Key>,
 }
 
 impl_traverse!(Ancestors, ancestors);
 fn ancestors<Key>(schema: Schema<'_, Key>) -> Either<Once<Key>, Empty<Key>>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     if let Some(parent) = schema.parent {
         Either::Left(once(parent))
@@ -184,7 +203,7 @@ where
 }
 impl<'i, Key> Ancestors<'i, Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
@@ -201,20 +220,23 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Descendants<'i, Key: slotmap::Key> {
+pub struct Descendants<'i, Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
     traverse: Slices<'i, Key>,
 }
 impl_traverse!(Descendants, descendants);
 fn descendants<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
     schema.subschemas.into_owned().into_iter()
 }
 impl<'i, Key> Descendants<'i, Key>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
 {
     pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
         Self {
@@ -223,14 +245,18 @@ where
     }
 }
 
-struct Iter<'i, Key: slotmap::Key, Inner: Iterator<Item = Key>> {
+struct Flat<'i, Key, Inner>
+where
+    Key: 'static + slotmap::Key,
+    Inner: Iterator<Item = Key>,
+{
     iter: Inner,
     schemas: &'i Schemas<Key>,
     sources: &'i Sources,
 }
-impl<'i, Key, Inner> Iter<'i, Key, Inner>
+impl<'i, Key, Inner> Flat<'i, Key, Inner>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Inner: Iterator<Item = Key>,
 {
     fn new(iter: Inner, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self {
@@ -242,9 +268,9 @@ where
     }
 }
 
-impl<'i, Key, Inner> Iterator for Iter<'i, Key, Inner>
+impl<'i, Key, Inner> Iterator for Flat<'i, Key, Inner>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Inner: Iterator<Item = Key>,
 {
     type Item = Schema<'i, Key>;
@@ -256,7 +282,7 @@ where
 
 struct DepthFirst<'i, Key, Iter, Func>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
@@ -269,7 +295,7 @@ where
 
 impl<'i, Key, Iter, Func> DepthFirst<'i, Key, Iter, Func>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: 'i + Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
@@ -295,7 +321,7 @@ where
 
 impl<'i, Key, Iter, Func> Iterator for DepthFirst<'i, Key, Iter, Func>
 where
-    Key: slotmap::Key,
+    Key: 'static + slotmap::Key,
     Iter: 'i + Iterator<Item = Key>,
     Func: Fn(Schema<'i, Key>) -> Iter,
 {
@@ -330,26 +356,26 @@ macro_rules! iter {
 
     ) => {
         $(#[$($attrss)*])*
-        $vis struct $name<'i, Key: slotmap::Key> {
-            iter: Iter<'i, Key, $iter<Key>>,
+        $vis struct $name<'i, Key> where Key: 'static + slotmap::Key {
+            iter: Flat<'i, Key, $iter<Key>>,
         }
 
         impl<'i, Key> $name<'i, Key>
         where
-            Key: slotmap::Key,
+            Key: 'static + slotmap::Key,
             {
                 #[doc=concat!("Creates a new ", stringify!($name))]
                 pub(crate) fn new(key: Key, schemas: &'i Schemas<Key>, sources: &'i Sources) -> Self
             {
                 let schema = schemas.get_unchecked(key, sources);
                 let iter = $func(schema);
-                let iter = Iter::new(iter, schemas, sources);
+                let iter = Flat::new(iter, schemas, sources);
                 Self { iter }
             }
         }
         impl<'i, Key> Iterator for $name<'i, Key>
         where
-            Key: slotmap::Key,
+            Key: 'static + slotmap::Key,
         {
             type Item = Schema<'i, Key>;
 
@@ -361,11 +387,22 @@ macro_rules! iter {
 }
 iter! {
     /// An [`Iterator`] over the direct dependencies of a [`Schema`]
-    pub DirectDependencies @ direct_dependencies -> IntoIter
+    pub DirectDependencies @ direct_dependencies -> Deps
 }
-fn direct_dependencies<Key: slotmap::Key>(schema: Schema<'_, Key>) -> IntoIter<Key> {
+
+type Deps<Key> = Map<IntoIter<Reference<Key>>, fn(Reference<Key>) -> Key>;
+type TransitiveDeps<'i, Key> = DepthFirst<'i, Key, Deps<Key>, fn(Schema<'i, Key>) -> Deps<Key>>;
+
+fn direct_dependencies<Key>(schema: Schema<'_, Key>) -> Deps<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     #[allow(clippy::unnecessary_to_owned)]
-    schema.dependencies.into_owned().into_iter()
+    schema
+        .references
+        .into_owned()
+        .into_iter()
+        .map(reference_to_key)
 }
 
 iter! {
@@ -373,9 +410,16 @@ iter! {
     /// depend on a specified [`Schema`](crate::schema::Schema)
     pub DirectDependents @ direct_dependents -> IntoIter
 }
-fn direct_dependents<Key: slotmap::Key>(schema: Schema<'_, Key>) -> IntoIter<Key> {
+fn direct_dependents<Key>(schema: Schema<'_, Key>) -> IntoIter<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     #[allow(clippy::unnecessary_to_owned)]
     schema.dependents.into_owned().into_iter()
+}
+
+fn x(mut i: Deps<SchemaKey>) {
+    let next = i.next();
 }
 
 type Slices<'i, Key> = DepthFirst<'i, Key, IntoIter<Key>, fn(Schema<'i, Key>) -> IntoIter<Key>>;
@@ -392,14 +436,16 @@ mod tests {
     use super::*;
 
     use crate::{
-        schema::CompiledSchema,
-        source::{deserialize_json, Deserializers, Source},
+        schema::{CompiledSchema, Keyword, Reference},
+        source::{deserialize_json, Deserializers, Link, SourceKey},
         AbsoluteUri, SchemaKey,
     };
     use jsonptr::Pointer;
-    use serde_json::json;
 
-    fn id_paths<Key: slotmap::Key>(schema: Schema<'_, Key>) -> String {
+    fn id_paths<Key>(schema: Schema<'_, Key>) -> String
+    where
+        Key: 'static + slotmap::Key,
+    {
         schema.id.unwrap().path_or_nss().to_owned()
     }
     #[test]
@@ -598,24 +644,34 @@ mod tests {
                 }
             }
             for d in 'a'..='d' {
-                let dep_key = schemas
-                    .insert(create_schema(&format!("{r}/dependency_{d}")))
-                    .unwrap();
+                let uri = create_test_uri(&format!("{r}/dependency_{d}"));
+                let dep_key = schemas.insert(create_schema(uri.clone())).unwrap();
                 {
                     let root = schemas.get_mut_unchecked(root_key);
-                    root.dependencies.push(dep_key);
+                    root.references.push(Reference {
+                        src_key: Default::default(),
+                        key: dep_key,
+                        ref_path: Pointer::default(),
+                        uri: uri.clone(),
+                        keyword: Keyword::REF,
+                    });
                 }
                 {
                     let dep = schemas.get_mut_unchecked(dep_key);
                     dep.dependents.push(root_key);
                 }
                 for t in 'a'..='d' {
-                    let transitive_dep_key = schemas
-                        .insert(create_schema(format!("{r}/dependency_{d}/transitive_{t}")))
-                        .unwrap();
+                    let uri = create_test_uri(format!("{r}/dependency_{d}/transitive_{t}"));
+                    let transitive_dep_key = schemas.insert(create_schema(uri.clone())).unwrap();
                     {
                         let dep = schemas.get_mut_unchecked(dep_key);
-                        dep.dependencies.push(transitive_dep_key);
+                        dep.references.push(Reference {
+                            src_key: Default::default(),
+                            key: transitive_dep_key,
+                            ref_path: Pointer::default(),
+                            uri: uri.clone(),
+                            keyword: Keyword::REF,
+                        });
                     }
                     {
                         let transitive_dep = schemas.get_mut_unchecked(transitive_dep_key);
@@ -629,7 +685,17 @@ mod tests {
                             .unwrap();
                         {
                             let transitive_dep = schemas.get_mut_unchecked(transitive_dep_key);
-                            transitive_dep.dependencies.push(transitive_dep_key_2);
+                            let uri = create_test_uri(
+                                "{r}/dependency_{d}/transitive_{t}/distant_transitive_{t2}",
+                            );
+
+                            transitive_dep.references.push(Reference {
+                                src_key: Default::default(),
+                                key: transitive_dep_key_2,
+                                ref_path: Pointer::default(),
+                                uri: uri.clone(),
+                                keyword: Keyword::REF,
+                            });
                         }
                         {
                             let transitive_dep_2 = schemas.get_mut_unchecked(transitive_dep_key_2);
@@ -674,14 +740,17 @@ mod tests {
             id: Some(uri.clone()),
             anchors: Vec::default(),
             parent: None,
-            dependencies: vec![],
+            references: vec![],
             dependents: vec![],
             handlers: vec![].into_boxed_slice(),
             metaschema,
-            src_path: Pointer::default(),
-            src_uri: uri.clone(),
             subschemas: vec![],
             uris: vec![uri],
+            src: Link {
+                key: SourceKey::default(),
+                uri,
+                path: Pointer::default(),
+            },
         }
     }
 }

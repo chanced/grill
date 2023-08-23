@@ -56,7 +56,7 @@ pub type Array = Vec<serde_json::Value>;
 
 
 pub mod source;
-pub(crate) use source::Source;
+pub(crate) use source::SrcValue;
 
 
 #[cfg(test)]

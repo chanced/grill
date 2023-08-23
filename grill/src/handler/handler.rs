@@ -2,34 +2,32 @@ use crate::{
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, UriError},
     output::{self, Structure},
     schema::{Anchor, Reference},
-    AbsoluteUri, Uri,
+    AbsoluteUri, Schema, Uri,
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
-use inherent::inherent;
 use jsonptr::Pointer;
-use num_rational::BigRational;
-use serde_json::{Number, Value};
-use slotmap::SlotMap;
-use std::{
-    any::{Any, TypeId},
-    collections::{hash_map, HashMap},
-    fmt,
-    hash::{BuildHasherDefault, Hasher},
-};
+use serde_json::Value;
+use std::fmt;
 
-use super::{Scope, Compile};
+use super::{Compile, Scope};
 
 /// A handler that performs logic for a given condition in a JSON Schema.
 #[derive(Debug, Clone)]
-pub enum Handler {
+pub enum Handler<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     /// A synchronous handler.
-    Sync(Box<dyn SyncHandler>),
+    Sync(Box<dyn SyncHandler<Key>>),
     /// An asynchronous handler.
-    Async(Box<dyn AsyncHandler>),
+    Async(Box<dyn AsyncHandler<Key>>),
 }
 
-impl Handler {
+impl<Key> Handler<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Returns `true` if the handler is [`Sync`].
     ///
     /// [`Sync`]: Handler::Sync
@@ -39,7 +37,7 @@ impl Handler {
     }
     #[must_use]
     #[allow(clippy::borrowed_box)]
-    pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler>> {
+    pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler<Key>>> {
         if let Self::Sync(v) = self {
             Some(v)
         } else {
@@ -57,7 +55,7 @@ impl Handler {
 
     #[must_use]
     #[allow(clippy::borrowed_box)]
-    pub fn as_async(&self) -> Option<&Box<dyn AsyncHandler>> {
+    pub fn as_async(&self) -> Option<&Box<dyn AsyncHandler<Key>>> {
         if let Self::Async(v) = self {
             Some(v)
         } else {
@@ -151,9 +149,9 @@ impl Handler {
         }
     }
 
-    /// Returns a list of [`Reference`](`crate::schema::Reference`)s to other
+    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
-    pub fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
+    pub fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
         match self {
             Handler::Sync(h) => h.references(schema),
             Handler::Async(h) => h.references(schema),
@@ -163,23 +161,26 @@ impl Handler {
 
 #[async_trait]
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
+pub trait AsyncHandler<Key>: IntoHandler<Key> + Send + Sync + DynClone + fmt::Debug
+where
+    Key: 'static + slotmap::Key,
+{
     /// For each `Schema` compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
     /// If the handler is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
-    async fn compile<'h, 'c, 's, 'p>(
-        &mut self,
-        compile: &'c mut Compile<'s>,
-        schema: &'s Value,
+    async fn compile<'i>(
+        &'i mut self,
+        compile: &'i mut Compile<'i, Key>,
+        schema: &'i Value,
     ) -> Result<bool, CompileError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
-    async fn evaluate<'h, 's, 'v>(
-        &'h self,
-        scope: &'s mut Scope,
+    async fn evaluate<'i, 'v>(
+        &'i self,
+        scope: &'i mut Scope,
         schema: &'v Value,
         structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
@@ -262,37 +263,40 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
         unimplemented!("is_pertinent_to must be implemented by the first Handler in a Dialect")
     }
 
-    /// Returns a list of [`Reference`](`crate::schema::Reference`)s to other
+    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
     #[allow(unused_variables)]
-    fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
+    fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
         Ok(Vec::new())
     }
 }
 
-clone_trait_object!(AsyncHandler);
-/// Handles the setup and execution of logic for a given keyword in a JSON Schema.
+clone_trait_object!(<Key> AsyncHandler<Key> where Key: 'static + slotmap::Key);
 
-pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
+/// Handles the setup and execution of logic for a given keyword in a JSON Schema.
+pub trait SyncHandler<Key>: IntoHandler<Key> + Send + Sync + DynClone + fmt::Debug
+where
+    Key: 'static + slotmap::Key,
+{
     /// For each [`Schema`] compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
     /// If the handler is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
-    fn compile<'s>(
-        &mut self,
-        compile: &mut Compile<'s>,
-        schema: &'s Value,
+    fn compile<'i>(
+        &'i mut self,
+        compile: &'i mut Compile<'i, Key>,
+        schema: Schema<'i, Key>,
     ) -> Result<bool, CompileError>;
 
     /// Evaluates the [`Value`] `value` and optionally returns an `Annotation`.
     ///
     /// Handlers should fail fast if the `structure` is
     /// [`Structure::Flag`](`crate::output::Structure::Flag`)
-    fn evaluate<'v>(
-        &self,
-        scope: &mut Scope,
+    fn evaluate<'i, 'v>(
+        &'i self,
+        scope: &'i mut Scope,
         value: &'v Value,
         _structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
@@ -377,24 +381,28 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
         Vec::new()
     }
 
-    /// Returns a list of [`Reference`](`crate::schema::Reference`)s to other
+    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
     #[allow(unused_variables)]
-    fn references(&self, schema: &Value) -> Result<Vec<Reference>, UriError> {
+    fn references(&self, schema: &Value) -> Result<Vec<Reference<Key>>, UriError> {
         Ok(Vec::new())
     }
 }
-clone_trait_object!(SyncHandler);
+clone_trait_object!(<Key> SyncHandler<Key> where Key: 'static + slotmap::Key);
 
-pub trait IntoHandler {
-    fn into_handler(self) -> Handler;
+pub trait IntoHandler<Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    fn into_handler(self) -> Handler<Key>;
 }
 
-impl<T> IntoHandler for T
+impl<T, Key> IntoHandler<Key> for T
 where
-    T: Into<Handler>,
+    T: Into<Handler<Key>>,
+    Key: 'static + slotmap::Key,
 {
-    fn into_handler(self) -> Handler {
+    fn into_handler(self) -> Handler<Key> {
         self.into()
     }
 }
@@ -402,8 +410,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::handler::State;
-
-    use super::*;
 
     #[test]
     fn test_get() {

@@ -1,75 +1,81 @@
 use crate::{
-    error::{CompileError, UnknownKeyError},
+    error::{CompileError, SourceConflictError, SourceError, UnknownKeyError},
     handler::Handler,
-    source::Sources,
+    schema::{
+        traverse::{
+            AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
+            TransitiveDependencies,
+        },
+        Anchor, Dialects, Reference,
+    },
+    source::{Deserializers, Link, Resolvers, Source, Sources},
     AbsoluteUri,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet, VecDeque},
-    iter::Copied,
-    slice,
-    str::FromStr,
-};
-
-use super::{
-    traverse::{
-        AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
-        TransitiveDependencies,
-    },
-    Anchor,
-};
+use std::{borrow::Cow, collections::HashMap, ops::Deref, str::FromStr};
 
 new_key_type! {
     pub struct SchemaKey;
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CompiledSchema<Key: slotmap::Key = SchemaKey> {
+pub(crate) struct CompiledSchema<Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Abs URI of the schema.
     pub(crate) id: Option<AbsoluteUri>,
+
     /// The [`Key`] of the schema which contains this schema, if any.
     ///
     /// Note that if this schema has an `id`, `parent` will be `None` regardless of
     /// whether or not this schema is embedded.
     pub(crate) parent: Option<Key>,
+
     /// Directly embedded subschemas, excluding those with `id`s.
     pub(crate) subschemas: Vec<Key>,
+
     /// Dependents of this `Schema`.
     pub(crate) dependents: Vec<Key>,
-    ///  Dependencies of this `Schema`.
-    pub(crate) dependencies: Vec<Key>,
+
+    ///  Referenced dependencies of this `Schema`.
+    pub(crate) references: Vec<Reference<Key>>,
+
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
     pub(crate) anchors: Vec<Anchor>,
+
     /// All URIs which this schema is referenced by.
     pub(crate) uris: Vec<AbsoluteUri>,
+
     /// Abs URI of the schema's `Metaschema`.
     pub(crate) metaschema: AbsoluteUri,
+
     // Compiled handlers.
-    pub(crate) handlers: Box<[Handler]>,
+    pub(crate) handlers: Box<[Handler<Key>]>,
+
     /// Abs URI of the source.
-    pub(crate) src_uri: AbsoluteUri,
-    /// Path to the schema within the source as a JSON pointer.
-    pub(crate) src_path: Pointer,
+    pub(crate) src: Link,
 }
 
-impl<Key: slotmap::Key> PartialEq for CompiledSchema<Key> {
+impl<Key> PartialEq for CompiledSchema<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && self.metaschema == other.metaschema
-            && self.src_path == other.src_path
-            && self.src_uri == other.src_uri
+        self.id == other.id && self.metaschema == other.metaschema && self.src == other.src
     }
 }
 
-impl<Key: slotmap::Key> Eq for CompiledSchema<Key> {}
+impl<Key> Eq for CompiledSchema<Key> where Key: 'static + slotmap::Key {}
 
 #[derive(Clone, Debug)]
-pub struct Schema<'i, Key: slotmap::Key> {
+pub struct Schema<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Key of the `Schema`
     pub key: Key,
     /// The `$id` or `id` of the schema, if any
@@ -78,8 +84,6 @@ pub struct Schema<'i, Key: slotmap::Key> {
     pub uris: Cow<'i, [AbsoluteUri]>,
     /// The URI of the schema's `Metaschema`.
     pub metaschema: Cow<'i, AbsoluteUri>,
-    /// The source of the schema.
-    pub source: Cow<'i, Value>,
     /// The `Key` of the parent `Schema`, if any.
     ///
     /// Note that if this `Schema` has an `id`, then `parent` will be `None`
@@ -94,38 +98,30 @@ pub struct Schema<'i, Key: slotmap::Key> {
     /// Dependents of this `Schema`.
     pub dependents: Cow<'i, [Key]>,
     ///  Dependencies of this `Schema`.
-    pub dependencies: Cow<'i, [Key]>,
+    pub references: Cow<'i, [Reference<Key>]>,
     /// Compiled [`Handler`]s.
-    pub handlers: Cow<'i, [Handler]>,
-    /// [`AbsoluteUri`] of the source.
-    pub source_uri: Cow<'i, AbsoluteUri>,
-    /// Path to the schema within the source as a JSON [`Pointer`].
-    pub source_path: Cow<'i, Pointer>,
+    pub handlers: Cow<'i, [Handler<Key>]>,
+    /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
+    /// [`Pointer`]
+    pub source: Source<'i>,
 }
 
-impl<'i, Key: slotmap::Key> Schema<'i, Key> {
+impl<'i, Key> Schema<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     pub(crate) fn new(key: Key, compiled: &'i CompiledSchema<Key>, sources: &'i Sources) -> Self {
-        let source = sources
-            .get(&compiled.src_uri)
-            .expect("source_uri not found in Sources");
-        let source = compiled
-            .src_path
-            .resolve(source)
-            .expect("sourece_path not found in Source");
-
         Self {
             key,
             id: compiled.id.as_ref().map(Cow::Borrowed),
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
-            source: Cow::Borrowed(source),
+            source: Source::new(&compiled.src, sources),
             parent: compiled.parent,
             subschemas: Cow::Borrowed(&compiled.subschemas),
-            dependents: Cow::Borrowed(&compiled.dependencies),
-            dependencies: Cow::Borrowed(&compiled.dependencies),
+            dependents: Cow::Borrowed(&compiled.dependents),
+            references: Cow::Borrowed(&compiled.references),
             handlers: Cow::Borrowed(&compiled.handlers),
-            source_uri: Cow::Borrowed(&compiled.src_uri),
-            source_path: Cow::Borrowed(&compiled.src_path),
         }
     }
 
@@ -136,39 +132,74 @@ impl<'i, Key: slotmap::Key> Schema<'i, Key> {
             id: self.id.map(|id| Cow::Owned(id.into_owned())),
             uris: Cow::Owned(self.uris.into_owned()),
             metaschema: Cow::Owned(self.metaschema.into_owned()),
-            source: Cow::Owned(self.source.into_owned()),
+            source: self.source.into_owned(),
             dependents: Cow::Owned(self.dependents.into_owned()),
-            dependencies: Cow::Owned(self.dependencies.into_owned()),
+            references: Cow::Owned(self.references.into_owned()),
             handlers: Cow::Owned(self.handlers.into_owned()),
-            source_uri: Cow::Owned(self.source_uri.into_owned()),
-            source_path: Cow::Owned(self.source_path.into_owned()),
             subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
     }
 }
 
-impl<'i, Key: slotmap::Key> Schema<'i, Key> {
+impl<'i, Key> Schema<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     pub fn value(&self) -> &Value {
-        self.source_path.resolve(self.source.as_ref()).unwrap()
+        &self.source
     }
 }
 
-impl<'i, Key: slotmap::Key> PartialEq for Schema<'i, Key> {
+impl<'i, Key> Deref for Schema<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.source
+    }
+}
+
+impl<'i, Key> PartialEq for Schema<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema
     }
 }
 
-impl<'i, Key: slotmap::Key> Eq for Schema<'i, Key> {}
+impl<'i, Key> Eq for Schema<'i, Key> where Key: 'static + slotmap::Key {}
 
 #[derive(Clone, Debug)]
-pub(crate) struct Schemas<Key: slotmap::Key = SchemaKey> {
+pub(crate) struct Schemas<Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
     pub(crate) store: SlotMap<Key, CompiledSchema<Key>>,
     keys: HashMap<AbsoluteUri, Key>,
     sandbox: Option<Box<Sandbox<Key>>>,
 }
 
-impl<Key: slotmap::Key> Schemas<Key> {
+pub(crate) struct Params<'i, Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    base_uri: AbsoluteUri,
+    path: &'i Pointer,
+    src: Link,
+    parent: Option<Key>,
+    sources: &'i mut Sources,
+    dialects: &'i Dialects<'i, Key>,
+    deserializers: &'i Deserializers,
+    resolvers: &'i Resolvers,
+}
+
+impl<Key> Schemas<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Creates a new [`Schemas<Key>`].
     #[must_use]
     pub fn new() -> Self {
@@ -177,6 +208,117 @@ impl<Key: slotmap::Key> Schemas<Key> {
             keys: HashMap::default(),
             sandbox: None,
         }
+    }
+
+    pub(crate) async fn compile(&mut self, params: Params<'_, Key>) -> Result<Key, CompileError> {
+        let Params {
+            base_uri,
+            path,
+            src,
+            mut parent,
+            sources,
+            dialects,
+            deserializers,
+            resolvers,
+        } = params;
+        let source = sources.get(src.key);
+        // determining the dialect
+        let dialect = dialects.pertinent_to_or_default(source);
+
+        // identifying the schema
+        let (id, uris) = dialect.identify(base_uri.clone(), path, source)?;
+
+        // if identify did not find a primary id, use the uri + pointer fragment
+        // as the lookup which will be at the first position in the uris list
+        let lookup_id = id.as_ref().unwrap_or(&uris[0]);
+
+        // checking to see if the schema has already been compiled under the id
+        if let Some(schema) = self.get_by_uri(lookup_id, sources) {
+            // if so, return it
+            return Ok(schema.key);
+        }
+
+        // if parent is None and this schema is not a document root (that is,
+        // has an $id) then attempt to locate the parent using the pointer
+        // fragment.
+        // this shouldn't be used much, if at all, but its here for safety
+        if id.is_none()
+            && parent.is_none()
+            && lookup_id.has_fragment()
+            && lookup_id.fragment().unwrap().starts_with('/')
+        {
+            parent = self.locate_parent(lookup_id.clone())?;
+        }
+        // create a new CompiledSchema and insert it. if compiling fails, the
+        // schema store will rollback to its previous state.
+        let key = self
+            .insert(CompiledSchema {
+                id: id.clone(),
+                uris: uris.clone(),
+                metaschema: dialect.primary_metaschema_id().clone(),
+                handlers: dialect.handlers.clone().into_boxed_slice(),
+                parent,
+                src,
+                subschemas: Vec::default(),
+                dependents: Vec::default(),
+                references: Vec::default(),
+                anchors: Vec::default(),
+            })
+            .map_err(|uri| {
+                SourceError::from(SourceConflictError {
+                    uri,
+                    value: source.clone().into(),
+                })
+            })?;
+
+        // linking all URIs of this schema to the the source location
+        let base_uri = id.unwrap_or(base_uri);
+        for uri in uris {
+            sources.link(uri, src.uri.clone(), src.path.clone())?;
+        }
+
+        // gather references
+        for Reference {
+            keyword,
+            ref_path,
+            uri,
+            key,
+            src_key,
+        } in dialect.references(source)?
+        {
+            let mut base_uri = uri.clone();
+            let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+
+            let (_, src) = sources.resolve(&uri, resolvers, deserializers).await?;
+            // let ref_key = self.compile(base_uri).await?;
+        }
+
+        let mut subschemas = Vec::new();
+
+        // gathering nested schemas
+        for subschema_path in dialect.subschemas(src_path, source) {
+            // let subschema = self
+            //     .compile(
+            //         base_uri.clone(),
+            //         &subschema_path,
+            //         src,
+            //         src_uri.clone(),
+            //         src_path,
+            //         Some(key),
+            //         sources,
+            //         dialects,
+            //         deserializers,
+            //         resolvers,
+            //     )
+            //     .await?;
+            // subschemas.push(subschema);
+            todo!()
+        }
+
+        let schema = self.get_mut_unchecked(key);
+        schema.subschemas = subschemas;
+
+        todo!()
     }
 
     pub(crate) fn insert(&mut self, schema: CompiledSchema<Key>) -> Result<Key, AbsoluteUri> {
@@ -248,7 +390,7 @@ impl<Key: slotmap::Key> Schemas<Key> {
         }
         .ok_or(UnknownKeyError)?;
 
-        let source = sources.get(&schema.src_uri).unwrap();
+        let source = sources.get_by_uri(&schema.src_uri).unwrap();
         Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
@@ -257,10 +399,8 @@ impl<Key: slotmap::Key> Schemas<Key> {
             uris: Cow::Borrowed(&schema.uris),
             handlers: Cow::Borrowed(&schema.handlers),
             parent: schema.parent,
-            dependencies: Cow::Borrowed(&schema.dependencies),
+            references: Cow::Borrowed(&schema.references),
             dependents: Cow::Borrowed(&schema.dependents),
-            source_uri: Cow::Borrowed(&schema.src_uri),
-            source_path: Cow::Borrowed(&schema.src_path),
             subschemas: Cow::Borrowed(&schema.subschemas),
         })
     }
@@ -370,25 +510,34 @@ impl<Key: slotmap::Key> Schemas<Key> {
 
     pub(crate) fn contains_key(&self, key: Key) -> bool
     where
-        Key: slotmap::Key,
+        Key: 'static + slotmap::Key,
     {
         self.store.contains_key(key)
     }
 }
-impl<Key: slotmap::Key> Default for Schemas<Key> {
+impl<Key> Default for Schemas<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Debug, Clone, Default)]
-struct Sandbox<Key: slotmap::Key> {
+struct Sandbox<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     store: SlotMap<Key, CompiledSchema<Key>>,
     keys: HashMap<AbsoluteUri, Key>,
 }
 
 #[allow(clippy::unnecessary_box_returns)]
-impl<Key: slotmap::Key> Sandbox<Key> {
+impl<Key> Sandbox<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn new(
         schemas: &SlotMap<Key, CompiledSchema<Key>>,
         keys: &HashMap<AbsoluteUri, Key>,

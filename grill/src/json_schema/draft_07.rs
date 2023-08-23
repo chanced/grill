@@ -5,7 +5,7 @@ mod type_handler;
 
 pub use const_handler::{ConstHandler, ConstInvalid};
 pub use enum_handler::{EnumHandler, EnumInvalid};
-pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
+// pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
 pub use type_handler::{TypeHandler, TypeInvalid};
 
 use crate::{

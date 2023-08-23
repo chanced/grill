@@ -1,13 +1,15 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
+use crate::error::{DialectExistsError, UriError};
 use crate::handler::Handler;
 use crate::schema::Metaschema;
+use crate::SchemaKey;
 
 use crate::{
     error::{DialectError, IdentifyError},
     uri::AbsoluteUri,
-    Object, Source,
+    Object, SrcValue,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -22,17 +24,22 @@ use std::{
 };
 use tap::TapOptional;
 
+use super::Reference;
+
 /// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
 /// schema.
 #[derive(Clone)]
-pub struct Dialect {
+pub struct Dialect<Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Identifier of the `Dialect`. A meta schema must be defined in
     /// `metaschemas` with this `id`.
     pub id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
     pub metaschemas: HashMap<AbsoluteUri, Object>,
     /// Set of [`Handler`]s defined by the dialect.
-    pub handlers: Vec<Handler>,
+    pub handlers: Vec<Handler<Key>>,
 }
 impl std::fmt::Display for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -40,7 +47,10 @@ impl std::fmt::Display for Dialect {
     }
 }
 
-impl Dialect {
+impl<Key> Dialect<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     /// Creates a new [`Dialect`].
     pub fn new<S, M, I, H>(
         id: AbsoluteUri,
@@ -50,7 +60,7 @@ impl Dialect {
     where
         S: Borrow<Metaschema>,
         M: IntoIterator<Item = S>,
-        I: Into<Handler>,
+        I: Into<Handler<Key>>,
         H: IntoIterator<Item = I>,
     {
         let metaschemas: HashMap<AbsoluteUri, Object> = metaschemas
@@ -63,7 +73,7 @@ impl Dialect {
         let handlers = handlers
             .into_iter()
             .map(Into::into)
-            .collect::<Vec<Handler>>();
+            .collect::<Vec<Handler<Key>>>();
         if !metaschemas.contains_key(&id) {
             return Err(DialectError::DefaultNotFound(id.clone()));
         }
@@ -118,22 +128,32 @@ impl Dialect {
     pub fn primary_metaschema_id(&self) -> &AbsoluteUri {
         &self.id
     }
-    /// Attempts to locate nested schemas within `value` by means of attached
-    /// `Handler`s of this `Dialect`.
+    /// Attempts to locate nested schemas within `source` by calling
+    /// [`Handler::subschemas`](`crate::Handler::subschemas`) for each attached
+    /// `Handler` of this `Dialect`.
     ///
     #[must_use]
-    pub fn locate_schemas(&self, path: &Pointer, value: &Value) -> HashSet<Pointer> {
+    pub fn subschemas(&self, path: &Pointer, source: &Value) -> HashSet<Pointer> {
         let mut locations = HashSet::new();
         for handler in &self.handlers {
-            locations.extend(handler.subschemas(path, value));
+            locations.extend(handler.subschemas(path, source));
         }
         locations
+    }
+
+    pub fn references(&self, source: &Value) -> Result<Vec<Reference<Key>>, UriError> {
+        let mut refs = Vec::new();
+        for handler in &self.handlers {
+            refs.append(&mut handler.references(source)?);
+        }
+        Ok(refs)
     }
 
     /// Determines if the schema is pertinent to this `Dialect`.
     ///
     /// # Convention
     /// Exactly one `Handler` must implement `is_pertinent_to` for a given
+    ///
     /// `Dialect`. It **must** be the **first** (index: `0`) `Handler` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
     /// [`Handlers`](`crate::dialect::Handlers`).
@@ -143,17 +163,27 @@ impl Dialect {
     }
 }
 
-impl PartialEq for Dialect {
+impl<Key> PartialEq for Dialect<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-impl Hash for Dialect {
+impl<Key> Hash for Dialect<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
-impl Debug for Dialect {
+
+impl<Key> Debug for Dialect<Key>
+where
+    Key: 'static + slotmap::Key,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Dialect")
             .field("id", &self.id)
@@ -164,35 +194,47 @@ impl Debug for Dialect {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Dialects<'d> {
-    dialects: Cow<'d, [Dialect]>,
+pub(crate) struct Dialects<'d, Key = SchemaKey>
+where
+    Key: 'static + slotmap::Key,
+{
+    dialects: Cow<'d, [Dialect<Key>]>,
     lookup: Cow<'d, HashMap<AbsoluteUri, usize>>,
     primary: usize,
 }
-impl<'d> Deref for Dialects<'d> {
-    type Target = [Dialect];
+
+impl<'d, Key> Deref for Dialects<'d, Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    type Target = [Dialect<Key>];
 
     fn deref(&self) -> &Self::Target {
         self.dialects.as_ref()
     }
 }
 
-impl<'d> Dialects<'d> {
+impl<'d, Key> Dialects<'d, Key>
+where
+    Key: 'static + slotmap::Key,
+{
     pub fn new(
-        dialects: Vec<Dialect>,
+        dialects: Vec<Dialect<Key>>,
         default: Option<&AbsoluteUri>,
     ) -> Result<Self, DialectError> {
         if dialects.is_empty() {
             return Err(DialectError::Empty);
         }
-        let mut collected: Vec<Dialect> = Vec::with_capacity(dialects.len());
+        let mut collected: Vec<Dialect<Key>> = Vec::with_capacity(dialects.len());
         let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(dialects.len());
         for (i, dialect) in dialects.into_iter().enumerate() {
             if dialect.id.fragment().is_some() && dialect.id.fragment() != Some("") {
                 return Err(DialectError::FragmentedId(dialect.id.clone()));
             }
             if lookup.contains_key(&dialect.id) {
-                return Err(DialectError::Duplicate(dialect));
+                return Err(DialectError::Duplicate(DialectExistsError {
+                    id: dialect.id,
+                }));
             }
             let id = dialect.id.clone();
             collected.push(dialect);
@@ -208,7 +250,7 @@ impl<'d> Dialects<'d> {
 
     /// Returns the [`Dialect`](crate::dialect::Dialect).
     #[must_use]
-    pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect> {
+    pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect<Key>> {
         self.lookup.get(id).map(|&index| &self.dialects[index])
     }
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
@@ -216,7 +258,7 @@ impl<'d> Dialects<'d> {
     /// [`Dialect`](`crate::dialect::Dialect`) or `None` if a [`Dialect`] cannot
     /// be confidently determined.
     #[must_use]
-    pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect> {
+    pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect<Key>> {
         self.dialects
             .iter()
             .find(|&dialect| dialect.is_pertinent_to(schema))
@@ -225,10 +267,10 @@ impl<'d> Dialects<'d> {
     /// Appends a [`Dialect`].
     ///
     /// # Errors
-    /// Returns the `Dialect` if a `Dialect` already exists with the same `id`.
-    pub(crate) fn push(&mut self, dialect: Dialect) -> Result<(), Dialect> {
+    /// Returns the [`DialectExists`] if a `Dialect` already exists with the same `id`.
+    pub(crate) fn push(&mut self, dialect: Dialect<Key>) -> Result<(), DialectExistsError> {
         if self.lookup.contains_key(&dialect.id) {
-            return Err(dialect);
+            return Err(DialectExistsError { id: dialect.id });
         }
         self.lookup
             .to_mut()
@@ -241,7 +283,10 @@ impl<'d> Dialects<'d> {
     ///
     /// # Errors
     /// Returns the `&Dialect` if the `Dialect` is not currently in this `Dialects`.
-    pub fn with_default<'o>(&'d self, default: &'o Dialect) -> Result<Dialects<'d>, &'o Dialect> {
+    pub fn with_default<'o>(
+        &'d self,
+        default: &'o Dialect,
+    ) -> Result<Dialects<'d, Key>, &'o Dialect> {
         let default = self.lookup.get(&default.id).copied().ok_or(default)?;
         Ok(Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
@@ -258,8 +303,8 @@ impl<'d> Dialects<'d> {
     /// Returns the [`Dialect`] that is pertinent to the schema or the default
     /// [`Dialect`] if the [`Dialect`] can not be determined from schema.
     #[must_use]
-    pub fn pertinent_to_or_default(&self, schema: &Value) -> &Dialect {
-        self.pertinent_to(schema).unwrap_or(self.default())
+    pub fn pertinent_to_or_default(&self, schema: &Value) -> &Dialect<Key> {
+        self.pertinent_to(schema).unwrap_or(self.primary_dialect())
     }
     /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`](`crate::dialect::Dialect`).
     pub fn source_ids(&self) -> impl Iterator<Item = &AbsoluteUri> {
@@ -267,11 +312,11 @@ impl<'d> Dialects<'d> {
     }
 
     #[must_use]
-    pub fn sources(&self) -> Vec<Source> {
+    pub fn sources(&self) -> Vec<SrcValue> {
         let mut result = Vec::with_capacity(self.dialects.len());
         for dialect in self.dialects.iter() {
             for metaschema in &dialect.metaschemas {
-                result.push(Source::Value(
+                result.push(SrcValue::Value(
                     metaschema.0.clone(),
                     metaschema.1.clone().into(),
                 ));
@@ -282,7 +327,7 @@ impl<'d> Dialects<'d> {
 
     /// Returns a slice of [`Dialect`](`crate::dialect::Dialect`).
     #[must_use]
-    pub fn as_slice(&self) -> &[Dialect] {
+    pub fn as_slice(&self) -> &[Dialect<Key>] {
         &self.dialects
     }
 
@@ -293,21 +338,21 @@ impl<'d> Dialects<'d> {
         self.primary
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
-    pub fn iter(&'d self) -> std::slice::Iter<'d, Dialect> {
+    pub fn iter(&'d self) -> std::slice::Iter<'d, Dialect<Key>> {
         self.dialects.iter()
     }
 
-    /// Returns the default [`Dialect`](`crate::dialect::Dialect`).
+    /// Returns the primary [`Dialect`](`crate::dialect::Dialect`).
     #[must_use]
-    pub fn default(&self) -> &Dialect {
+    pub fn primary_dialect(&self) -> &Dialect<Key> {
         &self.dialects[self.primary]
     }
 
-    /// Sets the default [`Dialect`] to use when no other [`Dialect`] matches.
+    /// Sets the primary [`Dialect`] to use when no other [`Dialect`] matches.
     ///
     /// # Panics
     /// Panics if the index is out of bounds.
-    pub fn set_default_dialect_index(&mut self, index: usize) {
+    pub fn set_primary_dialect_index(&mut self, index: usize) {
         assert!(index < self.dialects.len());
         self.primary = index;
     }
@@ -320,23 +365,23 @@ impl<'d> Dialects<'d> {
     }
 
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect {
+    pub fn primary(&self) -> &Dialect<Key> {
         &self.dialects[self.primary]
     }
     /// Returns the index of the given [`Dialect`] in the list of [`Dialect`]s.
     #[must_use]
-    pub fn position(&self, dialect: &Dialect) -> Option<usize> {
+    pub fn position(&self, dialect: &Dialect<Key>) -> Option<usize> {
         self.dialects.iter().position(|d| d == dialect)
     }
 
     #[must_use]
-    pub fn get_by_index(&self, idx: usize) -> Option<&Dialect> {
+    pub fn get_by_index(&self, idx: usize) -> Option<&Dialect<Key>> {
         self.dialects.get(idx)
     }
 
     #[must_use]
     pub fn dialect_index_for(&self, schema: &Value) -> usize {
-        let default = self.default_dialect();
+        let default = self.primary_dialect();
         if default.is_pertinent_to(schema) {
             return self.primary;
         }
@@ -349,7 +394,7 @@ impl<'d> Dialects<'d> {
     }
 
     fn find_primary(
-        dialects: &[Dialect],
+        dialects: &[Dialect<Key>],
         lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<&AbsoluteUri>,
     ) -> Result<usize, DialectError> {
@@ -361,10 +406,13 @@ impl<'d> Dialects<'d> {
     }
 }
 
-impl<'d> IntoIterator for &'d Dialects<'d> {
-    type Item = &'d Dialect;
+impl<'d, Key> IntoIterator for &'d Dialects<'d, Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    type Item = &'d Dialect<Key>;
 
-    type IntoIter = std::slice::Iter<'d, Dialect>;
+    type IntoIter = std::slice::Iter<'d, Dialect<Key>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.dialects.iter()

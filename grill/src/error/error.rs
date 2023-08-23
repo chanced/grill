@@ -215,7 +215,7 @@ pub enum DialectError {
     /// Multiple [`Dialect`]s with the same
     /// [`AbsoluteUri`] id were provided.
     #[error("duplicate dialect id provided: {0}")]
-    Duplicate(Dialect),
+    Duplicate(DialectExistsError),
 
     /// A [`Dialect`] ID contained a non-empty fragment.
     #[error("dialect ids may not contain fragments; found: \"{0}\"")]
@@ -555,6 +555,10 @@ pub enum CompileError {
     #[error("failed to parse JSON Pointer from ")]
     LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
 
+    /// Failed to link sources
+    #[error("failed to create source link: {0}")]
+    LinkError(#[from] LinkError),
+
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
     Custom(#[from] Box<dyn StdError + Send + Sync>),
@@ -793,4 +797,10 @@ pub struct LocatedSchemaUriPointerError {
     #[source]
     pub source: MalformedPointerError,
     pub uri: AbsoluteUri,
+}
+
+#[derive(Debug, Clone, Error)]
+#[error("dialect already exists with id \"{id}\"")]
+pub struct DialectExistsError {
+    pub id: AbsoluteUri,
 }

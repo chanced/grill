@@ -1,5 +1,7 @@
-use super::{Deserializer, Deserializers, Link, Resolvers};
+use super::{Deserializers, Link, Resolvers};
 use crate::error::{DeserializationError, LinkConflictError, LinkError, SourceConflictError};
+use crate::schema::CompiledSchema;
+use crate::SchemaKey;
 use crate::{
     error::{DeserializeError, SourceError},
     schema::Metaschema,
@@ -8,19 +10,57 @@ use crate::{
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::collections::hash_map::{Entry, HashMap, VacantEntry};
-use std::default;
+use std::borrow::Cow;
+use std::collections::hash_map::{Entry, HashMap};
+use std::ops::Deref;
 
 new_key_type! {
     pub struct SourceKey;
 }
 
-pub(crate) enum Source {
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// A reference to a location within a source
+pub struct Source<'i> {
+    pub(crate) key: SourceKey,
+    pub uri: Cow<'i, AbsoluteUri>,
+    pub path: Cow<'i, Pointer>,
+    pub value: Cow<'i, Value>,
+}
+
+impl Source<'_> {
+    pub(crate) fn new<'i>(src: &'i Link, sources: &Sources) -> Source<'i> {
+        let value = sources.store.get(src.key).unwrap();
+        Source {
+            key: src.key,
+            uri: Cow::Borrowed(&src.uri),
+            path: Cow::Borrowed(&src.path),
+            value: Cow::Borrowed(value),
+        }
+    }
+    pub fn into_owned(&self) -> Source<'static> {
+        Source {
+            key: self.key,
+            uri: Cow::Owned(self.uri.into_owned()),
+            path: Cow::Owned(self.path.into_owned()),
+            value: Cow::Owned(self.value.into_owned()),
+        }
+    }
+}
+
+impl Deref for Source<'_> {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        self.value.as_ref()
+    }
+}
+
+pub(crate) enum SrcValue {
     String(AbsoluteUri, String),
     Value(AbsoluteUri, Value),
 }
 
-impl Source {
+impl SrcValue {
     pub(crate) fn deserialize_or_take_value(
         self,
         deserializers: &Deserializers,
@@ -49,7 +89,7 @@ impl Source {
     }
 }
 
-impl From<&Metaschema> for Source {
+impl From<&Metaschema> for SrcValue {
     fn from(value: &Metaschema) -> Self {
         Self::Value(value.id.clone(), value.schema.clone().into())
     }
@@ -71,7 +111,7 @@ impl Sources {
     /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
     pub(crate) fn new(
-        sources: Vec<Source>,
+        sources: Vec<SrcValue>,
         deserializers: &Deserializers,
     ) -> Result<Self, SourceError> {
         let mut store = SlotMap::with_capacity_and_key(sources.len());
@@ -103,18 +143,22 @@ impl Sources {
         from: AbsoluteUri,
         to: AbsoluteUri,
         path: Pointer,
-        key: SourceKey,
-    ) -> Result<Link, LinkError> {
+    ) -> Result<&Link, LinkError> {
+        let key = self
+            .index
+            .get(&to)
+            .ok_or_else(|| LinkError::NotFound(to.clone()))?
+            .key;
         let link = Link::new(key, to, path.clone());
         match self.index.entry(from.clone()) {
             Entry::Occupied(_) => self.check_existing_link(link),
             Entry::Vacant(_) => self.try_create_link(from, link),
         }
     }
-    fn check_existing_link(&mut self, link: Link) -> Result<Link, LinkError> {
+    fn check_existing_link(&mut self, link: Link) -> Result<&Link, LinkError> {
         let entry = self.index.get(&link.uri).unwrap();
         if &link == entry {
-            return Ok(entry.clone());
+            return Ok(entry);
         }
         Err(LinkConflictError {
             existing: entry.into(),
@@ -122,15 +166,14 @@ impl Sources {
         }
         .into())
     }
-
-    fn try_create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<Link, LinkError> {
+    fn try_create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         match self.index.entry(link.uri.clone()) {
             Entry::Occupied(root) => {
                 let root = root.get();
                 let root_src = self.store.get(root.key).unwrap();
                 let _ = root_src.resolve(&link.path)?;
                 let link = self.index.entry(from).or_insert(link);
-                Ok(link.clone())
+                Ok(link)
             }
             Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
         }
@@ -191,8 +234,12 @@ impl Sources {
         }
     }
 
+    pub fn get(&self, key: SourceKey) -> &Value {
+        self.store.get(key).unwrap()
+    }
+
     #[must_use]
-    pub fn get(&self, uri: &AbsoluteUri) -> Option<&Value> {
+    pub fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
         self.index
             .get(uri)
             .map(|link| self.store.get(link.key).unwrap())

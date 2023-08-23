@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    handler::{Handler, SyncHandler, Scope},
+    handler::{Handler, Scope, SyncHandler},
     output,
 };
 
@@ -21,40 +21,65 @@ impl ConstHandler {
     pub fn new() -> ConstHandler {
         Self::default()
     }
-    #[must_use]
-    pub fn into_handler(self) -> Handler {
-        Handler::Sync(Box::new(self))
-    }
 }
 
-impl SyncHandler for ConstHandler {
-    fn compile<'s>(
-        &mut self,
-        _compile: &mut crate::handler::Compile<'s>,
-        _schema: &'s serde_json::Value,
+impl<Key> SyncHandler<Key> for ConstHandler
+where
+    Key: 'static + slotmap::Key,
+{
+    fn compile<'i>(
+        &'i mut self,
+        compile: &mut crate::handler::Compile<'i, Key>,
+        schema: crate::Schema<'i, Key>,
     ) -> Result<bool, crate::error::CompileError> {
         todo!()
     }
 
-    fn evaluate<'v>(
-        &self,
-        _scope: &mut Scope,
-        _value: &'v serde_json::Value,
+    fn evaluate<'i, 'v>(
+        &'i self,
+        scope: &'i mut Scope,
+        value: &'v serde_json::Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()
     }
 }
-impl From<ConstHandler> for Handler {
-    fn from(value: ConstHandler) -> Self {
-        value.into_handler()
+impl<Key> From<ConstHandler> for Handler<Key>
+where
+    Key: 'static + slotmap::Key,
+{
+    fn from(h: ConstHandler) -> Self {
+        Handler::Sync(Box::new(h))
     }
 }
-impl From<&ConstHandler> for Handler {
-    fn from(value: &ConstHandler) -> Self {
-        value.clone().into_handler()
-    }
-}
+// impl SyncHandler for ConstHandler {
+//     fn compile<'s>(
+//         &mut self,
+//         _compile: &mut crate::handler::Compile<'s>,
+//         _schema: &'s serde_json::Value,
+//     ) -> Result<bool, crate::error::CompileError> {
+//         todo!()
+//     }
+
+//     fn evaluate<'v>(
+//         &self,
+//         _scope: &mut Scope,
+//         _value: &'v serde_json::Value,
+//         _structure: crate::Structure,
+//     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
+//         todo!()
+//     }
+// }
+// impl From<ConstHandler> for Handler {
+//     fn from(value: ConstHandler) -> Self {
+//         value.into_handler()
+//     }
+// }
+// impl From<&ConstHandler> for Handler {
+//     fn from(value: &ConstHandler) -> Self {
+//         value.clone().into_handler()
+//     }
+// }
 // impl SyncHandler for ConstHandler {
 //     fn compile<'s>(
 //         &mut self,
