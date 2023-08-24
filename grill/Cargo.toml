@@ -12,31 +12,32 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-async-trait      = { workspace = true }
-dyn-clone        = { workspace = true }
-either           = { workspace = true }
-erased-serde     = { workspace = true }
-fancy-regex      = { workspace = true }
-inherent         = { workspace = true }
-jsonptr          = { workspace = true }
-lazy_static      = { workspace = true }
-num              = { workspace = true }
-num-rational     = { workspace = true }
-once_cell        = { workspace = true }
-percent-encoding = { workspace = true }
-regex            = { workspace = true }
-reqwest          = { workspace = true, optional = true }
-serde            = { workspace = true }
-serde_json       = { workspace = true }
-serde_yaml       = { workspace = true, optional = true }
-slotmap          = { workspace = true }
-strum            = { workspace = true }
-strum_macros     = { workspace = true }
-tap              = { workspace = true }
-thiserror        = { workspace = true }
-toml             = { workspace = true, optional = true }
-url              = { workspace = true }
-urn              = { workspace = true }
+async-trait       = { workspace = true }
+dyn-clone         = { workspace = true }
+either            = { workspace = true }
+erased-serde      = { workspace = true }
+fancy-regex       = { workspace = true }
+inherent          = { workspace = true }
+jsonptr           = { workspace = true }
+lazy_static       = { workspace = true }
+num               = { workspace = true }
+num-rational      = { workspace = true }
+once_cell         = { workspace = true }
+percent-encoding  = { workspace = true }
+polonius-the-crab = { workspace = true }
+regex             = { workspace = true }
+reqwest           = { workspace = true, optional = true }
+serde             = { workspace = true }
+serde_json        = { workspace = true }
+serde_yaml        = { workspace = true, optional = true }
+slotmap           = { workspace = true }
+strum             = { workspace = true }
+strum_macros      = { workspace = true }
+tap               = { workspace = true }
+thiserror         = { workspace = true }
+toml              = { workspace = true, optional = true }
+url               = { workspace = true }
+urn               = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.4" }

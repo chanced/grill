@@ -7,6 +7,7 @@ use crate::{
     schema::Metaschema,
     uri::AbsoluteUri,
 };
+use ::polonius_the_crab::prelude::*;
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -116,7 +117,6 @@ impl Store {
             return Err(SourceConflictError {
                 uri: uri.clone(),
                 existing_source: existing_src.clone().into(),
-                new_source: src.clone().into(),
             }
             .into());
         }
@@ -149,8 +149,10 @@ impl Store {
         }
     }
 
-    fn insert_link(&mut self, key: SourceKey, uri: AbsoluteUri, path: Pointer) {
-        self.index.insert(uri.clone(), Link::new(key, uri, path));
+    fn insert_link(&mut self, key: SourceKey, uri: AbsoluteUri, path: Pointer) -> &mut Link {
+        self.index
+            .entry(uri.clone())
+            .or_insert(Link::new(key, uri, path))
     }
 
     fn get(&self, key: SourceKey) -> &Value {
@@ -296,35 +298,46 @@ impl Sources {
         Ok((link, src))
     }
 
-    pub(crate) async fn resolve_remote<'i, 'u>(
+    pub(crate) async fn resolve_remote<'i, 'r, 'd, 'u>(
         &'i mut self,
         uri: &'u AbsoluteUri,
-        resolvers: &'i Resolvers,
-        deserializers: &'i Deserializers,
+        resolvers: &'r Resolvers,
+        deserializers: &'d Deserializers,
     ) -> Result<(&'i Link, &'i Value), SourceError> {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let resolved = resolvers.resolve(&base_uri).await?;
-        let store = self.store_mut();
-        let (key, src) = {
-            let src = deserializers
-                .deserialize(&resolved)
-                .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
-            let (_, link, src) = store.insert(base_uri.clone(), src)?;
-            if fragment.trim().is_empty() {
-                return Ok((link, src));
-            }
-            let key = link.key;
-            let src = src.clone();
-            (key, src)
-        };
+        let mut store = self.store_mut();
+        let src = deserializers
+            .deserialize(&resolved)
+            .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
 
-        if fragment.starts_with('/') {
-            let ptr = Pointer::parse(&fragment).map_err(|e| PointerError::from(e))?;
-            let src = src.resolve(&ptr).map_err(|e| PointerError::from(e))?;
-            store.insert_link(key, uri.clone(), ptr);
-        }
-        todo!()
+        polonius!(
+            |store| -> Result<(&'polonius Link, &'polonius Value), SourceError> {
+                let res = store.insert(base_uri.clone(), src);
+                if res.is_err() {
+                    let err = res.unwrap_err();
+                    polonius_return!(Err(err));
+                }
+                let (key, link, src) = res.unwrap();
+                if fragment.trim().is_empty() {
+                    polonius_return!(Ok((link, src)));
+                }
+                if fragment.starts_with('/') {
+                    let ptr = match Pointer::parse(&fragment).map_err(|e| PointerError::from(e)) {
+                        Ok(ptr) => ptr,
+                        Err(err) => polonius_return!(Err(err.into())),
+                    };
+                    let src = match src.resolve(&ptr).map_err(|e| PointerError::from(e)) {
+                        Ok(src) => src,
+                        Err(err) => polonius_return!(Err(err.into())),
+                    };
+                    let link = store.insert_link(key, uri.clone(), ptr);
+                    polonius_return!(Ok((link, src)))
+                }
+                polonius_return!(Ok((&link, &src)))
+            }
+        )
     }
 
     pub(crate) async fn resolve<'i, 'u>(
@@ -372,6 +385,7 @@ impl Sources {
 
     #[must_use]
     pub fn contains(&self, uri: &AbsoluteUri) -> bool {
-        self.index.contains_key(uri)
+        // self.index.contains_key(uri)
+        todo!()
     }
 }

@@ -171,8 +171,6 @@ pub struct SourceConflictError {
     pub uri: AbsoluteUri,
     /// The existing source value
     pub existing_source: Box<Value>,
-    /// The value attempted to be set
-    pub new_source: Box<Value>,
 }
 
 impl From<ResolveError> for SourceError {
