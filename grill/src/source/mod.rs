@@ -1,6 +1,6 @@
 mod source;
 pub use source::Source;
-pub(crate) use source::{SourceKey, Sources, SrcValue};
+pub(crate) use source::{SourceKey, Sources, Src};
 
 mod deserialize;
 #[cfg(feature = "toml")]

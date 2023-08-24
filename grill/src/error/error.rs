@@ -160,7 +160,7 @@ pub enum SourceError {
     UnexpectedUriFragment(AbsoluteUri),
 
     #[error("failed to locate json pointer path:\n{0}")]
-    ResolvePointerFailed(#[from] jsonptr::Error),
+    PointerFailedToParseOrResolve(#[from] PointerError),
 }
 
 /// Multiple sources with the same URI were provided.
@@ -169,8 +169,10 @@ pub enum SourceError {
 pub struct SourceConflictError {
     /// The URI of the duplicate source.
     pub uri: AbsoluteUri,
-    /// The value of the duplicate source.
-    pub value: Box<Value>,
+    /// The existing source value
+    pub existing_source: Box<Value>,
+    /// The value attempted to be set
+    pub new_source: Box<Value>,
 }
 
 impl From<ResolveError> for SourceError {

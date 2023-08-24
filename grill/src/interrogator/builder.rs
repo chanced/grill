@@ -6,15 +6,15 @@ use crate::{
     error::{BuildError, SourceError, UriError},
     json_schema,
     schema::{Dialect, Dialects, Schemas},
-    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources},
+    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, SrcValue,
+    AbsoluteUri, Interrogator,
 };
 
 /// Constructs an [`Interrogator`].
 pub struct Builder {
     dialects: Vec<Dialect>,
-    sources: Vec<SrcValue>,
+    sources: Vec<Src>,
     primary_dialect: Option<AbsoluteUri>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
@@ -84,7 +84,7 @@ impl Builder {
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
     ) -> Result<Self, SourceError> {
-        self.sources.push(SrcValue::String(
+        self.sources.push(Src::String(
             uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
         ));
@@ -108,7 +108,7 @@ impl Builder {
         uri: impl TryIntoAbsoluteUri,
         source: &str,
     ) -> Result<Self, UriError> {
-        self.sources.push(SrcValue::String(
+        self.sources.push(Src::String(
             uri.try_into_absolute_uri()?,
             source.to_string(),
         ));
@@ -135,7 +135,7 @@ impl Builder {
         uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
     ) -> Result<Self, UriError> {
-        self.sources.push(SrcValue::Value(
+        self.sources.push(Src::Value(
             uri.try_into_absolute_uri()?,
             source.borrow().clone(),
         ));
@@ -167,7 +167,7 @@ impl Builder {
     {
         for (k, v) in sources {
             self.sources
-                .push(SrcValue::String(k.try_into_absolute_uri()?, v.to_string()));
+                .push(Src::String(k.try_into_absolute_uri()?, v.to_string()));
         }
         Ok(self)
     }
@@ -198,7 +198,7 @@ impl Builder {
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.sources.push(SrcValue::String(
+            self.sources.push(Src::String(
                 k.try_into_absolute_uri()?,
                 String::from_utf8(v.as_ref().to_vec())?,
             ));
@@ -234,10 +234,8 @@ impl Builder {
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.sources.push(SrcValue::Value(
-                k.try_into_absolute_uri()?,
-                v.borrow().clone(),
-            ));
+            self.sources
+                .push(Src::Value(k.try_into_absolute_uri()?, v.borrow().clone()));
         }
         Ok(self)
     }

@@ -527,7 +527,9 @@ mod tests {
         let mut root_keys = vec![];
         // builds subschemas
         for r in 'a'..='d' {
-            let root_key = schemas.insert(create_schema(&r.to_string(), &mut sources)).unwrap();
+            let root_key = schemas
+                .insert(create_schema(&r.to_string(), &mut sources))
+                .unwrap();
             root_keys.push(root_key);
             for n in 'a'..='d' {
                 let id = format!("{r}/subschema_{n}");
@@ -637,7 +639,7 @@ mod tests {
                 }
             }
         }
-        schemas.accept_txn();
+        schemas.commit_txn();
 
         (root_keys, schemas, sources)
     }

@@ -26,8 +26,6 @@
 mod interrogator;
 pub use interrogator::{Interrogator, Builder};
 
-pub use slotmap::new_key_type;
-
 pub mod error;
 
 pub mod output;
@@ -56,7 +54,7 @@ pub type Array = Vec<serde_json::Value>;
 
 
 pub mod source;
-pub(crate) use source::SrcValue;
+pub(crate) use source::Src;
 
 
 #[cfg(test)]

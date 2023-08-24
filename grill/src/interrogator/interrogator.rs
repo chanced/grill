@@ -15,7 +15,7 @@ use crate::{
         },
         Dialect, Dialects, Key, Keyword, Schema, Schemas,
     },
-    source::{Deserializers, Resolvers, Sources, SrcValue},
+    source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Builder,
 };
@@ -246,7 +246,7 @@ impl Interrogator {
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
     {
-        self.schemas.start_txn();
+        self.start_txn();
         let mut keys = Vec::new();
         for uri in uris {
             // let schema = self
@@ -255,7 +255,7 @@ impl Interrogator {
             //     .tap_err(|_| self.schemas.rollback_txn())?;
             // keys.push(schema);
         }
-        self.schemas.accept_txn();
+        self.commit_txn();
         Ok(keys
             .into_iter()
             .map(|key| self.schemas.get(key, &self.sources).unwrap().into_owned())
@@ -273,15 +273,15 @@ impl Interrogator {
     ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     #[allow(clippy::unused_async)]
     pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
-        self.schemas.start_txn();
+        self.start_txn();
         // convert the uri to an absolute uri
         let uri = uri.try_into_absolute_uri()?;
         // resolving the uri provided.
         // let (ptr, value) = self.resolve(&uri).await?;
         // self.compile_schema(uri, &value)
         //     .await
-        //     .tap_ok(|_| self.schemas.accept_txn())
-        //     .tap_err(|_| self.schemas.rollback_txn());
+        //     .tap_ok(|_| self.accept_txn())
+        //     .tap_err(|_| self.rollback_txn());
         todo!()
     }
 
@@ -361,14 +361,14 @@ impl Interrogator {
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
     ) -> Result<&Value, SourceError> {
-        let source = SrcValue::String(
+        let source = Src::String(
             uri.try_into_absolute_uri()?,
             String::from_utf8(source.to_vec())?,
         );
 
         self.source(source)
     }
-    fn source(&mut self, source: SrcValue) -> Result<&Value, SourceError> {
+    fn source(&mut self, source: Src) -> Result<&Value, SourceError> {
         // self.sources.insert(source, &self.deserializers)
         todo!()
     }
@@ -387,7 +387,7 @@ impl Interrogator {
         uri: impl TryIntoAbsoluteUri,
         source: &str,
     ) -> Result<&Value, SourceError> {
-        self.source(SrcValue::String(
+        self.source(Src::String(
             uri.try_into_absolute_uri()?,
             source.to_string(),
         ))
@@ -412,7 +412,7 @@ impl Interrogator {
         uri: impl TryIntoAbsoluteUri,
         source: impl Borrow<Value>,
     ) -> Result<&Value, SourceError> {
-        self.source(SrcValue::Value(
+        self.source(Src::Value(
             uri.try_into_absolute_uri()?,
             source.borrow().clone(),
         ))
@@ -442,7 +442,7 @@ impl Interrogator {
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(SrcValue::String(k.try_into_absolute_uri()?, v.to_string()))?;
+            self.source(Src::String(k.try_into_absolute_uri()?, v.to_string()))?;
         }
         Ok(())
     }
@@ -472,7 +472,7 @@ impl Interrogator {
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(SrcValue::String(
+            self.source(Src::String(
                 k.try_into_absolute_uri()?,
                 String::from_utf8(v.as_ref().to_vec())?,
             ))?;
@@ -507,10 +507,7 @@ impl Interrogator {
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.source(SrcValue::Value(
-                k.try_into_absolute_uri()?,
-                v.borrow().clone(),
-            ))?;
+            self.source(Src::Value(k.try_into_absolute_uri()?, v.borrow().clone()))?;
         }
         Ok(())
     }
@@ -567,6 +564,23 @@ impl Interrogator {
             .json_schema_04()
             .default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
             .unwrap()
+    }
+    /// Starts a new transaction.
+    fn start_txn(&mut self) {
+        self.schemas.start_txn();
+        self.sources.start_txn();
+    }
+
+    /// Acccepts the current transaction, committing all changes.
+    fn commit_txn(&mut self) {
+        self.schemas.commit_txn();
+        self.sources.commit_txn();
+    }
+
+    /// Rejects the current transaction, discarding all changes.
+    pub(crate) fn rollback_txn(&mut self) {
+        self.schemas.rollback_txn();
+        self.sources.rollback_txn();
     }
 }
 

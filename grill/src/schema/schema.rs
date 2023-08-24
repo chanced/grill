@@ -155,33 +155,73 @@ impl<'i> PartialEq for Schema<'i> {
         self.id == other.id && self.metaschema == other.metaschema
     }
 }
-
 impl<'i> Eq for Schema<'i> {}
 
-#[derive(Clone, Debug)]
-pub(crate) struct Schemas {
-    pub(crate) store: SlotMap<Key, CompiledSchema>,
-    keys: HashMap<AbsoluteUri, Key>,
-    sandbox: Option<Box<Sandbox>>,
+#[derive(Debug, Clone, Default)]
+struct Store {
+    table: SlotMap<Key, CompiledSchema>,
+    index: HashMap<AbsoluteUri, Key>,
 }
 
-pub(crate) struct Params<'i> {
-    base_uri: AbsoluteUri,
-    path: &'i Pointer,
-    src: Link,
-    parent: Option<Key>,
-    sources: &'i mut Sources,
-    dialects: &'i Dialects<'i>,
-    deserializers: &'i Deserializers,
-    resolvers: &'i Resolvers,
+#[allow(clippy::unnecessary_box_returns)]
+impl Store {
+    fn new(store: SlotMap<Key, CompiledSchema>, keys: HashMap<AbsoluteUri, Key>) -> Box<Self> {
+        Box::new(Self {
+            table: store,
+            index: keys,
+        })
+    }
+    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
+        self.table.get_mut(key)
+    }
+    fn iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
+        self.table.iter()
+    }
+    fn get(&self, key: Key) -> Option<&CompiledSchema> {
+        self.table.get(key)
+    }
+
+    fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
+        self.index.get(id).copied()
+    }
+
+    fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+        self.index.entry(id)
+    }
+
+    fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+        let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
+        if let Some(key) = self.index.get(id) {
+            let existing = self.table.get(*key).unwrap();
+            if existing != &schema {
+                return Err(id.clone());
+            }
+            return Ok(*key);
+        }
+        let uris = schema.uris.clone();
+        let key = self.table.insert(schema);
+        for uri in uris {
+            self.index.insert(uri, key);
+        }
+        Ok(key)
+    }
+
+    fn contains_key(&self, key: Key) -> bool {
+        self.table.contains_key(key)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Schemas {
+    store: Store,
+    sandbox: Option<Store>,
 }
 
 impl Schemas {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            store: SlotMap::default(),
-            keys: HashMap::default(),
+            store: Store::default(),
             sandbox: None,
         }
     }
@@ -197,7 +237,7 @@ impl Schemas {
             deserializers,
             resolvers,
         } = params;
-        let source = sources.store.get(src.key).unwrap().clone();
+        let source = sources.get(src.key).clone();
         // determining the dialect
         let dialect = dialects.pertinent_to_or_default(&source);
 
@@ -209,8 +249,7 @@ impl Schemas {
         let lookup_id = id.as_ref().unwrap_or(&uris[0]);
 
         // checking to see if the schema has already been compiled under the id
-
-        if let Entry::Occupied(key) = self.keys.entry(lookup_id.clone()) {
+        if let Entry::Occupied(key) = self.index_entry(lookup_id.clone()) {
             return Ok(*key.get());
         }
 
@@ -225,12 +264,19 @@ impl Schemas {
         {
             parent = self.locate_parent(lookup_id.clone())?;
         }
+
+        // linking all URIs of this schema to the the source location
+        for uri in &uris {
+            sources.link(uri.clone(), src.uri.clone(), src.path.clone())?;
+        }
+        let base_uri = id.clone().unwrap_or(base_uri);
+
         // create a new CompiledSchema and insert it. if compiling fails, the
         // schema store will rollback to its previous state.
         let key = self
             .insert(CompiledSchema {
-                id: id.clone(),
-                uris: uris.clone(),
+                id,
+                uris,
                 metaschema: dialect.primary_metaschema_id().clone(),
                 handlers: dialect.handlers.clone().into_boxed_slice(),
                 parent,
@@ -243,15 +289,9 @@ impl Schemas {
             .map_err(|uri| {
                 SourceError::from(SourceConflictError {
                     uri,
-                    value: source.clone().into(),
+                    existing_source: source.clone().into(),
                 })
             })?;
-
-        // linking all URIs of this schema to the the source location
-        let base_uri = id.unwrap_or(base_uri);
-        for uri in uris {
-            sources.link(uri, src.uri.clone(), src.path.clone())?;
-        }
 
         // gather references
         for Reference {
@@ -264,7 +304,6 @@ impl Schemas {
         {
             let mut base_uri = uri.clone();
             let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
-
             let (_, src) = sources.resolve(&uri, resolvers, deserializers).await?;
             // let ref_key = self.compile(base_uri).await?;
         }
@@ -295,19 +334,33 @@ impl Schemas {
 
         todo!()
     }
-
-    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+    fn sandbox(&mut self) -> &mut Store {
         self.sandbox
-            .as_deref_mut()
-            .expect("sandbox not present")
-            .insert(schema)
+            .as_mut()
+            .expect("transaction failed: schema sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new")
+    }
+
+    fn store_mut(&mut self) -> &mut Store {
+        self.sandbox()
+    }
+
+    fn store(&self) -> &Store {
+        if let Some(sandbox) = self.sandbox.as_ref() {
+            return sandbox;
+        }
+        &self.store
+    }
+    fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
+        self.store().get_index(id)
+    }
+    fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+        self.store_mut().index_entry(id)
+    }
+    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+        self.sandbox().insert(schema)
     }
     pub(crate) fn compiled_iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
-        if let Some(sandbox) = self.sandbox.as_ref() {
-            sandbox.store.iter()
-        } else {
-            self.store.iter()
-        }
+        self.store().iter()
     }
     pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i> {
         Ancestors::new(key, self, sources)
@@ -354,12 +407,7 @@ impl Schemas {
         key: Key,
         sources: &'i Sources,
     ) -> Result<Schema<'i>, UnknownKeyError> {
-        let schema = if let Some(sandbox) = self.sandbox.as_ref() {
-            sandbox.get(key)
-        } else {
-            self.store.get(key)
-        }
-        .ok_or(UnknownKeyError)?;
+        let schema = self.store().get(key).ok_or(UnknownKeyError)?;
 
         Ok(Schema {
             key,
@@ -397,13 +445,19 @@ impl Schemas {
         Ok(None)
     }
 
+    /// Returns a mutable reference to the [`CompiledSchema`] with the given `Key` if it exists.
+    ///
+    /// # Panics
+    /// Panics if a transaction has not been started.
     pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
-        if let Some(sandbox) = self.sandbox.as_mut() {
-            sandbox.get_mut(key)
-        } else {
-            self.store.get_mut(key)
-        }
+        self.sandbox().get_mut(key)
     }
+    /// Returns a mutable reference to the [`CompiledSchema`] with the given `Key`.
+    ///
+    /// # Panics
+    /// Panics if:
+    /// - a transaction has not been started.
+    /// - the `Key` does not exist.
     pub(crate) fn get_mut_unchecked(&mut self, key: Key) -> &mut CompiledSchema {
         self.get_mut(key).unwrap()
     }
@@ -414,13 +468,13 @@ impl Schemas {
         uri: &AbsoluteUri,
         sources: &'i Sources,
     ) -> Option<Schema<'i>> {
-        let key = self.keys.get(uri).copied()?;
+        let key = self.store.index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
 
     #[must_use]
     pub(crate) fn get_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
-        self.keys.get(id).copied()
+        self.get_index(id)
     }
 
     pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> bool {
@@ -428,49 +482,16 @@ impl Schemas {
         todo!()
     }
 
-    // pub(crate) fn transitive_dependencies(of: Key) -> Iter
-
-    fn keys(&self) -> &HashMap<AbsoluteUri, Key> {
-        if let Some(sandbox) = self.sandbox.as_deref() {
-            return &sandbox.keys;
-        }
-        &self.keys
-    }
-
-    fn keys_mut(&mut self) -> &mut HashMap<AbsoluteUri, Key> {
-        &mut self
-            .sandbox
-            .as_deref_mut()
-            .expect("transaction not started")
-            .keys
-    }
-
-    fn schemas(&self) -> &SlotMap<Key, CompiledSchema> {
-        if let Some(sandbox) = self.sandbox.as_deref() {
-            return &sandbox.store;
-        }
-        &self.store
-    }
-
-    fn schemas_mut(&mut self) -> &mut SlotMap<Key, CompiledSchema> {
-        &mut self
-            .sandbox
-            .as_deref_mut()
-            .expect("transaction not started")
-            .store
-    }
-
     /// Starts a new transaction.
     pub(crate) fn start_txn(&mut self) {
-        assert!(self.sandbox.is_none(), "sandbox already exists\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new");
-        self.sandbox = Sandbox::new(&self.store, &self.keys).into();
+        assert!(self.sandbox.is_none(), "schema sandbox already exists\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new");
+        self.sandbox = Some(self.store.clone());
     }
 
     /// Accepts the current transaction, committing all changes.
-    pub(crate) fn accept_txn(&mut self) {
+    pub(crate) fn commit_txn(&mut self) {
         let sandbox = self.sandbox.take().expect("sandbox should be present");
-        self.keys = sandbox.keys;
-        self.store = sandbox.store;
+        self.store = sandbox;
     }
 
     /// Rejects the current transaction, discarding all changes.
@@ -482,50 +503,16 @@ impl Schemas {
         self.store.contains_key(key)
     }
 }
-impl Default for Schemas {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
-#[derive(Debug, Clone, Default)]
-struct Sandbox {
-    store: SlotMap<Key, CompiledSchema>,
-    keys: HashMap<AbsoluteUri, Key>,
-}
-
-#[allow(clippy::unnecessary_box_returns)]
-impl Sandbox {
-    fn new(schemas: &SlotMap<Key, CompiledSchema>, keys: &HashMap<AbsoluteUri, Key>) -> Box<Self> {
-        Box::new(Self {
-            store: schemas.clone(),
-            keys: keys.clone(),
-        })
-    }
-    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
-        self.store.get_mut(key)
-    }
-
-    fn get(&self, key: Key) -> Option<&CompiledSchema> {
-        self.store.get(key)
-    }
-
-    fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
-        let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
-        if let Some(key) = self.keys.get(id) {
-            let existing = self.store.get(*key).unwrap();
-            if existing != &schema {
-                return Err(id.clone());
-            }
-            return Ok(*key);
-        }
-        let uris = schema.uris.clone();
-        let key = self.store.insert(schema);
-        for uri in uris {
-            self.keys.insert(uri, key);
-        }
-        Ok(key)
-    }
+pub(crate) struct Params<'i> {
+    base_uri: AbsoluteUri,
+    path: &'i Pointer,
+    src: Link,
+    parent: Option<Key>,
+    sources: &'i mut Sources,
+    dialects: &'i Dialects<'i>,
+    deserializers: &'i Deserializers,
+    resolvers: &'i Resolvers,
 }
 
 #[cfg(test)]

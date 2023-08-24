@@ -9,7 +9,7 @@ use crate::Key;
 use crate::{
     error::{DialectError, IdentifyError},
     uri::AbsoluteUri,
-    Object, SrcValue,
+    Object, Src,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -285,11 +285,11 @@ impl<'d> Dialects<'d> {
     }
 
     #[must_use]
-    pub fn sources(&self) -> Vec<SrcValue> {
+    pub fn sources(&self) -> Vec<Src> {
         let mut result = Vec::with_capacity(self.dialects.len());
         for dialect in self.dialects.iter() {
             for metaschema in &dialect.metaschemas {
-                result.push(SrcValue::Value(
+                result.push(Src::Value(
                     metaschema.0.clone(),
                     metaschema.1.clone().into(),
                 ));
