@@ -175,12 +175,13 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
         schema: &'v Value,
         structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
-
+    #[allow(unused_variables)]
     fn subschemas(&self, path: &Pointer, schema: &Value) -> Vec<Pointer> {
         Vec::new()
     }
 
     /// Returns a list of [`Anchor`]s which are handled by this `Handler`
+    #[allow(unused_variables)]
     fn anchors(&self, schema: &Value) -> Result<Vec<Anchor>, AnchorError> {
         Ok(Vec::new())
     }

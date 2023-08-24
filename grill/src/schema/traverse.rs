@@ -349,10 +349,6 @@ fn direct_dependents(schema: Schema<'_>) -> IntoIter<Key> {
     schema.dependents.into_owned().into_iter()
 }
 
-fn x(mut i: Deps) {
-    let next = i.next();
-}
-
 type Slices<'i> = DepthFirst<'i, IntoKeyIter, fn(Schema<'i>) -> IntoKeyIter>;
 
 type Instances<'i> =
@@ -364,7 +360,7 @@ mod tests {
 
     use crate::{
         schema::{CompiledSchema, Keyword, Reference},
-        source::{deserialize_json, Deserializers, Link, SourceKey},
+        source::{deserialize_json, Deserializers, SourceKey},
         AbsoluteUri, Key,
     };
     use jsonptr::Pointer;
@@ -660,7 +656,7 @@ mod tests {
     }
     fn create_schema(uri: impl ToString, sources: &mut Sources) -> CompiledSchema {
         let uri: AbsoluteUri = create_test_uri(uri);
-        let (key, _) = sources
+        let (_, link, _) = sources
             .insert_value(uri.clone(), json!({"$id": uri.clone()}))
             .unwrap();
         let metaschema = metaschema();
@@ -674,11 +670,7 @@ mod tests {
             metaschema,
             subschemas: vec![],
             uris: vec![uri.clone()],
-            src: Link {
-                key,
-                uri,
-                path: Pointer::default(),
-            },
+            src: link,
         }
     }
 }

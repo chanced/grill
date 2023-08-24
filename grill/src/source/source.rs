@@ -106,46 +106,64 @@ struct Store {
 }
 impl Store {
     fn check_and_get_occupied(
-        &mut self,
+        &self,
         uri: AbsoluteUri,
         src: Value,
-        entry: OccupiedEntry<'_, AbsoluteUri, Link>,
-    ) -> Result<(SourceKey, &Link, &Value), SourceError> {
-        let key = entry.get().key;
-        let existing_src = self.table.get(key).unwrap();
-        if &src != existing_src {
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        let key = self.index.get(&uri).unwrap().key;
+        let existing_src = self.table.get(key).unwrap().clone();
+        if src != existing_src {
             return Err(SourceConflictError {
                 uri: uri.clone(),
                 existing_source: existing_src.clone().into(),
             }
             .into());
         }
-        Ok((key, entry.get(), existing_src))
+        let link = self.index.get(&uri).unwrap().clone();
+        Ok((key, link, existing_src))
     }
     fn insert_vacant(
         &mut self,
         uri: AbsoluteUri,
         src: Value,
-        mut entry: VacantEntry<'_, AbsoluteUri, Link>,
-    ) -> (SourceKey, &Link, &Value) {
-        let key = self.table.insert(src);
-        let mut src = self.table.get(key).unwrap();
-        let link = entry.insert(Link::new(key, uri.clone(), Pointer::default()));
-        (key, link, src)
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        let table = &mut self.table;
+        let index = &mut self.index;
+        let mut base_uri = uri.clone();
+        let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+        let key = table.insert(src);
+        let src = table.get(key).unwrap().clone();
+        index.insert(
+            base_uri.clone(),
+            Link::new(key, base_uri.clone(), Pointer::default()),
+        );
+        let link = index.get(&base_uri).unwrap().clone();
+        if fragment.trim().is_empty() {
+            return Ok((key, link, src));
+        }
+
+        if fragment.starts_with('/') {
+            let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
+            index.insert(uri.clone(), Link::new(key, uri.clone(), ptr.clone()));
+            let key = index.get(&uri).unwrap().key;
+            let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
+            return Ok((key, link, src));
+        }
+        Ok((key, link, src))
     }
 
     fn insert(
         &mut self,
         uri: AbsoluteUri,
         src: Value,
-    ) -> Result<(SourceKey, &Link, &Value), SourceError> {
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
         let fragment = uri.fragment().unwrap_or_default();
-        if !fragment.is_empty() {
+        if !fragment.trim().is_empty() {
             return Err(SourceError::UnexpectedUriFragment(uri.clone()));
         }
         match self.index.entry(uri.clone()) {
-            Entry::Occupied(entry) => self.check_and_get_occupied(uri, src, entry),
-            Entry::Vacant(entry) => Ok(self.insert_vacant(uri, src, entry)),
+            Entry::Occupied(_) => self.check_and_get_occupied(uri, src),
+            Entry::Vacant(_) => self.insert_vacant(uri, src),
         }
     }
 
@@ -275,8 +293,8 @@ impl Sources {
 
     fn try_create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(link.uri.clone()) {
-            Entry::Occupied(root) => {
-                let root = root.get();
+            Entry::Occupied(_) => {
+                let root = self.store().get_link(&link.uri).unwrap();
                 let root_src = self.store().get(root.key);
                 let _ = root_src.resolve(&link.path)?;
                 let link = self.store_mut().link_entry(from).or_insert(link);
@@ -289,71 +307,63 @@ impl Sources {
         self.store().get_link(uri)
     }
 
-    pub(crate) fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
-        let link = self.get_link(uri).unwrap();
-        let mut src = self.store().get(link.key);
+    async fn resolve_remote(
+        &mut self,
+        uri: &AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(Link, Value), SourceError> {
+        let mut base_uri = uri.clone();
+        let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+        let resolved = resolvers.resolve(&base_uri).await?;
+        let src = deserializers
+            .deserialize(&resolved)
+            .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
+        let (key, link, src) = self.store_mut().insert_vacant(uri.clone(), src)?;
+        if fragment.trim().is_empty() {
+            return Ok((link, src));
+        }
+        if fragment.starts_with('/') {
+            let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
+            let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
+            let link = self.store_mut().insert_link(key, uri.clone(), ptr).clone();
+            return Ok((link, src));
+        }
+        Ok((link, src))
+    }
+    fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(Link, Value), SourceError> {
+        let link = self.store().get_link(uri).unwrap().clone();
+        let mut src = self.store().get(link.key).clone();
         if !link.path.is_empty() {
-            src = src.resolve(&link.path).map_err(|e| PointerError::from(e))?;
+            src = src.resolve(&link.path).map_err(PointerError::from)?.clone();
         }
         Ok((link, src))
     }
 
-    pub(crate) async fn resolve_remote<'i, 'r, 'd, 'u>(
-        &'i mut self,
-        uri: &'u AbsoluteUri,
-        resolvers: &'r Resolvers,
-        deserializers: &'d Deserializers,
-    ) -> Result<(&'i Link, &'i Value), SourceError> {
-        let mut base_uri = uri.clone();
-        let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
-        let resolved = resolvers.resolve(&base_uri).await?;
-        let mut store = self.store_mut();
-        let src = deserializers
-            .deserialize(&resolved)
-            .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
+    // pub(crate) async fn resolve_remote<'i, 'r, 'd, 'u>(
+    //     &'i mut self,
+    //     entry: VacantEntry<'_, AbsoluteUri, Link>,
+    //     uri: &'u AbsoluteUri,
+    //     resolvers: &'r Resolvers,
+    //     deserializers: &'d Deserializers,
+    // ) -> Result<(&'i Link, &'i Value), SourceError> {
+    // }
 
-        polonius!(
-            |store| -> Result<(&'polonius Link, &'polonius Value), SourceError> {
-                let res = store.insert(base_uri.clone(), src);
-                if res.is_err() {
-                    let err = res.unwrap_err();
-                    polonius_return!(Err(err));
-                }
-                let (key, link, src) = res.unwrap();
-                if fragment.trim().is_empty() {
-                    polonius_return!(Ok((link, src)));
-                }
-                if fragment.starts_with('/') {
-                    let ptr = match Pointer::parse(&fragment).map_err(|e| PointerError::from(e)) {
-                        Ok(ptr) => ptr,
-                        Err(err) => polonius_return!(Err(err.into())),
-                    };
-                    let src = match src.resolve(&ptr).map_err(|e| PointerError::from(e)) {
-                        Ok(src) => src,
-                        Err(err) => polonius_return!(Err(err.into())),
-                    };
-                    let link = store.insert_link(key, uri.clone(), ptr);
-                    polonius_return!(Ok((link, src)))
-                }
-                polonius_return!(Ok((&link, &src)))
-            }
-        )
-    }
-
-    pub(crate) async fn resolve<'i, 'u>(
-        &'i mut self,
-        uri: &'u AbsoluteUri,
-        resolvers: &'i Resolvers,
-        deserializers: &'i Deserializers,
-    ) -> Result<(&'i Link, &'i Value), SourceError> {
+    pub(crate) async fn resolve(
+        &mut self,
+        uri: &AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(Link, Value), SourceError> {
         // if the value has already been indexed, return it
-        match self.store_mut().link_entry(uri.clone()) {
+        let entry = self.store_mut().link_entry(uri.clone());
+        match entry {
             Entry::Occupied(_) => self.resolve_local(uri),
             Entry::Vacant(_) => self.resolve_remote(uri, resolvers, deserializers).await,
         }
     }
 
-    pub fn get(&mut self, key: SourceKey) -> &Value {
+    pub fn get(&self, key: SourceKey) -> &Value {
         self.store.get(key)
     }
 
@@ -366,9 +376,8 @@ impl Sources {
         &mut self,
         uri: AbsoluteUri,
         src: Value,
-    ) -> Result<(SourceKey, &Value), SourceError> {
-        let (key, link, value) = self.store_mut().insert(uri, src)?;
-        Ok((key, value))
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        self.store_mut().insert(uri, src)
     }
 
     pub(crate) fn insert_string(
@@ -376,7 +385,7 @@ impl Sources {
         uri: AbsoluteUri,
         source: String,
         deserializers: &Deserializers,
-    ) -> Result<(SourceKey, &Value), SourceError> {
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
         let src = deserializers
             .deserialize(&source)
             .map_err(|e| DeserializationError::new(uri.clone(), e))?;
