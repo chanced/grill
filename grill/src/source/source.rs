@@ -7,7 +7,7 @@ use crate::{
     schema::Metaschema,
     uri::AbsoluteUri,
 };
-use ::polonius_the_crab::prelude::*;
+
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -196,7 +196,7 @@ impl Store {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Sources {
     store: Store,
     sandbox: Option<Store>,
@@ -309,7 +309,7 @@ impl Sources {
 
     async fn resolve_remote(
         &mut self,
-        uri: &AbsoluteUri,
+        uri: AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
@@ -336,7 +336,7 @@ impl Sources {
                 .get(link.key)
                 .resolve(&ptr)
                 .map_err(PointerError::from)?;
-            let link = self.store().get_link(uri).unwrap();
+            let link = self.store().get_link(&uri).unwrap();
             return Ok((link, src));
         }
         let link = self.store().get_link(&base_uri).unwrap();
@@ -344,8 +344,8 @@ impl Sources {
         Ok((link, src))
     }
 
-    fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
-        let link = self.store().get_link(uri).unwrap();
+    fn resolve_local(&self, uri: AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+        let link = self.store().get_link(&uri).unwrap();
         let mut src = self.store().get(link.key);
         if !link.path.is_empty() {
             src = src.resolve(&link.path).map_err(PointerError::from)?;
@@ -364,7 +364,7 @@ impl Sources {
 
     pub(crate) async fn resolve(
         &mut self,
-        uri: &AbsoluteUri,
+        uri: AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
@@ -409,5 +409,80 @@ impl Sources {
     pub fn contains(&self, uri: &AbsoluteUri) -> bool {
         // self.index.contains_key(uri)
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::source::resolve::MockResolver;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_resolve() {
+        let get_value = || {
+            json!({
+                "foo": {
+                    "bar": {
+                        "baz": "qux"
+                    }
+                }
+            })
+        };
+        let value = get_value();
+        let mut sources = Sources::default();
+        let mut resolver = MockResolver::new();
+        resolver
+            .expect_resolve()
+            .returning(move |_| Ok(Some(get_value().to_string())));
+        let resolvers = Resolvers::new(vec![Box::new(resolver)]);
+        let uri: AbsoluteUri = "https://example.com/foo".parse().unwrap();
+        let base_uri = uri.clone();
+        let deserializers = Deserializers::new(vec![]);
+        sources.start_txn();
+        let (link, src) = sources
+            .resolve(uri.clone(), &resolvers, &deserializers)
+            .await
+            .unwrap();
+        assert_eq!(src, &get_value());
+        assert_eq!(link.path, Pointer::default());
+
+        let mut sources = Sources::default();
+        sources.start_txn();
+        let mut uri: AbsoluteUri = base_uri.clone();
+        uri.set_fragment(Some("/foo")).unwrap();
+        let (link, src) = sources
+            .resolve(uri.clone(), &resolvers, &deserializers)
+            .await
+            .unwrap();
+        assert_eq!(src, &value["foo"]);
+        assert_eq!(link.path, Pointer::parse("/foo").unwrap());
+
+        assert_eq!(sources.store_mut().index.len(), 2);
+        assert_eq!(sources.store_mut().table.len(), 1);
+        let (link, src) = sources
+            .resolve(base_uri.clone(), &resolvers, &deserializers)
+            .await
+            .unwrap();
+        assert_eq!(src, &value);
+        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.uri, base_uri);
+        assert_eq!(sources.store_mut().index.len(), 2);
+        assert_eq!(sources.store_mut().table.len(), 1);
+
+        let mut sources = Sources::default();
+        sources.start_txn();
+        let mut uri = base_uri.clone();
+        uri.set_fragment(Some("foo")).unwrap();
+
+        let (link, src) = sources
+            .resolve(uri.clone(), &resolvers, &deserializers)
+            .await
+            .unwrap();
+        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.uri, base_uri);
+        assert_eq!(src, &value);
     }
 }

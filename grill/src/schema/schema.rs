@@ -304,7 +304,9 @@ impl Schemas {
         {
             let mut base_uri = uri.clone();
             let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
-            let (_, src) = sources.resolve(&uri, resolvers, deserializers).await?;
+            let (_, src) = sources
+                .resolve(uri.clone(), resolvers, deserializers)
+                .await?;
             // let ref_key = self.compile(base_uri).await?;
         }
 

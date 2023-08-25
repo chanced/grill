@@ -95,3 +95,16 @@ impl<'a> IntoIterator for &'a Resolvers {
         self.resolvers.iter()
     }
 }
+
+#[cfg(test)]
+mockall::mock! {
+    pub Resolver{}
+
+    #[async_trait]
+    impl Resolve for Resolver {
+        async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
+    }
+    impl Clone for Resolver {
+        fn clone(&self) -> Self;
+    }
+}
