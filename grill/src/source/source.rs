@@ -321,26 +321,23 @@ impl Sources {
             .deserialize(&resolved)
             .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
         self.store_mut().insert_vacant(base_uri.clone(), src)?;
-        if fragment.is_empty() {
+
+        if fragment.is_empty() || !fragment.starts_with('/') {
             let link = self.store().get_link(&base_uri).unwrap();
             let src = self.store().get(link.key);
             return Ok((link, src));
         }
-        if fragment.starts_with('/') {
-            let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
-            let link = self.store().get_link(&base_uri).unwrap().clone();
-            self.store_mut()
-                .insert_link(link.key, uri.clone(), ptr.clone());
-            let src = self
-                .store()
-                .get(link.key)
-                .resolve(&ptr)
-                .map_err(PointerError::from)?;
-            let link = self.store().get_link(&uri).unwrap();
-            return Ok((link, src));
-        }
-        let link = self.store().get_link(&base_uri).unwrap();
-        let src = self.store().get(link.key);
+
+        let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
+        let link = self.store().get_link(&base_uri).unwrap().clone();
+        self.store_mut()
+            .insert_link(link.key, uri.clone(), ptr.clone());
+        let src = self
+            .store()
+            .get(link.key)
+            .resolve(&ptr)
+            .map_err(PointerError::from)?;
+        let link = self.store().get_link(&uri).unwrap();
         Ok((link, src))
     }
 
@@ -422,6 +419,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve() {
+        //=============================================================\\
+        //                           absolute                          \\
+        //=============================================================\\
+
         let get_value = || {
             json!({
                 "foo": {
@@ -449,6 +450,10 @@ mod tests {
         assert_eq!(src, &get_value());
         assert_eq!(link.path, Pointer::default());
 
+        //=============================================================\\
+        //                           pointer                           \\
+        //=============================================================\\
+
         let mut sources = Sources::default();
         sources.start_txn();
         let mut uri: AbsoluteUri = base_uri.clone();
@@ -459,7 +464,6 @@ mod tests {
             .unwrap();
         assert_eq!(src, &value["foo"]);
         assert_eq!(link.path, Pointer::parse("/foo").unwrap());
-
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
         let (link, src) = sources
@@ -471,6 +475,10 @@ mod tests {
         assert_eq!(link.uri, base_uri);
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
+
+        //=============================================================\\
+        //                           anchor                            \\
+        //=============================================================\\
 
         let mut sources = Sources::default();
         sources.start_txn();
@@ -484,5 +492,7 @@ mod tests {
         assert_eq!(link.path, Pointer::default());
         assert_eq!(link.uri, base_uri);
         assert_eq!(src, &value);
+        assert_eq!(sources.store_mut().index.len(), 1);
+        assert_eq!(sources.store_mut().table.len(), 1);
     }
 }
