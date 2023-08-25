@@ -12,7 +12,7 @@ use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::borrow::Cow;
-use std::collections::hash_map::{Entry, HashMap, OccupiedEntry, VacantEntry};
+use std::collections::hash_map::{Entry, HashMap};
 use std::ops::Deref;
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
@@ -312,30 +312,43 @@ impl Sources {
         uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
-    ) -> Result<(Link, Value), SourceError> {
+    ) -> Result<(&Link, &Value), SourceError> {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+        let fragment = fragment.trim();
         let resolved = resolvers.resolve(&base_uri).await?;
         let src = deserializers
             .deserialize(&resolved)
             .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
-        let (key, link, src) = self.store_mut().insert_vacant(uri.clone(), src)?;
-        if fragment.trim().is_empty() {
+        self.store_mut().insert_vacant(base_uri.clone(), src)?;
+        if fragment.is_empty() {
+            let link = self.store().get_link(&base_uri).unwrap();
+            let src = self.store().get(link.key);
             return Ok((link, src));
         }
         if fragment.starts_with('/') {
-            let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
-            let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
-            let link = self.store_mut().insert_link(key, uri.clone(), ptr).clone();
+            let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
+            let link = self.store().get_link(&base_uri).unwrap().clone();
+            self.store_mut()
+                .insert_link(link.key, uri.clone(), ptr.clone());
+            let src = self
+                .store()
+                .get(link.key)
+                .resolve(&ptr)
+                .map_err(PointerError::from)?;
+            let link = self.store().get_link(uri).unwrap();
             return Ok((link, src));
         }
+        let link = self.store().get_link(&base_uri).unwrap();
+        let src = self.store().get(link.key);
         Ok((link, src))
     }
-    fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(Link, Value), SourceError> {
-        let link = self.store().get_link(uri).unwrap().clone();
-        let mut src = self.store().get(link.key).clone();
+
+    fn resolve_local(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+        let link = self.store().get_link(uri).unwrap();
+        let mut src = self.store().get(link.key);
         if !link.path.is_empty() {
-            src = src.resolve(&link.path).map_err(PointerError::from)?.clone();
+            src = src.resolve(&link.path).map_err(PointerError::from)?;
         }
         Ok((link, src))
     }
@@ -354,7 +367,7 @@ impl Sources {
         uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
-    ) -> Result<(Link, Value), SourceError> {
+    ) -> Result<(&Link, &Value), SourceError> {
         // if the value has already been indexed, return it
         let entry = self.store_mut().link_entry(uri.clone());
         match entry {
