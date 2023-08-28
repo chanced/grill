@@ -12,6 +12,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
+anyhow           = { workspace = true }
 async-recursion  = { workspace = true }
 async-trait      = { workspace = true }
 dyn-clone        = { workspace = true }

@@ -5,6 +5,7 @@ resolver = "2"
 [workspace.dependencies]
 grill = { path = "grill" }
 
+anyhow           = { version = "1.0.75" }
 anymap           = { version = "1.0.0-beta.2" }
 async-recursion  = { version = "1.0.4" }
 async-trait      = { version = "0.1" }

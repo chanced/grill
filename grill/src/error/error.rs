@@ -291,7 +291,7 @@ pub enum EvaluateError {
     Custom {
         /// `Box<dyn std::error::Error>`
         #[source]
-        source: Box<dyn StdError>,
+        source: Box<anyhow::Error>,
         /// The [`Value`] which failed to evaluate.
         value: Option<Box<Value>>,
     },
@@ -497,7 +497,7 @@ pub enum ResolveErrorSource {
 
     /// Any other error which occurred while resolving a source.
     #[error(transparent)]
-    Custom(#[from] Box<dyn StdError>),
+    Custom(#[from] anyhow::Error),
 }
 
 impl From<MalformedPointerError> for ResolveErrorSource {
@@ -563,7 +563,7 @@ pub enum CompileError {
 
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
-    Custom(#[from] Box<dyn StdError + Send + Sync>),
+    Custom(#[from] Box<anyhow::Error>),
 }
 
 #[derive(Debug, Error)]
@@ -759,7 +759,7 @@ pub enum IdentifyError {
     /// Any custom error which a [`Handler`](crate::handler::Handler) may need
     /// to return.
     #[error(transparent)]
-    Custom(#[from] Box<dyn StdError>),
+    Custom(#[from] anyhow::Error),
 }
 
 /// A [`Dialect`] with the [`AbsoluteUri`] was not able to be found.

@@ -25,6 +25,7 @@ impl<'i> Iter<'i> {
             inner: Either::Left(keys.iter()),
         }
     }
+    #[must_use]
     pub fn unchecked(self) -> IterUnchecked<'i> {
         IterUnchecked { inner: self }
     }
@@ -57,7 +58,7 @@ impl<'i> Iterator for IterUnchecked<'i> {
     type Item = Schema<'i>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|r| r.unwrap())
+        self.inner.next().map(std::result::Result::unwrap)
     }
 }
 

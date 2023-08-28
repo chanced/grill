@@ -231,8 +231,9 @@ impl Schemas {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
-    #[async_recursion(?Send)]
+    #[allow(clippy::too_many_lines, clippy::unused_async)]
+    // #[async_recursion(?Send)]
+
     pub(crate) async fn compile(
         &mut self,
         link: Link,
@@ -242,151 +243,152 @@ impl Schemas {
         deserializers: &Deserializers,
         resolvers: &Resolvers,
     ) -> Result<Key, CompileError> {
-        let store = self.store_mut();
+        unimplemented!()
+        // let store = self.store_mut();
 
-        // checking to ensure that the schema has not already been compiled
-        if store.index.contains_key(&link.uri) {
-            // if so, return it.
-            return Ok(store.get_index(&link.uri).unwrap());
-        }
+        // // checking to ensure that the schema has not already been compiled
+        // if store.index.contains_key(&link.uri) {
+        //     // if so, return it.
+        //     return Ok(store.get_index(&link.uri).unwrap());
+        // }
 
-        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
-        if !fragment.is_empty() && !fragment.starts_with('/') {
-            // this schema is anchored.. we need to compile the root first if it doesn't already exist.
-            let mut base_uri = link.uri.clone();
-            base_uri.set_fragment(None).unwrap();
-            let (root_link, _) = sources
-                .resolve(base_uri.clone(), resolvers, deserializers)
-                .await?;
-            let root_link = root_link.clone();
-            let _ = self
-                .compile(root_link, None, sources, dialects, deserializers, resolvers)
-                .await?;
+        // let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
+        // if !fragment.is_empty() && !fragment.starts_with('/') {
+        //     // this schema is anchored.. we need to compile the root first if it doesn't already exist.
+        //     let mut base_uri = link.uri.clone();
+        //     base_uri.set_fragment(None).unwrap();
+        //     let (root_link, _) = sources
+        //         .resolve(base_uri.clone(), resolvers, deserializers)
+        //         .await?;
+        //     let root_link = root_link.clone();
+        //     let _ = self
+        //         .compile(root_link, None, sources, dialects, deserializers, resolvers)
+        //         .await?;
 
-            // at this stage, all URIs should be indexed.
-            match self.get_by_uri(&link.uri, sources) {
-                Some(anchored) => return Ok(anchored.key),
-                None => {
-                    return Err(UnknownAnchorError {
-                        anchor: fragment,
-                        uri: link.uri.clone(),
-                    }
-                    .into())
-                }
-            }
-        }
-        let source = sources.get(link.key).clone();
+        //     // at this stage, all URIs should be indexed.
+        //     match self.get_by_uri(&link.uri, sources) {
+        //         Some(anchored) => return Ok(anchored.key),
+        //         None => {
+        //             return Err(UnknownAnchorError {
+        //                 anchor: fragment,
+        //                 uri: link.uri.clone(),
+        //             }
+        //             .into())
+        //         }
+        //     }
+        // }
+        // let source = sources.get(link.key).clone();
 
-        // determine the dialect
-        let dialect = dialects.pertinent_to_or_default(&source);
+        // // determine the dialect
+        // let dialect = dialects.pertinent_to_or_default(&source);
 
-        // identify the schema
-        let (id, uris) = dialect.identify(link.uri.clone(), &link.path, &source)?;
+        // // identify the schema
+        // let (id, uris) = dialect.identify(link.uri.clone(), &link.path, &source)?;
 
-        // if identify did not find a primary id, use the uri + pointer fragment
-        // as the lookup which will be at the first position in the uris list
-        let lookup_id = id.as_ref().unwrap_or(&uris[0]);
+        // // if identify did not find a primary id, use the uri + pointer fragment
+        // // as the lookup which will be at the first position in the uris list
+        // let lookup_id = id.as_ref().unwrap_or(&uris[0]);
 
-        // checking to see if the schema has already been compiled under the id
-        if let Entry::Occupied(key) = self.index_entry(lookup_id.clone()) {
-            return Ok(*key.get());
-        }
+        // // checking to see if the schema has already been compiled under the id
+        // if let Entry::Occupied(key) = self.index_entry(lookup_id.clone()) {
+        //     return Ok(*key.get());
+        // }
 
-        // if parent is None and this schema is not a document root (does not
-        // have an $id) then attempt to locate the parent using the pointer
-        // fragment.
-        if id.is_none()
-            && parent.is_none()
-            && lookup_id.has_fragment()
-            && lookup_id.fragment().unwrap().starts_with('/')
-        {
-            parent = self.locate_parent(lookup_id.clone())?;
-        }
+        // // if parent is None and this schema is not a document root (does not
+        // // have an $id) then attempt to locate the parent using the pointer
+        // // fragment.
+        // if id.is_none()
+        //     && parent.is_none()
+        //     && lookup_id.has_fragment()
+        //     && lookup_id.fragment().unwrap().starts_with('/')
+        // {
+        //     parent = self.locate_parent(lookup_id.clone())?;
+        // }
 
-        // linking all URIs of this schema to the the source location
-        for uri in &uris {
-            sources.link(uri.clone(), link.uri.clone(), link.path.clone())?;
-        }
+        // // linking all URIs of this schema to the the source location
+        // for uri in &uris {
+        //     sources.link(uri.clone(), link.uri.clone(), link.path.clone())?;
+        // }
 
-        let base_uri = id.clone().unwrap_or(link.uri.clone());
-        let link = sources.get_link(&base_uri).cloned().unwrap();
+        // let base_uri = id.clone().unwrap_or(link.uri.clone());
+        // let link = sources.get_link(&base_uri).cloned().unwrap();
 
-        let anchors = dialect.anchors(&source)?;
-        // create a new CompiledSchema and insert it. if compiling fails, the
-        // schema store will rollback to its previous state.
+        // let anchors = dialect.anchors(&source)?;
+        // // create a new CompiledSchema and insert it. if compiling fails, the
+        // // schema store will rollback to its previous state.
 
-        let key = self
-            .insert(CompiledSchema {
-                id: id.clone(),
-                uris,
-                metaschema: dialect.primary_metaschema_id().clone(),
-                handlers: dialect.handlers.clone().into_boxed_slice(),
-                parent,
-                src: link.clone(),
-                subschemas: Vec::default(), // set below
-                dependents: Vec::default(), // set below
-                references: Vec::default(), // set below
-                anchors: anchors.clone(),
-            })
-            .map_err(|uri| {
-                SourceError::from(SourceConflictError {
-                    uri,
-                    existing_source: source.clone().into(),
-                })
-            })?;
+        // let key = self
+        //     .insert(CompiledSchema {
+        //         id: id.clone(),
+        //         uris,
+        //         metaschema: dialect.primary_metaschema_id().clone(),
+        //         handlers: dialect.handlers.clone().into_boxed_slice(),
+        //         parent,
+        //         src: link.clone(),
+        //         subschemas: Vec::default(), // set below
+        //         dependents: Vec::default(), // set below
+        //         references: Vec::default(), // set below
+        //         anchors: anchors.clone(),
+        //     })
+        //     .map_err(|uri| {
+        //         SourceError::from(SourceConflictError {
+        //             uri,
+        //             existing_source: source.clone().into(),
+        //         })
+        //     })?;
 
-        // resolving & compiling references
+        // // resolving & compiling references
 
-        let mut references = dialect.references(&source)?;
-        for reference in &mut references {
-            let (ref_link, _) = sources
-                .resolve(reference.uri.clone(), resolvers, deserializers)
-                .await?;
-            let ref_link = ref_link.clone();
-            let ref_key = self
-                .compile(
-                    ref_link,
-                    Some(key),
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                )
-                .await?;
-            reference.key = ref_key;
-        }
+        // let mut references = dialect.references(&source)?;
+        // for reference in &mut references {
+        //     let (ref_link, _) = sources
+        //         .resolve(reference.uri.clone(), resolvers, deserializers)
+        //         .await?;
+        //     let ref_link = ref_link.clone();
+        //     let ref_key = self
+        //         .compile(
+        //             ref_link,
+        //             Some(key),
+        //             sources,
+        //             dialects,
+        //             deserializers,
+        //             resolvers,
+        //         )
+        //         .await?;
+        //     reference.key = ref_key;
+        // }
 
-        // compiling nested schemas
+        // // compiling nested schemas
 
-        let mut subschemas = Vec::new();
+        // let mut subschemas = Vec::new();
 
-        let path = if id.is_some() {
-            Cow::Owned(Pointer::default())
-        } else {
-            Cow::Borrowed(&link.path)
-        };
-        for subschema_path in dialect.subschemas(&path, &source) {
-            let mut uri = base_uri.clone();
-            uri.set_fragment(Some(&subschema_path))?;
-            let (sub_link, _) = sources.resolve(uri, resolvers, deserializers).await?;
-            let sub_link = sub_link.clone();
-            let subschema = self
-                .compile(
-                    sub_link,
-                    Some(key),
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                )
-                .await?;
-            subschemas.push(subschema);
-        }
+        // let path = if id.is_some() {
+        //     Cow::Owned(Pointer::default())
+        // } else {
+        //     Cow::Borrowed(&link.path)
+        // };
+        // for subschema_path in dialect.subschemas(&path, &source) {
+        //     let mut uri = base_uri.clone();
+        //     uri.set_fragment(Some(&subschema_path))?;
+        //     let (sub_link, _) = sources.resolve(uri, resolvers, deserializers).await?;
+        //     let sub_link = sub_link.clone();
+        //     let subschema = self
+        //         .compile(
+        //             sub_link,
+        //             Some(key),
+        //             sources,
+        //             dialects,
+        //             deserializers,
+        //             resolvers,
+        //         )
+        //         .await?;
+        //     subschemas.push(subschema);
+        // }
 
-        let schema = self.get_mut_unchecked(key);
-        schema.subschemas = subschemas;
+        // let schema = self.get_mut_unchecked(key);
+        // schema.subschemas = subschemas;
 
-        todo!()
+        // todo!()
     }
     fn sandbox(&mut self) -> &mut Store {
         self.sandbox
@@ -573,7 +575,18 @@ impl Schemas {
 
 #[cfg(test)]
 mod tests {
+    use crate::{schema::Schemas, Interrogator};
 
-    #[test]
-    fn test_name() {}
+    #[tokio::test]
+    async fn test_whatever() {
+        tokio::spawn(Schemas::compile(
+            unimplemented!(),
+            unimplemented!(),
+            unimplemented!(),
+            unimplemented!(),
+            unimplemented!(),
+            unimplemented!(),
+            unimplemented!(),
+        ));
+    }
 }
