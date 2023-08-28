@@ -19,14 +19,14 @@ use super::{
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct RelativeUri {
     pub(super) value: String,
-    pub(super) username_idx: Option<u32>,
-    pub(super) password_idx: Option<u32>,
-    pub(super) host_idx: Option<u32>,
-    pub(super) port_idx: Option<u32>,
+    pub(super) username_index: Option<u32>,
+    pub(super) password_index: Option<u32>,
+    pub(super) host_index: Option<u32>,
+    pub(super) port_index: Option<u32>,
     pub(super) port: Option<u16>,
-    pub(super) path_idx: u32,
-    pub(super) query_idx: Option<u32>,
-    pub(super) fragment_idx: Option<u32>,
+    pub(super) path_index: u32,
+    pub(super) query_index: Option<u32>,
+    pub(super) fragment_index: Option<u32>,
 }
 
 impl RelativeUri {
@@ -170,10 +170,10 @@ impl RelativeUri {
     #[must_use]
     pub fn path(&self) -> &str {
         let end = self
-            .query_idx()
-            .or(self.fragment_idx())
+            .query_index()
+            .or(self.fragment_index())
             .unwrap_or(self.value.len());
-        &self.value[self.path_idx()..end]
+        &self.value[self.path_index()..end]
     }
     /// returns the username portion of the `RelativeUri` if it exists.
     ///
@@ -185,45 +185,45 @@ impl RelativeUri {
     /// assert_eq!(relative_uri.username(), Some("user"));
     #[must_use]
     pub fn username(&self) -> Option<&str> {
-        let start = self.username_idx()?;
-        let end = self.username_end_idx()?;
+        let start = self.username_index()?;
+        let end = self.username_end_index()?;
         Some(&self.value[start..end])
     }
     #[must_use]
     pub fn password(&self) -> Option<&str> {
-        let start = self.password_idx()? + 1;
-        let end = self.host_idx().unwrap_or(self.path_idx());
+        let start = self.password_index()? + 1;
+        let end = self.host_index().unwrap_or(self.path_index());
         Some(&self.value[start..end])
     }
 
-    fn username_end_idx(&self) -> Option<usize> {
-        self.username_idx?;
-        self.password_idx()
-            .or(self.host_idx())
-            .unwrap_or(self.path_idx())
+    fn username_end_index(&self) -> Option<usize> {
+        self.username_index?;
+        self.password_index()
+            .or(self.host_index())
+            .unwrap_or(self.path_index())
             .into()
     }
 
     /// Returns the path of the `RelativeUri` if it exists.
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
-        let fragment_idx = self.fragment_idx()?;
-        if fragment_idx + 1 == self.len() {
+        let fragment_index = self.fragment_index()?;
+        if fragment_index + 1 == self.len() {
             return Some("");
         }
 
-        Some(&self.value[fragment_idx + 1..])
+        Some(&self.value[fragment_index + 1..])
     }
 
     /// Returns the query string segment of the `RelativeUri`, if it exists.
     #[must_use]
     pub fn query(&self) -> Option<&str> {
-        let query_idx = self.query_idx()?;
-        if query_idx + 1 == self.len() {
+        let query_index = self.query_index()?;
+        if query_index + 1 == self.len() {
             return Some("");
         }
-        let last = self.fragment_idx().unwrap_or(self.len());
-        Some(&self.value[query_idx + 1..last])
+        let last = self.fragment_index().unwrap_or(self.len());
+        Some(&self.value[query_index + 1..last])
     }
 
     /// Returns an [`Iterator`] of [`QueryParameter`] of this `RelativeUri`.
@@ -256,26 +256,26 @@ impl RelativeUri {
         let cap = self.len() - existing_query.as_ref().map(String::len).unwrap_or_default()
             + query.map(str::len).unwrap_or_default();
         let mut buf = String::with_capacity(cap);
-        let username_idx = write::username(&mut buf, self.username())?;
-        let password_idx = write::password(&mut buf, self.password())?;
-        let host_idx = write::host(&mut buf, self.host())?;
-        let port_idx = write::port(&mut buf, self.port_str())?;
-        let path_idx = write::path(&mut buf, self.path())?;
-        let query_idx = write::query(
+        let username_index = write::username(&mut buf, self.username())?;
+        let password_index = write::password(&mut buf, self.password())?;
+        let host_index = write::host(&mut buf, self.host())?;
+        let port_index = write::port(&mut buf, self.port_str())?;
+        let path_index = write::path(&mut buf, self.path())?;
+        let query_index = write::query(
             &mut buf,
             encode::query(query),
             self.has_authority(),
             self.has_path(),
         )?;
-        let fragment_idx: Option<u32> = write::fragment(&mut buf, self.fragment())?;
+        let fragment_index: Option<u32> = write::fragment(&mut buf, self.fragment())?;
         self.value = buf;
-        self.username_idx = username_idx;
-        self.password_idx = password_idx;
-        self.host_idx = host_idx;
-        self.port_idx = port_idx;
-        self.path_idx = path_idx;
-        self.query_idx = query_idx;
-        self.fragment_idx = fragment_idx;
+        self.username_index = username_index;
+        self.password_index = password_index;
+        self.host_index = host_index;
+        self.port_index = port_index;
+        self.path_index = path_index;
+        self.query_index = query_index;
+        self.fragment_index = fragment_index;
         Ok(existing_query)
     }
 
@@ -285,26 +285,26 @@ impl RelativeUri {
     pub fn set_path(&mut self, path: &str) -> Result<String, RelativeUriError> {
         let existing_path = self.path().to_string();
         let mut buf = String::with_capacity(self.len() - existing_path.len() + path.len());
-        let username_idx = write::username(&mut buf, self.username())?;
-        let password_idx = write::password(&mut buf, self.password())?;
-        let host_idx = write::host(&mut buf, self.host())?;
-        let port_idx = write::port(&mut buf, self.port_str())?;
-        let path_idx = write::path(&mut buf, encode::path(path))?;
-        let query_idx = write::query(
+        let username_index = write::username(&mut buf, self.username())?;
+        let password_index = write::password(&mut buf, self.password())?;
+        let host_index = write::host(&mut buf, self.host())?;
+        let port_index = write::port(&mut buf, self.port_str())?;
+        let path_index = write::path(&mut buf, encode::path(path))?;
+        let query_index = write::query(
             &mut buf,
             self.query(),
             self.has_authority(),
             self.has_path(),
         )?;
-        let fragment_idx: Option<u32> = write::fragment(&mut buf, self.fragment())?;
+        let fragment_index: Option<u32> = write::fragment(&mut buf, self.fragment())?;
         self.value = buf;
-        self.username_idx = username_idx;
-        self.password_idx = password_idx;
-        self.host_idx = host_idx;
-        self.port_idx = port_idx;
-        self.path_idx = path_idx;
-        self.query_idx = query_idx;
-        self.fragment_idx = fragment_idx;
+        self.username_index = username_index;
+        self.password_index = password_index;
+        self.host_index = host_index;
+        self.port_index = port_index;
+        self.path_index = path_index;
+        self.query_index = query_index;
+        self.fragment_index = fragment_index;
         Ok(existing_path)
     }
 
@@ -323,26 +323,26 @@ impl RelativeUri {
                     .unwrap_or_default()
                 + fragment.unwrap_or_default().len(),
         );
-        let username_idx = write::username(&mut buf, self.username())?;
-        let password_idx = write::password(&mut buf, self.password())?;
-        let host_idx = write::host(&mut buf, self.host())?;
-        let port_idx = write::port(&mut buf, self.port_str())?;
-        let path_idx: u32 = write::path(&mut buf, self.path())?;
-        let query_idx: Option<u32> = write::query(
+        let username_index = write::username(&mut buf, self.username())?;
+        let password_index = write::password(&mut buf, self.password())?;
+        let host_index = write::host(&mut buf, self.host())?;
+        let port_index = write::port(&mut buf, self.port_str())?;
+        let path_index: u32 = write::path(&mut buf, self.path())?;
+        let query_index: Option<u32> = write::query(
             &mut buf,
             self.query(),
             self.has_authority(),
             self.has_path(),
         )?;
-        let fragment_idx: Option<u32> = write::fragment(&mut buf, encode::fragment(fragment))?;
+        let fragment_index: Option<u32> = write::fragment(&mut buf, encode::fragment(fragment))?;
         self.value = buf;
-        self.username_idx = username_idx;
-        self.password_idx = password_idx;
-        self.host_idx = host_idx;
-        self.port_idx = port_idx;
-        self.path_idx = path_idx;
-        self.query_idx = query_idx;
-        self.fragment_idx = fragment_idx;
+        self.username_index = username_index;
+        self.password_index = password_index;
+        self.host_index = host_index;
+        self.port_index = port_index;
+        self.path_index = path_index;
+        self.query_index = query_index;
+        self.fragment_index = fragment_index;
         Ok(existing_fragment)
     }
 
@@ -351,24 +351,24 @@ impl RelativeUri {
     ///
     /// A relative URI may have an authority if it starts starts with `"//"`.
     pub fn authority(&self) -> Option<Authority> {
-        let host_idx = self.host_idx()?;
+        let host_index = self.host_index()?;
         Some(Authority {
-            value: Cow::Borrowed(&self.value[host_idx..self.path_idx()]),
-            username_idx: self.username_idx,
-            password_idx: self.password_idx,
-            host_idx: self.host_idx,
-            port_idx: self.port_idx,
+            value: Cow::Borrowed(&self.value[host_index..self.path_index()]),
+            username_index: self.username_index,
+            password_index: self.password_index,
+            host_index: self.host_index,
+            port_index: self.port_index,
             port: self.port,
         })
     }
     /// Returns the username if it exists.
     #[must_use]
     pub fn host(&self) -> Option<&str> {
-        let mut start = self.host_idx()?;
+        let mut start = self.host_index()?;
         if self.has_username() || self.has_password() {
             start += 1;
         }
-        let end = self.port_idx().unwrap_or_else(|| self.path_idx());
+        let end = self.port_index().unwrap_or_else(|| self.path_index());
         Some(&self.value[start..end])
     }
 
@@ -396,42 +396,42 @@ impl RelativeUri {
                     .unwrap_or_default()
                 + new.len(),
         );
-        let username_idx = write::username(&mut buf, new.username())?;
-        let password_idx = write::password(&mut buf, new.password())?;
-        let host_idx = write::host(&mut buf, new.host())?;
-        let port_idx = write::port(&mut buf, new.port_str())?;
-        let path_idx: u32 = write::path(&mut buf, self.path())?;
-        let query_idx: Option<u32> = write::query(
+        let username_index = write::username(&mut buf, new.username())?;
+        let password_index = write::password(&mut buf, new.password())?;
+        let host_index = write::host(&mut buf, new.host())?;
+        let port_index = write::port(&mut buf, new.port_str())?;
+        let path_index: u32 = write::path(&mut buf, self.path())?;
+        let query_index: Option<u32> = write::query(
             &mut buf,
             self.query(),
             self.has_authority(),
             self.has_path(),
         )?;
-        let fragment_idx = write::fragment(&mut buf, self.fragment())?;
+        let fragment_index = write::fragment(&mut buf, self.fragment())?;
         self.value = buf;
-        self.username_idx = username_idx;
-        self.password_idx = password_idx;
-        self.host_idx = host_idx;
-        self.port_idx = port_idx;
-        self.path_idx = path_idx;
-        self.query_idx = query_idx;
-        self.fragment_idx = fragment_idx;
+        self.username_index = username_index;
+        self.password_index = password_index;
+        self.host_index = host_index;
+        self.port_index = port_index;
+        self.path_index = path_index;
+        self.query_index = query_index;
+        self.fragment_index = fragment_index;
         Ok(existing_authority)
     }
 
     #[must_use]
     pub fn has_authority(&self) -> bool {
-        self.path_idx() > 2
+        self.path_index() > 2
     }
 
     #[must_use]
     pub fn has_username(&self) -> bool {
-        self.username_idx.is_some()
+        self.username_index.is_some()
     }
 
     #[must_use]
     pub fn has_password(&self) -> bool {
-        self.password_idx.is_some()
+        self.password_index.is_some()
     }
 
     /// Returns `true` if the `RelativeUri` has a host.
@@ -447,51 +447,51 @@ impl RelativeUri {
     /// ```
     #[must_use]
     pub fn has_host(&self) -> bool {
-        self.host_idx.is_some()
+        self.host_index.is_some()
     }
 
     /// Returns `true` if the `RelativeUri` has a port.
     #[must_use]
     pub fn has_port(&self) -> bool {
-        self.port_idx.is_some()
+        self.port_index.is_some()
     }
 
     pub(crate) fn authority_str(&self) -> Option<&str> {
-        let start = self.username_idx().or(self.host_idx())?;
-        Some(&self.value[start..self.path_idx()])
+        let start = self.username_index().or(self.host_index())?;
+        Some(&self.value[start..self.path_index()])
     }
 
-    fn path_idx(&self) -> usize {
-        self.path_idx as usize
+    fn path_index(&self) -> usize {
+        self.path_index as usize
     }
 
-    fn fragment_idx(&self) -> Option<usize> {
-        self.fragment_idx.map(|idx| idx as usize)
+    fn fragment_index(&self) -> Option<usize> {
+        self.fragment_index.map(|idx| idx as usize)
     }
 
-    fn query_idx(&self) -> Option<usize> {
-        self.query_idx.map(|idx| idx as usize)
+    fn query_index(&self) -> Option<usize> {
+        self.query_index.map(|idx| idx as usize)
     }
 
-    fn username_idx(&self) -> Option<usize> {
-        self.username_idx.map(|idx| idx as usize)
+    fn username_index(&self) -> Option<usize> {
+        self.username_index.map(|idx| idx as usize)
     }
 
-    fn host_idx(&self) -> Option<usize> {
-        self.host_idx.map(|idx| idx as usize)
+    fn host_index(&self) -> Option<usize> {
+        self.host_index.map(|idx| idx as usize)
     }
 
-    fn port_idx(&self) -> Option<usize> {
-        self.port_idx.map(|idx| idx as usize)
+    fn port_index(&self) -> Option<usize> {
+        self.port_index.map(|idx| idx as usize)
     }
 
-    fn password_idx(&self) -> Option<usize> {
-        self.password_idx.map(|idx| idx as usize)
+    fn password_index(&self) -> Option<usize> {
+        self.password_index.map(|idx| idx as usize)
     }
 
     fn port_str(&self) -> Option<&str> {
-        self.port_idx()
-            .map(|idx| &self.value[idx + 1..self.path_idx()])
+        self.port_index()
+            .map(|idx| &self.value[idx + 1..self.path_index()])
     }
 
     /// Returns the path normalized by removing dot segments, i.e. `'.'`, `'..'`.

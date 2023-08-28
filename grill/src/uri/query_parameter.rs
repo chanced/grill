@@ -6,16 +6,16 @@ use crate::error::OverflowError;
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct QueryParameter<'a> {
     full: Cow<'a, str>,
-    eq_idx: Option<u32>,
+    eq_index: Option<u32>,
 }
 impl<'a> QueryParameter<'a> {
     pub fn new(full: &'a str) -> Result<Self, OverflowError> {
         if full.len() > u32::MAX as usize {
             return Err(OverflowError(full.len()));
         }
-        let eq_idx = full.find('=').map(|i| i.try_into().unwrap());
+        let eq_index = full.find('=').map(|i| i.try_into().unwrap());
         let full = full.into();
-        Ok(Self { full, eq_idx })
+        Ok(Self { full, eq_index })
     }
 
     /// Converts this `QueryParameter` into an owned version.
@@ -23,7 +23,7 @@ impl<'a> QueryParameter<'a> {
     pub fn into_owned(self) -> QueryParameter<'static> {
         QueryParameter {
             full: self.full.into_owned().into(),
-            eq_idx: self.eq_idx,
+            eq_index: self.eq_index,
         }
     }
 
@@ -36,17 +36,17 @@ impl<'a> QueryParameter<'a> {
     /// parameter.
     #[must_use]
     pub fn key(&self) -> &str {
-        self.full[..self.eq_idx().unwrap_or(self.full.len())].as_ref()
+        self.full[..self.eq_index().unwrap_or(self.full.len())].as_ref()
     }
     /// Returns the value, i.e. anything to the right of `'='`, of the query
     /// parameter, if it exists.
     #[must_use]
     pub fn value(&self) -> Option<&str> {
-        self.eq_idx().map(|i| &self.full[i + 1..])
+        self.eq_index().map(|i| &self.full[i + 1..])
     }
 
-    fn eq_idx(&self) -> Option<usize> {
-        self.eq_idx.map(|i| i as usize)
+    fn eq_index(&self) -> Option<usize> {
+        self.eq_index.map(|i| i as usize)
     }
 }
 

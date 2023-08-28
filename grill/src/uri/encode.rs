@@ -25,8 +25,8 @@ const QUERY: &AsciiSet = &CONTROLS
     .add(b'\'');
 
 pub(super) use urn::percent::{
-    encode_f_component as f_component, encode_nss as nss, encode_r_component as r_component,
-    encode_q_component as q_component,
+    encode_f_component as f_component, encode_nss as nss, encode_q_component as q_component,
+    encode_r_component as r_component,
 };
 
 #[inline]
@@ -96,6 +96,6 @@ mod tests {
     #[test]
     fn test_encode_authority() {
         // let s = "user:pass@host:1234";
-        // let userinfo_idx = s.find('@');
+        // let userinfo_index = s.find('@');
     }
 }

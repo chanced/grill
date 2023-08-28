@@ -4,7 +4,6 @@
 use crate::error::{AnchorError, DialectExistsError, UriError};
 use crate::handler::Handler;
 use crate::schema::Metaschema;
-use crate::Key;
 
 use crate::{
     error::{DialectError, IdentifyError},
@@ -12,7 +11,8 @@ use crate::{
     Object, Src,
 };
 use jsonptr::Pointer;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::panic::{self, UnwindSafe};
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
@@ -22,9 +22,8 @@ use std::{
     iter::IntoIterator,
     ops::Deref,
 };
-use tap::TapOptional;
 
-use super::{Anchor, Reference};
+use super::{Anchor, Identifier, Reference};
 
 /// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
 /// schema.
@@ -32,11 +31,13 @@ use super::{Anchor, Reference};
 pub struct Dialect {
     /// Identifier of the `Dialect`. A meta schema must be defined in
     /// `metaschemas` with this `id`.
-    pub id: AbsoluteUri,
+    id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
-    pub metaschemas: HashMap<AbsoluteUri, Object>,
+    metaschemas: HashMap<AbsoluteUri, Object>,
     /// Set of [`Handler`]s defined by the dialect.
-    pub handlers: Vec<Handler>,
+    handlers: Vec<Handler>,
+    is_pertinent_to_index: usize,
+    identify_indexes: Vec<usize>,
 }
 impl std::fmt::Display for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -68,6 +69,11 @@ impl Dialect {
             .into_iter()
             .map(Into::into)
             .collect::<Vec<Handler>>();
+        let Some(is_pertinent_to_index) = Self::find_is_pertinent_to_index(&handlers) else { return Err(DialectError::IsPertinentToNotImplemented(id.clone())); };
+        let identify_indexes = Self::find_identify_index(&handlers);
+        if identify_indexes.is_empty() {
+            return Err(DialectError::IdentifyNotImplemented(id.clone()));
+        }
         if !metaschemas.contains_key(&id) {
             return Err(DialectError::DefaultNotFound(id.clone()));
         }
@@ -75,9 +81,31 @@ impl Dialect {
             id,
             metaschemas,
             handlers,
+            is_pertinent_to_index,
+            identify_indexes,
         })
     }
 
+    fn find_is_pertinent_to_index(handlers: &[Handler]) -> Option<usize> {
+        handlers
+            .iter()
+            .enumerate()
+            .find(|(_, handler)| is_implemented(|schema| handler.is_pertinent_to(schema)))
+            .map(|(idx, _)| idx)
+    }
+
+    fn find_identify_index(handlers: &[Handler]) -> Vec<usize> {
+        let mut result = Vec::new();
+        for (idx, handler) in handlers.iter().enumerate() {
+            #[allow(clippy::blocks_in_if_conditions)]
+            if is_implemented(|schema| {
+                let _ = handler.identify(schema);
+            }) {
+                result.push(idx);
+            }
+        }
+        result
+    }
     /// Attempts to identify a `schema` based on the [`Handler`]s associated with
     /// this `Dialect`, returning the primary (if any) and all [`AbsoluteUri`]s
     /// the [`Schema`](`crate::schema::Schema`) can be referenced by.
@@ -95,33 +123,36 @@ impl Dialect {
         schema: &Value,
     ) -> Result<(Option<AbsoluteUri>, Vec<AbsoluteUri>), IdentifyError> {
         let mut uris = Vec::new();
-
-        // use the second handler to identify the primary identifier, if any
-        let primary = self.handlers[1]
-            .identify(schema)?
-            .map(|uri| base_uri.resolve(&uri))
-            .transpose()?
-            .tap_some(|id| uris.push(id.clone()));
-
         base_uri.set_fragment(Some(path))?;
-        uris.insert(0, base_uri.clone());
-
+        uris.push(base_uri.clone());
+        // attempt to find a primary id
+        let mut primary = None;
+        for idx in &self.identify_indexes {
+            if let Some(Identifier::Primary(id)) = self.handlers[*idx].identify(schema)? {
+                let uri = base_uri.resolve(&id)?;
+                primary = Some(uri);
+                break;
+            }
+        }
         // if a primary identifier was found, use it as the base_uri for
         // subschemas. Otherwise, use the base_uri provided by the caller
         // with the fragment set to the json pointer `path`.
         let base_uri = primary.as_ref().unwrap_or(&base_uri);
-
-        for handler in &self.handlers[2..] {
+        for idx in &self.identify_indexes {
+            let handler = &self.handlers[*idx];
             if let Some(id) = handler.identify(schema)? {
-                uris.push(base_uri.resolve(&id)?);
+                let uri = base_uri.resolve(id.uri())?;
+                uris.push(uri);
             }
         }
         Ok((primary, uris))
     }
+
     #[must_use]
     pub fn primary_metaschema_id(&self) -> &AbsoluteUri {
         &self.id
     }
+
     /// Attempts to locate nested schemas within `source` by calling
     /// [`Handler::subschemas`](`crate::Handler::subschemas`) for each attached
     /// `Handler` of this `Dialect`.
@@ -161,7 +192,25 @@ impl Dialect {
     /// [`Handlers`](`crate::dialect::Handlers`).
     #[must_use]
     pub fn is_pertinent_to(&self, schema: &Value) -> bool {
-        self.handlers[0].is_pertinent_to(schema)
+        self.handlers[self.is_pertinent_to_index].is_pertinent_to(schema)
+    }
+
+    #[must_use]
+    /// Returns the [`AbsoluteUri`] of this `Dialect`.
+    pub fn id(&self) -> &AbsoluteUri {
+        &self.id
+    }
+
+    #[must_use]
+    /// Returns the metaschemas of this `Dialect`.
+    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Object> {
+        &self.metaschemas
+    }
+
+    #[must_use]
+    /// Returns the [`Handler`]s of this `Dialect`.
+    pub fn handlers(&self) -> &[Handler] {
+        self.handlers.as_ref()
     }
 }
 
@@ -397,5 +446,16 @@ impl<'d> IntoIterator for &'d Dialects<'d> {
     }
 }
 
+fn is_implemented<M, R>(method: M) -> bool
+where
+    R: std::panic::UnwindSafe,
+    M: UnwindSafe + FnOnce(&Value) -> R,
+{
+    let empty = json!({});
+    let result = panic::catch_unwind(|| {
+        let _ = method(&empty);
+    });
+    result.is_ok()
+}
 #[cfg(test)]
 mod tests {}

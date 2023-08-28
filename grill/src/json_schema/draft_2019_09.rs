@@ -350,7 +350,7 @@ mod tests {
         ];
         let dialect = JSON_SCHEMA_2019_09.clone();
 
-        let _dialects: Dialects = Dialects::new(vec![dialect.clone()], Some(&dialect.id)).unwrap();
+        let _dialects: Dialects = Dialects::new(vec![dialect.clone()], Some(dialect.id())).unwrap();
         let _base_uri = "https://example.com/example-schema.json"
             .parse::<AbsoluteUri>()
             .unwrap();

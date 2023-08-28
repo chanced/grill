@@ -66,8 +66,8 @@ struct Parser<'a> {
     value: &'a str,
     state: State,
     is_negative: bool,
-    integer_idx: Option<usize>,
-    fraction_idx: Option<usize>,
+    integer_index: Option<usize>,
+    fraction_index: Option<usize>,
     exponent: Option<usize>,
 }
 
@@ -80,13 +80,13 @@ impl<'a> Parser<'a> {
                 self.is_negative = true;
             }
             Integer => {
-                if self.integer_idx.is_none() {
-                    self.integer_idx = Some(i);
+                if self.integer_index.is_none() {
+                    self.integer_index = Some(i);
                 }
             }
             Fraction => {
-                if self.fraction_idx.is_none() {
-                    self.fraction_idx = Some(i);
+                if self.fraction_index.is_none() {
+                    self.fraction_index = Some(i);
                 }
             }
             E => {
@@ -101,8 +101,8 @@ impl<'a> Parser<'a> {
         let mut parser = Parser {
             value,
             state: State::Head,
-            integer_idx: None,
-            fraction_idx: None,
+            integer_index: None,
+            fraction_index: None,
             exponent: None,
             is_negative: false,
         };
@@ -132,15 +132,15 @@ impl<'a> Parser<'a> {
         println!("result: {}", result);
     }
     fn fraction(&self) -> Option<&str> {
-        let start = self.fraction_idx?;
+        let start = self.fraction_index?;
         let end = self.exponent.unwrap_or(self.value.len());
         Some(&self.value[start + 1..end])
     }
 
     fn integer(&self) -> &str {
-        let Some(start) = self.integer_idx else { return "0" };
+        let Some(start) = self.integer_index else { return "0" };
         let end = self
-            .fraction_idx
+            .fraction_index
             .or(self.exponent)
             .unwrap_or(self.value.len());
         &self.value[start..end]

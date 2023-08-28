@@ -10,10 +10,10 @@ use url::Url;
 /// The Authority component of a Relative URI.
 pub struct Authority<'a> {
     pub(super) value: Cow<'a, str>,
-    pub(super) username_idx: Option<u32>,
-    pub(super) password_idx: Option<u32>,
-    pub(super) host_idx: Option<u32>,
-    pub(super) port_idx: Option<u32>,
+    pub(super) username_index: Option<u32>,
+    pub(super) password_index: Option<u32>,
+    pub(super) host_index: Option<u32>,
+    pub(super) port_index: Option<u32>,
     pub(super) port: Option<u16>,
 }
 impl Deref for Authority<'_> {
@@ -44,11 +44,11 @@ impl<'a> Authority<'a> {
     /// Returns the username component if it exists.
     #[must_use]
     pub fn username(&self) -> Option<&str> {
-        let start = self.username_idx()?;
+        let start = self.username_index()?;
         let end = self
-            .password_idx
-            .or(self.host_idx)
-            .or(self.port_idx)
+            .password_index
+            .or(self.host_index)
+            .or(self.port_index)
             .map_or(self.value.len(), |idx| idx as usize);
 
         Some(&self.value[start..end])
@@ -57,10 +57,10 @@ impl<'a> Authority<'a> {
     /// Returns the password component if it exists.
     #[must_use]
     pub fn password(&self) -> Option<&str> {
-        let start = self.password_idx()?;
+        let start = self.password_index()?;
         let end = self
-            .host_idx()
-            .or(self.port_idx())
+            .host_index()
+            .or(self.port_index())
             .unwrap_or(self.value.len());
         Some(&self.value[start..end])
     }
@@ -68,9 +68,9 @@ impl<'a> Authority<'a> {
     /// Returns the host component if it exists.
     #[must_use]
     pub fn host(&self) -> Option<&str> {
-        let offset = usize::from(self.username_idx.is_some() || self.password_idx.is_some());
-        let start = self.host_idx()? + offset;
-        let end = self.port_idx().unwrap_or(self.value.len());
+        let offset = usize::from(self.username_index.is_some() || self.password_index.is_some());
+        let start = self.host_index()? + offset;
+        let end = self.port_index().unwrap_or(self.value.len());
         Some(&self.value[start..end])
     }
 
@@ -83,7 +83,7 @@ impl<'a> Authority<'a> {
     /// Returns the port as an `&str` if it exists.
     #[must_use]
     pub fn port_str(&self) -> Option<&str> {
-        self.port_idx().map(|idx| &self.value[idx + 1..])
+        self.port_index().map(|idx| &self.value[idx + 1..])
     }
 
     /// Returns the
@@ -91,10 +91,10 @@ impl<'a> Authority<'a> {
     pub fn into_owned(&self) -> Authority<'static> {
         Authority {
             value: Cow::Owned(self.value.to_string()),
-            username_idx: self.username_idx,
-            password_idx: self.password_idx,
-            host_idx: self.host_idx,
-            port_idx: self.port_idx,
+            username_index: self.username_index,
+            password_index: self.password_index,
+            host_index: self.host_index,
+            port_index: self.port_index,
             port: self.port,
         }
     }
@@ -105,17 +105,17 @@ impl<'a> Authority<'a> {
         &self.value
     }
 
-    fn port_idx(&self) -> Option<usize> {
-        self.port_idx.map(|idx| idx as usize)
+    fn port_index(&self) -> Option<usize> {
+        self.port_index.map(|idx| idx as usize)
     }
-    fn host_idx(&self) -> Option<usize> {
-        self.host_idx.map(|idx| idx as usize)
+    fn host_index(&self) -> Option<usize> {
+        self.host_index.map(|idx| idx as usize)
     }
-    fn username_idx(&self) -> Option<usize> {
-        self.username_idx.map(|idx| idx as usize)
+    fn username_index(&self) -> Option<usize> {
+        self.username_index.map(|idx| idx as usize)
     }
-    fn password_idx(&self) -> Option<usize> {
-        self.password_idx.map(|idx| idx as usize)
+    fn password_index(&self) -> Option<usize> {
+        self.password_index.map(|idx| idx as usize)
     }
 }
 

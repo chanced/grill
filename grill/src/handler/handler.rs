@@ -1,14 +1,14 @@
 use crate::{
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, UriError},
     output::{self, Structure},
-    schema::{Anchor, Reference},
-    AbsoluteUri, Schema, Uri,
+    schema::{Anchor, Identifier, Reference},
+    AbsoluteUri, Schema,
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde_json::Value;
-use std::fmt;
+use std::{fmt, panic::RefUnwindSafe};
 
 use super::{Compile, Scope};
 
@@ -70,7 +70,7 @@ impl Handler {
     /// let id = IdHandler.identify(&json!({"$id": "https://example.com/schema.json"}));
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".try_into().unwrap())));
     /// ```
-    pub fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+    pub fn identify(&self, schema: &Value) -> Result<Option<Identifier>, IdentifyError> {
         match self {
             Handler::Sync(handler) => handler.identify(schema),
             Handler::Async(handler) => handler.identify(schema),
@@ -81,9 +81,6 @@ impl Handler {
     ///
     /// # Convention
     /// Exactly one `Handler` must implement the method `is_pertinent_to` for a given `Dialect`.
-    /// It **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
     ///
     /// # Example
     /// ```rust
@@ -99,29 +96,6 @@ impl Handler {
         match self {
             Handler::Sync(handler) => handler.is_pertinent_to(value),
             Handler::Async(handler) => handler.is_pertinent_to(value),
-        }
-    }
-    /// Attempts to retrieve the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) of
-    /// the schema.
-    ///
-    /// # Convention
-    /// Exactly one `Handler` must implement the method `dialect` for a given `Dialect`. It
-    /// **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
-    ///
-    /// # Example
-    /// ```rust
-    /// use grill::json_schema::draft_2020_12::SchemaHandler;
-    ///
-    /// let draft = "https://json-schema.org/draft/2020-12/schema";
-    /// let dialect = SchemaHandler.dialect(&json!({ "$schema": draft }));
-    /// assert_eq!(dialect.as_str(), draft);
-    /// ```
-    pub fn dialect(&self, value: &Value) -> Result<Option<AbsoluteUri>, UriError> {
-        match self {
-            Handler::Sync(handler) => handler.dialect(value),
-            Handler::Async(handler) => handler.dialect(value),
         }
     }
 
@@ -155,7 +129,7 @@ impl Handler {
 
 #[async_trait]
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
+pub trait AsyncHandler: IntoHandler + RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     /// For each `Schema` compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
@@ -190,21 +164,18 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement the method `identify` for a given `Dialect`.
-    /// It **must** be the **second** (index: `1`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
+    /// At least `Handler` must implement the method `identify` for a given `Dialect`.
     ///
     /// # Example
     /// ```rust
     /// use grill::json_schema::draft_2020_12::handlers::Id;
     ///
-    /// let id = Id.identify(&json!({"$id": "https://example.com/schema.json"}));
+    /// let id = Id.identify(&json!({"$id": "https://example.com/schema.json" }));
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".parse().unwrap())));
     /// ```
     #[allow(unused_variables)]
-    fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
-        unimplemented!("identify must be implemented by the second Handler in a Dialect")
+    fn identify(&self, schema: &Value) -> Result<Option<Identifier>, IdentifyError> {
+        unimplemented!("identify must be implemented by at least one Handler in a Dialect")
     }
 
     /// Attempts to retrieve the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) of
@@ -212,9 +183,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     ///
     /// # Convention
     /// Exactly one `Handler` must implement the `dialect` method for a given
-    /// `Dialect`. It **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
+    /// `Dialect`.
     ///
     /// # Example
     /// ```rust
@@ -226,7 +195,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// ```
     #[allow(unused_variables)]
     fn dialect(&self, schema: &Value) -> Result<Option<AbsoluteUri>, UriError> {
-        unimplemented!("dialect must be implemented by the first Handler in a Dialect")
+        unimplemented!("dialect is not implemented by this Handler")
     }
 
     /// Determines if the schema is of a specific
@@ -234,25 +203,25 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     ///
     /// # Convention
     /// Exactly one `Handler` must implement the method `is_pertinent_to` for a given `Dialect`.
-    /// It **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
     ///
     /// # Example
     /// ```rust
     /// use grill::json_schema::draft_2020_12::SchemaHandler;
     ///
-    /// let draft = "https://json-schema.org/draft/2020-12/schema";
-    /// let is_pertinent_to = SchemaHandler.is_pertinent_to(&json!({ "$schema": draft }));
+    /// let schema = serde_json::json!({
+    ///     "$schema": "https://json-schema.org/draft/2020-12/schema
+    /// });
+    ///
+    /// let is_pertinent_to = SchemaHandler.is_pertinent_to(&schema);
     /// assert!(is_pertinent_to);
     ///
-    /// let draft = "https://json-schema.org/draft/2019-09/schema";
-    /// let is_pertinent_to = SchemaHandler.is_pertinent_to(&json!({ "$schema": draft }));
+    /// let schema = serde_json::json!({"$schema": "https://json-schema.org/draft/2019-09/schema" });
+    /// let is_pertinent_to = SchemaHandler.is_pertinent_to(&schema);
     /// assert!(!is_pertinent_to);
     /// ```
     #[allow(unused_variables)]
     fn is_pertinent_to(&self, schema: &Value) -> bool {
-        unimplemented!("is_pertinent_to must be implemented by the first Handler in a Dialect")
+        unimplemented!("is_pertinent_to is not implemented by this Handler")
     }
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
@@ -266,7 +235,7 @@ pub trait AsyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
 clone_trait_object!(AsyncHandler);
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
+pub trait SyncHandler: IntoHandler + RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     /// For each [`Schema`] compiled by the [`Interrogator`], this `Handler` is
     /// cloned and [`setup`] is called.
     ///
@@ -307,40 +276,14 @@ pub trait SyncHandler: IntoHandler + Send + Sync + DynClone + fmt::Debug {
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".parse().unwrap())));
     /// ```
     #[allow(unused_variables)]
-    fn identify(&self, schema: &Value) -> Result<Option<Uri>, IdentifyError> {
+    fn identify(&self, schema: &Value) -> Result<Option<Identifier>, IdentifyError> {
         unimplemented!("identify must be implemented by the second Handler in a Dialect")
     }
-
-    /// Attempts to retrieve the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) of
-    /// the schema.
-    ///
-    /// # Convention
-    /// Exactly one `Handler` must implement the method `dialect` for a given `Dialect`. It
-    /// **must** be the **first** (index: `0`) `Handler` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
-    ///
-    /// # Example
-    /// ```rust
-    /// use grill::json_schema::draft_2020_12::SchemaHandler;
-    ///
-    /// let draft = "https://json-schema.org/draft/2020-12/schema";
-    /// let dialect = SchemaHandler.dialect(&json!({ "$schema": draft }));
-    /// assert_eq!(dialect.as_str(), draft);
-    /// ```
-    #[allow(unused_variables)]
-    fn dialect(&self, value: &Value) -> Result<Option<AbsoluteUri>, UriError> {
-        unimplemented!("dialect must be implemented by the first Handler in a Dialect")
-    }
-
     /// Determines if the schema is of a specific
     /// [`Dialect`](`crate::dialect::Dialect`).
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement the method `is_pertinent_to` for a
-    /// given `Dialect`. It **must** be the **first** (index: `0`) `Handler` in
-    /// the [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`)
+    /// Exactly one `Handler` must implement the method `is_pertinent_to` for a given `Dialect`.
     ///
     /// # Example
     /// ```rust

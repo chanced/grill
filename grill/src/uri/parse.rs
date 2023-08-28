@@ -19,13 +19,13 @@ pub(super) fn authority(value: &str) -> Result<super::Authority, AuthorityError>
 struct Parse<'a> {
     state: State,
     input: &'a str,
-    path_idx: u32,
-    username_idx: Option<u32>,
-    password_idx: Option<u32>,
-    host_idx: Option<u32>,
-    port_idx: Option<u32>,
-    query_idx: Option<u32>,
-    fragment_idx: Option<u32>,
+    path_index: u32,
+    username_index: Option<u32>,
+    password_index: Option<u32>,
+    host_index: Option<u32>,
+    port_index: Option<u32>,
+    query_index: Option<u32>,
+    fragment_index: Option<u32>,
 }
 
 impl<'a> Parse<'a> {
@@ -53,9 +53,9 @@ impl<'a> Parse<'a> {
             parser.next(i, c).transpose().unwrap();
         }
 
-        if parser.host_idx.is_none() && parser.username_idx.is_some() {
-            parser.port_idx = parser.password_idx.take();
-            parser.host_idx = parser.username_idx.take();
+        if parser.host_index.is_none() && parser.username_index.is_some() {
+            parser.port_index = parser.password_index.take();
+            parser.host_index = parser.username_index.take();
         }
 
         if !parser.path().is_empty() {
@@ -72,10 +72,10 @@ impl<'a> Parse<'a> {
 
         Ok(super::Authority {
             value: input.into(),
-            username_idx: parser.username_idx,
-            password_idx: parser.password_idx,
-            host_idx: parser.host_idx,
-            port_idx: parser.port_idx,
+            username_index: parser.username_index,
+            password_index: parser.password_index,
+            host_index: parser.host_index,
+            port_index: parser.port_index,
             port: parser.port().transpose()?,
         })
     }
@@ -106,9 +106,9 @@ impl<'a> Parse<'a> {
     }
 
     fn finalize_uri(mut self) -> Result<Uri, UriError> {
-        if self.username_idx.is_some() && self.host().is_none() {
-            self.host_idx = self.username_idx.take();
-            self.port_idx = self.password_idx.take();
+        if self.username_index.is_some() && self.host().is_none() {
+            self.host_index = self.username_index.take();
+            self.port_index = self.password_index.take();
         }
         let mut buf = String::with_capacity(self.input.len());
         let username = encode::username(self.username());
@@ -121,24 +121,24 @@ impl<'a> Parse<'a> {
         let fragment = encode::fragment(self.fragment());
         let has_path = !path.is_empty();
         let has_authority = username.is_some() || host.is_some();
-        let username_idx = write::username(&mut buf, username)?;
-        let password_idx = write::password(&mut buf, password)?;
-        let host_idx = write::host(&mut buf, host)?;
-        let port_idx = write::port(&mut buf, port_str)?;
-        let path_idx = write::path(&mut buf, path)?;
-        let query_idx = write::query(&mut buf, query, has_authority, has_path)?;
-        let fragment_idx = write::fragment(&mut buf, fragment)?;
+        let username_index = write::username(&mut buf, username)?;
+        let password_index = write::password(&mut buf, password)?;
+        let host_index = write::host(&mut buf, host)?;
+        let port_index = write::port(&mut buf, port_str)?;
+        let path_index = write::path(&mut buf, path)?;
+        let query_index = write::query(&mut buf, query, has_authority, has_path)?;
+        let fragment_index = write::fragment(&mut buf, fragment)?;
 
         Ok(RelativeUri {
             value: buf,
-            username_idx,
-            password_idx,
-            host_idx,
+            username_index,
+            password_index,
+            host_index,
             port,
-            port_idx,
-            path_idx,
-            query_idx,
-            fragment_idx,
+            port_index,
+            path_index,
+            query_index,
+            fragment_index,
         }
         .into())
     }
@@ -157,9 +157,9 @@ impl<'a> Parse<'a> {
     }
 
     fn host(&self) -> Option<&str> {
-        let end = self.port_idx().unwrap_or(self.path_idx());
-        self.host_idx().map(|mut i| {
-            if self.password_idx.is_some() || self.username_idx.is_some() {
+        let end = self.port_index().unwrap_or(self.path_index());
+        self.host_index().map(|mut i| {
+            if self.password_index.is_some() || self.username_index.is_some() {
                 i += 1;
             }
             &self.input[i..end]
@@ -174,7 +174,8 @@ impl<'a> Parse<'a> {
     }
 
     fn port_str(&self) -> Option<&str> {
-        self.port_idx().map(|i| &self.input[i + 1..self.path_idx()])
+        self.port_index()
+            .map(|i| &self.input[i + 1..self.path_index()])
     }
 
     fn path(&self) -> &str {
@@ -182,33 +183,33 @@ impl<'a> Parse<'a> {
     }
 
     fn username(&self) -> Option<&str> {
-        self.username_idx()
-            .map(|i| &self.input[i..self.password_idx().unwrap_or(self.path_idx())])
+        self.username_index()
+            .map(|i| &self.input[i..self.password_index().unwrap_or(self.path_index())])
     }
 
     fn password(&self) -> Option<&str> {
-        let end = self.host_idx().unwrap_or(self.path_idx());
-        self.password_idx().map(|i| &self.input[i + 1..end])
+        let end = self.host_index().unwrap_or(self.path_index());
+        self.password_index().map(|i| &self.input[i + 1..end])
     }
 
     fn query(&self) -> Option<&str> {
-        self.query_idx()
-            .map(|i| &self.input[i + 1..self.fragment_idx().unwrap_or(self.input.len())])
+        self.query_index()
+            .map(|i| &self.input[i + 1..self.fragment_index().unwrap_or(self.input.len())])
     }
 
     fn fragment(&self) -> Option<&str> {
-        self.fragment_idx()
+        self.fragment_index()
             .map(|i| &self.input[i..self.input.len()])
     }
 
     fn set_query(&mut self, index: u32) {
         self.maybe_finalize_authority(index);
-        self.query_idx = self.query_idx.or(Some(index));
+        self.query_index = self.query_index.or(Some(index));
     }
 
     fn set_fragment(&mut self, index: u32) {
         self.maybe_finalize_authority(index);
-        self.fragment_idx = self.fragment_idx.or(Some(index));
+        self.fragment_index = self.fragment_index.or(Some(index));
     }
 
     fn set_path_index(&mut self, index: u32) {
@@ -216,70 +217,70 @@ impl<'a> Parse<'a> {
     }
 
     fn set_username(&mut self, index: u32) {
-        self.username_idx.get_or_insert(index);
-        self.path_idx = index + 1;
+        self.username_index.get_or_insert(index);
+        self.path_index = index + 1;
     }
 
     fn set_password(&mut self, index: u32) {
-        self.password_idx.get_or_insert(index);
-        self.path_idx = index + 1;
+        self.password_index.get_or_insert(index);
+        self.path_index = index + 1;
     }
 
     fn set_port(&mut self, index: u32) {
-        self.port_idx.get_or_insert(index);
-        self.path_idx = index + 1;
+        self.port_index.get_or_insert(index);
+        self.path_index = index + 1;
     }
 
     fn set_host(&mut self, index: u32) {
         if self.state.is_port() {
-            self.port_idx = None;
+            self.port_index = None;
         }
-        self.host_idx.get_or_insert(index);
-        self.path_idx = index + 1;
+        self.host_index.get_or_insert(index);
+        self.path_index = index + 1;
     }
 
     fn maybe_finalize_authority(&mut self, index: u32) {
         if self.state.is_authority() {
-            self.path_idx = index;
+            self.path_index = index;
         }
-        if self.host_idx.is_none() && self.username_idx.is_some() {
-            self.host_idx = self.username_idx.take();
-            self.password_idx = self.password_idx.take();
+        if self.host_index.is_none() && self.username_index.is_some() {
+            self.host_index = self.username_index.take();
+            self.password_index = self.password_index.take();
         }
     }
 
-    fn path_idx(&self) -> usize {
-        self.path_idx as usize
+    fn path_index(&self) -> usize {
+        self.path_index as usize
     }
 
     fn path_range(&self) -> Range<usize> {
-        self.path_idx()..self.path_end_idx()
+        self.path_index()..self.path_end_index()
     }
-    fn path_end_idx(&self) -> usize {
-        self.query_idx
-            .or(self.fragment_idx)
+    fn path_end_index(&self) -> usize {
+        self.query_index
+            .or(self.fragment_index)
             .map_or_else(|| self.input.len(), |i| i as usize)
     }
 
-    fn fragment_idx(&self) -> Option<usize> {
-        self.fragment_idx.map(|i| i as usize)
+    fn fragment_index(&self) -> Option<usize> {
+        self.fragment_index.map(|i| i as usize)
     }
-    fn host_idx(&self) -> Option<usize> {
-        self.host_idx.map(|i| i as usize)
+    fn host_index(&self) -> Option<usize> {
+        self.host_index.map(|i| i as usize)
     }
-    fn port_idx(&self) -> Option<usize> {
-        self.port_idx.map(|i| i as usize)
+    fn port_index(&self) -> Option<usize> {
+        self.port_index.map(|i| i as usize)
     }
-    fn username_idx(&self) -> Option<usize> {
-        self.username_idx.map(|i| i as usize)
-    }
-
-    fn password_idx(&self) -> Option<usize> {
-        self.password_idx.map(|i| i as usize)
+    fn username_index(&self) -> Option<usize> {
+        self.username_index.map(|i| i as usize)
     }
 
-    fn query_idx(&self) -> Option<usize> {
-        self.query_idx.map(|i| i as usize)
+    fn password_index(&self) -> Option<usize> {
+        self.password_index.map(|i| i as usize)
+    }
+
+    fn query_index(&self) -> Option<usize> {
+        self.query_index.map(|i| i as usize)
     }
 }
 

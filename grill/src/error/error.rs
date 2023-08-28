@@ -228,6 +228,21 @@ pub enum DialectError {
         "the primary metaschema with id \"{0}\" was not found within the supplied metaschemas"
     )]
     PrimaryMetaschemaNotFound(AbsoluteUri),
+
+    /// Exactly one [`Handler`](crate::handler::Handler) must implement
+    /// implement [`is_pertinent_to`](`crate::handler::Handler::is_pertinent_to`) but none were provided.
+    #[error("exactly one `Handler` must implemenet the `is_pertinent_to` method; none were found")]
+    IsPertinentToNotImplemented(AbsoluteUri),
+
+    /// Exactly one [`Handler`](crate::handler::Handler) must implement
+    /// implement [`dialect`](`crate::handler::Handler::dialect`) but none were provided.
+    #[error("exactly one `Handler` must implement the `dialect` method; none were found")]
+    DialectNotImplemented(AbsoluteUri),
+
+    /// At least one [`Handler`](crate::handler::Handler) must implement
+    /// implement [`identify`](`crate::handler::Handler::identify`) but none were provided.
+    #[error("exactly one `Handler` must implement the `identify` method; none were found")]
+    IdentifyNotImplemented(AbsoluteUri),
 }
 
 #[derive(Debug, Error)]
