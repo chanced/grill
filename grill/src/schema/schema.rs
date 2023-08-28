@@ -1,5 +1,5 @@
 use crate::{
-    error::{CompileError, SourceConflictError, SourceError, UnknownKeyError},
+    error::{CompileError, SourceConflictError, SourceError, UnknownAnchorError, UnknownKeyError},
     handler::Handler,
     schema::{
         traverse::{
@@ -11,6 +11,7 @@ use crate::{
     source::{Deserializers, Link, Resolvers, Source, Sources},
     AbsoluteUri,
 };
+use async_recursion::async_recursion;
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -91,6 +92,8 @@ pub struct Schema<'i> {
     /// be present in this list as per the specification, `Schema`s which are
     /// identified are to be treated as root schemas.
     pub subschemas: Cow<'i, [Key]>,
+    /// Anchors within this `Schema`
+    pub anchors: Cow<'i, [Anchor]>,
     /// Dependents of this `Schema`.
     pub dependents: Cow<'i, [Key]>,
     ///  Dependencies of this `Schema`.
@@ -109,6 +112,7 @@ impl<'i> Schema<'i> {
             id: compiled.id.as_ref().map(Cow::Borrowed),
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
+            anchors: Cow::Borrowed(&compiled.anchors),
             source: Source::new(&compiled.src, sources),
             parent: compiled.parent,
             subschemas: Cow::Borrowed(&compiled.subschemas),
@@ -127,6 +131,7 @@ impl<'i> Schema<'i> {
             uris: Cow::Owned(self.uris.into_owned()),
             metaschema: Cow::Owned(self.metaschema.into_owned()),
             source: self.source.into_owned(),
+            anchors: Cow::Owned(self.anchors.into_owned()),
             dependents: Cow::Owned(self.dependents.into_owned()),
             references: Cow::Owned(self.references.into_owned()),
             handlers: Cow::Owned(self.handlers.into_owned()),
@@ -226,23 +231,57 @@ impl Schemas {
         }
     }
 
-    pub(crate) async fn compile(&mut self, params: Params<'_>) -> Result<Key, CompileError> {
-        let Params {
-            base_uri,
-            path,
-            src,
-            mut parent,
-            sources,
-            dialects,
-            deserializers,
-            resolvers,
-        } = params;
-        let source = sources.get(src.key).clone();
-        // determining the dialect
+    #[allow(clippy::too_many_lines)]
+    #[async_recursion(?Send)]
+    pub(crate) async fn compile(
+        &mut self,
+        link: Link,
+        mut parent: Option<Key>,
+        sources: &mut Sources,
+        dialects: &Dialects<'_>,
+        deserializers: &Deserializers,
+        resolvers: &Resolvers,
+    ) -> Result<Key, CompileError> {
+        let store = self.store_mut();
+
+        // checking to ensure that the schema has not already been compiled
+        if store.index.contains_key(&link.uri) {
+            // if so, return it.
+            return Ok(store.get_index(&link.uri).unwrap());
+        }
+
+        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
+        if !fragment.is_empty() && !fragment.starts_with('/') {
+            // this schema is anchored.. we need to compile the root first if it doesn't already exist.
+            let mut base_uri = link.uri.clone();
+            base_uri.set_fragment(None).unwrap();
+            let (root_link, _) = sources
+                .resolve(base_uri.clone(), resolvers, deserializers)
+                .await?;
+            let root_link = root_link.clone();
+            let _ = self
+                .compile(root_link, None, sources, dialects, deserializers, resolvers)
+                .await?;
+
+            // at this stage, all URIs should be indexed.
+            match self.get_by_uri(&link.uri, sources) {
+                Some(anchored) => return Ok(anchored.key),
+                None => {
+                    return Err(UnknownAnchorError {
+                        anchor: fragment,
+                        uri: link.uri.clone(),
+                    }
+                    .into())
+                }
+            }
+        }
+        let source = sources.get(link.key).clone();
+
+        // determine the dialect
         let dialect = dialects.pertinent_to_or_default(&source);
 
-        // identifying the schema
-        let (id, uris) = dialect.identify(base_uri.clone(), path, &source)?;
+        // identify the schema
+        let (id, uris) = dialect.identify(link.uri.clone(), &link.path, &source)?;
 
         // if identify did not find a primary id, use the uri + pointer fragment
         // as the lookup which will be at the first position in the uris list
@@ -253,10 +292,9 @@ impl Schemas {
             return Ok(*key.get());
         }
 
-        // if parent is None and this schema is not a document root (that is,
-        // has an $id) then attempt to locate the parent using the pointer
+        // if parent is None and this schema is not a document root (does not
+        // have an $id) then attempt to locate the parent using the pointer
         // fragment.
-        // this shouldn't be used much, if at all, but its here for safety
         if id.is_none()
             && parent.is_none()
             && lookup_id.has_fragment()
@@ -267,24 +305,28 @@ impl Schemas {
 
         // linking all URIs of this schema to the the source location
         for uri in &uris {
-            sources.link(uri.clone(), src.uri.clone(), src.path.clone())?;
+            sources.link(uri.clone(), link.uri.clone(), link.path.clone())?;
         }
-        let base_uri = id.clone().unwrap_or(base_uri);
 
+        let base_uri = id.clone().unwrap_or(link.uri.clone());
+        let link = sources.get_link(&base_uri).cloned().unwrap();
+
+        let anchors = dialect.anchors(&source)?;
         // create a new CompiledSchema and insert it. if compiling fails, the
         // schema store will rollback to its previous state.
+
         let key = self
             .insert(CompiledSchema {
-                id,
+                id: id.clone(),
                 uris,
                 metaschema: dialect.primary_metaschema_id().clone(),
                 handlers: dialect.handlers.clone().into_boxed_slice(),
                 parent,
-                src: src.clone(),
-                subschemas: Vec::default(),
-                dependents: Vec::default(),
-                references: Vec::default(),
-                anchors: Vec::default(),
+                src: link.clone(),
+                subschemas: Vec::default(), // set below
+                dependents: Vec::default(), // set below
+                references: Vec::default(), // set below
+                anchors: anchors.clone(),
             })
             .map_err(|uri| {
                 SourceError::from(SourceConflictError {
@@ -293,43 +335,53 @@ impl Schemas {
                 })
             })?;
 
-        // gather references
-        for Reference {
-            keyword,
-            ref_path,
-            uri,
-            key,
-            src_key,
-        } in dialect.references(&source)?
-        {
-            let mut base_uri = uri.clone();
-            let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
-            let (_, src) = sources
-                .resolve(uri.clone(), resolvers, deserializers)
+        // resolving & compiling references
+
+        let mut references = dialect.references(&source)?;
+        for reference in &mut references {
+            let (ref_link, _) = sources
+                .resolve(reference.uri.clone(), resolvers, deserializers)
                 .await?;
-            // let ref_key = self.compile(base_uri).await?;
+            let ref_link = ref_link.clone();
+            let ref_key = self
+                .compile(
+                    ref_link,
+                    Some(key),
+                    sources,
+                    dialects,
+                    deserializers,
+                    resolvers,
+                )
+                .await?;
+            reference.key = ref_key;
         }
+
+        // compiling nested schemas
 
         let mut subschemas = Vec::new();
 
-        // gathering nested schemas
-        // for subschema_path in dialect.subschemas(src_path, source) {
-        // let subschema = self
-        //     .compile(
-        //         base_uri.clone(),
-        //         &subschema_path,
-        //         src,
-        //         src_uri.clone(),
-        //         src_path,
-        //         Some(key),
-        //         sources,
-        //         dialects,
-        //         deserializers,
-        //         resolvers,
-        //     )
-        //     .await?;
-        // subschemas.push(subschema);
-        // }
+        let path = if id.is_some() {
+            Cow::Owned(Pointer::default())
+        } else {
+            Cow::Borrowed(&link.path)
+        };
+        for subschema_path in dialect.subschemas(&path, &source) {
+            let mut uri = base_uri.clone();
+            uri.set_fragment(Some(&subschema_path))?;
+            let (sub_link, _) = sources.resolve(uri, resolvers, deserializers).await?;
+            let sub_link = sub_link.clone();
+            let subschema = self
+                .compile(
+                    sub_link,
+                    Some(key),
+                    sources,
+                    dialects,
+                    deserializers,
+                    resolvers,
+                )
+                .await?;
+            subschemas.push(subschema);
+        }
 
         let schema = self.get_mut_unchecked(key);
         schema.subschemas = subschemas;
@@ -370,6 +422,18 @@ impl Schemas {
     pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i> {
         Descendants::new(key, self, sources)
     }
+
+    pub(crate) fn ensure_key_exists<T, F>(&self, key: Key, f: F) -> Result<T, UnknownKeyError>
+    where
+        F: FnOnce() -> T,
+    {
+        if self.store().contains_key(key) {
+            Ok(f())
+        } else {
+            Err(UnknownKeyError)
+        }
+    }
+
     pub(crate) fn direct_dependents<'i>(
         &'i self,
         key: Key,
@@ -422,6 +486,7 @@ impl Schemas {
             references: Cow::Borrowed(&schema.references),
             dependents: Cow::Borrowed(&schema.dependents),
             subschemas: Cow::Borrowed(&schema.subschemas),
+            anchors: Cow::Borrowed(&schema.anchors),
         })
     }
 
@@ -470,7 +535,7 @@ impl Schemas {
         uri: &AbsoluteUri,
         sources: &'i Sources,
     ) -> Option<Schema<'i>> {
-        let key = self.store.index.get(uri).copied()?;
+        let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
 
@@ -480,7 +545,7 @@ impl Schemas {
     }
 
     pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> bool {
-        let from = self.store.get(from).unwrap();
+        let from = self.store().get(from).unwrap();
         todo!()
     }
 
@@ -502,19 +567,8 @@ impl Schemas {
     }
 
     pub(crate) fn contains_key(&self, key: Key) -> bool {
-        self.store.contains_key(key)
+        self.store().contains_key(key)
     }
-}
-
-pub(crate) struct Params<'i> {
-    base_uri: AbsoluteUri,
-    path: &'i Pointer,
-    src: Link,
-    parent: Option<Key>,
-    sources: &'i mut Sources,
-    dialects: &'i Dialects<'i>,
-    deserializers: &'i Deserializers,
-    resolvers: &'i Resolvers,
 }
 
 #[cfg(test)]

@@ -548,16 +548,29 @@ pub enum CompileError {
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
     /// schema's path as a JSON [`Pointer`](jsonptr::Pointer).
-    #[error("failed to parse JSON Pointer from ")]
+    #[error(transparent)]
     LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
 
     /// Failed to link sources
     #[error("failed to create source link: {0}")]
-    LinkError(#[from] LinkError),
+    FailedToLinkSource(#[from] LinkError),
+
+    #[error(transparent)]
+    UnknownAnchor(#[from] UnknownAnchorError),
+
+    #[error(transparent)]
+    FailedToParseAnchor(#[from] AnchorError),
 
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
     Custom(#[from] Box<dyn StdError + Send + Sync>),
+}
+
+#[derive(Debug, Error)]
+#[error("unknown anchor: \"{}\" in URI \"{}\"", .anchor, .uri)]
+pub struct UnknownAnchorError {
+    pub anchor: String,
+    pub uri: AbsoluteUri,
 }
 
 /// A source or schema could not be found.

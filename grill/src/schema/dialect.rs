@@ -1,7 +1,7 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
-use crate::error::{DialectExistsError, UriError};
+use crate::error::{AnchorError, DialectExistsError, UriError};
 use crate::handler::Handler;
 use crate::schema::Metaschema;
 use crate::Key;
@@ -24,7 +24,7 @@ use std::{
 };
 use tap::TapOptional;
 
-use super::Reference;
+use super::{Anchor, Reference};
 
 /// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
 /// schema.
@@ -141,6 +141,14 @@ impl Dialect {
             refs.append(&mut handler.references(source)?);
         }
         Ok(refs)
+    }
+
+    pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
+        let mut anchors = Vec::new();
+        for handler in &self.handlers {
+            anchors.append(&mut handler.anchors(source)?);
+        }
+        Ok(anchors)
     }
 
     /// Determines if the schema is pertinent to this `Dialect`.

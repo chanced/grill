@@ -1,6 +1,7 @@
-use std::{borrow::Borrow, fmt::Debug, ops::Deref};
+use std::{borrow::Borrow, collections::HashMap, fmt::Debug, ops::Deref};
 
 use serde_json::Value;
+use tap::{Tap, TapFallible};
 
 use crate::{
     error::{
@@ -11,11 +12,12 @@ use crate::{
     output::{Output, Structure},
     schema::{
         traverse::{
-            Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
+            Ancestors, Descendants, DirectDependencies, DirectDependents, Iter, IterUnchecked,
+            TransitiveDependencies,
         },
         Dialect, Dialects, Key, Keyword, Schema, Schemas,
     },
-    source::{Deserializers, Resolvers, Sources, Src},
+    source::{Deserializers, Link, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Builder,
 };
@@ -139,7 +141,8 @@ impl Interrogator {
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
     pub fn direct_dependencies(&self, key: Key) -> Result<DirectDependencies<'_>, UnknownKeyError> {
-        self.ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
+        self.schemas
+            .ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
     }
 
     /// Returns [`DirectDependencies`] which is an [`Iterator`] over the direct
@@ -212,11 +215,7 @@ impl Interrogator {
     where
         F: FnOnce() -> T,
     {
-        if self.schemas.contains_key(key) {
-            Ok(f())
-        } else {
-            Err(UnknownKeyError)
-        }
+        self.schemas.ensure_key_exists(key, f)
     }
 
     /// Compiles all schemas at the given URIs if not already compiled, returning
@@ -240,26 +239,29 @@ impl Interrogator {
     ///     assert_eq!(schemas.len(), 2);
     /// }
     /// ```
+    ///
     #[allow(clippy::unused_async)]
-    pub async fn compile_all<I>(&mut self, uris: I) -> Result<Vec<Schema<'static>>, CompileError>
+    pub async fn compile_all<I>(&mut self, uris: I) -> Result<Vec<(AbsoluteUri, Key)>, CompileError>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
     {
+        let uris = uris.into_iter();
+        let (lower, upper) = uris.size_hint();
+        let mut keys = Vec::with_capacity(upper.unwrap_or(lower));
         self.start_txn();
-        let mut keys = Vec::new();
         for uri in uris {
-            // let schema = self
-            //     .compile_schema(uri)
-            //     .await
-            //     .tap_err(|_| self.schemas.rollback_txn())?;
-            // keys.push(schema);
+            let uri = uri
+                .try_into_absolute_uri()
+                .tap_err(|_| self.rollback_txn())?;
+            let key = self
+                .compile_schema(uri.clone())
+                .await
+                .tap_err(|_| self.rollback_txn())?;
+            keys.push((uri, key));
         }
         self.commit_txn();
-        Ok(keys
-            .into_iter()
-            .map(|key| self.schemas.get(key, &self.sources).unwrap().into_owned())
-            .collect())
+        Ok(keys)
     }
 
     /// Attempts to compile the schema at the given URI if not already compiled,
@@ -273,16 +275,47 @@ impl Interrogator {
     ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     #[allow(clippy::unused_async)]
     pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+        // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
         self.start_txn();
-        // convert the uri to an absolute uri
         let uri = uri.try_into_absolute_uri()?;
-        // resolving the uri provided.
-        // let (ptr, value) = self.resolve(&uri).await?;
-        // self.compile_schema(uri, &value)
-        //     .await
-        //     .tap_ok(|_| self.accept_txn())
-        //     .tap_err(|_| self.rollback_txn());
-        todo!()
+        match self.compile_schema(uri).await {
+            Ok(key) => {
+                self.commit_txn();
+                Ok(key)
+            }
+            Err(err) => {
+                self.rollback_txn();
+                Err(err)
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn iter<'i>(&'i self, keys: &'i [Key]) -> Iter<'i> {
+        Iter::new(keys, &self.schemas, &self.sources)
+    }
+
+    #[must_use]
+    pub fn iter_unchecked<'i>(&'i self, keys: &'i [Key]) -> IterUnchecked<'i> {
+        self.iter(keys).unchecked()
+    }
+
+    async fn compile_schema(&mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
+        let (link, _) = self
+            .sources
+            .resolve(uri.clone(), &self.resolvers, &self.deserializers)
+            .await?;
+        let link = link.clone();
+        self.schemas
+            .compile(
+                link,
+                None,
+                &mut self.sources,
+                &self.dialects,
+                &self.deserializers,
+                &self.resolvers,
+            )
+            .await
     }
 
     #[must_use]
@@ -511,9 +544,7 @@ impl Interrogator {
         }
         Ok(())
     }
-}
 
-impl Interrogator {
     /// Returns a new, empty [`Builder`].
     #[must_use]
     #[allow(unused_must_use)]
@@ -581,6 +612,25 @@ impl Interrogator {
     pub(crate) fn rollback_txn(&mut self) {
         self.schemas.rollback_txn();
         self.sources.rollback_txn();
+    }
+
+    /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
+    fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>
+    where
+        F: FnOnce(&mut Self) -> Result<O, E>,
+    {
+        self.start_txn();
+        let result = f(self);
+        match result {
+            Ok(res) => {
+                self.commit_txn();
+                Ok(res)
+            }
+            Err(err) => {
+                self.rollback_txn();
+                Err(err)
+            }
+        }
     }
 }
 

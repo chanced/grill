@@ -303,7 +303,7 @@ impl Sources {
             Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
         }
     }
-    fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
+    pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
         self.store().get_link(uri)
     }
 
