@@ -6,7 +6,7 @@ use crate::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
         },
-        Anchor, Dialects, Reference,
+        Anchor, Dialect, Dialects, Reference,
     },
     source::{Deserializers, Link, Resolvers, Source, Sources},
     AbsoluteUri,
@@ -242,17 +242,16 @@ impl Schemas {
         deserializers: &Deserializers,
         resolvers: &Resolvers,
     ) -> Result<Key, CompileError> {
-        let store = self.store_mut();
-
-        // checking to ensure that the schema has not already been compiled
-        if store.index.contains_key(&link.uri) {
+        // check to see if schema is already been compiled
+        if self.sandbox().index.contains_key(&link.uri) {
             // if so, return it.
-            return Ok(store.get_index(&link.uri).unwrap());
+            return Ok(self.sandbox().get_index(&link.uri).unwrap());
         }
 
         let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
         if !fragment.is_empty() && !fragment.starts_with('/') {
-            // this schema is anchored.. we need to compile the root first if it doesn't already exist.
+            // this schema is anchored
+            // need to compile the root first
             let mut base_uri = link.uri.clone();
             base_uri.set_fragment(None).unwrap();
             let (root_link, _) = sources
@@ -287,8 +286,8 @@ impl Schemas {
         // as the lookup which will be at the first position in the uris list
         let lookup_id = id.as_ref().unwrap_or(&uris[0]);
 
-        // checking to see if the schema has already been compiled under the id
-        if let Entry::Occupied(key) = self.index_entry(lookup_id.clone()) {
+        // check to see if the schema has already been compiled under the id
+        if let Entry::Occupied(key) = self.sandbox().index_entry(lookup_id.clone()) {
             return Ok(*key.get());
         }
 
@@ -316,6 +315,7 @@ impl Schemas {
         // schema store will rollback to its previous state.
 
         let key = self
+            .sandbox()
             .insert(CompiledSchema {
                 id: id.clone(),
                 uris,
@@ -335,8 +335,22 @@ impl Schemas {
                 })
             })?;
 
-        // resolving & compiling references
+        let subschemas = self
+            .compile_subschemas(compile::Subschemas {
+                id: id.as_ref(),
+                base_uri: &base_uri,
+                path: &link.path,
+                source: &source,
+                parent: key,
+                dialect,
+                dialects,
+                deserializers,
+                resolvers,
+                sources,
+            })
+            .await?;
 
+        // resolving & compiling references
         let mut references = dialect.references(&source)?;
         for reference in &mut references {
             let (ref_link, _) = sources
@@ -344,28 +358,41 @@ impl Schemas {
                 .await?;
             let ref_link = ref_link.clone();
             let ref_key = self
-                .compile(
-                    ref_link,
-                    Some(key),
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                )
+                .compile(ref_link, None, sources, dialects, deserializers, resolvers)
                 .await?;
             reference.key = ref_key;
+            let ref_schema = self.sandbox().get_mut(ref_key).unwrap();
+            ref_schema.dependents.push(key);
         }
 
-        // compiling nested schemas
+        let schema = self.get_mut_unchecked(key);
 
+        todo!()
+    }
+
+    async fn compile_subschemas(
+        &mut self,
+        compile::Subschemas {
+            id,
+            base_uri,
+            path,
+            source,
+            parent,
+            dialect,
+            dialects,
+            deserializers,
+            resolvers,
+            sources,
+        }: compile::Subschemas<'_>,
+    ) -> Result<Vec<Key>, CompileError> {
+        // compile nested schemas
         let mut subschemas = Vec::new();
-
         let path = if id.is_some() {
             Cow::Owned(Pointer::default())
         } else {
-            Cow::Borrowed(&link.path)
+            Cow::Borrowed(path)
         };
-        for subschema_path in dialect.subschemas(&path, &source) {
+        for subschema_path in dialect.subschemas(&path, source) {
             let mut uri = base_uri.clone();
             uri.set_fragment(Some(&subschema_path))?;
             let (sub_link, _) = sources.resolve(uri, resolvers, deserializers).await?;
@@ -373,7 +400,7 @@ impl Schemas {
             let subschema = self
                 .compile(
                     sub_link,
-                    Some(key),
+                    Some(parent),
                     sources,
                     dialects,
                     deserializers,
@@ -382,20 +409,13 @@ impl Schemas {
                 .await?;
             subschemas.push(subschema);
         }
-
-        let schema = self.get_mut_unchecked(key);
-        schema.subschemas = subschemas;
-
-        todo!()
+        Ok(subschemas)
     }
+
     fn sandbox(&mut self) -> &mut Store {
         self.sandbox
             .as_mut()
             .expect("transaction failed: schema sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new")
-    }
-
-    fn store_mut(&mut self) -> &mut Store {
-        self.sandbox()
     }
 
     fn store(&self) -> &Store {
@@ -408,7 +428,7 @@ impl Schemas {
         self.store().get_index(id)
     }
     fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
-        self.store_mut().index_entry(id)
+        self.sandbox().index_entry(id)
     }
     pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
         self.sandbox().insert(schema)
@@ -568,6 +588,22 @@ impl Schemas {
 
     pub(crate) fn contains_key(&self, key: Key) -> bool {
         self.store().contains_key(key)
+    }
+}
+
+mod compile {
+    use super::*;
+    pub(super) struct Subschemas<'i> {
+        pub(crate) id: Option<&'i AbsoluteUri>,
+        pub(crate) base_uri: &'i AbsoluteUri,
+        pub(crate) path: &'i Pointer,
+        pub(crate) source: &'i Value,
+        pub(crate) parent: Key,
+        pub(crate) dialect: &'i Dialect,
+        pub(crate) dialects: &'i Dialects<'i>,
+        pub(crate) deserializers: &'i Deserializers,
+        pub(crate) resolvers: &'i Resolvers,
+        pub(crate) sources: &'i mut Sources,
     }
 }
 

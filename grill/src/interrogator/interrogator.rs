@@ -1,7 +1,7 @@
-use std::{borrow::Borrow, collections::HashMap, fmt::Debug, ops::Deref};
+use std::{borrow::Borrow, fmt::Debug, ops::Deref};
 
 use serde_json::Value;
-use tap::{Tap, TapFallible};
+use tap::TapFallible;
 
 use crate::{
     error::{
@@ -17,7 +17,7 @@ use crate::{
         },
         Dialect, Dialects, Key, Keyword, Schema, Schemas,
     },
-    source::{Deserializers, Link, Resolvers, Sources, Src},
+    source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Builder,
 };
@@ -614,24 +614,24 @@ impl Interrogator {
         self.sources.rollback_txn();
     }
 
-    /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
-    fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>
-    where
-        F: FnOnce(&mut Self) -> Result<O, E>,
-    {
-        self.start_txn();
-        let result = f(self);
-        match result {
-            Ok(res) => {
-                self.commit_txn();
-                Ok(res)
-            }
-            Err(err) => {
-                self.rollback_txn();
-                Err(err)
-            }
-        }
-    }
+    // /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
+    // fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>
+    // where
+    //     F: FnOnce(&mut Self) -> Result<O, E>,
+    // {
+    //     self.start_txn();
+    //     let result = f(self);
+    //     match result {
+    //         Ok(res) => {
+    //             self.commit_txn();
+    //             Ok(res)
+    //         }
+    //         Err(err) => {
+    //             self.rollback_txn();
+    //             Err(err)
+    //         }
+    //     }
+    // }
 }
 
 #[cfg(test)]
