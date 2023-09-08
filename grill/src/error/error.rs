@@ -9,11 +9,12 @@ pub use url::ParseError as UrlError;
 pub use urn::Error as UrnError;
 
 use crate::{schema::Keyword, uri::AbsoluteUri, Output, Uri};
-use serde_json::{Number, Value};
+use serde_json::Value;
 use std::{
     collections::HashMap,
     error::Error as StdError,
     fmt::{self, Debug, Display},
+    num::ParseIntError,
     ops::Deref,
     string::FromUtf8Error,
 };
@@ -282,12 +283,25 @@ pub enum BuildError {
 }
 
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
-#[derive(Debug, Error)]
-#[error("failed to parse number \"{number}\":\n\t{error}")]
-pub struct NumberError {
-    pub error: String,
-    /// The [`Number`] which failed to parse.
-    pub number: Number,
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum NumberError {
+    #[error("failed to parse exponent of number \"{value}\":\n\t{source}")]
+    FailedToParseExponent {
+        value: String,
+        #[source]
+        source: ParseIntError,
+    },
+    #[error("failed to parse number \"{value}\":\n\tunexpected character: '{character}' at index {index}")]
+    UnexpectedChar {
+        value: String,
+        character: char,
+        index: usize,
+    },
+    #[error("failed to parse number \"{value}\":\n\tnot an integer")]
+    NotAnInteger { value: String },
+    #[cfg(not(target_pointer_width = "64"))]
+    #[error("exponent ({value}) exceeds maximum value for non-64-bit architecture")]
+    ExponentTooLarge(OverflowError<u64, { usize::MAX as u64 }>),
 }
 
 /// An error occurred while evaluating a [`Value`].
@@ -554,7 +568,7 @@ pub enum CompileError {
 
     /// Failed to resolve or deserialize a source
     #[error(transparent)]
-    SourcingFailed(#[from] SourceError),
+    FailedToSource(#[from] SourceError),
 
     /// Failed to locate subschemas within a schema.
     #[error(transparent)]
@@ -566,6 +580,10 @@ pub enum CompileError {
     #[error(transparent)]
     LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
 
+    #[error(transparent)]
+    /// A [`Schema`] contains a cyclic dependency.
+    CyclicDependency(#[from] CyclicDependencyError),
+
     /// Failed to link sources
     #[error("failed to create source link: {0}")]
     FailedToLinkSource(#[from] LinkError),
@@ -575,6 +593,9 @@ pub enum CompileError {
 
     #[error(transparent)]
     FailedToParseAnchor(#[from] AnchorError),
+
+    #[error("schema not found: \"{0}\"")]
+    SchemaNotFound(AbsoluteUri),
 
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
@@ -586,6 +607,13 @@ pub enum CompileError {
 pub struct UnknownAnchorError {
     pub anchor: String,
     pub uri: AbsoluteUri,
+}
+
+#[derive(Debug, Error)]
+#[error("schema \"{}\" contains a cyclic dependency to \"{}\"", .from, .to)]
+pub struct CyclicDependencyError {
+    pub from: AbsoluteUri,
+    pub to: AbsoluteUri,
 }
 
 /// A source or schema could not be found.
@@ -638,8 +666,8 @@ impl From<InvalidPortError> for UriError {
         Self::FailedToParseRelativeUri(err.into())
     }
 }
-impl From<OverflowError> for UriError {
-    fn from(err: OverflowError) -> Self {
+impl From<OverflowError<usize, { u32::MAX as u64 }>> for UriError {
+    fn from(err: OverflowError<usize, { u32::MAX as u64 }>) -> Self {
         Self::FailedToParseRelativeUri(err.into())
     }
 }
@@ -749,7 +777,7 @@ pub struct InvalidPortError(pub String);
 pub enum RelativeUriError {
     /// The length of the input exceeds `u32::MAX`
     #[error(transparent)]
-    Overflow(#[from] OverflowError),
+    Overflow(#[from] OverflowError<usize, { u32::MAX as u64 }>),
 
     /// The decoded string is not valid UTF-8
     #[error(transparent)]
@@ -804,10 +832,16 @@ pub struct UnknownKeyError;
 /// A slice or string overflowed an allowed length maximum of `M`.
 #[derive(Debug, Clone, Copy, Error)]
 #[error("the length of a string or slice overflows the maximum of {M}, received {0}")]
-pub struct OverflowError<const M: usize = { u32::MAX as usize }, V = usize>(pub V);
-impl<const M: usize, V> OverflowError<M, V> {
+pub struct OverflowError<Value, const M: u64 = { u32::MAX as u64 }>(pub Value);
+impl<V, const M: u64> OverflowError<V, M> {
     /// The maximum allowed size.
-    pub const MAX: usize = M;
+    pub const MAX: u64 = M;
+}
+
+impl From<u64> for OverflowError<u64, { usize::MAX as u64 }> {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
 }
 
 #[derive(Debug, Error)]

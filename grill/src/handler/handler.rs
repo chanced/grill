@@ -22,6 +22,17 @@ pub enum Handler {
 }
 
 impl Handler {
+    pub async fn compile<'i>(
+        &mut self,
+        compile: &mut Compile<'i>,
+        schema: Schema<'i>,
+    ) -> Result<bool, CompileError> {
+        match self {
+            Self::Sync(handler) => handler.compile(compile, schema),
+            Self::Async(handler) => handler.compile(compile, schema).await,
+        }
+    }
+
     /// Returns `true` if the handler is [`Sync`].
     ///
     /// [`Sync`]: Handler::Sync
@@ -29,6 +40,7 @@ impl Handler {
     pub fn is_sync(&self) -> bool {
         matches!(self, Self::Sync(..))
     }
+
     #[must_use]
     #[allow(clippy::borrowed_box)]
     pub fn as_sync(&self) -> Option<&Box<dyn SyncHandler>> {
@@ -137,9 +149,9 @@ pub trait AsyncHandler: IntoHandler + RefUnwindSafe + Send + Sync + DynClone + f
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
     async fn compile<'i>(
-        &'i mut self,
-        compile: &'i mut Compile<'i>,
-        schema: &'i Value,
+        &mut self,
+        compile: &mut Compile<'i>,
+        schema: Schema<'i>,
     ) -> Result<bool, CompileError>;
 
     /// Executes the handler logic for the given [`Schema`] and [`Value`].
@@ -243,8 +255,8 @@ pub trait SyncHandler: IntoHandler + RefUnwindSafe + Send + Sync + DynClone + fm
     /// `true`. A return value of `false` indicates that [`execute`] should not
     /// be called for the given [`Schema`].
     fn compile<'i>(
-        &'i mut self,
-        compile: &'i mut Compile<'i>,
+        &mut self,
+        compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError>;
 
@@ -252,11 +264,11 @@ pub trait SyncHandler: IntoHandler + RefUnwindSafe + Send + Sync + DynClone + fm
     ///
     /// Handlers should fail fast if the `structure` is
     /// [`Structure::Flag`](`crate::output::Structure::Flag`)
-    fn evaluate<'i, 'v>(
-        &'i self,
-        scope: &'i mut Scope,
+    fn evaluate<'v>(
+        &self,
+        scope: &mut Scope,
         value: &'v Value,
-        _structure: Structure,
+        structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
 
     /// Attempts to identify the schema based on the

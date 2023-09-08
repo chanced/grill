@@ -1,9 +1,12 @@
+use super::{u64_to_usize, TEN};
 use std::str::FromStr;
 
-use num_rational::BigRational;
+use num::{pow, BigInt, BigRational, One, Zero};
 
-lazy_static::lazy_static! {
-    static ref TEN: BigInt = BigInt::from_u8(10).unwrap();
+use crate::error::NumberError;
+
+pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
+    Parser::parse(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,10 +19,6 @@ enum State {
     Exponent,
     Error,
 }
-use num::{integer, pow, BigInt, FromPrimitive, One, Signed, Zero};
-
-#[derive(Debug)]
-struct ParseNumberError;
 
 impl State {
     fn next(self, c: char) -> State {
@@ -68,11 +67,11 @@ struct Parser<'a> {
     is_negative: bool,
     integer_index: Option<usize>,
     fraction_index: Option<usize>,
-    exponent: Option<usize>,
+    exponent_index: Option<usize>,
 }
 
 impl<'a> Parser<'a> {
-    fn next(&mut self, i: usize, c: char) {
+    fn next(&mut self, i: usize, c: char) -> Result<(), NumberError> {
         use State::*;
         self.state = self.state.next(c);
         match self.state {
@@ -90,24 +89,31 @@ impl<'a> Parser<'a> {
                 }
             }
             E => {
-                self.exponent = Some(i);
+                self.exponent_index = Some(i);
             }
-            Error => panic!("error"),
+            Error => {
+                return Err(NumberError::UnexpectedChar {
+                    value: self.value.to_string(),
+                    character: c,
+                    index: i,
+                })
+            }
             _ => {}
         }
+        Ok(())
     }
-    fn parse(value: &'a str) {
+    fn parse(value: &'a str) -> Result<BigRational, NumberError> {
         let value = value.trim();
         let mut parser = Parser {
             value,
             state: State::Head,
             integer_index: None,
             fraction_index: None,
-            exponent: None,
+            exponent_index: None,
             is_negative: false,
         };
         for (i, c) in value.char_indices() {
-            parser.next(i, c);
+            parser.next(i, c)?;
         }
         let integer = BigInt::from_str(parser.integer()).unwrap();
         let fraction = parser
@@ -121,19 +127,32 @@ impl<'a> Parser<'a> {
 
         let fraction = BigRational::new(fraction, denom);
         let mut result = fraction + integer;
-        if let Some(exp) = parser.exponent().map(|e| i64::from_str(e).unwrap()) {
-            if exp.is_positive() {
-                result *= pow(TEN.clone(), exp as usize);
+        let exponent = parser
+            .exponent()
+            .map(i64::from_str)
+            .transpose()
+            .map_err(|err| NumberError::FailedToParseExponent {
+                value: value.to_string(),
+                source: err,
+            })?;
+
+        if let Some(exp) = exponent {
+            let is_positive = exp.is_positive();
+            #[cfg(not(target_pointer_width = "64"))]
+            let exp = u64_to_usize(exp.unsigned_abs())?;
+            #[cfg(target_pointer_width = "64")]
+            let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
+            if is_positive {
+                result *= pow(TEN.clone(), exp);
             } else {
-                result /= pow(TEN.clone(), exp.unsigned_abs() as usize);
+                result /= pow(TEN.clone(), exp);
             }
         }
-
-        println!("result: {}", result);
+        Ok(result)
     }
     fn fraction(&self) -> Option<&str> {
         let start = self.fraction_index?;
-        let end = self.exponent.unwrap_or(self.value.len());
+        let end = self.exponent_index.unwrap_or(self.value.len());
         Some(&self.value[start + 1..end])
     }
 
@@ -141,13 +160,13 @@ impl<'a> Parser<'a> {
         let Some(start) = self.integer_index else { return "0" };
         let end = self
             .fraction_index
-            .or(self.exponent)
+            .or(self.exponent_index)
             .unwrap_or(self.value.len());
         &self.value[start..end]
     }
 
     fn exponent(&self) -> Option<&str> {
-        let e = &self.value[self.exponent? + 1..];
+        let e = &self.value[self.exponent_index? + 1..];
         if e.is_empty() {
             None
         } else {

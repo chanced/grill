@@ -1,6 +1,6 @@
 use std::{borrow::Cow, str::Split};
 
-use crate::error::OverflowError;
+use crate::{big::usize_to_u32, error::OverflowError};
 
 /// A single query parameter key value pair.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -9,10 +9,8 @@ pub struct QueryParameter<'a> {
     eq_index: Option<u32>,
 }
 impl<'a> QueryParameter<'a> {
-    pub fn new(full: &'a str) -> Result<Self, OverflowError> {
-        if full.len() > u32::MAX as usize {
-            return Err(OverflowError(full.len()));
-        }
+    pub fn new(full: &'a str) -> Result<Self, OverflowError<usize, { u32::MAX as u64 }>> {
+        usize_to_u32(full.len())?;
         let eq_index = full.find('=').map(|i| i.try_into().unwrap());
         let full = full.into();
         Ok(Self { full, eq_index })
@@ -51,7 +49,7 @@ impl<'a> QueryParameter<'a> {
 }
 
 impl<'a> TryFrom<&'a str> for QueryParameter<'a> {
-    type Error = OverflowError;
+    type Error = OverflowError<usize, { u32::MAX as u64 }>;
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         Self::new(s)
@@ -63,7 +61,9 @@ pub struct QueryParameters<'a> {
     query: Option<Split<'a, char>>,
 }
 impl<'a> QueryParameters<'a> {
-    pub fn new(query: Option<&'a str>) -> Result<Self, OverflowError> {
+    pub fn new(
+        query: Option<&'a str>,
+    ) -> Result<Self, OverflowError<usize, { usize::MAX as u64 }>> {
         let Some(query) = query else { return Ok(Self { query: None }) };
         if query.len() > u32::MAX as usize {
             return Err(OverflowError(query.len()));

@@ -42,7 +42,6 @@ pub mod handler;
 pub mod json_schema;
 
 
-
 /// A JSON object.
 /// 
 /// Alias for [`serde_json::Map<String, serde_json::Value>`](`serde_json::Map`).
@@ -60,7 +59,7 @@ pub(crate) use source::Src;
 #[cfg(test)]
 pub mod test;
 
-pub(crate) mod number;
+pub mod big;
 
 // mod integration;
 // pub use integration::Integration;

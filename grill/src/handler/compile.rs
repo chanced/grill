@@ -1,39 +1,56 @@
-use std::marker::PhantomData;
+use num::{BigInt, BigRational};
+use serde_json::{Number, Value};
+
+use crate::{
+    error::{CompileError, NumberError},
+    schema::Schemas,
+    AbsoluteUri, Key, Uri,
+};
+
+use super::{IntKey, Numbers, RationalKey, ValueKey, Values};
 
 #[derive(Debug)]
 pub struct Compile<'i> {
-    marker: PhantomData<&'i ()>, // location: Location,
-                                 // anchors: Vec<(String, Anchor<'s>)>,
-                                 // schemas: HashMap<Keyword<'s>, Subschema<'s>>,
-                                 // numbers: HashMap<Keyword<'s>, &'s Number>,
-                                 // references: HashMap<Keyword<'s>, &'s str>,
+    base_uri: &'i AbsoluteUri,
+    schemas: &'i Schemas,
+
+    rationals: &'i mut Numbers<RationalKey, BigRational>,
+    ints: &'i mut Numbers<IntKey, BigInt>,
+    values: &'i mut Values,
 }
 
-// impl<'s> Compile<'s> {
-//     #[must_use]
-//     pub fn new(location: Location) -> Self {
-//         Self {
-//             location,
-//             anchors: Vec::new(),
-//             schemas: HashMap::default(),
-//             numbers: HashMap::default(),
-//             references: HashMap::default(),
-//         }
-//     }
+impl<'i> Compile<'i> {
+    /// Parses a [`Number`] into a [`BigRational`], stores it and returns the
+    /// [`RationalKey`].
+    ///
+    /// # Errors
+    /// Returns `NumberError` if the number fails to parse
+    pub fn rational(&mut self, value: &Number) -> Result<RationalKey, NumberError> {
+        self.rationals.insert(value)
+    }
+    /// Parses a [`Number`] into a [`BigInt`], stores it and returns the
+    /// [`IntKey`].
+    ///
+    /// # Errors
+    /// Returns `NumberError` if the number fails to parse
+    pub fn int(&mut self, num: &Number) -> Result<IntKey, NumberError> {
+        self.ints.insert(num)
+    }
+    /// Stores a [`Value`] and returns the [`ValueKey`].
+    pub fn value(&mut self, value: &Value) -> ValueKey {
+        self.values.insert(value)
+    }
 
-//     pub fn anchor(&mut self, anchor: Anchor<'s>) {
-//         self.anchors
-//             .push((self.location.absolute_keyword_location.clone(), anchor));
-//     }
-//     pub fn schema(&mut self, keyword: Keyword<'s>, schema: Subschema<'s>) {
-//         self.schemas.insert(keyword, schema);
-//     }
-//     pub fn reference(&mut self, keyword: Keyword<'s>, reference: &'s str) {
-//         self.references.insert(keyword, reference);
-//     }
-
-//     /// # Errors
-//     pub fn number<'x>(&'x mut self, keyword: Keyword<'s>, number: &'s Number) {
-//         self.numbers.entry(keyword).or_insert_with(|| number);
-//     }
-// }
+    /// Resolves a schema `Key` by URI
+    ///
+    /// # Errors
+    /// - `CompileError::SchemaNotFound` if the schema is not found
+    /// - `CompileError::UriParsingFailed` if the URI is invalid
+    pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
+        let uri: Uri = uri.parse()?;
+        let uri = self.base_uri.resolve(&uri)?;
+        self.schemas
+            .get_key_by_id(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+}

@@ -25,13 +25,12 @@ impl ConstHandler {
 
 impl SyncHandler for ConstHandler {
     fn compile<'i>(
-        &'i mut self,
+        &mut self,
         compile: &mut crate::handler::Compile<'i>,
         schema: crate::Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
         todo!()
     }
-
     fn evaluate<'i, 'v>(
         &'i self,
         scope: &'i mut Scope,

@@ -1,6 +1,7 @@
 use super::{Deserializers, Link, Resolvers};
 use crate::error::{
-    DeserializationError, LinkConflictError, LinkError, PointerError, SourceConflictError,
+    CompileError, DeserializationError, LinkConflictError, LinkError, PointerError,
+    SourceConflictError,
 };
 use crate::{
     error::{DeserializeError, SourceError},
@@ -203,19 +204,6 @@ pub(crate) struct Sources {
 }
 
 impl Sources {
-    fn sandbox(&mut self) -> &mut Store {
-        self.sandbox.as_mut().expect(SANDBOX_ERR)
-    }
-    fn store_mut(&mut self) -> &mut Store {
-        self.sandbox()
-    }
-    fn store(&self) -> &Store {
-        if let Some(sandbox) = self.sandbox.as_ref() {
-            return sandbox;
-        }
-        &self.store
-    }
-
     /// Returns a new [`Sources`] instance.
     ///
     /// # Errors
@@ -275,8 +263,71 @@ impl Sources {
 
         match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => self.check_existing_link(link),
-            Entry::Vacant(_) => self.try_create_link(from, link),
+            Entry::Vacant(_) => self.create_link(from, link),
         }
+    }
+
+    pub(crate) fn link_all(
+        &mut self,
+        primary: Option<&AbsoluteUri>,
+        from: &[AbsoluteUri],
+        to_uri: &AbsoluteUri,
+        to_path: &Pointer,
+    ) -> Result<(), LinkError> {
+        if let Some(primary) = primary {
+            self.link(primary.clone(), to_uri.clone(), to_path.clone())?;
+        }
+        for uri in from {
+            self.link(uri.clone(), to_uri.clone(), to_path.clone())?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
+        self.store().get_link(uri)
+    }
+
+    pub(crate) async fn resolve(
+        &mut self,
+        uri: AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(&Link, &Value), SourceError> {
+        // if the value has already been indexed, return it
+        let entry = self.store_mut().link_entry(uri.clone());
+        match entry {
+            Entry::Occupied(_) => self.resolve_internal(uri),
+            Entry::Vacant(_) => self.resolve_external(uri, resolvers, deserializers).await,
+        }
+    }
+
+    pub(crate) fn get(&self, key: SourceKey) -> &Value {
+        self.store.get(key)
+    }
+
+    #[must_use]
+    pub(crate) fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
+        self.store().get_by_uri(uri)
+    }
+
+    pub(crate) fn insert_value(
+        &mut self,
+        uri: AbsoluteUri,
+        src: Value,
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        self.store_mut().insert(uri, src)
+    }
+
+    pub(crate) fn insert_string(
+        &mut self,
+        uri: AbsoluteUri,
+        source: String,
+        deserializers: &Deserializers,
+    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        let src = deserializers
+            .deserialize(&source)
+            .map_err(|e| DeserializationError::new(uri.clone(), e))?;
+        self.insert_value(uri, src)
     }
 
     fn check_existing_link(&mut self, link: Link) -> Result<&Link, LinkError> {
@@ -291,7 +342,7 @@ impl Sources {
         .into())
     }
 
-    fn try_create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
+    fn create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(link.uri.clone()) {
             Entry::Occupied(_) => {
                 let root = self.store().get_link(&link.uri).unwrap();
@@ -303,11 +354,20 @@ impl Sources {
             Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
         }
     }
-    pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
-        self.store().get_link(uri)
-    }
 
-    async fn resolve_remote(
+    fn sandbox(&mut self) -> &mut Store {
+        self.sandbox.as_mut().expect(SANDBOX_ERR)
+    }
+    fn store_mut(&mut self) -> &mut Store {
+        self.sandbox()
+    }
+    fn store(&self) -> &Store {
+        if let Some(sandbox) = self.sandbox.as_ref() {
+            return sandbox;
+        }
+        &self.store
+    }
+    async fn resolve_external(
         &mut self,
         uri: AbsoluteUri,
         resolvers: &Resolvers,
@@ -341,71 +401,13 @@ impl Sources {
         Ok((link, src))
     }
 
-    fn resolve_local(&self, uri: AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+    fn resolve_internal(&self, uri: AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
         let link = self.store().get_link(&uri).unwrap();
         let mut src = self.store().get(link.key);
         if !link.path.is_empty() {
             src = src.resolve(&link.path).map_err(PointerError::from)?;
         }
         Ok((link, src))
-    }
-
-    // pub(crate) async fn resolve_remote<'i, 'r, 'd, 'u>(
-    //     &'i mut self,
-    //     entry: VacantEntry<'_, AbsoluteUri, Link>,
-    //     uri: &'u AbsoluteUri,
-    //     resolvers: &'r Resolvers,
-    //     deserializers: &'d Deserializers,
-    // ) -> Result<(&'i Link, &'i Value), SourceError> {
-    // }
-
-    pub(crate) async fn resolve(
-        &mut self,
-        uri: AbsoluteUri,
-        resolvers: &Resolvers,
-        deserializers: &Deserializers,
-    ) -> Result<(&Link, &Value), SourceError> {
-        // if the value has already been indexed, return it
-        let entry = self.store_mut().link_entry(uri.clone());
-        match entry {
-            Entry::Occupied(_) => self.resolve_local(uri),
-            Entry::Vacant(_) => self.resolve_remote(uri, resolvers, deserializers).await,
-        }
-    }
-
-    pub fn get(&self, key: SourceKey) -> &Value {
-        self.store.get(key)
-    }
-
-    #[must_use]
-    pub fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
-        self.store().get_by_uri(uri)
-    }
-
-    pub(crate) fn insert_value(
-        &mut self,
-        uri: AbsoluteUri,
-        src: Value,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
-        self.store_mut().insert(uri, src)
-    }
-
-    pub(crate) fn insert_string(
-        &mut self,
-        uri: AbsoluteUri,
-        source: String,
-        deserializers: &Deserializers,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
-        let src = deserializers
-            .deserialize(&source)
-            .map_err(|e| DeserializationError::new(uri.clone(), e))?;
-        self.insert_value(uri, src)
-    }
-
-    #[must_use]
-    pub fn contains(&self, uri: &AbsoluteUri) -> bool {
-        // self.index.contains_key(uri)
-        todo!()
     }
 }
 

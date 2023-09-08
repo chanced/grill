@@ -2,13 +2,13 @@ use std::{borrow::Cow, fmt::Write};
 
 use crate::error::OverflowError;
 
-use crate::number::usize_to_u32;
+use crate::big::usize_to_u32;
 
 #[allow(clippy::unnecessary_unwrap, clippy::unnecessary_wraps)]
 pub(super) fn username<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     username: Option<T>,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(authority) = username else { return Ok(None) };
     let authority = authority.into();
     if !buf.ends_with("//") && !authority.starts_with("//") {
@@ -21,7 +21,7 @@ pub(super) fn username<'a, T: Into<Cow<'a, str>>>(
 pub(super) fn password<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     password: Option<T>,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(password) = password else { return Ok(None) };
     let password = password.into();
     _ = buf.trim_end_matches(':');
@@ -37,7 +37,7 @@ pub(super) fn password<'a, T: Into<Cow<'a, str>>>(
 pub(super) fn host<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     host: Option<T>,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(host) = host else { return Ok(None) };
     let host = host.into();
     _ = buf.trim_end_matches('@');
@@ -57,7 +57,7 @@ pub(super) fn host<'a, T: Into<Cow<'a, str>>>(
 pub(super) fn port<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     port: Option<T>,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(port) = port else { return Ok(None) };
     let port = port.into();
     _ = buf.trim_end_matches(':');
@@ -74,7 +74,7 @@ pub(super) fn port<'a, T: Into<Cow<'a, str>>>(
 pub(super) fn path<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     path: T,
-) -> Result<u32, OverflowError> {
+) -> Result<u32, OverflowError<usize, { u32::MAX as u64 }>> {
     let path = path.into();
     if path.is_empty() {
         if buf.is_empty() {
@@ -95,7 +95,7 @@ pub(super) fn query<'a, T: Into<Cow<'a, str>>>(
     query: Option<T>,
     has_authority: bool,
     has_path: bool,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(query) = query else { return Ok(None) };
     let query = query.into();
     if has_authority && !has_path && !buf.is_empty() && !buf.ends_with('/') {
@@ -112,7 +112,7 @@ pub(super) fn query<'a, T: Into<Cow<'a, str>>>(
 pub(super) fn fragment<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     fragment: Option<T>,
-) -> Result<Option<u32>, OverflowError> {
+) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
     let Some(fragment) = fragment else { return Ok(None) };
     let fragment = fragment.into();
     _ = buf.trim_end_matches('#');

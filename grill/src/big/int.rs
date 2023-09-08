@@ -1,12 +1,10 @@
+use num::BigInt;
 use num_rational::BigRational;
+
 use std::str::FromStr;
 
-lazy_static::lazy_static! {
-    static ref TEN: BigInt = BigInt::from_u8(10).unwrap();
-}
-
-pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
-    todo!()
+pub fn parse_int(value: &str) -> Result<BigInt, NumberError> {
+    Parser::parse(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,12 +12,15 @@ enum State {
     Head,
     Negative,
     Integer,
-    Fraction,
     E,
     Exponent,
     Error,
 }
-use num::{integer, pow, BigInt, FromPrimitive, One, Signed, Zero};
+use num::pow;
+
+use crate::error::NumberError;
+
+use super::{u64_to_usize, TEN};
 
 impl State {
     fn next(self, c: char) -> State {
@@ -29,22 +30,14 @@ impl State {
                 ' ' => Head,
                 '-' => Negative,
                 '0'..='9' => Integer,
-                '.' => Fraction,
                 _ => Error,
             },
             Negative => match c {
                 '0'..='9' => Integer,
-                '.' => Fraction,
                 _ => Error,
             },
             Integer => match c {
                 '0'..='9' => Integer,
-                '.' => Fraction,
-                'e' | 'E' => E,
-                _ => Error,
-            },
-            Fraction => match c {
-                '0'..='9' => Fraction,
                 'e' | 'E' => E,
                 _ => Error,
             },
@@ -67,12 +60,11 @@ struct Parser<'a> {
     state: State,
     is_negative: bool,
     integer_index: Option<usize>,
-    fraction_index: Option<usize>,
-    exponent: Option<usize>,
+    exponent_index: Option<usize>,
 }
 
 impl<'a> Parser<'a> {
-    fn next(&mut self, i: usize, c: char) {
+    fn next(&mut self, i: usize, c: char) -> Result<(), NumberError> {
         use State::*;
         self.state = self.state.next(c);
         match self.state {
@@ -84,70 +76,76 @@ impl<'a> Parser<'a> {
                     self.integer_index = Some(i);
                 }
             }
-            Fraction => {
-                if self.fraction_index.is_none() {
-                    self.fraction_index = Some(i);
-                }
-            }
             E => {
-                self.exponent = Some(i);
+                self.exponent_index = Some(i);
             }
-            Error => panic!("error"),
+            Error => {
+                if c == '.' {
+                    return Err(NumberError::NotAnInteger {
+                        value: self.value.to_string(),
+                    });
+                }
+                return Err(NumberError::UnexpectedChar {
+                    value: self.value.to_string(),
+                    character: c,
+                    index: i,
+                });
+            }
             _ => {}
         }
+        Ok(())
     }
-    fn parse(value: &'a str) {
+    fn parse(value: &'a str) -> Result<BigInt, NumberError> {
         let value = value.trim();
         let mut parser = Parser {
             value,
             state: State::Head,
             integer_index: None,
-            fraction_index: None,
-            exponent: None,
+            exponent_index: None,
             is_negative: false,
         };
         for (i, c) in value.char_indices() {
-            parser.next(i, c);
+            parser.next(i, c)?;
         }
         let integer = BigInt::from_str(parser.integer()).unwrap();
-        let fraction = parser
-            .fraction()
-            .map(|f| BigInt::from_str(f).unwrap())
-            .unwrap_or(BigInt::zero());
+        let exponent = parser
+            .exponent()
+            .map(i64::from_str)
+            .transpose()
+            .map_err(|err| NumberError::FailedToParseExponent {
+                value: value.to_string(),
+                source: err,
+            })?;
+        let mut result = BigRational::from_integer(integer);
 
-        let denom = parser
-            .fraction()
-            .map_or(BigInt::one(), |f| pow(TEN.clone(), f.len()));
-
-        let fraction = BigRational::new(fraction, denom);
-        let mut result = fraction + integer;
-        if let Some(exp) = parser.exponent().map(|e| i64::from_str(e).unwrap()) {
-            if exp.is_positive() {
-                result *= pow(TEN.clone(), exp as usize);
+        if let Some(exp) = exponent {
+            let is_positive = exp.is_positive();
+            #[cfg(not(target_pointer_width = "64"))]
+            let exp = u64_to_usize(exp.unsigned_abs())?;
+            #[cfg(target_pointer_width = "64")]
+            let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
+            if is_positive {
+                result *= pow(TEN.clone(), exp);
             } else {
-                result /= pow(TEN.clone(), exp.unsigned_abs() as usize);
+                result /= pow(TEN.clone(), exp);
+                if !result.is_integer() {
+                    return Err(NumberError::NotAnInteger {
+                        value: value.to_string(),
+                    });
+                }
             }
         }
-
-        println!("result: {}", result);
-    }
-    fn fraction(&self) -> Option<&str> {
-        let start = self.fraction_index?;
-        let end = self.exponent.unwrap_or(self.value.len());
-        Some(&self.value[start + 1..end])
+        Ok(result.to_integer())
     }
 
     fn integer(&self) -> &str {
         let Some(start) = self.integer_index else { return "0" };
-        let end = self
-            .fraction_index
-            .or(self.exponent)
-            .unwrap_or(self.value.len());
+        let end = self.exponent_index.unwrap_or(self.value.len());
         &self.value[start..end]
     }
 
     fn exponent(&self) -> Option<&str> {
-        let e = &self.value[self.exponent? + 1..];
+        let e = &self.value[self.exponent_index? + 1..];
         if e.is_empty() {
             None
         } else {
@@ -162,19 +160,42 @@ mod tests {
     use State::*;
 
     #[test]
+    fn test_parse() {
+        let valid_tests = [
+            ("123456", BigInt::from(123_456)),
+            ("5e10", BigInt::from(50_000_000_000i64)),
+        ];
+        for (input, expected) in valid_tests {
+            let int = parse_int(input).unwrap();
+            assert_eq!(int, expected);
+        }
+
+        let invalid_tests = [(
+            "12.345",
+            NumberError::NotAnInteger {
+                value: "12.345".to_string(),
+            },
+        )];
+
+        for (input, expected) in invalid_tests {
+            let err = parse_int(input);
+            assert_eq!(err, Err(expected));
+        }
+    }
+    #[test]
     fn test_state_changes() {
         let tests = [
             (Head, "-", Negative),
             (Head, "-0", Integer),
-            (Head, "-0.", Fraction),
-            (Head, "-0.0", Fraction),
-            (Head, "-0.0e", E),
-            (Head, "-0.0e-", Exponent),
-            (Head, "-0.0e--", Error),
-            (Head, "-0.0e-0", Exponent),
-            (Head, "-0.0e3", Exponent),
-            (Head, "-0.0e3.", Error),
-            (Head, "123.456", Fraction),
+            (Head, "-0.", Error),
+            (Head, "0.", Error),
+            (Head, "10e", E),
+            (Head, "-0e-", Exponent),
+            (Head, "-0e--", Error),
+            (Head, "-0e-0", Exponent),
+            (Head, "-0e3", Exponent),
+            (Head, "-0e3.", Error),
+            (Head, "123.", Error),
         ];
         for (state, input, expected) in &tests {
             assert_state_change(*state, input, *expected);

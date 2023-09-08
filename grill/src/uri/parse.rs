@@ -1,6 +1,6 @@
 use std::{ops::Range, str::FromStr};
 
-use crate::number::usize_to_u32;
+use crate::big::usize_to_u32;
 
 use super::{encode, write, RelativeUri, Uri};
 use crate::error::{AuthorityError, InvalidPortError, UriError};

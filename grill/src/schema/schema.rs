@@ -1,6 +1,9 @@
 use crate::{
-    error::{CompileError, SourceConflictError, SourceError, UnknownAnchorError, UnknownKeyError},
-    handler::Handler,
+    error::{
+        CompileError, CyclicDependencyError, SourceConflictError, SourceError, UnknownAnchorError,
+        UnknownKeyError,
+    },
+    handler::{Compile, Handler},
     schema::{
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
@@ -21,6 +24,8 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
+
+use super::traverse::Traverse;
 
 new_key_type! {
     pub struct Key;
@@ -247,33 +252,6 @@ impl Schemas {
             // if so, return it.
             return Ok(self.sandbox().get_index(&link.uri).unwrap());
         }
-
-        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
-        if !fragment.is_empty() && !fragment.starts_with('/') {
-            // this schema is anchored
-            // need to compile the root first
-            let mut base_uri = link.uri.clone();
-            base_uri.set_fragment(None).unwrap();
-            let (root_link, _) = sources
-                .resolve(base_uri.clone(), resolvers, deserializers)
-                .await?;
-            let root_link = root_link.clone();
-            let _ = self
-                .compile(root_link, None, sources, dialects, deserializers, resolvers)
-                .await?;
-
-            // at this stage, all URIs should be indexed.
-            match self.get_by_uri(&link.uri, sources) {
-                Some(anchored) => return Ok(anchored.key),
-                None => {
-                    return Err(UnknownAnchorError {
-                        anchor: fragment,
-                        uri: link.uri.clone(),
-                    }
-                    .into())
-                }
-            }
-        }
         let source = sources.get(link.key).clone();
 
         // determine the dialect
@@ -291,57 +269,55 @@ impl Schemas {
             return Ok(*key.get());
         }
 
+        // if the schema is anchored (i.e. has a non json ptr fragment) then
+        // compile the root (non-fragmented uri) and attempt to locate the anchor.
+        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
+        if !fragment.is_empty() && !fragment.starts_with('/') {
+            return self
+                .compile_anchored(link, sources, dialects, deserializers, resolvers)
+                .await;
+        }
+
         // if parent is None and this schema is not a document root (does not
         // have an $id) then attempt to locate the parent using the pointer
         // fragment.
-        if id.is_none()
-            && parent.is_none()
-            && lookup_id.has_fragment()
-            && lookup_id.fragment().unwrap().starts_with('/')
-        {
+        let fragment = lookup_id.fragment().unwrap_or_default().trim();
+        if id.is_none() && parent.is_none() && fragment.starts_with('/') {
             parent = self.locate_parent(lookup_id.clone())?;
         }
 
         // linking all URIs of this schema to the the source location
-        for uri in &uris {
-            sources.link(uri.clone(), link.uri.clone(), link.path.clone())?;
-        }
+        sources.link_all(id.as_ref(), &uris, &link.uri, &link.path)?;
 
         let base_uri = id.clone().unwrap_or(link.uri.clone());
         let link = sources.get_link(&base_uri).cloned().unwrap();
-
         let anchors = dialect.anchors(&source)?;
+
         // create a new CompiledSchema and insert it. if compiling fails, the
         // schema store will rollback to its previous state.
-
-        let key = self
-            .sandbox()
-            .insert(CompiledSchema {
-                id: id.clone(),
-                uris,
-                metaschema: dialect.primary_metaschema_id().clone(),
-                handlers: dialect.handlers().to_vec().into_boxed_slice(),
-                parent,
-                src: link.clone(),
-                subschemas: Vec::default(), // set below
-                dependents: Vec::default(), // set below
-                references: Vec::default(), // set below
-                anchors: anchors.clone(),
-            })
-            .map_err(|uri| {
-                SourceError::from(SourceConflictError {
-                    uri,
-                    existing_source: source.clone().into(),
-                })
-            })?;
+        let key = self.insert_placeholder(&id, uris, &link, &source, parent, anchors, dialect)?;
 
         let subschemas = self
-            .compile_subschemas(compile::Subschemas {
+            .compile_subschemas(Params {
+                key,
                 id: id.as_ref(),
                 base_uri: &base_uri,
                 path: &link.path,
                 source: &source,
-                parent: key,
+                dialect,
+                dialects,
+                deserializers,
+                resolvers,
+                sources,
+            })
+            .await?;
+        let references = self
+            .compile_references(Params {
+                key,
+                id: id.as_ref(),
+                base_uri: &base_uri,
+                path: &link.path,
+                source: &source,
                 dialect,
                 dialects,
                 deserializers,
@@ -350,8 +326,131 @@ impl Schemas {
             })
             .await?;
 
-        // resolving & compiling references
-        let mut references = dialect.references(&source)?;
+        // check to ensure that there are not cyclic references
+        self.ensure_not_cyclic(key, &base_uri, &references, sources)?;
+
+        let schema = self.sandbox().get_mut(key).unwrap();
+        schema.references = references;
+        schema.subschemas = subschemas;
+        todo!()
+    }
+
+    fn compile_handlers(
+        schema: &CompiledSchema,
+        dialect: &Dialect,
+    ) -> Result<Box<[Handler]>, CompileError> {
+        let mut handlers = Vec::new();
+
+        for mut handler in dialect.handlers().iter().cloned() {
+            // TODO !!!!!
+            // handler.compile(compile, schema)
+            todo!()
+        }
+        Ok(handlers.into_boxed_slice())
+    }
+    fn ensure_not_cyclic(
+        &mut self,
+        key: Key,
+        uri: &AbsoluteUri,
+        references: &[Reference],
+        sources: &Sources,
+    ) -> Result<(), CompileError> {
+        for reference in references {
+            if let Some(found) = self
+                .transitive_dependencies(reference.key, sources)
+                .find(|schema| schema.key == key)
+            {
+                return Err(CyclicDependencyError {
+                    from: uri.clone(),
+                    to: reference.uri.clone(),
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn insert_placeholder(
+        &mut self,
+        id: &Option<AbsoluteUri>,
+        uris: Vec<AbsoluteUri>,
+        link: &Link,
+        source: &Value,
+        parent: Option<Key>,
+        anchors: Vec<Anchor>,
+        dialect: &Dialect,
+    ) -> Result<Key, CompileError> {
+        let id = id.as_ref();
+        self.sandbox()
+            .insert(CompiledSchema {
+                id: id.cloned(),
+                uris,
+                metaschema: dialect.primary_metaschema_id().clone(),
+                handlers: Box::default(),
+                parent,
+                src: link.clone(),
+                subschemas: Vec::new(),
+                dependents: Vec::new(),
+                references: Vec::new(),
+                anchors: anchors.clone(),
+            })
+            .map_err(|uri| {
+                SourceError::from(SourceConflictError {
+                    uri,
+                    existing_source: source.clone().into(),
+                })
+            })
+            .map_err(CompileError::from)
+    }
+
+    async fn compile_anchored(
+        &mut self,
+        link: Link,
+        sources: &mut Sources,
+        dialects: &Dialects<'_>,
+        deserializers: &Deserializers,
+        resolvers: &Resolvers,
+    ) -> Result<Key, CompileError> {
+        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
+        // need to compile the root first
+        let mut base_uri = link.uri.clone();
+        base_uri.set_fragment(None).unwrap();
+        let (root_link, _) = sources
+            .resolve(base_uri.clone(), resolvers, deserializers)
+            .await?;
+        let root_link = root_link.clone();
+        let _ = self
+            .compile(root_link, None, sources, dialects, deserializers, resolvers)
+            .await?;
+
+        // at this stage, all URIs should be indexed.
+        match self.get_by_uri(&link.uri, sources) {
+            Some(anchored) => Ok(anchored.key),
+            None => Err(UnknownAnchorError {
+                anchor: fragment,
+                uri: link.uri.clone(),
+            }
+            .into()),
+        }
+    }
+    async fn compile_references(
+        &mut self,
+        params: Params<'_>,
+    ) -> Result<Vec<Reference>, CompileError> {
+        let Params {
+            key,
+            dialect,
+            dialects,
+            deserializers,
+            resolvers,
+            sources,
+            source,
+            id,
+            base_uri,
+            path,
+        } = params;
+        let mut references = dialect.references(source)?;
         for reference in &mut references {
             let (ref_link, _) = sources
                 .resolve(reference.uri.clone(), resolvers, deserializers)
@@ -364,27 +463,22 @@ impl Schemas {
             let ref_schema = self.sandbox().get_mut(ref_key).unwrap();
             ref_schema.dependents.push(key);
         }
-
-        let schema = self.get_mut_unchecked(key);
-
-        todo!()
+        Ok(references)
     }
 
-    async fn compile_subschemas(
-        &mut self,
-        compile::Subschemas {
+    async fn compile_subschemas(&mut self, params: Params<'_>) -> Result<Vec<Key>, CompileError> {
+        let Params {
             id,
             base_uri,
             path,
             source,
-            parent,
             dialect,
             dialects,
             deserializers,
             resolvers,
             sources,
-        }: compile::Subschemas<'_>,
-    ) -> Result<Vec<Key>, CompileError> {
+            key,
+        } = params;
         // compile nested schemas
         let mut subschemas = Vec::new();
         let path = if id.is_some() {
@@ -400,7 +494,7 @@ impl Schemas {
             let subschema = self
                 .compile(
                     sub_link,
-                    Some(parent),
+                    Some(key),
                     sources,
                     dialects,
                     deserializers,
@@ -590,21 +684,17 @@ impl Schemas {
         self.store().contains_key(key)
     }
 }
-
-mod compile {
-    use super::*;
-    pub(super) struct Subschemas<'i> {
-        pub(crate) id: Option<&'i AbsoluteUri>,
-        pub(crate) base_uri: &'i AbsoluteUri,
-        pub(crate) path: &'i Pointer,
-        pub(crate) source: &'i Value,
-        pub(crate) parent: Key,
-        pub(crate) dialect: &'i Dialect,
-        pub(crate) dialects: &'i Dialects<'i>,
-        pub(crate) deserializers: &'i Deserializers,
-        pub(crate) resolvers: &'i Resolvers,
-        pub(crate) sources: &'i mut Sources,
-    }
+struct Params<'i> {
+    pub(crate) key: Key,
+    pub(crate) id: Option<&'i AbsoluteUri>,
+    pub(crate) base_uri: &'i AbsoluteUri,
+    pub(crate) path: &'i Pointer,
+    pub(crate) source: &'i Value,
+    pub(crate) dialect: &'i Dialect,
+    pub(crate) dialects: &'i Dialects<'i>,
+    pub(crate) deserializers: &'i Deserializers,
+    pub(crate) resolvers: &'i Resolvers,
+    pub(crate) sources: &'i mut Sources,
 }
 
 #[cfg(test)]
