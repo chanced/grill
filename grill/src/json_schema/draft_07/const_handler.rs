@@ -1,8 +1,13 @@
 use std::borrow::Cow;
 
+use either::Either;
+use serde_json::Value;
+
 use crate::{
-    handler::{Handler, Scope, SyncHandler},
+    handler::{Compile, Handler, RationalKey, Scope, SyncHandler, ValueKey},
     output,
+    schema::Keyword,
+    Schema,
 };
 
 /// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
@@ -13,7 +18,7 @@ use crate::{
 /// equal to the value of the keyword.
 #[derive(Default, Clone, Debug)]
 pub struct ConstHandler {
-    pub expected: Option<serde_json::Value>,
+    pub expected_key: Option<Either<ValueKey, RationalKey>>,
 }
 
 impl ConstHandler {
@@ -26,15 +31,23 @@ impl ConstHandler {
 impl SyncHandler for ConstHandler {
     fn compile<'i>(
         &mut self,
-        compile: &mut crate::handler::Compile<'i>,
-        schema: crate::Schema<'i>,
+        compile: &mut Compile<'i>,
+        schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
-        todo!()
+        let Some(c) = schema.get(Keyword::CONST.as_str()) else { return Ok(false) };
+        if let Value::Number(n) = c {
+            let rat = compile.rational(n)?;
+            self.expected_key = Some(Either::Right(rat));
+        } else {
+            let val = compile.value(c);
+            self.expected_key = Some(Either::Left(val));
+        }
+        Ok(true)
     }
     fn evaluate<'i, 'v>(
         &'i self,
         scope: &'i mut Scope,
-        value: &'v serde_json::Value,
+        value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()
@@ -109,8 +122,8 @@ impl From<ConstHandler> for Handler {
 /// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstHandler`].
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
-    pub expected: serde_json::Value,
-    pub actual: Cow<'v, serde_json::Value>,
+    pub expected: Value,
+    pub actual: Cow<'v, Value>,
 }
 // impl Display for ConstInvalid<'_> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

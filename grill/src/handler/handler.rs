@@ -12,7 +12,7 @@ use std::{fmt, panic::RefUnwindSafe};
 
 use super::{Compile, Scope};
 
-/// A handler that performs logic for a given condition in a JSON Schema.
+/// A handler for a given keyword in a JSON Schema Dialect.
 #[derive(Debug, Clone)]
 pub enum Handler {
     /// A synchronous handler.

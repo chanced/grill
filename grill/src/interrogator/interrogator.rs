@@ -1,5 +1,7 @@
 use std::{borrow::Borrow, fmt::Debug, ops::Deref};
 
+use num::BigInt;
+use num_rational::BigRational;
 use serde_json::Value;
 use tap::TapFallible;
 
@@ -8,6 +10,7 @@ use crate::{
         CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceError,
         UnknownKeyError,
     },
+    handler::{IntKey, Numbers, RationalKey, Values},
     json_schema,
     output::{Output, Structure},
     schema::{
@@ -30,6 +33,9 @@ pub struct Interrogator {
     pub(super) resolvers: Resolvers,
     pub(super) schemas: Schemas,
     pub(super) deserializers: Deserializers,
+    pub(super) rationals: Numbers<RationalKey, BigRational>,
+    pub(super) ints: Numbers<IntKey, BigInt>,
+    pub(super) values: Values,
 }
 
 impl Debug for Interrogator {
@@ -314,6 +320,9 @@ impl Interrogator {
                 &self.dialects,
                 &self.deserializers,
                 &self.resolvers,
+                &mut self.ints,
+                &mut self.rationals,
+                &mut self.values,
             )
             .await
     }

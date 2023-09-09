@@ -597,6 +597,9 @@ pub enum CompileError {
     #[error("schema not found: \"{0}\"")]
     SchemaNotFound(AbsoluteUri),
 
+    #[error(transparent)]
+    FailedToParseNumber(#[from] NumberError),
+
     /// Custom errors returned by a [`Handler`]
     #[error(transparent)]
     Custom(#[from] Box<anyhow::Error>),

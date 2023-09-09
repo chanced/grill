@@ -7,16 +7,15 @@ use crate::{
     AbsoluteUri, Key, Uri,
 };
 
-use super::{IntKey, Numbers, RationalKey, ValueKey, Values};
+use super::{BigInts, BigRationals, IntKey, Numbers, RationalKey, ValueKey, Values};
 
 #[derive(Debug)]
 pub struct Compile<'i> {
-    base_uri: &'i AbsoluteUri,
-    schemas: &'i Schemas,
-
-    rationals: &'i mut Numbers<RationalKey, BigRational>,
-    ints: &'i mut Numbers<IntKey, BigInt>,
-    values: &'i mut Values,
+    pub(crate) base_uri: &'i AbsoluteUri,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) rationals: &'i mut BigRationals,
+    pub(crate) ints: &'i mut BigInts,
+    pub(crate) values: &'i mut Values,
 }
 
 impl<'i> Compile<'i> {

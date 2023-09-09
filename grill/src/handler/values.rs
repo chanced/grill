@@ -65,7 +65,7 @@ enum BoolKey {
     False,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Values {
     strings: SlotMap<StringKey, Value>,
     objects: SlotMap<ObjectKey, Value>,

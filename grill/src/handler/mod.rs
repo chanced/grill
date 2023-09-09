@@ -11,7 +11,7 @@ mod compile;
 pub use compile::Compile;
 
 mod numbers;
-pub use numbers::{IntKey, Numbers, RationalKey};
+pub use numbers::{BigInts, BigRationals, IntKey, Numbers, RationalKey};
 
 mod values;
 pub use values::{ValueKey, Values};

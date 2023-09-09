@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use crate::{
     error::{BuildError, SourceError, UriError},
+    handler::{Numbers, Values},
     json_schema,
     schema::{Dialect, Dialects, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
@@ -339,6 +340,9 @@ impl Builder {
             resolvers,
             schemas,
             deserializers,
+            rationals: Numbers::default(),
+            ints: Numbers::default(),
+            values: Values::default(),
         };
 
         for id in precompile {

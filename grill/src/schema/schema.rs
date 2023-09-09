@@ -3,7 +3,7 @@ use crate::{
         CompileError, CyclicDependencyError, SourceConflictError, SourceError, UnknownAnchorError,
         UnknownKeyError,
     },
-    handler::{Compile, Handler},
+    handler::{BigInts, BigRationals, Compile, Handler, Values},
     schema::{
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
@@ -25,7 +25,7 @@ use std::{
     str::FromStr,
 };
 
-use super::traverse::Traverse;
+use super::Keyword;
 
 new_key_type! {
     pub struct Key;
@@ -144,6 +144,21 @@ impl<'i> Schema<'i> {
         }
     }
 }
+impl std::ops::Index<&str> for Schema<'_> {
+    type Output = Value;
+
+    fn index(&self, index: &str) -> &Self::Output {
+        &self.source[index]
+    }
+}
+
+impl std::ops::Index<Keyword<'_>> for Schema<'_> {
+    type Output = Value;
+
+    fn index(&self, index: Keyword<'_>) -> &Self::Output {
+        &self.source[index.as_str()]
+    }
+}
 
 impl<'i> Schema<'i> {
     #[must_use]
@@ -175,12 +190,6 @@ struct Store {
 
 #[allow(clippy::unnecessary_box_returns)]
 impl Store {
-    fn new(store: SlotMap<Key, CompiledSchema>, keys: HashMap<AbsoluteUri, Key>) -> Box<Self> {
-        Box::new(Self {
-            table: store,
-            index: keys,
-        })
-    }
     fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
         self.table.get_mut(key)
     }
@@ -236,7 +245,7 @@ impl Schemas {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
     #[async_recursion]
     pub(crate) async fn compile(
         &mut self,
@@ -246,6 +255,9 @@ impl Schemas {
         dialects: &Dialects<'_>,
         deserializers: &Deserializers,
         resolvers: &Resolvers,
+        ints: &mut BigInts,
+        rationals: &mut BigRationals,
+        values: &mut Values,
     ) -> Result<Key, CompileError> {
         // check to see if schema is already been compiled
         if self.sandbox().index.contains_key(&link.uri) {
@@ -274,7 +286,16 @@ impl Schemas {
         let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
         if !fragment.is_empty() && !fragment.starts_with('/') {
             return self
-                .compile_anchored(link, sources, dialects, deserializers, resolvers)
+                .compile_anchored(
+                    link,
+                    sources,
+                    dialects,
+                    deserializers,
+                    resolvers,
+                    ints,
+                    rationals,
+                    values,
+                )
                 .await;
         }
 
@@ -309,6 +330,9 @@ impl Schemas {
                 deserializers,
                 resolvers,
                 sources,
+                ints,
+                rationals,
+                values,
             })
             .await?;
         let references = self
@@ -323,28 +347,48 @@ impl Schemas {
                 deserializers,
                 resolvers,
                 sources,
+                ints,
+                rationals,
+                values,
             })
             .await?;
 
         // check to ensure that there are not cyclic references
         self.ensure_not_cyclic(key, &base_uri, &references, sources)?;
-
+        let handlers = self
+            .compile_handlers(key, dialect, sources, ints, rationals, values)
+            .await?;
         let schema = self.sandbox().get_mut(key).unwrap();
+
         schema.references = references;
         schema.subschemas = subschemas;
-        todo!()
+        schema.handlers = handlers;
+        Ok(key)
     }
 
-    fn compile_handlers(
-        schema: &CompiledSchema,
+    async fn compile_handlers(
+        &self,
+        key: Key,
         dialect: &Dialect,
+        sources: &Sources,
+        ints: &mut BigInts,
+        rationals: &mut BigRationals,
+        values: &mut Values,
     ) -> Result<Box<[Handler]>, CompileError> {
-        let mut handlers = Vec::new();
+        let schema = self.get(key, sources).unwrap();
 
+        let mut handlers = Vec::new();
         for mut handler in dialect.handlers().iter().cloned() {
-            // TODO !!!!!
-            // handler.compile(compile, schema)
-            todo!()
+            let mut compile = Compile {
+                base_uri: schema.id.as_deref().unwrap_or(&schema.uris[0]),
+                schemas: self,
+                rationals,
+                ints,
+                values,
+            };
+            if handler.compile(&mut compile, schema.clone()).await? {
+                handlers.push(handler);
+            }
         }
         Ok(handlers.into_boxed_slice())
     }
@@ -356,9 +400,9 @@ impl Schemas {
         sources: &Sources,
     ) -> Result<(), CompileError> {
         for reference in references {
-            if let Some(found) = self
+            if self
                 .transitive_dependencies(reference.key, sources)
-                .find(|schema| schema.key == key)
+                .any(|schema| schema.key == key)
             {
                 return Err(CyclicDependencyError {
                     from: uri.clone(),
@@ -404,6 +448,7 @@ impl Schemas {
             .map_err(CompileError::from)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn compile_anchored(
         &mut self,
         link: Link,
@@ -411,6 +456,9 @@ impl Schemas {
         dialects: &Dialects<'_>,
         deserializers: &Deserializers,
         resolvers: &Resolvers,
+        ints: &mut BigInts,
+        rationals: &mut BigRationals,
+        values: &mut Values,
     ) -> Result<Key, CompileError> {
         let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
         // need to compile the root first
@@ -421,7 +469,17 @@ impl Schemas {
             .await?;
         let root_link = root_link.clone();
         let _ = self
-            .compile(root_link, None, sources, dialects, deserializers, resolvers)
+            .compile(
+                root_link,
+                None,
+                sources,
+                dialects,
+                deserializers,
+                resolvers,
+                ints,
+                rationals,
+                values,
+            )
             .await?;
 
         // at this stage, all URIs should be indexed.
@@ -446,9 +504,12 @@ impl Schemas {
             resolvers,
             sources,
             source,
-            id,
-            base_uri,
-            path,
+            id: _,
+            base_uri: _,
+            path: _,
+            ints,
+            rationals,
+            values,
         } = params;
         let mut references = dialect.references(source)?;
         for reference in &mut references {
@@ -457,7 +518,17 @@ impl Schemas {
                 .await?;
             let ref_link = ref_link.clone();
             let ref_key = self
-                .compile(ref_link, None, sources, dialects, deserializers, resolvers)
+                .compile(
+                    ref_link,
+                    None,
+                    sources,
+                    dialects,
+                    deserializers,
+                    resolvers,
+                    ints,
+                    rationals,
+                    values,
+                )
                 .await?;
             reference.key = ref_key;
             let ref_schema = self.sandbox().get_mut(ref_key).unwrap();
@@ -478,6 +549,9 @@ impl Schemas {
             resolvers,
             sources,
             key,
+            ints,
+            rationals,
+            values,
         } = params;
         // compile nested schemas
         let mut subschemas = Vec::new();
@@ -499,6 +573,9 @@ impl Schemas {
                     dialects,
                     deserializers,
                     resolvers,
+                    ints,
+                    rationals,
+                    values,
                 )
                 .await?;
             subschemas.push(subschema);
@@ -695,6 +772,9 @@ struct Params<'i> {
     pub(crate) deserializers: &'i Deserializers,
     pub(crate) resolvers: &'i Resolvers,
     pub(crate) sources: &'i mut Sources,
+    pub(crate) ints: &'i mut BigInts,
+    pub(crate) rationals: &'i mut BigRationals,
+    pub(crate) values: &'i mut Values,
 }
 
 #[cfg(test)]

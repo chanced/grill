@@ -8,6 +8,9 @@ use crate::error::NumberError;
 
 use crate::big::{parse_int, parse_rational};
 
+pub type BigRationals = Numbers<RationalKey, BigRational>;
+pub type BigInts = Numbers<IntKey, BigInt>;
+
 new_key_type! {
     pub struct RationalKey;
 }
@@ -29,7 +32,7 @@ impl Parse for BigRational {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Numbers<K: Key, V: Parse> {
     table: SlotMap<K, V>,
     lookup: HashMap<Number, K>,
