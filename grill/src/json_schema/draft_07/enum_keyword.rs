@@ -1,4 +1,4 @@
-/// [`Handler`](`crate::handler::Handler`) for the `enum` keyword.
+/// [`Keyword`](`crate::keyword::Keyword`) for the `enum` keyword.
 ///
 /// An instance validates successfully against this keyword if its value is
 /// equal to one of the elements in this keyword's array value.
@@ -14,11 +14,11 @@
 /// - [JSON Schema Validation 07 # 6.1.2.
 ///   `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
 #[derive(Debug, Clone, Default)]
-pub struct EnumHandler {
+pub struct EnumKeyword {
     _expected: Vec<serde_json::Value>,
 }
 
-// impl SyncHandler for EnumHandler {
+// impl SyncKeyword for EnumKeyword {
 //     fn compile<'s>(
 //         &mut self,
 //         _compiler: &mut crate::Compiler<'s>,
@@ -52,7 +52,7 @@ pub struct EnumHandler {
 //     }
 // }
 
-/// [`ValidationError`] for the `enum` keyword, produced by [`EnumHandler`].
+/// [`ValidationError`] for the `enum` keyword, produced by [`EnumKeyword`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
     _expected: Vec<serde_json::Value>,
@@ -92,26 +92,26 @@ pub struct EnumInvalid<'v> {
 
 //     #[test]
 //     fn test_setup_succeeds() {
-//         let mut handler = EnumHandler::default();
+//         let mut keyword = EnumKeyword::default();
 //         let mut compiler = crate::Compiler::default();
 //         let schema = serde_json::json!({"enum": [1, 2, 3]});
 //         let schema: Schema = serde_json::from_value(schema).unwrap();
-//         let result = handler.compile(&mut compiler, &schema);
+//         let result = keyword.compile(&mut compiler, &schema);
 //         assert!(result.is_ok());
 //         assert!(result.unwrap());
-//         assert_eq!(handler.expected, vec![1, 2, 3]);
+//         assert_eq!(keyword.expected, vec![1, 2, 3]);
 //     }
 //     #[test]
 //     fn test_evaluate() {
-//         let mut handler = EnumHandler::default();
+//         let mut keyword = EnumKeyword::default();
 //         let mut compiler = crate::Compiler::default();
 //         let schema = serde_json::json!({"enum": [1, 2, 3]});
 //         let schema: Schema = serde_json::from_value(schema).unwrap();
-//         handler.compile(&mut compiler, &schema).unwrap();
+//         keyword.compile(&mut compiler, &schema).unwrap();
 //         let mut state = State::new();
 //         let mut scope = Scope::new(crate::Location::default(), &mut state);
 //         let one = serde_json::json!(1);
-//         let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
+//         let result = keyword.evaluate(&mut scope, &one, crate::Structure::Complete);
 //         assert!(result.is_ok());
 //         let annotation = result.unwrap();
 //         assert!(annotation.is_some());

@@ -212,10 +212,7 @@ impl Sources {
     /// - a [`Source`]'s [`AbsoluteUri`] has a fragment.
     /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
-    pub(crate) fn new(
-        sources: Vec<Src>,
-        deserializers: &Deserializers,
-    ) -> Result<Self, SourceError> {
+    pub fn new(sources: Vec<Src>, deserializers: &Deserializers) -> Result<Self, SourceError> {
         let mut store = Store::default();
         let iter = sources.into_iter();
         for src in iter {

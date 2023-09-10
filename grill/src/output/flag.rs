@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// [`Structure`](`crate::output::Structure`) which only contains a single
 /// `"valid"` `bool` field.
 ///
-/// [`Handler`](`crate::Handler`)s should short circuit and return errors as
+/// [`Keyword`](`crate::Keyword`)s should short circuit and return errors as
 /// soon as possible when using this structure.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Flag {

@@ -10,15 +10,15 @@ use crate::{
         CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceError,
         UnknownKeyError,
     },
-    handler::{IntKey, Numbers, RationalKey, Values},
-    json_schema,
+    json_schema, keyword,
+    keyword::{IntKey, Numbers, RationalKey, Values},
     output::{Output, Structure},
     schema::{
+        iter::{Iter, IterUnchecked},
         traverse::{
-            Ancestors, Descendants, DirectDependencies, DirectDependents, Iter, IterUnchecked,
-            TransitiveDependencies,
+            Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
         },
-        Dialect, Dialects, Key, Keyword, Schema, Schemas,
+        Dialect, Dialects, Key, Schema, Schemas,
     },
     source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -346,10 +346,10 @@ impl Interrogator {
         if let Some(schema) = self.dialects.pertinent_to(schema) {
             return Ok(Some(schema));
         }
-        // TODO: this is the only place outside of a Handler that a specific
+        // TODO: this is the only place outside of a Keyword that a specific
         // json schema keyword is used. This should be refactored.
         match schema
-            .get(Keyword::SCHEMA.as_str())
+            .get(keyword::SCHEMA)
             .and_then(Value::as_str)
             .map(ToString::to_string)
         {

@@ -2,45 +2,27 @@ use num_rational::BigRational;
 use serde_json::{Number, Value};
 use slotmap::SlotMap;
 
-use crate::{error::NumberError, output::Node, schema::Location, Key};
+use crate::{error::NumberError, output::Node, schema::Schemas, Key};
 
-use super::State;
-/// Contains state and location information needed to perform an
+use super::{BigInts, BigRationals, State, Values};
+/// Contains global and evaluation level state, schemas, and location
+/// information needed to perform an
 /// [`evaluation`](`crate::Interrogator::evaluate`).
-pub struct Scope<'s> {
-    pub state: &'s mut State,
-    location: Location,
-    number: Option<BigRational>,
+pub struct Context<'i> {
+    /// global state to the interrogator
+    pub(crate) global_state: &'i mut State,
+    /// per-evaluation state
+    pub(crate) eval_state: &'i mut State,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) ints: &'i BigInts,
+    pub(crate) rationals: &'i BigRationals,
+    pub(crate) values: &'i Values,
 }
 
-impl<'s> Scope<'s> {
-    pub fn new(location: Location, state: &'s mut State, _schemas: SlotMap<Key, Value>) -> Self {
-        Self {
-            state,
-            location,
-            number: None,
-        }
-    }
+impl<'s> Context<'s> {
     #[must_use]
-    pub fn annotate<'v>(&self, keyword: &'static str, value: &'v Value) -> Node<'v> {
-        let mut location = self.location.clone();
-        location.push_keyword_location(keyword);
-        Node::new(location, value)
-    }
-
-    /// # Errors
-    /// Returns a [`ParseError`](`big_rational_str::ParseError`) if `number` cannot be parsed as a [`BigRational`].
-    #[allow(clippy::missing_panics_doc)]
-    pub fn number(&mut self, number: &Number) -> Result<&BigRational, NumberError> {
-        let n = &mut self.number;
-        if let Some(number) = n {
-            Ok(number)
-        } else {
-            // let number = big_rational_str::str_to_big_rational(&number.to_string())?;
-            // n.replace(number);
-            // Ok(n.as_ref().unwrap())
-            todo!()
-        }
+    pub fn evalute<'v>(&self, key: Key) -> Node<'v> {
+        todo!()
     }
 
     /// Returns a new, nested [`Scope`], where `instance` should be the name of
@@ -55,7 +37,7 @@ impl<'s> Scope<'s> {
         _instance: &str,
         _keyword: &str,
         _absolute_keyword_location: Option<String>,
-    ) -> Result<Scope, jsonptr::MalformedPointerError> {
+    ) -> Result<Context, jsonptr::MalformedPointerError> {
         // let mut keyword_location = self.keyword_location().clone();
         // keyword_location.push_back(keyword.into());
         // let absolute_keyword_location =
@@ -81,4 +63,8 @@ impl<'s> Scope<'s> {
         // })
         todo!()
     }
+}
+
+fn x(r: impl std::io::Read) -> Result<Option<String>, serde_json::Error> {
+    serde_json::from_reader(r).map(Option::Some)
 }

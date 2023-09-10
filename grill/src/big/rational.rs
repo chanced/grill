@@ -140,7 +140,9 @@ impl<'a> Parser<'a> {
             let is_positive = exp.is_positive();
             #[cfg(not(target_pointer_width = "64"))]
             let exp = u64_to_usize(exp.unsigned_abs())?;
+
             #[cfg(target_pointer_width = "64")]
+            // safety: usize is the same width as u64 on 64-bit systems
             let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
             if is_positive {
                 result *= pow(TEN.clone(), exp);

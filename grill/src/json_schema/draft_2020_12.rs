@@ -218,7 +218,7 @@ lazy_static::lazy_static! {
            JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA.clone(),
            JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA.clone(),
         ],
-        [super::draft_07::ConstHandler::new()], // TOOD: FIX
+        [super::draft_07::ConstKeyword::new()], // TOOD: FIX
     )
     .unwrap();
 }

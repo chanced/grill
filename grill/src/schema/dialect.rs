@@ -2,7 +2,7 @@
 //! schema.
 
 use crate::error::{AnchorError, DialectExistsError, UriError};
-use crate::handler::Handler;
+use crate::keyword::Keyword;
 use crate::schema::Metaschema;
 
 use crate::{
@@ -34,8 +34,8 @@ pub struct Dialect {
     id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
     metaschemas: HashMap<AbsoluteUri, Object>,
-    /// Set of [`Handler`]s defined by the dialect.
-    handlers: Vec<Handler>,
+    /// Set of [`Keyword`]s defined by the dialect.
+    keywords: Vec<Keyword>,
     is_pertinent_to_index: usize,
     identify_indexes: Vec<usize>,
 }
@@ -50,12 +50,12 @@ impl Dialect {
     pub fn new<S, M, I, H>(
         id: AbsoluteUri,
         metaschemas: M,
-        handlers: H,
+        keywords: H,
     ) -> Result<Self, DialectError>
     where
         S: Borrow<Metaschema>,
         M: IntoIterator<Item = S>,
-        I: Into<Handler>,
+        I: Into<Keyword>,
         H: IntoIterator<Item = I>,
     {
         let metaschemas: HashMap<AbsoluteUri, Object> = metaschemas
@@ -65,12 +65,12 @@ impl Dialect {
                 (m.id.clone(), m.schema.clone())
             })
             .collect();
-        let handlers = handlers
+        let keywords = keywords
             .into_iter()
             .map(Into::into)
-            .collect::<Vec<Handler>>();
-        let Some(is_pertinent_to_index) = Self::find_is_pertinent_to_index(&handlers) else { return Err(DialectError::IsPertinentToNotImplemented(id.clone())); };
-        let identify_indexes = Self::find_identify_index(&handlers);
+            .collect::<Vec<Keyword>>();
+        let Some(is_pertinent_to_index) = Self::find_is_pertinent_to_index(&keywords) else { return Err(DialectError::IsPertinentToNotImplemented(id.clone())); };
+        let identify_indexes = Self::find_identify_index(&keywords);
         if identify_indexes.is_empty() {
             return Err(DialectError::IdentifyNotImplemented(id.clone()));
         }
@@ -80,42 +80,42 @@ impl Dialect {
         Ok(Self {
             id,
             metaschemas,
-            handlers,
+            keywords,
             is_pertinent_to_index,
             identify_indexes,
         })
     }
 
-    fn find_is_pertinent_to_index(handlers: &[Handler]) -> Option<usize> {
-        handlers
+    fn find_is_pertinent_to_index(keywords: &[Keyword]) -> Option<usize> {
+        keywords
             .iter()
             .enumerate()
-            .find(|(_, handler)| is_implemented(|schema| handler.is_pertinent_to(schema)))
+            .find(|(_, keyword)| is_implemented(|schema| keyword.is_pertinent_to(schema)))
             .map(|(idx, _)| idx)
     }
 
-    fn find_identify_index(handlers: &[Handler]) -> Vec<usize> {
+    fn find_identify_index(keywords: &[Keyword]) -> Vec<usize> {
         let mut result = Vec::new();
-        for (idx, handler) in handlers.iter().enumerate() {
+        for (idx, keyword) in keywords.iter().enumerate() {
             #[allow(clippy::blocks_in_if_conditions)]
             if is_implemented(|schema| {
-                let _ = handler.identify(schema);
+                let _ = keyword.identify(schema);
             }) {
                 result.push(idx);
             }
         }
         result
     }
-    /// Attempts to identify a `schema` based on the [`Handler`]s associated with
+    /// Attempts to identify a `schema` based on the [`Keyword`]s associated with
     /// this `Dialect`, returning the primary (if any) and all [`AbsoluteUri`]s
     /// the [`Schema`](`crate::schema::Schema`) can be referenced by.
     ///
     /// # Convention
-    /// The second (index: `1`) `Handler` must implement `identify` and, if
+    /// The second (index: `1`) `Keyword` must implement `identify` and, if
     /// able, return the primary identifier.
     ///
     /// Secondary identifiers are determined by
-    /// [`Handler`](crate::handler::Handler)s index `2` and greater.
+    /// [`Keyword`](crate::keyword::Keyword)s index `2` and greater.
     pub fn identify(
         &self,
         mut base_uri: AbsoluteUri,
@@ -128,7 +128,7 @@ impl Dialect {
         // attempt to find a primary id
         let mut primary = None;
         for idx in &self.identify_indexes {
-            if let Some(Identifier::Primary(id)) = self.handlers[*idx].identify(schema)? {
+            if let Some(Identifier::Primary(id)) = self.keywords[*idx].identify(schema)? {
                 let uri = base_uri.resolve(&id)?;
                 primary = Some(uri);
                 break;
@@ -139,8 +139,8 @@ impl Dialect {
         // with the fragment set to the json pointer `path`.
         let base_uri = primary.as_ref().unwrap_or(&base_uri);
         for idx in &self.identify_indexes {
-            let handler = &self.handlers[*idx];
-            if let Some(id) = handler.identify(schema)? {
+            let keyword = &self.keywords[*idx];
+            if let Some(id) = keyword.identify(schema)? {
                 let uri = base_uri.resolve(id.uri())?;
                 uris.push(uri);
             }
@@ -154,30 +154,30 @@ impl Dialect {
     }
 
     /// Attempts to locate nested schemas within `source` by calling
-    /// [`Handler::subschemas`](`crate::Handler::subschemas`) for each attached
-    /// `Handler` of this `Dialect`.
+    /// [`Keyword::subschemas`](`crate::Keyword::subschemas`) for each attached
+    /// `Keyword` of this `Dialect`.
     ///
     #[must_use]
     pub fn subschemas(&self, path: &Pointer, source: &Value) -> HashSet<Pointer> {
         let mut locations = HashSet::new();
-        for handler in &self.handlers {
-            locations.extend(handler.subschemas(path, source));
+        for keyword in &self.keywords {
+            locations.extend(keyword.subschemas(path, source));
         }
         locations
     }
 
     pub fn references(&self, source: &Value) -> Result<Vec<Reference>, UriError> {
         let mut refs = Vec::new();
-        for handler in &self.handlers {
-            refs.append(&mut handler.references(source)?);
+        for keyword in &self.keywords {
+            refs.append(&mut keyword.references(source)?);
         }
         Ok(refs)
     }
 
     pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
         let mut anchors = Vec::new();
-        for handler in &self.handlers {
-            anchors.append(&mut handler.anchors(source)?);
+        for keyword in &self.keywords {
+            anchors.append(&mut keyword.anchors(source)?);
         }
         Ok(anchors)
     }
@@ -185,14 +185,14 @@ impl Dialect {
     /// Determines if the schema is pertinent to this `Dialect`.
     ///
     /// # Convention
-    /// Exactly one `Handler` must implement `is_pertinent_to` for a given
+    /// Exactly one `Keyword` must implement `is_pertinent_to` for a given
     ///
-    /// `Dialect`. It **must** be the **first** (index: `0`) `Handler` in the
+    /// `Dialect`. It **must** be the **first** (index: `0`) `Keyword` in the
     /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Handlers`](`crate::dialect::Handlers`).
+    /// [`Keywords`](`crate::dialect::Keywords`).
     #[must_use]
     pub fn is_pertinent_to(&self, schema: &Value) -> bool {
-        self.handlers[self.is_pertinent_to_index].is_pertinent_to(schema)
+        self.keywords[self.is_pertinent_to_index].is_pertinent_to(schema)
     }
 
     #[must_use]
@@ -208,9 +208,9 @@ impl Dialect {
     }
 
     #[must_use]
-    /// Returns the [`Handler`]s of this `Dialect`.
-    pub fn handlers(&self) -> &[Handler] {
-        self.handlers.as_ref()
+    /// Returns the [`Keyword`]s of this `Dialect`.
+    pub fn keywords(&self) -> &[Keyword] {
+        self.keywords.as_ref()
     }
 }
 
@@ -230,7 +230,7 @@ impl Debug for Dialect {
         f.debug_struct("Dialect")
             .field("id", &self.id)
             .field("meta_schemas", &self.metaschemas)
-            .field("handlers", &self.handlers)
+            .field("keywords", &self.keywords)
             .finish_non_exhaustive()
     }
 }
@@ -287,7 +287,7 @@ impl<'d> Dialects<'d> {
         self.lookup.get(id).map(|&index| &self.dialects[index])
     }
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
-    /// upon the first [`Handler`] in each
+    /// upon the first [`Keyword`] in each
     /// [`Dialect`](`crate::dialect::Dialect`) or `None` if a [`Dialect`] cannot
     /// be confidently determined.
     #[must_use]

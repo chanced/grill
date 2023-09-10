@@ -1,66 +1,11 @@
 use super::{Reference, Schemas};
-use crate::{
-    error::UnknownKeyError,
-    source::{Source, Sources},
-    AbsoluteUri, Key, Schema,
-};
+use crate::{error::UnknownKeyError, source::Sources, AbsoluteUri, Key, Schema};
 use either::Either;
 use std::{
     collections::{HashSet, VecDeque},
     iter::{empty, once, Empty, Map, Once},
     vec::IntoIter,
 };
-
-pub struct Iter<'i> {
-    sources: &'i Sources,
-    schemas: &'i Schemas,
-    inner: Either<std::slice::Iter<'i, Key>, std::vec::IntoIter<Key>>,
-}
-
-impl<'i> Iter<'i> {
-    pub(crate) fn new(keys: &'i [Key], schemas: &'i Schemas, sources: &'i Sources) -> Self {
-        Self {
-            sources,
-            schemas,
-            inner: Either::Left(keys.iter()),
-        }
-    }
-    #[must_use]
-    pub fn unchecked(self) -> IterUnchecked<'i> {
-        IterUnchecked { inner: self }
-    }
-
-    pub(crate) fn from_vec(keys: Vec<Key>, schemas: &'i Schemas, sources: &'i Sources) -> Self {
-        Self {
-            sources,
-            schemas,
-            inner: Either::Right(keys.into_iter()),
-        }
-    }
-}
-impl<'i> Iterator for Iter<'i> {
-    type Item = Result<Schema<'i>, UnknownKeyError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let key = match self.inner.as_mut() {
-            Either::Left(iter) => *iter.next()?,
-            Either::Right(iter) => iter.next()?,
-        };
-        Some(self.schemas.get(key, self.sources))
-    }
-}
-
-pub struct IterUnchecked<'i> {
-    inner: Iter<'i>,
-}
-
-impl<'i> Iterator for IterUnchecked<'i> {
-    type Item = Schema<'i>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(std::result::Result::unwrap)
-    }
-}
 
 /// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
 pub trait Traverse<'i, Key, Iter>: Iterator<Item = Schema<'i>>
@@ -415,7 +360,8 @@ mod tests {
     use super::*;
 
     use crate::{
-        schema::{CompiledSchema, Keyword, Reference},
+        keyword,
+        schema::{CompiledSchema, Reference},
         source::{deserialize_json, Deserializers, SourceKey},
         AbsoluteUri, Key,
     };
@@ -634,7 +580,7 @@ mod tests {
                         key: dep_key,
                         ref_path: Pointer::default(),
                         uri: uri.clone(),
-                        keyword: Keyword::REF,
+                        keyword: keyword::REF,
                     });
                 }
                 {
@@ -653,7 +599,7 @@ mod tests {
                             key: transitive_dep_key,
                             ref_path: Pointer::default(),
                             uri: uri.clone(),
-                            keyword: Keyword::REF,
+                            keyword: keyword::REF,
                         });
                     }
                     {
@@ -680,7 +626,7 @@ mod tests {
                                 key: transitive_dep_key_2,
                                 ref_path: Pointer::default(),
                                 uri: uri.clone(),
-                                keyword: Keyword::REF,
+                                keyword: keyword::REF,
                             });
                         }
                         {
@@ -722,7 +668,7 @@ mod tests {
             parent: None,
             references: vec![],
             dependents: vec![],
-            handlers: vec![].into_boxed_slice(),
+            keywords: vec![].into_boxed_slice(),
             metaschema,
             subschemas: vec![],
             uris: vec![uri.clone()],

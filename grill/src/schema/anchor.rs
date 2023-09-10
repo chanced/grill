@@ -1,7 +1,5 @@
 use jsonptr::Pointer;
 
-use super::Keyword;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Anchor {
     /// Value of the anchor.  
@@ -11,5 +9,5 @@ pub struct Anchor {
     /// Path to the object which contains the anchor
     pub container_path: Pointer,
     /// The keyword of the anchor, e.g. `"$anchor"`, `"$dynamicAnchor"`, `"$recursiveAnchor"`
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
 }

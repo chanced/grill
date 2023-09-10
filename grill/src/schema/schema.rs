@@ -3,7 +3,7 @@ use crate::{
         CompileError, CyclicDependencyError, SourceConflictError, SourceError, UnknownAnchorError,
         UnknownKeyError,
     },
-    handler::{BigInts, BigRationals, Compile, Handler, Values},
+    keyword::{BigInts, BigRationals, Compile, Keyword, Values},
     schema::{
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
@@ -24,8 +24,6 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
-
-use super::Keyword;
 
 new_key_type! {
     pub struct Key;
@@ -61,10 +59,10 @@ pub(crate) struct CompiledSchema {
     /// Abs URI of the schema's `Metaschema`.
     pub(crate) metaschema: AbsoluteUri,
 
-    // Compiled handlers.
-    pub(crate) handlers: Box<[Handler]>,
+    // Compiled keywords.
+    pub(crate) keywords: Box<[Keyword]>,
 
-    /// Abs URI of the source.
+    /// Absolute URI of the source and path to this schema.
     pub(crate) src: Link,
 }
 
@@ -80,31 +78,44 @@ impl Eq for CompiledSchema {}
 pub struct Schema<'i> {
     /// Key of the `Schema`
     pub key: Key,
+
     /// The `$id` or `id` of the schema, if any
     pub id: Option<Cow<'i, AbsoluteUri>>,
+
+    /// The path to the schema from the root schema as a JSON Pointer
+    pub path: Cow<'i, Pointer>,
+
     /// All URIs which this schema can be referenced by.
     pub uris: Cow<'i, [AbsoluteUri]>,
+
     /// The URI of the schema's `Metaschema`.
     pub metaschema: Cow<'i, AbsoluteUri>,
+
     /// The `Key` of the parent `Schema`, if any.
     ///
     /// Note that if this `Schema` has an `id`, then `parent` will be `None`
     /// regardless of whether or not this schema is embedded.
     pub parent: Option<Key>,
+
     /// `Schema`s that are directly embedded within this `Schema`
     ///
     /// Note that if any embedded `Schema` has an `id`, then it will not be
     /// be present in this list as per the specification, `Schema`s which are
     /// identified are to be treated as root schemas.
     pub subschemas: Cow<'i, [Key]>,
+
     /// Anchors within this `Schema`
     pub anchors: Cow<'i, [Anchor]>,
+
     /// Dependents of this `Schema`.
     pub dependents: Cow<'i, [Key]>,
+
     ///  Dependencies of this `Schema`.
     pub references: Cow<'i, [Reference]>,
-    /// Compiled [`Handler`]s.
-    pub handlers: Cow<'i, [Handler]>,
+
+    /// Compiled [`Keyword`]s.
+    pub keywords: Cow<'i, [Keyword]>,
+
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]
     pub source: Source<'i>,
@@ -115,6 +126,7 @@ impl<'i> Schema<'i> {
         Self {
             key,
             id: compiled.id.as_ref().map(Cow::Borrowed),
+            path: Cow::Borrowed(&compiled.src.path),
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
             anchors: Cow::Borrowed(&compiled.anchors),
@@ -123,7 +135,7 @@ impl<'i> Schema<'i> {
             subschemas: Cow::Borrowed(&compiled.subschemas),
             dependents: Cow::Borrowed(&compiled.dependents),
             references: Cow::Borrowed(&compiled.references),
-            handlers: Cow::Borrowed(&compiled.handlers),
+            keywords: Cow::Borrowed(&compiled.keywords),
         }
     }
 
@@ -133,13 +145,14 @@ impl<'i> Schema<'i> {
             key: self.key,
             parent: self.parent,
             id: self.id.map(|id| Cow::Owned(id.into_owned())),
+            path: Cow::Owned(self.path.into_owned()),
             uris: Cow::Owned(self.uris.into_owned()),
             metaschema: Cow::Owned(self.metaschema.into_owned()),
             source: self.source.into_owned(),
             anchors: Cow::Owned(self.anchors.into_owned()),
             dependents: Cow::Owned(self.dependents.into_owned()),
             references: Cow::Owned(self.references.into_owned()),
-            handlers: Cow::Owned(self.handlers.into_owned()),
+            keywords: Cow::Owned(self.keywords.into_owned()),
             subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
     }
@@ -149,14 +162,6 @@ impl std::ops::Index<&str> for Schema<'_> {
 
     fn index(&self, index: &str) -> &Self::Output {
         &self.source[index]
-    }
-}
-
-impl std::ops::Index<Keyword<'_>> for Schema<'_> {
-    type Output = Value;
-
-    fn index(&self, index: Keyword<'_>) -> &Self::Output {
-        &self.source[index.as_str()]
     }
 }
 
@@ -231,7 +236,7 @@ impl Store {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Schemas {
+pub struct Schemas {
     store: Store,
     sandbox: Option<Store>,
 }
@@ -355,18 +360,18 @@ impl Schemas {
 
         // check to ensure that there are not cyclic references
         self.ensure_not_cyclic(key, &base_uri, &references, sources)?;
-        let handlers = self
-            .compile_handlers(key, dialect, sources, ints, rationals, values)
+        let keywords = self
+            .compile_keywords(key, dialect, sources, ints, rationals, values)
             .await?;
         let schema = self.sandbox().get_mut(key).unwrap();
 
         schema.references = references;
         schema.subschemas = subschemas;
-        schema.handlers = handlers;
+        schema.keywords = keywords;
         Ok(key)
     }
 
-    async fn compile_handlers(
+    async fn compile_keywords(
         &self,
         key: Key,
         dialect: &Dialect,
@@ -374,11 +379,11 @@ impl Schemas {
         ints: &mut BigInts,
         rationals: &mut BigRationals,
         values: &mut Values,
-    ) -> Result<Box<[Handler]>, CompileError> {
+    ) -> Result<Box<[Keyword]>, CompileError> {
         let schema = self.get(key, sources).unwrap();
 
-        let mut handlers = Vec::new();
-        for mut handler in dialect.handlers().iter().cloned() {
+        let mut keywords = Vec::new();
+        for mut keyword in dialect.keywords().iter().cloned() {
             let mut compile = Compile {
                 base_uri: schema.id.as_deref().unwrap_or(&schema.uris[0]),
                 schemas: self,
@@ -386,11 +391,11 @@ impl Schemas {
                 ints,
                 values,
             };
-            if handler.compile(&mut compile, schema.clone()).await? {
-                handlers.push(handler);
+            if keyword.compile(&mut compile, schema.clone()).await? {
+                keywords.push(keyword);
             }
         }
-        Ok(handlers.into_boxed_slice())
+        Ok(keywords.into_boxed_slice())
     }
     fn ensure_not_cyclic(
         &mut self,
@@ -431,7 +436,7 @@ impl Schemas {
                 id: id.cloned(),
                 uris,
                 metaschema: dialect.primary_metaschema_id().clone(),
-                handlers: Box::default(),
+                keywords: Box::default(),
                 parent,
                 src: link.clone(),
                 subschemas: Vec::new(),
@@ -669,10 +674,11 @@ impl Schemas {
         Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
+            path: Cow::Borrowed(&schema.src.path),
             metaschema: Cow::Borrowed(&schema.metaschema),
             source: Source::new(&schema.src, sources),
             uris: Cow::Borrowed(&schema.uris),
-            handlers: Cow::Borrowed(&schema.handlers),
+            keywords: Cow::Borrowed(&schema.keywords),
             parent: schema.parent,
             references: Cow::Borrowed(&schema.references),
             dependents: Cow::Borrowed(&schema.dependents),

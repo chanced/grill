@@ -3,7 +3,7 @@ use std::{collections::HashSet, fmt::Display, str::FromStr};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// [`Handler`](`crate::handler::Handler`) for the `type` keyword.
+/// [`Keyword`](`crate::keyword::Keyword`) for the `type` keyword.
 ///
 /// `type` is fundamental to JSON Schema. It specifies the data type for a
 /// schema.
@@ -21,11 +21,11 @@ use serde_json::Value;
 /// - [Schema Validation 07 # 6.1.1.
 ///   `type`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.1)
 #[derive(Clone)]
-pub struct TypeHandler<F> {
+pub struct TypeKeyword<F> {
     get_types: F,
 }
 
-impl Default for TypeHandler<fn(&serde_json::Value) -> Types> {
+impl Default for TypeKeyword<fn(&serde_json::Value) -> Types> {
     fn default() -> Self {
         Self {
             get_types: Types::of_value,
@@ -33,13 +33,13 @@ impl Default for TypeHandler<fn(&serde_json::Value) -> Types> {
     }
 }
 
-impl<F> std::fmt::Debug for TypeHandler<F> {
+impl<F> std::fmt::Debug for TypeKeyword<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TypeHandler").finish_non_exhaustive()
+        f.debug_struct("TypeKeyword").finish_non_exhaustive()
     }
 }
 
-/// [`ValidationError`] for the `type` keyword, produced by [`TypeHandler`].
+/// [`ValidationError`] for the `type` keyword, produced by [`TypeKeyword`].
 #[derive(Debug, Clone)]
 pub struct TypeInvalid<'v> {
     pub expected: Types,
@@ -607,7 +607,7 @@ mod tests {
 // }
 // impl<'v> ValidationError<'v> for TypeInvalid<'v> {}
 
-// impl<F> SyncHandler for TypeHandler<F>
+// impl<F> SyncKeyword for TypeKeyword<F>
 // where
 //     F: 'static + Send + Sync + Clone + Fn(&serde_json::Value) -> Types,
 // {
@@ -656,30 +656,30 @@ mod tests {
 
 //     #[test]
 //     fn test_setup_succeeds() {
-//         // let mut handler = TypeHandler::default();
+//         // let mut keyword = TypeKeyword::default();
 //         // let mut compiler = crate::Compiler::default();
 //         // let schema = serde_json::json!({"type": ["string", "number"]});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // let result = handler.compile(&mut compiler, &schema);
+//         // let result = keyword.compile(&mut compiler, &schema);
 //         // assert!(result.is_ok());
 //         // assert!(result.unwrap());
 //         // assert_eq!(
-//         //     handler.expected,
+//         //     keyword.expected,
 //         //     Some(Types::from(vec!["string", "number"]))
 //         // );
 //     }
 
 //     #[test]
 //     fn test_successful_evaluate() {
-//         // let mut handler = TypeHandler::default();
+//         // let mut keyword = TypeKeyword::default();
 //         // let mut compiler = crate::Compiler::default();
 //         // let schema = serde_json::json!({"type": ["null", "number"]});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // handler.compile(&mut compiler, &schema).unwrap();
+//         // keyword.compile(&mut compiler, &schema).unwrap();
 //         // let mut state = State::new();
 //         // let mut scope = Scope::new(crate::Location::default(), &mut state);
 //         // let one = serde_json::json!(1.1);
-//         // let result = handler.evaluate(&mut scope, &one, crate::Structure::Complete);
+//         // let result = keyword.evaluate(&mut scope, &one, crate::Structure::Complete);
 //         // assert!(result.is_ok());
 //         // let annotation = result.unwrap();
 //         // assert!(annotation.is_some());
@@ -690,17 +690,17 @@ mod tests {
 
 //     #[test]
 //     fn test_failed_evaluate() {
-//         // let mut handler = TypeHandler::default();
+//         // let mut keyword = TypeKeyword::default();
 //         // let mut compiler = crate::Compiler::default();
 //         // let schema = serde_json::json!({"type": ["null", "string"]});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // handler.compile(&mut compiler, &schema).unwrap();
+//         // keyword.compile(&mut compiler, &schema).unwrap();
 //         // let mut state = State::new();
 //         // let mut scope = Scope::new(crate::Location::default(), &mut state);
 //         // let one = serde_json::json!(1.1);
 //         // let compiled_schema = CompiledSchema::default();
 
-//         // let result = handler.evaluate(
+//         // let result = keyword.evaluate(
 //         //     &mut scope,
 //         //     &compiled_schema,
 //         //     &one,

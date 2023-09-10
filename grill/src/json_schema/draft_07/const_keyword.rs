@@ -4,37 +4,36 @@ use either::Either;
 use serde_json::Value;
 
 use crate::{
-    handler::{Compile, Handler, RationalKey, Scope, SyncHandler, ValueKey},
-    output,
-    schema::Keyword,
-    Schema,
+    keyword,
+    keyword::{Compile, Context, Keyword, RationalKey, SyncKeyword, ValueKey},
+    output, Schema,
 };
 
-/// [`Handler`](`crate::handler::Handler`) for the `const` keyword.
+/// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
 ///
 /// The value of this keyword MAY be of any type, including null.
 ///
 /// An instance validates successfully against this keyword if its value is
 /// equal to the value of the keyword.
 #[derive(Default, Clone, Debug)]
-pub struct ConstHandler {
+pub struct ConstKeyword {
     pub expected_key: Option<Either<ValueKey, RationalKey>>,
 }
 
-impl ConstHandler {
+impl ConstKeyword {
     #[must_use]
-    pub fn new() -> ConstHandler {
+    pub fn new() -> ConstKeyword {
         Self::default()
     }
 }
 
-impl SyncHandler for ConstHandler {
+impl SyncKeyword for ConstKeyword {
     fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
-        let Some(c) = schema.get(Keyword::CONST.as_str()) else { return Ok(false) };
+        let Some(c) = schema.get(keyword::CONST) else { return Ok(false) };
         if let Value::Number(n) = c {
             let rat = compile.rational(n)?;
             self.expected_key = Some(Either::Right(rat));
@@ -46,22 +45,22 @@ impl SyncHandler for ConstHandler {
     }
     fn evaluate<'i, 'v>(
         &'i self,
-        scope: &'i mut Scope,
+        scope: &'i mut Context,
         value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
         todo!()
     }
 }
-impl From<ConstHandler> for Handler {
-    fn from(h: ConstHandler) -> Handler {
-        Handler::Sync(Box::<ConstHandler>::default())
+impl From<ConstKeyword> for Keyword {
+    fn from(h: ConstKeyword) -> Keyword {
+        Keyword::Sync(Box::<ConstKeyword>::default())
     }
 }
-// impl SyncHandler for ConstHandler {
+// impl SyncKeyword for ConstKeyword {
 //     fn compile<'s>(
 //         &mut self,
-//         _compile: &mut crate::handler::Compile<'s>,
+//         _compile: &mut crate::keyword::Compile<'s>,
 //         _schema: &'s serde_json::Value,
 //     ) -> Result<bool, crate::error::CompileError> {
 //         todo!()
@@ -76,17 +75,17 @@ impl From<ConstHandler> for Handler {
 //         todo!()
 //     }
 // }
-// impl From<ConstHandler> for Handler {
-//     fn from(value: ConstHandler) -> Self {
-//         value.into_handler()
+// impl From<ConstKeyword> for Keyword {
+//     fn from(value: ConstKeyword) -> Self {
+//         value.into_keyword()
 //     }
 // }
-// impl From<&ConstHandler> for Handler {
-//     fn from(value: &ConstHandler) -> Self {
-//         value.clone().into_handler()
+// impl From<&ConstKeyword> for Keyword {
+//     fn from(value: &ConstKeyword) -> Self {
+//         value.clone().into_keyword()
 //     }
 // }
-// impl SyncHandler for ConstHandler {
+// impl SyncKeyword for ConstKeyword {
 //     fn compile<'s>(
 //         &mut self,
 //         _compiler: &mut crate::Compiler<'s>,
@@ -119,7 +118,7 @@ impl From<ConstHandler> for Handler {
 //     }
 // }
 
-/// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstHandler`].
+/// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstKeyword`].
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
     pub expected: Value,
@@ -144,32 +143,32 @@ pub struct ConstInvalid<'v> {
 //     fn test_const_setup() {
 //         let mut compiler = crate::Compiler::default();
 //         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-//         let mut handler = ConstHandler::default();
-//         assert!(handler.compile(&mut compiler, &schema).unwrap());
-//         assert_eq!(handler.expected, Some(serde_json::json!(1)));
+//         let mut keyword = ConstKeyword::default();
+//         assert!(keyword.compile(&mut compiler, &schema).unwrap());
+//         assert_eq!(keyword.expected, Some(serde_json::json!(1)));
 
 //         let schema: Schema = serde_json::from_value(json!({})).unwrap();
-//         let mut handler = ConstHandler::default();
-//         assert!(!handler.compile(&mut compiler, &schema).unwrap());
+//         let mut keyword = ConstKeyword::default();
+//         assert!(!keyword.compile(&mut compiler, &schema).unwrap());
 //     }
 
 //     #[test]
 //     fn test_const_evaluate() {
 //         let mut compiler = crate::Compiler::default();
 //         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-//         let mut handler = ConstHandler::default();
-//         handler.compile(&mut compiler, &schema).unwrap();
+//         let mut keyword = ConstKeyword::default();
+//         keyword.compile(&mut compiler, &schema).unwrap();
 //         let mut state = State::new();
 //         let mut scope = crate::Scope::new(Location::default(), &mut state);
 //         let value = serde_json::json!(1);
-//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         assert!(result.is_ok());
 //         let result = result.unwrap();
 //         assert!(result.is_some());
 //         let result = result.unwrap();
 //         assert!(result.is_valid());
 //         let value = serde_json::json!(2);
-//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         assert!(result.is_ok());
 //         let result = result.unwrap();
 //         assert!(result.is_some());
@@ -181,13 +180,13 @@ pub struct ConstInvalid<'v> {
 //         let mut compiler = crate::Compiler::default();
 //         let schema: Schema =
 //             serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
-//         let mut handler = ConstHandler::default();
-//         handler.compile(&mut compiler, &schema).unwrap();
+//         let mut keyword = ConstKeyword::default();
+//         keyword.compile(&mut compiler, &schema).unwrap();
 //         let mut state = State::new();
 //         let mut scope = crate::Scope::new(Location::default(), &mut state);
 
 //         let value = serde_json::json!({"b": "b", "a":"a"});
-//         let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         assert!(result.is_ok());
 //         let result = result.unwrap();
 //         assert!(result.is_some());

@@ -5,35 +5,37 @@ resolver = "2"
 [workspace.dependencies]
 grill = { path = "grill" }
 
-anyhow           = { version = "1.0.75" }
-anymap           = { version = "1.0.0-beta.2" }
-async-recursion  = { version = "1.0.4" }
-async-trait      = { version = "0.1" }
-dyn-clone        = { version = "1.0.11" }
-either           = { version = "1.8.1" }
-erased-serde     = { version = "0.3.25" }
-fancy-regex      = { version = "0.11.0" }
-inherent         = { version = "1" }
-jsonptr          = { version = "0.4.3" }
-lazy_static      = { version = "1.4.0" }
-mockall          = { version = "0.11.4" }
-num              = { version = "0.4", features = ["serde"] }
-num-rational     = { version = "0.4.1" }
-once_cell        = { version = "1.10" }
-paste            = { version = "1.0.14" }
+anyhow = { version = "1.0.75" }
+anymap = { version = "1.0.0-beta.2" }
+async-recursion = { version = "1.0.4" }
+async-trait = { version = "0.1" }
+dyn-clone = { version = "1.0.11" }
+either = { version = "1.8.1" }
+erased-serde = { version = "0.3.25" }
+fancy-regex = { version = "0.11.0" }
+inherent = { version = "1" }
+jsonptr = { version = "0.4.3" }
+lazy_static = { version = "1.4.0" }
+mockall = { version = "0.11.4" }
+num = { version = "0.4", features = ["serde"] }
+num-rational = { version = "0.4.1" }
+once_cell = { version = "1.10" }
+paste = { version = "1.0.14" }
 percent-encoding = { version = "2.3" }
-proptest         = { version = "1.2.0" }
-regex            = { version = "1.5.4" }
-reqwest          = { version = "0.11" }
-serde            = { version = "1.0.163", features = ["derive", "rc"] }
-serde_json       = { version = "1.0", features = ["arbitrary_precision"] }
-serde_yaml       = { version = "0.9.21" }
-similar          = { version = "2.2.1" }
-slotmap          = { version = "1.0.6" }
-strum            = { version = "0.24", features = ["derive"] }
-strum_macros     = { version = "0.24" }
-tap              = { version = "1.0.1" }
-thiserror        = { version = "1.0.25" }
-toml             = { version = "0.7.4" }
-url              = { version = "2.2.2" }
-urn              = { version = "0.7.0" }
+proptest = { version = "1.2.0" }
+regex = { version = "1.5.4" }
+reqwest = { version = "0.11" }
+serde = { version = "1.0.163", features = ["derive", "rc"] }
+serde_json = { git = "https://github.com/serde-rs/json/", features = [
+	"arbitrary_precision",
+] }
+serde_yaml = { version = "0.9.21" }
+similar = { version = "2.2.1" }
+slotmap = { version = "1.0.6" }
+strum = { version = "0.24", features = ["derive"] }
+strum_macros = { version = "0.24" }
+tap = { version = "1.0.1" }
+thiserror = { version = "1.0.25" }
+toml = { version = "0.7.4" }
+url = { version = "2.2.2" }
+urn = { version = "0.7.0" }

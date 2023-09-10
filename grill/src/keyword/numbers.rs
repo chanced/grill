@@ -50,10 +50,7 @@ where
         if let Some(key) = self.lookup.get(num) {
             return Ok(*key);
         }
-
-        // TODO use `as_str` once github.com/serde-rs/json/pull/1067 is merged
-        let num_str = num.to_string();
-        let value = V::parse(&num_str)?;
+        let value = V::parse(num.as_str())?;
         for (key, val) in self.table.iter() {
             if val == &value {
                 return Ok(key);

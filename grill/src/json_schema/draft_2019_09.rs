@@ -1,6 +1,7 @@
 use crate::{
     error::IdentifyError,
-    schema::{Dialect, Keyword, Metaschema},
+    keyword,
+    schema::{Dialect, Metaschema},
     uri::{AbsoluteUri, AsUriRef, Uri},
 };
 use lazy_static::lazy_static;
@@ -167,7 +168,7 @@ lazy_static! {
             JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA.clone(),
             JSON_SCHEMA_2019_09_METASCHEMA.clone(),
         ],
-        [super::draft_07::ConstHandler::new()], // TOOD: FIX
+        [super::draft_07::ConstKeyword::new()], // TOOD: FIX
     ).unwrap();
 }
 
@@ -181,7 +182,7 @@ pub fn is_json_schema_2019_09(v: &Value) -> bool {
         return true;
     }
     let Value::Object(obj) = v else { return false };
-    let Some(s) = obj.get(Keyword::SCHEMA.as_str()).and_then(Value::as_str) else { return false };
+    let Some(s) = obj.get(keyword::SCHEMA).and_then(Value::as_str) else { return false };
     if s == JSON_SCHEMA_2019_09_URI_STR {
         return true;
     }
@@ -220,7 +221,7 @@ pub fn is_json_schema_2019_09_uri(uri: impl AsUriRef) -> bool {
 ///   * has an `"$id"` field which can not be parsed as a [`Uri`]
 ///   * The [`Uri`] parsed from`"$id"` contains a non-empty fragment (i.e. `"https://example.com/example#fragment"`)
 pub fn identify_schema(schema: &Value) -> Result<Option<Uri>, IdentifyError> {
-    let Some(id) = schema.get(Keyword::ID.as_ref()).and_then(Value::as_str) else { return Ok(None) };
+    let Some(id) = schema.get(keyword::ID).and_then(Value::as_str) else { return Ok(None) };
     let uri = Uri::parse(id)?;
     let Some(fragment) = uri.fragment() else { return Ok(Some(uri)) };
     if fragment.is_empty() {
@@ -236,7 +237,7 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::{schema::Dialects, Key};
+    use crate::schema::Dialects;
 
     use super::*;
 

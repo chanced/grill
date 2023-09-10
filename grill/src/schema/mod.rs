@@ -1,3 +1,5 @@
+pub mod iter;
+
 pub mod traverse;
 
 mod anchor;
@@ -9,12 +11,6 @@ pub use metaschema::Metaschema;
 mod dialect;
 pub use dialect::Dialect;
 pub(crate) use dialect::Dialects;
-
-mod keyword;
-pub use keyword::Keyword;
-
-mod location;
-pub use location::{AbsoluteKeywordLocation, Location};
 
 mod reference;
 pub use reference::Reference;

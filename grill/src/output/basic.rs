@@ -3,8 +3,9 @@ use serde::Serialize;
 use serde_json::Value;
 use std::{borrow::Cow, collections::BTreeMap};
 
+use crate::{keyword::Location, Object};
+
 use super::ValidationError;
-use crate::schema::Location;
 
 #[derive(Debug, Clone)]
 pub struct Basic<'v> {
@@ -29,18 +30,20 @@ impl<'v> Serialize for Basic<'v> {
         todo!()
     }
 }
+
 /// A [`Basic`] output node for a given keyword. Contains the keyword's location, sub
 /// annotations and errors, possibly a [`ValidationError`] and any additional
 /// fields pertinent to the keyword.
 #[derive(Debug, Clone)]
 pub struct Node<'v> {
-    /// Location of the keyword
-    location: Location,
     /// Additional properties
-    additional_properties: BTreeMap<String, Value>,
+    additional_properties: Object,
     /// Validation error
     error: Option<Box<dyn ValidationError<'v>>>,
+    /// Location of the node
+    location: Location,
 }
+
 impl<'v> Node<'v> {
     #[must_use]
     pub fn location(&self) -> &Location {
@@ -73,7 +76,7 @@ struct Unit<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<Cow<'a, String>>,
     #[serde(flatten)]
-    additional_properties: Cow<'a, BTreeMap<String, Value>>,
+    additional_properties: Cow<'a, Object>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]

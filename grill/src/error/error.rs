@@ -8,7 +8,7 @@ pub use url::ParseError as UrlError;
 
 pub use urn::Error as UrnError;
 
-use crate::{schema::Keyword, uri::AbsoluteUri, Output, Uri};
+use crate::{uri::AbsoluteUri, Output, Uri};
 use serde_json::Value;
 use std::{
     collections::HashMap,
@@ -41,7 +41,7 @@ pub struct AnchorEmptyError {
     /// The keyword's path can be found as a JSON pointer in the fragment.
     pub location: AbsoluteUri,
     /// The [`Keyword`] of the anchor.
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
 }
 
 /// An anchor keyword which does not allow for non-empty values (e.g.
@@ -55,7 +55,7 @@ pub struct AnchorNotEmptyError {
     pub location: AbsoluteUri,
 
     /// The [`Keyword`] of the anchor.
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
 
     /// The value of the anchor.
     pub value: Box<Value>,
@@ -74,7 +74,7 @@ pub struct AnchorInvalidLeadCharError {
     /// The value of the anchor.
     pub value: String,
     /// The [`Keyword`] of the anchor.
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
     /// The character which caused the error.
     pub character: char,
 }
@@ -90,7 +90,7 @@ pub struct AnchorInvalidCharError {
     /// The value of the anchor.
     pub value: String,
     /// The [`Keyword`] of the anchor.
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
     /// The character which caused the error.
     pub character: char,
 }
@@ -219,7 +219,7 @@ pub enum DialectError {
     FragmentedId(AbsoluteUri),
 
     /// The [`Dialect`] did not have the minimum required number of
-    /// [`Handler`](`crate::handler::Handler`)s (2).
+    /// [`Keyword`](`crate::keyword::Keyword`)s (2).
     #[error("at least one dialect is required to build an Interrogator; none were provided")]
     Empty,
 
@@ -230,19 +230,19 @@ pub enum DialectError {
     )]
     PrimaryMetaschemaNotFound(AbsoluteUri),
 
-    /// Exactly one [`Handler`](crate::handler::Handler) must implement
-    /// implement [`is_pertinent_to`](`crate::handler::Handler::is_pertinent_to`) but none were provided.
-    #[error("exactly one `Handler` must implemenet the `is_pertinent_to` method; none were found")]
+    /// Exactly one [`Keyword`](crate::keyword::Keyword) must implement
+    /// implement [`is_pertinent_to`](`crate::keyword::Keyword::is_pertinent_to`) but none were provided.
+    #[error("exactly one `Keyword` must implemenet the `is_pertinent_to` method; none were found")]
     IsPertinentToNotImplemented(AbsoluteUri),
 
-    /// Exactly one [`Handler`](crate::handler::Handler) must implement
-    /// implement [`dialect`](`crate::handler::Handler::dialect`) but none were provided.
-    #[error("exactly one `Handler` must implement the `dialect` method; none were found")]
+    /// Exactly one [`Keyword`](crate::keyword::Keyword) must implement
+    /// implement [`dialect`](`crate::keyword::Keyword::dialect`) but none were provided.
+    #[error("exactly one `Keyword` must implement the `dialect` method; none were found")]
     DialectNotImplemented(AbsoluteUri),
 
-    /// At least one [`Handler`](crate::handler::Handler) must implement
-    /// implement [`identify`](`crate::handler::Handler::identify`) but none were provided.
-    #[error("exactly one `Handler` must implement the `identify` method; none were found")]
+    /// At least one [`Keyword`](crate::keyword::Keyword) must implement
+    /// implement [`identify`](`crate::keyword::Keyword::identify`) but none were provided.
+    #[error("exactly one `Keyword` must implement the `identify` method; none were found")]
     IdentifyNotImplemented(AbsoluteUri),
 }
 
@@ -315,7 +315,7 @@ pub enum EvaluateError {
     #[error(transparent)]
     Regex(EvaluateRegexError),
 
-    /// A custom error occurred in a [`Handler`](crate::handler::Handler).
+    /// A custom error occurred in a [`Keyword`](crate::keyword::Keyword).
     #[error("{source}")]
     Custom {
         /// `Box<dyn std::error::Error>`
@@ -600,7 +600,7 @@ pub enum CompileError {
     #[error(transparent)]
     FailedToParseNumber(#[from] NumberError),
 
-    /// Custom errors returned by a [`Handler`]
+    /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]
     Custom(#[from] Box<anyhow::Error>),
 }
@@ -802,7 +802,7 @@ pub enum IdentifyError {
     #[error("the $id of a schema is not absolute: {0}")]
     FragmentedId(Uri),
 
-    /// Any custom error which a [`Handler`](crate::handler::Handler) may need
+    /// Any custom error which a [`Keyword`](crate::keyword::Keyword) may need
     /// to return.
     #[error(transparent)]
     Custom(#[from] anyhow::Error),

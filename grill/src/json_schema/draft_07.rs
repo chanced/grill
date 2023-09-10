@@ -1,12 +1,12 @@
-mod const_handler;
-mod enum_handler;
-mod multiple_of_handler;
-mod type_handler;
+mod const_keyword;
+mod enum_keyword;
+mod multiple_of_keyword;
+mod type_keyword;
 
-pub use const_handler::{ConstHandler, ConstInvalid};
-pub use enum_handler::{EnumHandler, EnumInvalid};
-// pub use multiple_of_handler::{MultipleOfHandler, MultipleOfInvalid};
-pub use type_handler::{TypeHandler, TypeInvalid};
+pub use const_keyword::{ConstInvalid, ConstKeyword};
+pub use enum_keyword::{EnumInvalid, EnumKeyword};
+// pub use multiple_of_keyword::{MultipleOfKeyword, MultipleOfInvalid};
+pub use type_keyword::{TypeInvalid, TypeKeyword};
 
 use crate::{
     error::IdentifyError,
@@ -44,7 +44,7 @@ lazy_static::lazy_static! {
     pub static ref JSON_SCHEMA_07: Dialect = Dialect::new(
         JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
         [JSON_SCHEMA_07_METASCHEMA.clone()],
-        [ConstHandler::new()],
+        [ConstKeyword::new()],
     )
     .unwrap();
 }

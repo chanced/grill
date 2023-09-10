@@ -1,6 +1,5 @@
 use jsonptr::Pointer;
 
-use super::Keyword;
 use crate::{source::SourceKey, AbsoluteUri, Key};
 
 // ///
@@ -11,7 +10,7 @@ use crate::{source::SourceKey, AbsoluteUri, Key};
 //     /// The referenced URI
 //     pub uri: AbsoluteUri,
 //     /// The keyword of the reference (e.g. $ref, $dynamicRef, $recursiveRef, etc)
-//     pub keyword: Keyword<'static>,
+//     pub keyword: &'static str,
 // }
 
 /// A reference to a schema. This type is almost identical to `Ref` except
@@ -21,7 +20,7 @@ pub struct Reference {
     pub(crate) src_key: SourceKey,
     /// Key to the referenced [`Schema`]
     ///
-    /// [`Handler`]s should use [`Reference::new`](`Reference::new`) or set this to [`Default::default`]
+    /// [`Keyword`]s should use [`Reference::new`](`Reference::new`) or set this to [`Default::default`]
     ///
     pub key: Key,
     /// Path to the $ref, $dynamicRef, $recursiveRef, etc
@@ -29,13 +28,13 @@ pub struct Reference {
     /// The referenced URI
     pub uri: AbsoluteUri,
     /// The keyword of the reference (e.g. $ref, $dynamicRef, $recursiveRef, etc)
-    pub keyword: Keyword<'static>,
+    pub keyword: &'static str,
 }
 
 impl Reference {
     #[must_use]
     /// Creates a new reference
-    pub fn new(key: Key, ref_path: Pointer, uri: AbsoluteUri, keyword: Keyword<'static>) -> Self {
+    pub fn new(key: Key, ref_path: Pointer, uri: AbsoluteUri, keyword: &'static str) -> Self {
         Self {
             src_key: SourceKey::default(),
             key,

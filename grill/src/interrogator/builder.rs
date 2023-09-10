@@ -4,8 +4,8 @@ use serde_json::Value;
 
 use crate::{
     error::{BuildError, SourceError, UriError},
-    handler::{Numbers, Values},
     json_schema,
+    keyword::{Numbers, Values},
     schema::{Dialect, Dialects, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,

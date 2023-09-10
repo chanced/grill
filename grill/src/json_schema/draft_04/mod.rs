@@ -10,11 +10,11 @@ use url::Url;
 
 pub const JSON_SCHEMA_04_URI_STR: &str = "http://json-schema.org/draft-04/schema#";
 pub const JSON_HYPER_SCHEMA_04_URI_STR: &str = "http://json-schema.org/draft-04/hyper-schema#";
-pub const JSON_SCHEMA_04_BYTES: &[u8] = include_bytes!("../../../json_schema/04/schema.json");
+pub const JSON_SCHEMA_04_BYTES: &[u8] = include_bytes!("../../../../json_schema/04/schema.json");
 pub const JSON_HYPER_SCHEMA_04_BYTES: &[u8] =
-    include_bytes!("../../../json_schema/04/hyper-schema.json");
+    include_bytes!("../../../../json_schema/04/hyper-schema.json");
 pub const JSON_HYPER_SCHEMA_04_LINKS_BYTES: &[u8] =
-    include_bytes!("../../../json_schema/04/links.json");
+    include_bytes!("../../../../json_schema/04/links.json");
 
 lazy_static! {
     pub static ref JSON_SCHEMA_04_URL: Url = Url::parse(JSON_SCHEMA_04_URI_STR).unwrap();
@@ -31,7 +31,7 @@ lazy_static! {
                 JSON_SCHEMA_04_ABSOLUTE_URI.clone(),
                 JSON_SCHEMA_04_VALUE.as_object().unwrap().clone(),
             )],
-            [super::draft_07::ConstHandler::new()], // TODO: FIX/FINISH,
+            [super::draft_07::ConstKeyword::new()], // TODO: FIX/FINISH,
         )
         .unwrap();
 

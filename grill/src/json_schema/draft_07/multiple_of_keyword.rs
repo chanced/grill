@@ -2,19 +2,19 @@
 
 // use crate::{
 //     error::CompileError,
-//     handler::{Compile, Handler, SyncHandler},
+//     keyword::{Compile, Keyword, SyncKeyword},
 //     output::{self, ValidationError},
 // };
 // use serde_json::{Number, Value};
 
 // #[derive(Debug, Clone, Default)]
-// pub struct MultipleOfHandler {}
-// impl From<MultipleOfHandler> for Handler {
-//     fn from(handler: MultipleOfHandler) -> Self {
-//         Self::Sync(Box::new(handler))
+// pub struct MultipleOfKeyword {}
+// impl From<MultipleOfKeyword> for Keyword {
+//     fn from(keyword: MultipleOfKeyword) -> Self {
+//         Self::Sync(Box::new(keyword))
 //     }
 // }
-// impl SyncHandler for MultipleOfHandler {
+// impl SyncKeyword for MultipleOfKeyword {
 //     fn compile<'s>(
 //         &mut self,
 //         _compile: &mut Compile<'s>,
@@ -25,7 +25,7 @@
 
 //     fn evaluate<'v>(
 //         &self,
-//         _scope: &mut crate::handler::Scope,
+//         _scope: &mut crate::keyword::Scope,
 //         _value: &'v Value,
 //         _structure: crate::Structure,
 //     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
@@ -62,38 +62,38 @@
 // mod tests {
 //     #[test]
 //     fn test_multiple_of_setup() {
-//         // let mut handler = MultipleOfHandler::default();
+//         // let mut keyword = MultipleOfKeyword::default();
 //         // let mut compiler = Compiler::default();
 //         // let schema = serde_json::json!({"multipleOf": 3});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // let result = handler.setup(&mut compiler, &schema);
+//         // let result = keyword.setup(&mut compiler, &schema);
 //         // assert!(result.is_ok());
 //         // assert!(result.unwrap());
-//         // assert_eq!(handler.expected_multiple_of, Some(3.into()));
+//         // assert_eq!(keyword.expected_multiple_of, Some(3.into()));
 
-//         // let mut handler = MultipleOfHandler::default();
+//         // let mut keyword = MultipleOfKeyword::default();
 //         // let mut compiler = Compiler::default();
 //         // let schema = serde_json::json!({});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // let result = handler.setup(&mut compiler, &schema);
+//         // let result = keyword.setup(&mut compiler, &schema);
 //         // assert!(result.is_ok());
 //         // assert!(!result.unwrap());
-//         // assert_eq!(handler.expected_multiple_of, None);
+//         // assert_eq!(keyword.expected_multiple_of, None);
 //     }
 
 //     #[test]
 //     fn test_multiple_of_evaluate() {
-//         // let mut handler = MultipleOfHandler::default();
+//         // let mut keyword = MultipleOfKeyword::default();
 //         // let mut compiler = Compiler::default();
 //         // let schema = serde_json::json!({"multipleOf": 3});
 //         // let schema: Schema = serde_json::from_value(schema).unwrap();
-//         // let result = handler.setup(&mut compiler, &schema);
+//         // let result = keyword.setup(&mut compiler, &schema);
 //         // assert!(result.is_ok());
-//         // assert_eq!(handler.expected_multiple_of, Some(3.into()));
+//         // assert_eq!(keyword.expected_multiple_of, Some(3.into()));
 //         // let mut state = State::default();
 //         // let mut scope = Scope::new(Location::default(), &mut state);
 //         // let value = serde_json::json!(3);
-//         // let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         // let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         // assert!(result.is_ok());
 //         // let result = result.unwrap();
 //         // assert!(result.is_some());
@@ -101,7 +101,7 @@
 //         // assert!(result.is_valid());
 
 //         // let value = serde_json::json!(21);
-//         // let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         // let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         // assert!(result.is_ok());
 //         // let result = result.unwrap();
 //         // assert!(result.is_some());
@@ -109,7 +109,7 @@
 //         // assert!(result.is_valid());
 
 //         // let value = serde_json::json!(34);
-//         // let result = handler.evaluate(&mut scope, &value, Structure::Complete);
+//         // let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
 //         // assert!(result.is_ok());
 //         // let result = result.unwrap();
 //         // assert!(result.is_some());

@@ -7,7 +7,7 @@ pub enum Structure {
     /// `"valid"` `bool` field.
     ///
     /// This `Structure` may have a positive impact on
-    /// performance as [`Handler`]s are expected to short circuit and return errors as
+    /// performance as [`Keyword`]s are expected to short circuit and return errors as
     /// soon as possible.
     ///
     /// # Example

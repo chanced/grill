@@ -1,9 +1,9 @@
 use super::ValidationError;
-use crate::schema::Location;
+use crate::{keyword::Location, Object};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::BTreeMap, error::Error, fmt::Display};
+use std::{error::Error, fmt::Display};
 
 /// An output node for a given keyword. Contains the keyword's location, sub
 /// annotations and errors, possibly a [`ValidationError`] and any additional
@@ -13,7 +13,7 @@ pub struct Node<'v> {
     /// Location of the keyword
     location: Location,
     /// Additional properties
-    additional_properties: BTreeMap<String, Value>,
+    additional_props: Object,
     /// Validation error
     error: Option<Box<dyn 'static + ValidationError<'v>>>,
     /// Sub annotations
@@ -31,7 +31,7 @@ impl<'v> Node<'v> {
     pub fn into_owned_box(&self) -> Node<'static> {
         Node {
             location: self.location.clone(),
-            additional_properties: self.additional_properties.clone(),
+            additional_props: self.additional_props.clone(),
             error: self.error.clone().map(ValidationError::into_owned_box),
             annotations: self.annotations.iter().map(Node::into_owned_box).collect(),
             errors: self.errors.iter().map(Node::into_owned_box).collect(),
@@ -47,24 +47,24 @@ impl<'v> Node<'v> {
         self.error.is_none() && self.errors.is_empty()
     }
     #[must_use]
-    pub fn additional_properties(&self) -> &BTreeMap<String, Value> {
-        &self.additional_properties
+    pub fn additional_props(&self) -> &Object {
+        &self.additional_props
     }
 
-    pub fn additional_properties_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        &mut self.additional_properties
+    pub fn additional_props_mut(&mut self) -> &mut Object {
+        &mut self.additional_props
     }
 
-    pub fn insert_additional_property(&mut self, key: &str, value: Value) {
-        self.additional_properties.insert(key.to_string(), value);
+    pub fn insert_additional_prop(&mut self, key: &str, value: Value) {
+        self.additional_props.insert(key.to_string(), value);
     }
-    pub fn remove_additional_property(&mut self, key: &str) {
-        self.additional_properties.remove(key);
+    pub fn remove_additional_prop(&mut self, key: &str) {
+        self.additional_props.remove(key);
     }
 
     #[must_use]
-    pub fn get_additional_property(&self, key: &str) -> Option<&Value> {
-        self.additional_properties.get(key)
+    pub fn get_additional_prop(&self, key: &str) -> Option<&Value> {
+        self.additional_props.get(key)
     }
 
     #[must_use]
@@ -104,8 +104,7 @@ impl Display for Node<'_> {
         if let Some(err) = &self.error {
             write!(f, "{err}")
         } else {
-            todo!()
-            // write!(f, "{} passed evaluation", self.absolute_keyword_location()) // TODO ABSOLUTE KEYWORD LOCATION
+            write!(f, "{} passed evaluation", self.absolute_keyword_location()) // TODO ABSOLUTE KEYWORD LOCATION
         }
     }
 }
@@ -122,7 +121,7 @@ impl<'n> Serialize for Node<'n> {
             #[serde(flatten)]
             pub location: &'x Location,
             #[serde(flatten)]
-            pub additional_props: &'x BTreeMap<String, Value>,
+            pub additional_props: &'x Object,
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub error: Option<String>,
             #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
@@ -132,7 +131,7 @@ impl<'n> Serialize for Node<'n> {
         }
         let data = Data {
             location: &self.location,
-            additional_props: &self.additional_properties,
+            additional_props: &self.additional_props,
             error: self.error.as_ref().map(ToString::to_string),
             annotations: &self.annotations,
             errors: &self.errors,
@@ -151,7 +150,7 @@ impl<'de> Deserialize<'de> for Node<'static> {
             #[serde(flatten)]
             pub location: Location,
             #[serde(flatten)]
-            pub additional_props: BTreeMap<String, Value>,
+            pub additional_props: Object,
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub error: Option<String>,
             #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
@@ -169,7 +168,7 @@ impl<'de> Deserialize<'de> for Node<'static> {
 
         Ok(Self {
             location,
-            additional_properties: additional_props,
+            additional_props,
             error: error.map(|e| Box::new(e) as Box<dyn ValidationError<'static>>),
             annotations,
             errors,
