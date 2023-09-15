@@ -1,4 +1,3 @@
-use num::{BigInt, BigRational};
 use serde_json::{Number, Value};
 
 use crate::{
@@ -7,7 +6,7 @@ use crate::{
     AbsoluteUri, Key, Uri,
 };
 
-use super::{BigInts, BigRationals, IntKey, Numbers, RationalKey, ValueKey, Values};
+use super::{BigInts, BigRationals, IntKey, RationalKey, ValueKey, Values};
 
 #[derive(Debug)]
 pub struct Compile<'i> {

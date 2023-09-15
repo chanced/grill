@@ -7,7 +7,7 @@ use crate::{
     json_schema,
     keyword::{Numbers, Values},
     schema::{Dialect, Dialects, Schemas},
-    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
+    source::{deserialize_json, Deserialize, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator,
 };
@@ -18,7 +18,7 @@ pub struct Builder {
     sources: Vec<Src>,
     primary_dialect: Option<AbsoluteUri>,
     resolvers: Vec<Box<dyn Resolve>>,
-    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
+    deserializers: Vec<(&'static str, Box<dyn Deserialize>)>,
 }
 
 impl Default for Builder {
@@ -304,7 +304,7 @@ impl Builder {
     #[must_use]
     pub fn deserializer<R>(mut self, format: &'static str, deserializer: R) -> Self
     where
-        R: 'static + Deserializer,
+        R: 'static + Deserialize,
     {
         let f = format.to_lowercase();
         for (idx, (fmt, _)) in self.deserializers.iter().enumerate() {

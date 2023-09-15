@@ -7,9 +7,6 @@ pub use keyword::{AsyncKeyword, IntoKeyword, Keyword, SyncKeyword};
 mod context;
 pub use context::Context;
 
-pub mod state;
-pub use state::State;
-
 mod compile;
 pub use compile::Compile;
 

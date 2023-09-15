@@ -5,6 +5,9 @@
 // The reason this was lifted rather than using anymap directly is due to `Downcast` not being exposed.
 // unsafe code can be removed once dyn upcasting is stable: https://github.com/rust-lang/rust/issues/65991
 
+pub mod state;
+pub use state::State;
+
 use std::{
     any::{Any, TypeId},
     collections::{hash_map, HashMap},

@@ -6,7 +6,8 @@ use serde_json::Value;
 use crate::{
     keyword,
     keyword::{Compile, Context, Keyword, RationalKey, SyncKeyword, ValueKey},
-    output, Schema,
+    output::{self, Node},
+    Schema,
 };
 
 /// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
@@ -45,16 +46,16 @@ impl SyncKeyword for ConstKeyword {
     }
     fn evaluate<'i, 'v>(
         &'i self,
-        scope: &'i mut Context,
+        ctx: &'i mut Context,
         value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
-        todo!()
+        ctx.error
     }
 }
 impl From<ConstKeyword> for Keyword {
     fn from(h: ConstKeyword) -> Keyword {
-        Keyword::Sync(Box::<ConstKeyword>::default())
+        Keyword::Sync(Box::new(h))
     }
 }
 // impl SyncKeyword for ConstKeyword {

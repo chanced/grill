@@ -30,7 +30,7 @@ percent-encoding = { workspace = true }
 regex            = { workspace = true }
 reqwest          = { workspace = true, optional = true }
 serde            = { workspace = true }
-serde_json       = { workspace = true }
+serde_json       = { version = "1.0.106", features = ["arbitrary_precision"] }
 serde_yaml       = { workspace = true, optional = true }
 slotmap          = { workspace = true }
 strum            = { workspace = true }
@@ -56,3 +56,6 @@ yaml    = ["dep:serde_yaml"]
 [[bench]]
 harness = false
 name    = "benchmark"
+
+[replace]
+"serde_json:1.0.106" = { git = "https://github.com/serde-rs/json" }

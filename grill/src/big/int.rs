@@ -1,6 +1,7 @@
-use num::BigInt;
+use super::{ten, u64_to_usize};
+use crate::error::NumberError;
+use num::{pow, BigInt};
 use num_rational::BigRational;
-
 use std::str::FromStr;
 
 pub fn parse_int(value: &str) -> Result<BigInt, NumberError> {
@@ -16,11 +17,6 @@ enum State {
     Exponent,
     Error,
 }
-use num::pow;
-
-use crate::error::NumberError;
-
-use super::{u64_to_usize, TEN};
 
 impl State {
     fn next(self, c: char) -> State {
@@ -125,9 +121,9 @@ impl<'a> Parser<'a> {
             #[cfg(target_pointer_width = "64")]
             let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
             if is_positive {
-                result *= pow(TEN.clone(), exp);
+                result *= pow(ten(), exp);
             } else {
-                result /= pow(TEN.clone(), exp);
+                result /= pow(ten(), exp);
                 if !result.is_integer() {
                     return Err(NumberError::NotAnInteger {
                         value: value.to_string(),

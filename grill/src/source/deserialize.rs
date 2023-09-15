@@ -3,6 +3,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use dyn_clone::{clone_trait_object, DynClone};
+use inherent::inherent;
 use serde_json::Value;
 
 use crate::error::DeserializeError;
@@ -27,11 +28,11 @@ use crate::error::DeserializeError;
 ///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
 /// }
 /// ```
-pub trait Deserializer: DynClone + Send + Sync + 'static {
+pub trait Deserialize: DynClone + Send + Sync + 'static {
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
-clone_trait_object!(Deserializer);
-impl<F> Deserializer for F
+clone_trait_object!(Deserialize);
+impl<F> Deserialize for F
 where
     F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,
 {
@@ -42,7 +43,7 @@ where
 
 #[derive(Clone)]
 pub struct Deserializers {
-    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
+    deserializers: Vec<(&'static str, Box<dyn Deserialize>)>,
 }
 impl std::fmt::Debug for Deserializers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -53,7 +54,7 @@ impl std::fmt::Debug for Deserializers {
 }
 
 impl Deserializers {
-    pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserializer>)>) -> Self {
+    pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserialize>)>) -> Self {
         if deserializers.is_empty() {
             deserializers.push(("json", Box::new(deserialize_json)));
         }
@@ -73,7 +74,7 @@ impl Deserializers {
     }
 }
 impl Deref for Deserializers {
-    type Target = [(&'static str, Box<dyn Deserializer>)];
+    type Target = [(&'static str, Box<dyn Deserialize>)];
 
     fn deref(&self) -> &Self::Target {
         &self.deserializers

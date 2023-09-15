@@ -8,7 +8,7 @@ pub use deserialize::deserialize_toml;
 #[cfg(feature = "yaml")]
 pub use deserialize::deserialize_yaml;
 pub(crate) use deserialize::Deserializers;
-pub use deserialize::{deserialize_json, Deserializer};
+pub use deserialize::{deserialize_json, Deserialize};
 
 mod resolve;
 #[cfg(feature = "http")]

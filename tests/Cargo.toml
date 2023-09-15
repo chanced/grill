@@ -6,4 +6,7 @@ version = "0.1.0"
 [dependencies]
 grill      = { workspace = true }
 serde      = { worksspace = true }
-serde_json = { workspace = true }
+serde_json = { version = "*" }
+
+[patch.crates-io]
+serde_json = { git = "https://github.com/serde-rs/json" }

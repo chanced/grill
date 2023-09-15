@@ -1,7 +1,7 @@
 use crate::{
     error::{
-        CompileError, CyclicDependencyError, SourceConflictError, SourceError, UnknownAnchorError,
-        UnknownKeyError,
+        self, CompileError, CyclicDependencyError, SourceConflictError, SourceError,
+        UnknownAnchorError, UnknownKeyError,
     },
     keyword::{BigInts, BigRationals, Compile, Keyword, Values},
     schema::{
@@ -34,6 +34,9 @@ pub(crate) struct CompiledSchema {
     /// Abs URI of the schema.
     pub(crate) id: Option<AbsoluteUri>,
 
+    /// Path to the schema from the root schema as a JSON Pointer
+    pub(crate) path: Pointer,
+
     /// The [`Key`] of the schema which contains this schema, if any.
     ///
     /// Note that if this schema has an `id`, `parent` will be `None` regardless of
@@ -63,12 +66,36 @@ pub(crate) struct CompiledSchema {
     pub(crate) keywords: Box<[Keyword]>,
 
     /// Absolute URI of the source and path to this schema.
-    pub(crate) src: Link,
+    pub(crate) link: Link,
 }
 
+impl CompiledSchema {
+    pub(crate) fn new(
+        id: Option<AbsoluteUri>,
+        path: Pointer,
+        uris: Vec<AbsoluteUri>,
+        link: Link,
+        parent: Option<Key>,
+        anchors: Vec<Anchor>,
+    ) -> Self {
+        Self {
+            id,
+            path,
+            uris,
+            metaschema: link.uri.clone(),
+            parent,
+            link,
+            subschemas: Vec::new(),
+            dependents: Vec::new(),
+            references: Vec::new(),
+            anchors,
+            keywords: Box::default(),
+        }
+    }
+}
 impl PartialEq for CompiledSchema {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.metaschema == other.metaschema && self.src == other.src
+        self.id == other.id && self.metaschema == other.metaschema && self.link == other.link
     }
 }
 
@@ -126,11 +153,11 @@ impl<'i> Schema<'i> {
         Self {
             key,
             id: compiled.id.as_ref().map(Cow::Borrowed),
-            path: Cow::Borrowed(&compiled.src.path),
+            path: Cow::Borrowed(&compiled.path),
             uris: Cow::Borrowed(&compiled.uris),
             metaschema: Cow::Borrowed(&compiled.metaschema),
             anchors: Cow::Borrowed(&compiled.anchors),
-            source: Source::new(&compiled.src, sources),
+            source: Source::new(&compiled.link, sources),
             parent: compiled.parent,
             subschemas: Cow::Borrowed(&compiled.subschemas),
             dependents: Cow::Borrowed(&compiled.dependents),
@@ -204,21 +231,33 @@ impl Store {
     fn get(&self, key: Key) -> Option<&CompiledSchema> {
         self.table.get(key)
     }
-
-    fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
+    pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
         self.index.get(id).copied()
     }
-
-    fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+    pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
         self.index.entry(id)
     }
-
-    fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+    pub(crate) fn contains_key(&self, key: Key) -> bool {
+        self.table.contains_key(key)
+    }
+    pub(crate) fn contains_uri(&self, uri: &AbsoluteUri) -> bool {
+        self.index.contains_key(uri)
+    }
+    /// Inserts the schema unless it already exists. If it does exist, returns
+    /// the existing schema's key.
+    ///
+    /// # Errors
+    /// Returns the URI of the existing schema if it is not equal to the new
+    /// schema.
+    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.index.get(id) {
             let existing = self.table.get(*key).unwrap();
             if existing != &schema {
-                return Err(id.clone());
+                return Err(SourceConflictError {
+                    uri: id.clone(),
+                    existing_source: existing.link.source.clone().into(),
+                });
             }
             return Ok(*key);
         }
@@ -229,10 +268,34 @@ impl Store {
         }
         Ok(key)
     }
+}
+pub(crate) struct Params<'i> {
+    path: Option<Pointer>,
+    link: Link,
+    parent: Option<Key>,
+    sources: &'i mut Sources,
+    dialects: &'i Dialects<'i>,
+    deserializers: &'i Deserializers,
+    resolvers: &'i Resolvers,
+    ints: &'i mut BigInts,
+    rationals: &'i mut BigRationals,
+    values: &'i mut Values,
+}
 
-    fn contains_key(&self, key: Key) -> bool {
-        self.table.contains_key(key)
-    }
+struct Subparams<'i> {
+    key: Key,
+    id: Option<&'i AbsoluteUri>,
+    base_uri: &'i AbsoluteUri,
+    path: &'i Pointer,
+    source: &'i Value,
+    dialect: &'i Dialect,
+    dialects: &'i Dialects<'i>,
+    deserializers: &'i Deserializers,
+    resolvers: &'i Resolvers,
+    sources: &'i mut Sources,
+    ints: &'i mut BigInts,
+    rationals: &'i mut BigRationals,
+    values: &'i mut Values,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -252,18 +315,19 @@ impl Schemas {
 
     #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
     #[async_recursion]
-    pub(crate) async fn compile(
-        &mut self,
-        link: Link,
-        mut parent: Option<Key>,
-        sources: &mut Sources,
-        dialects: &Dialects<'_>,
-        deserializers: &Deserializers,
-        resolvers: &Resolvers,
-        ints: &mut BigInts,
-        rationals: &mut BigRationals,
-        values: &mut Values,
-    ) -> Result<Key, CompileError> {
+    pub(crate) async fn compile(&mut self, params: Params) -> Result<Key, CompileError> {
+        let Params {
+            mut path,
+            link,
+            parent,
+            sources,
+            dialects,
+            deserializers,
+            resolvers,
+            ints,
+            rationals,
+            values,
+        } = params;
         // check to see if schema is already been compiled
         if self.sandbox().index.contains_key(&link.uri) {
             // if so, return it.
@@ -311,6 +375,9 @@ impl Schemas {
         if id.is_none() && parent.is_none() && fragment.starts_with('/') {
             parent = self.locate_parent(lookup_id.clone())?;
         }
+        if id.is_some() {
+            path = Pointer::default()
+        }
 
         // linking all URIs of this schema to the the source location
         sources.link_all(id.as_ref(), &uris, &link.uri, &link.path)?;
@@ -321,14 +388,23 @@ impl Schemas {
 
         // create a new CompiledSchema and insert it. if compiling fails, the
         // schema store will rollback to its previous state.
-        let key = self.insert_placeholder(&id, uris, &link, &source, parent, anchors, dialect)?;
+        let key = self.insert_placeholder(
+            &id,
+            path.clone(),
+            uris,
+            &link,
+            &source,
+            parent,
+            anchors,
+            dialect,
+        )?;
 
         let subschemas = self
-            .compile_subschemas(Params {
+            .compile_subschemas(Subparams {
                 key,
                 id: id.as_ref(),
                 base_uri: &base_uri,
-                path: &link.path,
+                path: &path,
                 source: &source,
                 dialect,
                 dialects,
@@ -341,7 +417,7 @@ impl Schemas {
             })
             .await?;
         let references = self
-            .compile_references(Params {
+            .compile_references(Subparams {
                 key,
                 id: id.as_ref(),
                 base_uri: &base_uri,
@@ -397,7 +473,7 @@ impl Schemas {
         }
         Ok(keywords.into_boxed_slice())
     }
-    fn ensure_not_cyclic(
+    pub(crate) fn ensure_not_cyclic(
         &mut self,
         key: Key,
         uri: &AbsoluteUri,
@@ -423,6 +499,7 @@ impl Schemas {
     fn insert_placeholder(
         &mut self,
         id: &Option<AbsoluteUri>,
+        path: Pointer,
         uris: Vec<AbsoluteUri>,
         link: &Link,
         source: &Value,
@@ -434,11 +511,12 @@ impl Schemas {
         self.sandbox()
             .insert(CompiledSchema {
                 id: id.cloned(),
+                path,
                 uris,
                 metaschema: dialect.primary_metaschema_id().clone(),
                 keywords: Box::default(),
                 parent,
-                src: link.clone(),
+                link: link.clone(),
                 subschemas: Vec::new(),
                 dependents: Vec::new(),
                 references: Vec::new(),
@@ -473,19 +551,7 @@ impl Schemas {
             .resolve(base_uri.clone(), resolvers, deserializers)
             .await?;
         let root_link = root_link.clone();
-        let _ = self
-            .compile(
-                root_link,
-                None,
-                sources,
-                dialects,
-                deserializers,
-                resolvers,
-                ints,
-                rationals,
-                values,
-            )
-            .await?;
+        let _ = self.compile().await?;
 
         // at this stage, all URIs should be indexed.
         match self.get_by_uri(&link.uri, sources) {
@@ -497,53 +563,12 @@ impl Schemas {
             .into()),
         }
     }
-    async fn compile_references(
-        &mut self,
-        params: Params<'_>,
-    ) -> Result<Vec<Reference>, CompileError> {
-        let Params {
-            key,
-            dialect,
-            dialects,
-            deserializers,
-            resolvers,
-            sources,
-            source,
-            id: _,
-            base_uri: _,
-            path: _,
-            ints,
-            rationals,
-            values,
-        } = params;
-        let mut references = dialect.references(source)?;
-        for reference in &mut references {
-            let (ref_link, _) = sources
-                .resolve(reference.uri.clone(), resolvers, deserializers)
-                .await?;
-            let ref_link = ref_link.clone();
-            let ref_key = self
-                .compile(
-                    ref_link,
-                    None,
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                    ints,
-                    rationals,
-                    values,
-                )
-                .await?;
-            reference.key = ref_key;
-            let ref_schema = self.sandbox().get_mut(ref_key).unwrap();
-            ref_schema.dependents.push(key);
-        }
-        Ok(references)
-    }
 
-    async fn compile_subschemas(&mut self, params: Params<'_>) -> Result<Vec<Key>, CompileError> {
-        let Params {
+    async fn compile_subschemas(
+        &mut self,
+        params: Subparams<'_>,
+    ) -> Result<Vec<Key>, CompileError> {
+        let Subparams {
             id,
             base_uri,
             path,
@@ -600,13 +625,13 @@ impl Schemas {
         }
         &self.store
     }
-    fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
+    pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
         self.store().get_index(id)
     }
-    fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+    pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
         self.sandbox().index_entry(id)
     }
-    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, AbsoluteUri> {
+    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
         self.sandbox().insert(schema)
     }
     pub(crate) fn compiled_iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
@@ -674,9 +699,9 @@ impl Schemas {
         Ok(Schema {
             key,
             id: schema.id.as_ref().map(Cow::Borrowed),
-            path: Cow::Borrowed(&schema.src.path),
+            path: Cow::Borrowed(&schema.path),
             metaschema: Cow::Borrowed(&schema.metaschema),
-            source: Source::new(&schema.src, sources),
+            source: Source::new(&schema.link, sources),
             uris: Cow::Borrowed(&schema.uris),
             keywords: Cow::Borrowed(&schema.keywords),
             parent: schema.parent,
@@ -685,28 +710,6 @@ impl Schemas {
             subschemas: Cow::Borrowed(&schema.subschemas),
             anchors: Cow::Borrowed(&schema.anchors),
         })
-    }
-
-    pub(crate) fn locate_parent(
-        &mut self,
-        mut base: AbsoluteUri,
-    ) -> Result<Option<Key>, CompileError> {
-        let ptr = Pointer::from_str(base.fragment().unwrap()).map_err(|e| {
-            crate::error::LocatedSchemaUriPointerError {
-                source: e,
-                uri: base.clone(),
-            }
-        })?;
-        let mut path = Pointer::default();
-        base.set_fragment(None).unwrap();
-        for idx in 0..ptr.count() {
-            path.push_front(ptr.get(idx).unwrap());
-            base.set_fragment(Some(&path))?;
-            if let Some(key) = self.get_key_by_id(&base) {
-                return Ok(Some(key));
-            }
-        }
-        Ok(None)
     }
 
     /// Returns a mutable reference to the [`CompiledSchema`] with the given `Key` if it exists.
@@ -766,23 +769,11 @@ impl Schemas {
     pub(crate) fn contains_key(&self, key: Key) -> bool {
         self.store().contains_key(key)
     }
-}
-struct Params<'i> {
-    pub(crate) key: Key,
-    pub(crate) id: Option<&'i AbsoluteUri>,
-    pub(crate) base_uri: &'i AbsoluteUri,
-    pub(crate) path: &'i Pointer,
-    pub(crate) source: &'i Value,
-    pub(crate) dialect: &'i Dialect,
-    pub(crate) dialects: &'i Dialects<'i>,
-    pub(crate) deserializers: &'i Deserializers,
-    pub(crate) resolvers: &'i Resolvers,
-    pub(crate) sources: &'i mut Sources,
-    pub(crate) ints: &'i mut BigInts,
-    pub(crate) rationals: &'i mut BigRationals,
-    pub(crate) values: &'i mut Values,
-}
 
+    pub(crate) fn contains_uri(&self, uri: &str) -> bool {
+        self.store()
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::{schema::Schemas, Interrogator};

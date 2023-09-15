@@ -21,3 +21,6 @@ pub use schema::{Key, Schema};
 
 mod identifier;
 pub use identifier::Identifier;
+
+mod compiler;
+pub(crate) use compiler::Compiler;

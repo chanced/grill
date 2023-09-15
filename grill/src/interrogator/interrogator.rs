@@ -18,7 +18,7 @@ use crate::{
         traverse::{
             Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
         },
-        Dialect, Dialects, Key, Schema, Schemas,
+        Compiler, Dialect, Dialects, Key, Schema, Schemas,
     },
     source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -28,14 +28,15 @@ use crate::{
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator {
-    pub(super) dialects: Dialects<'static>,
-    pub(super) sources: Sources,
-    pub(super) resolvers: Resolvers,
-    pub(super) schemas: Schemas,
-    pub(super) deserializers: Deserializers,
-    pub(super) rationals: Numbers<RationalKey, BigRational>,
-    pub(super) ints: Numbers<IntKey, BigInt>,
-    pub(super) values: Values,
+    pub(crate) dialects: Dialects<'static>,
+    pub(crate) sources: Sources,
+    pub(crate) resolvers: Resolvers,
+    pub(crate) schemas: Schemas,
+    pub(crate) deserializers: Deserializers,
+    pub(crate) rationals: Numbers<RationalKey, BigRational>,
+    pub(crate) ints: Numbers<IntKey, BigInt>,
+    pub(crate) values: Values,
+    pub(crate) state: State
 }
 
 impl Debug for Interrogator {
@@ -312,19 +313,8 @@ impl Interrogator {
             .resolve(uri.clone(), &self.resolvers, &self.deserializers)
             .await?;
         let link = link.clone();
-        self.schemas
-            .compile(
-                link,
-                None,
-                &mut self.sources,
-                &self.dialects,
-                &self.deserializers,
-                &self.resolvers,
-                &mut self.ints,
-                &mut self.rationals,
-                &mut self.values,
-            )
-            .await
+        let compiler = Compiler::new(self);
+        compiler.compile_schema(None, link.clone(), None).await
     }
 
     #[must_use]

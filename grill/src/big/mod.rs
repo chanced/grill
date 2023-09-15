@@ -33,6 +33,11 @@ pub(crate) fn usize_to_u32(v: usize) -> Result<u32, OverflowError<usize, { u32::
 /// # Errors
 /// Returns `OverflowError<u64, { usize::MAX as u64 }>` if the architure is not
 /// 64-bit and the value is too large
+#[inline]
 pub(crate) fn u64_to_usize(v: u64) -> Result<usize, OverflowError<u64, { usize::MAX as u64 }>> {
     v.try_into().map_err(|_| OverflowError(v))
+}
+
+const fn ten() -> BigInt {
+    TEN.clone()
 }

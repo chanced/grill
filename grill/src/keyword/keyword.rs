@@ -157,7 +157,7 @@ pub trait AsyncKeyword: IntoKeyword + RefUnwindSafe + Send + Sync + DynClone + f
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     async fn evaluate<'i, 'v>(
         &'i self,
-        scope: &'i mut Context,
+        ctx: &'i mut Context,
         schema: &'v Value,
         structure: Structure,
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;

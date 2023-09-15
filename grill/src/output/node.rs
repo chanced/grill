@@ -1,6 +1,7 @@
 use super::ValidationError;
-use crate::{keyword::Location, Object};
+use crate::{keyword::Location, Object, Uri};
 
+use jsonptr::Pointer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{error::Error, fmt::Display};
@@ -23,6 +24,28 @@ pub struct Node<'v> {
 }
 
 impl<'v> Node<'v> {
+    pub fn new(location: Location, err: Option<impl 'static + ValidationError<'v>>) -> Node<'v> {
+        Self {
+            location,
+            error: err.map(|e| Box::new(e) as Box<dyn 'static + ValidationError<'v>>),
+            ..Default::default()
+        }
+    }
+    #[must_use]
+    pub fn absolute_keyword_location(&self) -> &Uri {
+        self.location.absolute_keyword_location()
+    }
+
+    #[must_use]
+    pub fn keyword_location(&self) -> &Pointer {
+        self.location.keyword_location()
+    }
+
+    #[must_use]
+    pub fn instance_locaiton(&self) -> &Pointer {
+        self.location.instance_location()
+    }
+
     #[must_use]
     pub fn is_valid(&self) -> bool {
         self.is_annotation()
@@ -92,10 +115,6 @@ impl<'v> Node<'v> {
         } else {
             self.annotations.push(detail);
         }
-    }
-
-    pub(crate) fn new(_location: Location, _value: &Value) -> Node<'_> {
-        todo!()
     }
 }
 

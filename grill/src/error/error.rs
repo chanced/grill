@@ -170,8 +170,6 @@ pub enum SourceError {
 pub struct SourceConflictError {
     /// The URI of the duplicate source.
     pub uri: AbsoluteUri,
-    /// The existing source value
-    pub existing_source: Box<Value>,
 }
 
 impl From<ResolveError> for SourceError {
@@ -314,6 +312,10 @@ pub enum EvaluateError {
     /// Failed to evaluate a regular expression.
     #[error(transparent)]
     Regex(EvaluateRegexError),
+
+    /// A [`Key`] was provided that is not known to the `Interrogator`
+    #[error(transparent)]
+    UnknownKey(#[from] UnknownKeyError),
 
     /// A custom error occurred in a [`Keyword`](crate::keyword::Keyword).
     #[error("{source}")]
@@ -582,7 +584,7 @@ pub enum CompileError {
 
     #[error(transparent)]
     /// A [`Schema`] contains a cyclic dependency.
-    CyclicDependency(#[from] CyclicDependencyError),
+    CyclicGraph(#[from] CyclicDependencyError),
 
     /// Failed to link sources
     #[error("failed to create source link: {0}")]
@@ -603,6 +605,10 @@ pub enum CompileError {
     /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]
     Custom(#[from] Box<anyhow::Error>),
+
+    /// Failed to parse json pointer path
+    #[error(transparent)]
+    PointerFailedToParse(#[from] PointerError),
 }
 
 #[derive(Debug, Error)]

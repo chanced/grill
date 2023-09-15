@@ -1,7 +1,6 @@
 use super::{Deserializers, Link, Resolvers};
 use crate::error::{
-    CompileError, DeserializationError, LinkConflictError, LinkError, PointerError,
-    SourceConflictError,
+    DeserializationError, LinkConflictError, LinkError, PointerError, SourceConflictError,
 };
 use crate::{
     error::{DeserializeError, SourceError},
@@ -142,7 +141,6 @@ impl Store {
         if fragment.trim().is_empty() {
             return Ok((key, link, src));
         }
-
         if fragment.starts_with('/') {
             let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
             index.insert(uri.clone(), Link::new(key, uri.clone(), ptr.clone()));
@@ -268,9 +266,10 @@ impl Sources {
         &mut self,
         primary: Option<&AbsoluteUri>,
         from: &[AbsoluteUri],
-        to_uri: &AbsoluteUri,
-        to_path: &Pointer,
+        to: &Link,
     ) -> Result<(), LinkError> {
+        let to_uri = to.uri.clone();
+        let to_path = to.path.clone();
         if let Some(primary) = primary {
             self.link(primary.clone(), to_uri.clone(), to_path.clone())?;
         }
@@ -290,9 +289,9 @@ impl Sources {
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
-        // if the value has already been indexed, return it
         let entry = self.store_mut().link_entry(uri.clone());
         match entry {
+            // if the value has already been indexed, return it
             Entry::Occupied(_) => self.resolve_internal(uri),
             Entry::Vacant(_) => self.resolve_external(uri, resolvers, deserializers).await,
         }
@@ -373,10 +372,13 @@ impl Sources {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = fragment.trim();
+
         let resolved = resolvers.resolve(&base_uri).await?;
+
         let src = deserializers
             .deserialize(&resolved)
             .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
+
         self.store_mut().insert_vacant(base_uri.clone(), src)?;
 
         if fragment.is_empty() || !fragment.starts_with('/') {
@@ -386,15 +388,19 @@ impl Sources {
         }
 
         let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
+
         let link = self.store().get_link(&base_uri).unwrap().clone();
+
         self.store_mut()
             .insert_link(link.key, uri.clone(), ptr.clone());
+
         let src = self
             .store()
             .get(link.key)
             .resolve(&ptr)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(&uri).unwrap();
+
         Ok((link, src))
     }
 
