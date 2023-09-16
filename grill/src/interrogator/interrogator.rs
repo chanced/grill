@@ -25,6 +25,8 @@ use crate::{
     Builder,
 };
 
+use super::state::State;
+
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator {
@@ -36,7 +38,7 @@ pub struct Interrogator {
     pub(crate) rationals: Numbers<RationalKey, BigRational>,
     pub(crate) ints: Numbers<IntKey, BigInt>,
     pub(crate) values: Values,
-    pub(crate) state: State
+    pub(crate) state: State,
 }
 
 impl Debug for Interrogator {
@@ -308,13 +310,7 @@ impl Interrogator {
     }
 
     async fn compile_schema(&mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
-        let (link, _) = self
-            .sources
-            .resolve(uri.clone(), &self.resolvers, &self.deserializers)
-            .await?;
-        let link = link.clone();
-        let compiler = Compiler::new(self);
-        compiler.compile_schema(None, link.clone(), None).await
+        Compiler::new(self).compile(uri).await
     }
 
     #[must_use]

@@ -12,6 +12,8 @@ use crate::{
     AbsoluteUri, Interrogator,
 };
 
+use super::state::State;
+
 /// Constructs an [`Interrogator`].
 pub struct Builder {
     dialects: Vec<Dialect>,
@@ -19,6 +21,7 @@ pub struct Builder {
     primary_dialect: Option<AbsoluteUri>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserialize>)>,
+    state: State,
 }
 
 impl Default for Builder {
@@ -34,6 +37,7 @@ impl Builder {
             sources: Vec::new(),
             resolvers: Vec::new(),
             deserializers: Vec::new(),
+            state: State::new(),
             primary_dialect: None,
         }
     }
@@ -324,6 +328,7 @@ impl Builder {
             resolvers,
             deserializers,
             primary_dialect,
+            state,
         } = self;
 
         let dialects = Dialects::new(dialects, primary_dialect.as_ref())?;
@@ -340,6 +345,7 @@ impl Builder {
             resolvers,
             schemas,
             deserializers,
+            state,
             rationals: Numbers::default(),
             ints: Numbers::default(),
             values: Values::default(),

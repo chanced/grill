@@ -1,7 +1,6 @@
-use std::{borrow::Cow, collections::hash_map::Entry, vec::IntoIter};
+use std::collections::hash_map::Entry;
 
 use async_recursion::async_recursion;
-use either::Either;
 use jsonptr::Pointer;
 use serde_json::Value;
 
@@ -89,6 +88,7 @@ impl<'i> Compiler<'i> {
         // determine the dialect
         let dialect = dialects.pertinent_to_or_default(&source);
         let dialects = dialects.with_default(dialect).unwrap();
+
         let (uri, id, uris) = identify(&link, &source, dialect)?;
 
         // check to see if the schema has already been compiled under the id
@@ -150,7 +150,6 @@ impl<'i> Compiler<'i> {
         schema.references = references;
         schema.subschemas = subschemas;
         schema.keywords = keywords;
-
         Ok(key)
     }
 
@@ -166,6 +165,8 @@ impl<'i> Compiler<'i> {
             let fragment = uri.fragment().unwrap_or_default();
             if fragment.is_empty() || fragment.starts_with('/') {
                 let mut uri = uri.clone();
+                let mut uri_path = Pointer::parse(fragment).unwrap();
+
                 uri.set_fragment(Some(&path))?;
                 if !uris.contains(&uri) {
                     uris.push(uri);

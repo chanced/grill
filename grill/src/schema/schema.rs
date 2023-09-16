@@ -1,9 +1,6 @@
 use crate::{
-    error::{
-        self, CompileError, CyclicDependencyError, SourceConflictError, SourceError,
-        UnknownAnchorError, UnknownKeyError,
-    },
-    keyword::{BigInts, BigRationals, Compile, Keyword, Values},
+    error::{CompileError, CyclicDependencyError, SourceConflictError, UnknownKeyError},
+    keyword::{BigInts, BigRationals, Keyword, Values},
     schema::{
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
@@ -14,7 +11,6 @@ use crate::{
     source::{Deserializers, Link, Resolvers, Source, Sources},
     AbsoluteUri,
 };
-use async_recursion::async_recursion;
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -22,7 +18,6 @@ use std::{
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
     ops::Deref,
-    str::FromStr,
 };
 
 new_key_type! {
@@ -254,10 +249,7 @@ impl Store {
         if let Some(key) = self.index.get(id) {
             let existing = self.table.get(*key).unwrap();
             if existing != &schema {
-                return Err(SourceConflictError {
-                    uri: id.clone(),
-                    existing_source: existing.link.source.clone().into(),
-                });
+                return Err(SourceConflictError { uri: id.clone() });
             }
             return Ok(*key);
         }
@@ -313,166 +305,6 @@ impl Schemas {
         }
     }
 
-    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-    #[async_recursion]
-    pub(crate) async fn compile(&mut self, params: Params) -> Result<Key, CompileError> {
-        let Params {
-            mut path,
-            link,
-            parent,
-            sources,
-            dialects,
-            deserializers,
-            resolvers,
-            ints,
-            rationals,
-            values,
-        } = params;
-        // check to see if schema is already been compiled
-        if self.sandbox().index.contains_key(&link.uri) {
-            // if so, return it.
-            return Ok(self.sandbox().get_index(&link.uri).unwrap());
-        }
-        let source = sources.get(link.key).clone();
-
-        // determine the dialect
-        let dialect = dialects.pertinent_to_or_default(&source);
-
-        // identify the schema
-        let (id, uris) = dialect.identify(link.uri.clone(), &link.path, &source)?;
-
-        // if identify did not find a primary id, use the uri + pointer fragment
-        // as the lookup which will be at the first position in the uris list
-        let lookup_id = id.as_ref().unwrap_or(&uris[0]);
-
-        // check to see if the schema has already been compiled under the id
-        if let Entry::Occupied(key) = self.sandbox().index_entry(lookup_id.clone()) {
-            return Ok(*key.get());
-        }
-
-        // if the schema is anchored (i.e. has a non json ptr fragment) then
-        // compile the root (non-fragmented uri) and attempt to locate the anchor.
-        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
-        if !fragment.is_empty() && !fragment.starts_with('/') {
-            return self
-                .compile_anchored(
-                    link,
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                    ints,
-                    rationals,
-                    values,
-                )
-                .await;
-        }
-
-        // if parent is None and this schema is not a document root (does not
-        // have an $id) then attempt to locate the parent using the pointer
-        // fragment.
-        let fragment = lookup_id.fragment().unwrap_or_default().trim();
-        if id.is_none() && parent.is_none() && fragment.starts_with('/') {
-            parent = self.locate_parent(lookup_id.clone())?;
-        }
-        if id.is_some() {
-            path = Pointer::default()
-        }
-
-        // linking all URIs of this schema to the the source location
-        sources.link_all(id.as_ref(), &uris, &link.uri, &link.path)?;
-
-        let base_uri = id.clone().unwrap_or(link.uri.clone());
-        let link = sources.get_link(&base_uri).cloned().unwrap();
-        let anchors = dialect.anchors(&source)?;
-
-        // create a new CompiledSchema and insert it. if compiling fails, the
-        // schema store will rollback to its previous state.
-        let key = self.insert_placeholder(
-            &id,
-            path.clone(),
-            uris,
-            &link,
-            &source,
-            parent,
-            anchors,
-            dialect,
-        )?;
-
-        let subschemas = self
-            .compile_subschemas(Subparams {
-                key,
-                id: id.as_ref(),
-                base_uri: &base_uri,
-                path: &path,
-                source: &source,
-                dialect,
-                dialects,
-                deserializers,
-                resolvers,
-                sources,
-                ints,
-                rationals,
-                values,
-            })
-            .await?;
-        let references = self
-            .compile_references(Subparams {
-                key,
-                id: id.as_ref(),
-                base_uri: &base_uri,
-                path: &link.path,
-                source: &source,
-                dialect,
-                dialects,
-                deserializers,
-                resolvers,
-                sources,
-                ints,
-                rationals,
-                values,
-            })
-            .await?;
-
-        // check to ensure that there are not cyclic references
-        self.ensure_not_cyclic(key, &base_uri, &references, sources)?;
-        let keywords = self
-            .compile_keywords(key, dialect, sources, ints, rationals, values)
-            .await?;
-        let schema = self.sandbox().get_mut(key).unwrap();
-
-        schema.references = references;
-        schema.subschemas = subschemas;
-        schema.keywords = keywords;
-        Ok(key)
-    }
-
-    async fn compile_keywords(
-        &self,
-        key: Key,
-        dialect: &Dialect,
-        sources: &Sources,
-        ints: &mut BigInts,
-        rationals: &mut BigRationals,
-        values: &mut Values,
-    ) -> Result<Box<[Keyword]>, CompileError> {
-        let schema = self.get(key, sources).unwrap();
-
-        let mut keywords = Vec::new();
-        for mut keyword in dialect.keywords().iter().cloned() {
-            let mut compile = Compile {
-                base_uri: schema.id.as_deref().unwrap_or(&schema.uris[0]),
-                schemas: self,
-                rationals,
-                ints,
-                values,
-            };
-            if keyword.compile(&mut compile, schema.clone()).await? {
-                keywords.push(keyword);
-            }
-        }
-        Ok(keywords.into_boxed_slice())
-    }
     pub(crate) fn ensure_not_cyclic(
         &mut self,
         key: Key,
@@ -493,124 +325,6 @@ impl Schemas {
             }
         }
         Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn insert_placeholder(
-        &mut self,
-        id: &Option<AbsoluteUri>,
-        path: Pointer,
-        uris: Vec<AbsoluteUri>,
-        link: &Link,
-        source: &Value,
-        parent: Option<Key>,
-        anchors: Vec<Anchor>,
-        dialect: &Dialect,
-    ) -> Result<Key, CompileError> {
-        let id = id.as_ref();
-        self.sandbox()
-            .insert(CompiledSchema {
-                id: id.cloned(),
-                path,
-                uris,
-                metaschema: dialect.primary_metaschema_id().clone(),
-                keywords: Box::default(),
-                parent,
-                link: link.clone(),
-                subschemas: Vec::new(),
-                dependents: Vec::new(),
-                references: Vec::new(),
-                anchors: anchors.clone(),
-            })
-            .map_err(|uri| {
-                SourceError::from(SourceConflictError {
-                    uri,
-                    existing_source: source.clone().into(),
-                })
-            })
-            .map_err(CompileError::from)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn compile_anchored(
-        &mut self,
-        link: Link,
-        sources: &mut Sources,
-        dialects: &Dialects<'_>,
-        deserializers: &Deserializers,
-        resolvers: &Resolvers,
-        ints: &mut BigInts,
-        rationals: &mut BigRationals,
-        values: &mut Values,
-    ) -> Result<Key, CompileError> {
-        let fragment = link.uri.fragment().unwrap_or_default().trim().to_string();
-        // need to compile the root first
-        let mut base_uri = link.uri.clone();
-        base_uri.set_fragment(None).unwrap();
-        let (root_link, _) = sources
-            .resolve(base_uri.clone(), resolvers, deserializers)
-            .await?;
-        let root_link = root_link.clone();
-        let _ = self.compile().await?;
-
-        // at this stage, all URIs should be indexed.
-        match self.get_by_uri(&link.uri, sources) {
-            Some(anchored) => Ok(anchored.key),
-            None => Err(UnknownAnchorError {
-                anchor: fragment,
-                uri: link.uri.clone(),
-            }
-            .into()),
-        }
-    }
-
-    async fn compile_subschemas(
-        &mut self,
-        params: Subparams<'_>,
-    ) -> Result<Vec<Key>, CompileError> {
-        let Subparams {
-            id,
-            base_uri,
-            path,
-            source,
-            dialect,
-            dialects,
-            deserializers,
-            resolvers,
-            sources,
-            key,
-            ints,
-            rationals,
-            values,
-        } = params;
-        // compile nested schemas
-        let mut subschemas = Vec::new();
-        let path = if id.is_some() {
-            Cow::Owned(Pointer::default())
-        } else {
-            Cow::Borrowed(path)
-        };
-        for subschema_path in dialect.subschemas(&path, source) {
-            let mut uri = base_uri.clone();
-            uri.set_fragment(Some(&subschema_path))?;
-            let (sub_link, _) = sources.resolve(uri, resolvers, deserializers).await?;
-            let sub_link = sub_link.clone();
-            let subschema = self
-                .compile(
-                    sub_link,
-                    Some(key),
-                    sources,
-                    dialects,
-                    deserializers,
-                    resolvers,
-                    ints,
-                    rationals,
-                    values,
-                )
-                .await?;
-            subschemas.push(subschema);
-        }
-        Ok(subschemas)
     }
 
     fn sandbox(&mut self) -> &mut Store {
@@ -770,8 +484,8 @@ impl Schemas {
         self.store().contains_key(key)
     }
 
-    pub(crate) fn contains_uri(&self, uri: &str) -> bool {
-        self.store()
+    pub(crate) fn contains_uri(&self, uri: &AbsoluteUri) -> bool {
+        self.store().contains_uri(uri)
     }
 }
 #[cfg(test)]

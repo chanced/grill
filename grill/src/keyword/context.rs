@@ -1,17 +1,13 @@
 use jsonptr::Pointer;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
-use slotmap::SlotMap;
 
 use crate::{
-    error::{EvaluateError, NumberError},
-    output::Node,
-    schema::{CompiledSchema, Schemas},
-    source::Sources,
-    Key,
+    error::EvaluateError, interrogator::state::State, output::Node, schema::Schemas,
+    source::Sources, Key,
 };
 
-use super::{BigInts, BigRationals, State, Values};
+use super::{BigInts, BigRationals, Values};
 /// Contains global and evaluation level state, schemas, and location
 /// information needed to perform an
 /// [`evaluation`](`crate::Interrogator::evaluate`).
@@ -33,6 +29,7 @@ impl<'s> Context<'s> {
     pub fn evalute<'v>(&self, key: Key) -> Result<Node<'v>, EvaluateError> {
         let schema = self.schemas.get(key, self.sources)?;
         let abs_loc = schema.id.as_deref().unwrap_or(&schema.uris[0]);
+        todo!()
     }
 }
 
