@@ -88,7 +88,7 @@ impl<'i> Compiler<'i> {
 
         // determine the dialect
         let dialect = dialects.pertinent_to_or_default(&source);
-        let dialects = dialects.with_default(dialect);
+        let dialects = dialects.with_default(dialect).unwrap();
         let (uri, id, uris) = identify(&link, &source, dialect)?;
 
         // check to see if the schema has already been compiled under the id
@@ -111,9 +111,10 @@ impl<'i> Compiler<'i> {
             // compiled as document root
             path = Some(Pointer::default());
         }
-
         // path should now have a value
         let path = path.unwrap();
+
+        let uris = self.add_parent_uris_with_path(uris, &path, parent)?;
 
         // linking all URIs of this schema to the the source location
         self.sources.link_all(id.as_ref(), &uris, &link)?;
@@ -133,7 +134,7 @@ impl<'i> Compiler<'i> {
             .map_err(SourceError::SourceConflict)?;
 
         let subschemas = self
-            .compile_subschemas(key, &uri, &path, dialect, &source)
+            .compile_subschemas(key, &uri, &path, dialect, &source, &dialects)
             .await?;
 
         let references = self.compile_references(key, &source, dialect).await?;
@@ -152,6 +153,28 @@ impl<'i> Compiler<'i> {
 
         Ok(key)
     }
+
+    fn add_parent_uris_with_path(
+        &mut self,
+        mut uris: Vec<AbsoluteUri>,
+        path: &Pointer,
+        parent: Option<Key>,
+    ) -> Result<Vec<AbsoluteUri>, CompileError> {
+        let Some(parent) = parent else { return Ok(uris) };
+        let parent = self.schemas.get(parent, self.sources).unwrap();
+        for uri in parent.uris.iter() {
+            let fragment = uri.fragment().unwrap_or_default();
+            if fragment.is_empty() || fragment.starts_with('/') {
+                let mut uri = uri.clone();
+                uri.set_fragment(Some(&path))?;
+                if !uris.contains(&uri) {
+                    uris.push(uri);
+                }
+            }
+        }
+        Ok(uris)
+    }
+
     async fn compile_references(
         &mut self,
         key: Key,
@@ -201,17 +224,18 @@ impl<'i> Compiler<'i> {
     }
     async fn compile_ancestor_then_find_descendant(
         &mut self,
-        uri: &AbsoluteUri,
+        mut uri: AbsoluteUri,
         path: Pointer,
-        link: Link,
     ) -> Option<Key> {
+        uri.set_fragment(Some(&path)).unwrap();
+        let link = self.sources.get_link(&uri).unwrap().clone();
         self.compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
             .await
             .ok()
             .map(|ancestor| {
                 self.schemas
                     .descendants(ancestor, self.sources)
-                    .find_by_uri(uri)
+                    .find_by_uri(&uri)
                     .map(|s| s.key)
             })
             .flatten()
@@ -222,40 +246,29 @@ impl<'i> Compiler<'i> {
         link: Link,
     ) -> Result<Key, CompileError> {
         let link = self.sources.get_link(&link.uri).unwrap().clone();
-
-        let ptr = Pointer::parse(uri.fragment().unwrap())
+        let full_path = Pointer::parse(uri.fragment().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
         let mut path = Pointer::default();
-
-        // TODO: remove this once i update jsonptr to include the root token
-        let mut uri = link.uri.clone();
+        // TODO: remove once i update jsonptr to include the root token in the `Tokens` iter
+        // https://github.com/chanced/jsonptr/issues/17
+        let uri = link.uri.clone();
         if let Some(key) = self
-            .compile_ancestor_then_find_descendant(&uri, path.clone(), link.clone())
+            .compile_ancestor_then_find_descendant(uri.clone(), path.clone())
             .await
         {
             return Ok(key);
         }
-        for tok in ptr.tokens() {
+        for tok in full_path.tokens() {
             path.push_back(tok);
-            uri.set_fragment(Some(&path));
-            let link = self.sources.get_link(&uri).unwrap();
-
-            if let Ok(ancestor) = self
-                .compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
+            if let Some(key) = self
+                .compile_ancestor_then_find_descendant(uri.clone(), path.clone())
                 .await
             {
-                if let Some(key) = self
-                    .schemas
-                    .descendants(ancestor, self.sources)
-                    .find_by_uri(&uri)
-                    .map(|s| s.key)
-                {
-                    return Ok(key);
-                }
+                return Ok(key);
             }
         }
         return self
-            .compile_schema(Some(ptr), link, None, self.dialects)
+            .compile_schema(Some(full_path), link, None, self.dialects)
             .await;
     }
 
@@ -266,6 +279,7 @@ impl<'i> Compiler<'i> {
         path: &Pointer,
         dialect: &Dialect,
         source: &Value,
+        dialects: &Dialects<'i>,
     ) -> Result<Vec<Key>, CompileError> {
         let mut subschemas = Vec::new();
         for subschema_path in dialect.subschemas(&path, source) {
@@ -277,7 +291,7 @@ impl<'i> Compiler<'i> {
                 .await?;
             let sub_link = sub_link.clone();
             let subschema = self
-                .compile_schema(Some(subschema_path), sub_link, Some(key))
+                .compile_schema(Some(subschema_path), sub_link, Some(key), dialects)
                 .await?;
             subschemas.push(subschema);
         }
