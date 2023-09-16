@@ -561,12 +561,12 @@ pub enum CompileError {
     /// Failed to parse a [`Uri`](crate::uri::Uri) or
     /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
     #[error(transparent)]
-    UriParsingFailed(#[from] UriError),
+    FailedToParseUri(#[from] UriError),
 
     /// All attached implementations of [`Resolve`](crate::resolve::Resolve)
     /// failed to resolve a source.
     #[error(transparent)]
-    ResolveFailed(#[from] ResolveErrors),
+    FailedToResolve(#[from] ResolveErrors),
 
     /// Failed to resolve or deserialize a source
     #[error(transparent)]
@@ -574,7 +574,7 @@ pub enum CompileError {
 
     /// Failed to locate subschemas within a schema.
     #[error(transparent)]
-    LocateSubschemasFailed(#[from] LocateSchemasError),
+    FailedToLocateSubschemas(#[from] LocateSchemasError),
 
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
@@ -590,25 +590,28 @@ pub enum CompileError {
     #[error("failed to create source link: {0}")]
     FailedToLinkSource(#[from] LinkError),
 
+    /// Could not locate an anchor referenced in a schema
     #[error(transparent)]
     UnknownAnchor(#[from] UnknownAnchorError),
 
+    /// Failed to parse an anchor field
     #[error(transparent)]
     FailedToParseAnchor(#[from] AnchorError),
 
     #[error("schema not found: \"{0}\"")]
     SchemaNotFound(AbsoluteUri),
 
+    /// Failed to parse a number
     #[error(transparent)]
     FailedToParseNumber(#[from] NumberError),
+
+    /// Failed to parse json pointer path
+    #[error(transparent)]
+    FailedToParsePointer(#[from] PointerError),
 
     /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]
     Custom(#[from] Box<anyhow::Error>),
-
-    /// Failed to parse json pointer path
-    #[error(transparent)]
-    PointerFailedToParse(#[from] PointerError),
 }
 
 #[derive(Debug, Error)]

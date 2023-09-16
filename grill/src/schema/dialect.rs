@@ -251,7 +251,7 @@ impl<'d> Deref for Dialects<'d> {
 }
 
 impl<'d> Dialects<'d> {
-    pub fn new(
+    pub(crate) fn new(
         dialects: Vec<Dialect>,
         default: Option<&AbsoluteUri>,
     ) -> Result<Self, DialectError> {
@@ -382,7 +382,7 @@ impl<'d> Dialects<'d> {
     ///
     /// # Panics
     /// Panics if the index is out of bounds.
-    pub fn set_primary_dialect_index(&mut self, index: usize) {
+    pub(crate) fn set_primary_dialect_index(&mut self, index: usize) {
         assert!(index < self.dialects.len());
         self.primary = index;
     }

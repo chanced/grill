@@ -1,6 +1,7 @@
-use std::{borrow::Cow, collections::hash_map::Entry};
+use std::{borrow::Cow, collections::hash_map::Entry, vec::IntoIter};
 
 use async_recursion::async_recursion;
+use either::Either;
 use jsonptr::Pointer;
 use serde_json::Value;
 
@@ -13,7 +14,7 @@ use crate::{
     AbsoluteUri, Interrogator, Key,
 };
 
-use super::{CompiledSchema, Dialect, Reference};
+use super::{traverse::Traverse, CompiledSchema, Dialect, Reference};
 
 pub(crate) struct Compiler<'i> {
     schemas: &'i mut Schemas,
@@ -43,13 +44,40 @@ impl<'i> Compiler<'i> {
             values: &mut interrogator.values,
         }
     }
+    pub(crate) async fn compile(mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
+        let link = self
+            .sources
+            .resolve_link(uri, self.resolvers, self.deserializers)
+            .await?;
+        self.compile_schema(None, link, None, self.dialects).await
+    }
+
+    pub(crate) async fn compile_all(
+        mut self,
+        uris: impl IntoIterator<Item = AbsoluteUri>,
+    ) -> Result<Vec<(AbsoluteUri, Key)>, CompileError> {
+        let mut keys = Vec::new();
+        for uri in uris {
+            let (link, _) = self
+                .sources
+                .resolve(uri.clone(), &self.resolvers, &self.deserializers)
+                .await?;
+            let link = link.clone();
+            keys.push((
+                uri,
+                self.compile_schema(None, link, None, self.dialects).await?,
+            ));
+        }
+        Ok(keys)
+    }
 
     #[async_recursion]
-    pub(crate) async fn compile_schema(
+    async fn compile_schema(
         &mut self,
         mut path: Option<Pointer>,
         link: Link,
         mut parent: Option<Key>,
+        dialects: &Dialects<'i>,
     ) -> Result<Key, CompileError> {
         // check to see if schema is already been compiled
         if self.schemas.contains_uri(&link.uri) {
@@ -59,8 +87,8 @@ impl<'i> Compiler<'i> {
         let source = self.sources.get(link.key).clone();
 
         // determine the dialect
-        let dialect = self.dialects.pertinent_to_or_default(&source);
-
+        let dialect = dialects.pertinent_to_or_default(&source);
+        let dialects = dialects.with_default(dialect);
         let (uri, id, uris) = identify(&link, &source, dialect)?;
 
         // check to see if the schema has already been compiled under the id
@@ -75,7 +103,7 @@ impl<'i> Compiler<'i> {
             // if parent is None and this schema is not a document root (does
             // not have an $id/id) then find the most relevant ancestor and
             // compile it. Doing so will also compile this schema.
-            return self.compile_via_ancestors(uri, link).await;
+            return self.compile_ancestors(uri, link).await;
         } else if is_anchored(&uri) {
             return self.compile_anchored(link).await;
         } else if parent.is_none() && path.is_none() && !has_ptr_fragment(&uri) {
@@ -137,7 +165,9 @@ impl<'i> Compiler<'i> {
                 .resolve(reference.uri.clone(), self.resolvers, self.deserializers)
                 .await?;
             let ref_link = ref_link.clone();
-            let ref_key = self.compile_schema(None, ref_link, None).await?;
+            let ref_key = self
+                .compile_schema(None, ref_link, None, self.dialects)
+                .await?;
             reference.key = ref_key;
             let ref_schema = self.schemas.get_mut(ref_key).unwrap();
             ref_schema.dependents.push(key);
@@ -156,7 +186,7 @@ impl<'i> Compiler<'i> {
             .await?;
         let root_link = root_link.clone();
         let _ = self
-            .compile_schema(Some(Pointer::default()), root_link, None)
+            .compile_schema(Some(Pointer::default()), root_link, None, self.dialects)
             .await?;
 
         // at this stage, all URIs should be indexed.
@@ -169,18 +199,64 @@ impl<'i> Compiler<'i> {
             .into()),
         }
     }
-
-    async fn compile_via_ancestors(
+    async fn compile_ancestor_then_find_descendant(
+        &mut self,
+        uri: &AbsoluteUri,
+        path: Pointer,
+        link: Link,
+    ) -> Option<Key> {
+        self.compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
+            .await
+            .ok()
+            .map(|ancestor| {
+                self.schemas
+                    .descendants(ancestor, self.sources)
+                    .find_by_uri(uri)
+                    .map(|s| s.key)
+            })
+            .flatten()
+    }
+    async fn compile_ancestors(
         &mut self,
         uri: AbsoluteUri,
         link: Link,
     ) -> Result<Key, CompileError> {
-        let mut path = Pointer::parse(uri.fragment().unwrap())
-            .map_err(|err| CompileError::PointerFailedToParse(err.into()))?;
+        let link = self.sources.get_link(&link.uri).unwrap().clone();
 
-        while let Some(tok) = path.pop_back() {
-            todo!()
+        let ptr = Pointer::parse(uri.fragment().unwrap())
+            .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
+        let mut path = Pointer::default();
+
+        // TODO: remove this once i update jsonptr to include the root token
+        let mut uri = link.uri.clone();
+        if let Some(key) = self
+            .compile_ancestor_then_find_descendant(&uri, path.clone(), link.clone())
+            .await
+        {
+            return Ok(key);
         }
+        for tok in ptr.tokens() {
+            path.push_back(tok);
+            uri.set_fragment(Some(&path));
+            let link = self.sources.get_link(&uri).unwrap();
+
+            if let Ok(ancestor) = self
+                .compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
+                .await
+            {
+                if let Some(key) = self
+                    .schemas
+                    .descendants(ancestor, self.sources)
+                    .find_by_uri(&uri)
+                    .map(|s| s.key)
+                {
+                    return Ok(key);
+                }
+            }
+        }
+        return self
+            .compile_schema(Some(ptr), link, None, self.dialects)
+            .await;
     }
 
     async fn compile_subschemas(

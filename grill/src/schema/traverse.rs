@@ -1,5 +1,5 @@
 use super::{Reference, Schemas};
-use crate::{error::UnknownKeyError, source::Sources, AbsoluteUri, Key, Schema};
+use crate::{source::Sources, AbsoluteUri, Key, Schema};
 use either::Either;
 use std::{
     collections::{HashSet, VecDeque},
@@ -8,7 +8,7 @@ use std::{
 };
 
 /// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
-pub trait Traverse<'i, Key, Iter>: Iterator<Item = Schema<'i>>
+pub trait Traverse<'i, Iter>: Iterator<Item = Schema<'i>>
 where
     Self: Sized,
     Iter: Iterator<Item = Schema<'i>>,
@@ -27,7 +27,7 @@ where
     fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i>>;
 }
 
-impl<'i, Key, Iter> Traverse<'i, Key, Iter> for Iter
+impl<'i, Iter> Traverse<'i, Iter> for Iter
 where
     Iter: Iterator<Item = Schema<'i>>,
 {

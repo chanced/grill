@@ -113,11 +113,7 @@ impl Store {
         let key = self.index.get(&uri).unwrap().key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
-            return Err(SourceConflictError {
-                uri: uri.clone(),
-                existing_source: existing_src.clone().into(),
-            }
-            .into());
+            return Err(SourceConflictError { uri: uri.clone() }.into());
         }
         let link = self.index.get(&uri).unwrap().clone();
         Ok((key, link, existing_src))
@@ -281,6 +277,16 @@ impl Sources {
 
     pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
         self.store().get_link(uri)
+    }
+
+    pub(crate) async fn resolve_link(
+        &mut self,
+        uri: AbsoluteUri,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<Link, SourceError> {
+        let (link, _) = self.resolve(uri, resolvers, deserializers).await?;
+        Ok(link.clone())
     }
 
     pub(crate) async fn resolve(
