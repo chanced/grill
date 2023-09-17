@@ -29,7 +29,7 @@ pub(crate) struct Compiler<'i> {
 }
 
 impl<'i> Compiler<'i> {
-    pub(crate) fn new(interrogator: &mut Interrogator) -> Self {
+    pub(crate) fn new(interrogator: &'i mut Interrogator) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -223,24 +223,6 @@ impl<'i> Compiler<'i> {
             .into()),
         }
     }
-    async fn compile_ancestor_then_find_descendant(
-        &mut self,
-        mut uri: AbsoluteUri,
-        path: Pointer,
-    ) -> Option<Key> {
-        uri.set_fragment(Some(&path)).unwrap();
-        let link = self.sources.get_link(&uri).unwrap().clone();
-        self.compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
-            .await
-            .ok()
-            .map(|ancestor| {
-                self.schemas
-                    .descendants(ancestor, self.sources)
-                    .find_by_uri(&uri)
-                    .map(|s| s.key)
-            })
-            .flatten()
-    }
     async fn compile_ancestors(
         &mut self,
         uri: AbsoluteUri,
@@ -271,6 +253,25 @@ impl<'i> Compiler<'i> {
         return self
             .compile_schema(Some(full_path), link, None, self.dialects)
             .await;
+    }
+
+    async fn compile_ancestor_then_find_descendant(
+        &mut self,
+        mut uri: AbsoluteUri,
+        path: Pointer,
+    ) -> Option<Key> {
+        uri.set_fragment(Some(&path)).unwrap();
+        let link = self.sources.get_link(&uri).unwrap().clone();
+        self.compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
+            .await
+            .ok()
+            .map(|ancestor| {
+                self.schemas
+                    .descendants(ancestor, self.sources)
+                    .find_by_uri(&uri)
+                    .map(|s| s.key)
+            })
+            .flatten()
     }
 
     async fn compile_subschemas(

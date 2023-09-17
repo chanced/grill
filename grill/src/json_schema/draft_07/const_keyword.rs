@@ -50,7 +50,7 @@ impl SyncKeyword for ConstKeyword {
         value: &'v Value,
         _structure: crate::Structure,
     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
-        ctx.error
+        todo!()
     }
 }
 impl From<ConstKeyword> for Keyword {

@@ -38,6 +38,6 @@ pub(crate) fn u64_to_usize(v: u64) -> Result<usize, OverflowError<u64, { usize::
     v.try_into().map_err(|_| OverflowError(v))
 }
 
-const fn ten() -> BigInt {
+fn ten() -> BigInt {
     TEN.clone()
 }

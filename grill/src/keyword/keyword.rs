@@ -349,7 +349,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::keyword::State;
+    use crate::interrogator::state::State;
 
     #[test]
     fn test_get() {
