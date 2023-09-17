@@ -25,7 +25,6 @@ pub struct Context<'i> {
 }
 
 impl<'s> Context<'s> {
-    #[must_use]
     pub fn evalute<'v>(&self, key: Key) -> Result<Node<'v>, EvaluateError> {
         let schema = self.schemas.get(key, self.sources)?;
         let abs_loc = schema.id.as_deref().unwrap_or(&schema.uris[0]);

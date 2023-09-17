@@ -669,10 +669,11 @@ mod tests {
             references: vec![],
             dependents: vec![],
             keywords: vec![].into_boxed_slice(),
-            meta_schema: metaschema,
             subschemas: vec![],
             uris: vec![uri.clone()],
             link,
+            path: Pointer::default(),
+            metaschema,
         }
     }
 }

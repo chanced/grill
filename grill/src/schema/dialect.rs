@@ -236,9 +236,9 @@ impl Debug for Dialect {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Dialects<'d> {
-    dialects: Cow<'d, [Dialect]>,
-    lookup: Cow<'d, HashMap<AbsoluteUri, usize>>,
+pub struct Dialects<'i> {
+    dialects: Cow<'i, [Dialect]>,
+    lookup: Cow<'i, HashMap<AbsoluteUri, usize>>,
     primary: usize,
 }
 
@@ -250,8 +250,8 @@ impl<'d> Deref for Dialects<'d> {
     }
 }
 
-impl<'d> Dialects<'d> {
-    pub(crate) fn new(
+impl<'i> Dialects<'i> {
+    pub fn new(
         dialects: Vec<Dialect>,
         default: Option<&AbsoluteUri>,
     ) -> Result<Self, DialectError> {
@@ -301,7 +301,7 @@ impl<'d> Dialects<'d> {
     ///
     /// # Errors
     /// Returns the [`DialectExists`] if a `Dialect` already exists with the same `id`.
-    pub(crate) fn push(&mut self, dialect: Dialect) -> Result<(), DialectExistsError> {
+    pub fn push(&mut self, dialect: Dialect) -> Result<(), DialectExistsError> {
         if self.lookup.contains_key(&dialect.id) {
             return Err(DialectExistsError { id: dialect.id });
         }
@@ -315,13 +315,17 @@ impl<'d> Dialects<'d> {
     /// Returns a new `Dialects` with the default `Dialect` set to the provided
     ///
     /// # Errors
-    /// Returns the `&Dialect` if the `Dialect` is not currently in this `Dialects`.
-    pub fn with_default<'o>(&'d self, default: &'o Dialect) -> Result<Dialects<'d>, &'o Dialect> {
-        let default = self.lookup.get(&default.id).copied().ok_or(default)?;
+    /// Returns the `Err(&'static str)` if the `Dialect` is not currently in this `Dialects`.
+    pub fn with_default(self, default: &Dialect) -> Result<Dialects<'i>, &'static str> {
+        let primary = self
+            .lookup
+            .get(&default.id)
+            .copied()
+            .ok_or("dialect not found")?;
         Ok(Dialects {
-            dialects: Cow::Borrowed(self.dialects.as_ref()),
-            primary: default,
-            lookup: Cow::Borrowed(self.lookup.as_ref()),
+            dialects: self.dialects,
+            primary,
+            lookup: self.lookup,
         })
     }
 
@@ -334,15 +338,22 @@ impl<'d> Dialects<'d> {
     /// [`Dialect`] if the [`Dialect`] can not be determined from schema.
     #[must_use]
     pub fn pertinent_to_or_default(&self, schema: &Value) -> &Dialect {
-        self.pertinent_to(schema).unwrap_or(self.primary_dialect())
+        self.pertinent_to(schema).unwrap_or(self.primary())
     }
+
+    #[must_use]
+    pub fn pertinent_to_or_default_idx(&self, schema: &Value) -> usize {
+        self.pertinent_to(schema)
+            .map_or(self.primary, |d| self.position(d).unwrap())
+    }
+
     /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`](`crate::dialect::Dialect`).
     pub fn source_ids(&self) -> impl Iterator<Item = &AbsoluteUri> {
         self.dialects.iter().map(|d| &d.id)
     }
 
     #[must_use]
-    pub fn sources(&self) -> Vec<Src> {
+    pub(crate) fn sources(&self) -> Vec<Src> {
         let mut result = Vec::with_capacity(self.dialects.len());
         for dialect in self.dialects.iter() {
             for metaschema in &dialect.metaschemas {
@@ -368,21 +379,21 @@ impl<'d> Dialects<'d> {
         self.primary
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
-    pub fn iter(&'d self) -> std::slice::Iter<'d, Dialect> {
+    pub fn iter(&'i self) -> std::slice::Iter<'i, Dialect> {
         self.dialects.iter()
     }
 
     /// Returns the primary [`Dialect`](`crate::dialect::Dialect`).
     #[must_use]
-    pub fn primary_dialect(&self) -> &Dialect {
+    pub fn primary(&self) -> &Dialect {
         &self.dialects[self.primary]
     }
 
-    /// Sets the primary [`Dialect`] to use when no other [`Dialect`] matches.
+    /// Sets the  [`Dialect`] to use when no other [`Dialect`] matches.
     ///
     /// # Panics
     /// Panics if the index is out of bounds.
-    pub(crate) fn set_primary_dialect_index(&mut self, index: usize) {
+    pub(crate) fn set_default_dialect_index(&mut self, index: usize) {
         assert!(index < self.dialects.len());
         self.primary = index;
     }
@@ -394,10 +405,6 @@ impl<'d> Dialects<'d> {
         self.dialects.len()
     }
 
-    #[must_use]
-    pub fn primary(&self) -> &Dialect {
-        &self.dialects[self.primary]
-    }
     /// Returns the index of the given [`Dialect`] in the list of [`Dialect`]s.
     #[must_use]
     pub fn position(&self, dialect: &Dialect) -> Option<usize> {
@@ -411,7 +418,7 @@ impl<'d> Dialects<'d> {
 
     #[must_use]
     pub fn dialect_index_for(&self, schema: &Value) -> usize {
-        let default = self.primary_dialect();
+        let default = self.primary();
         if default.is_pertinent_to(schema) {
             return self.primary;
         }
@@ -433,6 +440,15 @@ impl<'d> Dialects<'d> {
             .get(uri)
             .copied()
             .ok_or(DialectError::DefaultNotFound(uri.clone()))
+    }
+
+    #[must_use]
+    pub fn as_borrowed(&'i self) -> Dialects<'i> {
+        Dialects {
+            dialects: Cow::Borrowed(self.dialects.as_ref()),
+            lookup: Cow::Borrowed(self.lookup.as_ref()),
+            primary: self.primary,
+        }
     }
 }
 

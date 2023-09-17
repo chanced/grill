@@ -6,7 +6,7 @@ use crate::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
         },
-        Anchor, Dialect, Dialects, Reference,
+        Anchor, Dialect, Reference,
     },
     source::{Deserializers, Link, Resolvers, Source, Sources},
     AbsoluteUri,
@@ -19,6 +19,8 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Deref,
 };
+
+use super::dialect::Dialects;
 
 new_key_type! {
     pub struct Key;
@@ -261,35 +263,6 @@ impl Store {
         Ok(key)
     }
 }
-pub(crate) struct Params<'i> {
-    path: Option<Pointer>,
-    link: Link,
-    parent: Option<Key>,
-    sources: &'i mut Sources,
-    dialects: &'i Dialects<'i>,
-    deserializers: &'i Deserializers,
-    resolvers: &'i Resolvers,
-    ints: &'i mut BigInts,
-    rationals: &'i mut BigRationals,
-    values: &'i mut Values,
-}
-
-struct Subparams<'i> {
-    key: Key,
-    id: Option<&'i AbsoluteUri>,
-    base_uri: &'i AbsoluteUri,
-    path: &'i Pointer,
-    source: &'i Value,
-    dialect: &'i Dialect,
-    dialects: &'i Dialects<'i>,
-    deserializers: &'i Deserializers,
-    resolvers: &'i Resolvers,
-    sources: &'i mut Sources,
-    ints: &'i mut BigInts,
-    rationals: &'i mut BigRationals,
-    values: &'i mut Values,
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct Schemas {
     store: Store,

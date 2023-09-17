@@ -8,9 +8,8 @@ pub use anchor::Anchor;
 mod metaschema;
 pub use metaschema::Metaschema;
 
-mod dialect;
-pub use dialect::Dialect;
-pub(crate) use dialect::Dialects;
+pub mod dialect;
+pub use dialect::{Dialect, Dialects};
 
 mod reference;
 pub use reference::Reference;

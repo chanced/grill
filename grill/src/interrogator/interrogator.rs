@@ -314,14 +314,14 @@ impl Interrogator {
     }
 
     #[must_use]
-    pub fn dialects(&self) -> &[Dialect] {
-        &self.dialects
+    pub fn dialects(&self) -> Dialects<'_> {
+        self.dialects.as_borrowed()
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
     pub fn default_dialect(&self) -> &Dialect {
-        self.dialects.primary_dialect()
+        self.dialects.primary()
     }
 
     /// Returns the [`Dialect`] for the given schema, if any.

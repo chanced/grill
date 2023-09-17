@@ -8,7 +8,7 @@ use crate::{
     error::{CompileError, SourceError, UnknownAnchorError},
     interrogator::state::State,
     keyword::{BigInts, BigRationals, Compile, Keyword, Values},
-    schema::{Dialects, Schemas},
+    schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     AbsoluteUri, Interrogator, Key,
 };
@@ -48,7 +48,8 @@ impl<'i> Compiler<'i> {
             .sources
             .resolve_link(uri, self.resolvers, self.deserializers)
             .await?;
-        self.compile_schema(None, link, None, self.dialects).await
+        self.compile_schema(None, link, None, self.dialects.clone())
+            .await
     }
 
     pub(crate) async fn compile_all(
@@ -59,12 +60,13 @@ impl<'i> Compiler<'i> {
         for uri in uris {
             let (link, _) = self
                 .sources
-                .resolve(uri.clone(), &self.resolvers, &self.deserializers)
+                .resolve(uri.clone(), self.resolvers, self.deserializers)
                 .await?;
             let link = link.clone();
             keys.push((
                 uri,
-                self.compile_schema(None, link, None, self.dialects).await?,
+                self.compile_schema(None, link, None, self.dialects.as_borrowed())
+                    .await?,
             ));
         }
         Ok(keys)
@@ -76,7 +78,7 @@ impl<'i> Compiler<'i> {
         mut path: Option<Pointer>,
         link: Link,
         mut parent: Option<Key>,
-        dialects: &Dialects<'i>,
+        mut dialects: Dialects<'i>,
     ) -> Result<Key, CompileError> {
         // check to see if schema is already been compiled
         if self.schemas.contains_uri(&link.uri) {
@@ -86,8 +88,9 @@ impl<'i> Compiler<'i> {
         let source = self.sources.get(link.key).clone();
 
         // determine the dialect
-        let dialect = dialects.pertinent_to_or_default(&source);
-        let dialects = dialects.with_default(dialect).unwrap();
+        let dialect_idx = dialects.pertinent_to_or_default_idx(&source);
+        dialects.set_default_dialect_index(dialect_idx);
+        let dialect = dialects.get_by_index(dialect_idx).unwrap();
 
         let (uri, id, uris) = identify(&link, &source, dialect)?;
 
@@ -134,7 +137,7 @@ impl<'i> Compiler<'i> {
             .map_err(SourceError::SourceConflict)?;
 
         let subschemas = self
-            .compile_subschemas(key, &uri, &path, dialect, &source, &dialects)
+            .compile_subschemas(key, &uri, &path, dialect, &source, dialects.clone())
             .await?;
 
         let references = self.compile_references(key, &source, dialect).await?;
@@ -167,7 +170,7 @@ impl<'i> Compiler<'i> {
                 let mut uri = uri.clone();
                 let mut uri_path = Pointer::parse(fragment).unwrap();
 
-                uri.set_fragment(Some(&path))?;
+                uri.set_fragment(Some(&uri_path))?;
                 if !uris.contains(&uri) {
                     uris.push(uri);
                 }
@@ -190,7 +193,7 @@ impl<'i> Compiler<'i> {
                 .await?;
             let ref_link = ref_link.clone();
             let ref_key = self
-                .compile_schema(None, ref_link, None, self.dialects)
+                .compile_schema(None, ref_link, None, self.dialects.clone())
                 .await?;
             reference.key = ref_key;
             let ref_schema = self.schemas.get_mut(ref_key).unwrap();
@@ -210,7 +213,12 @@ impl<'i> Compiler<'i> {
             .await?;
         let root_link = root_link.clone();
         let _ = self
-            .compile_schema(Some(Pointer::default()), root_link, None, self.dialects)
+            .compile_schema(
+                Some(Pointer::default()),
+                root_link,
+                None,
+                self.dialects.clone(),
+            )
             .await?;
 
         // at this stage, all URIs should be indexed.
@@ -250,9 +258,8 @@ impl<'i> Compiler<'i> {
                 return Ok(key);
             }
         }
-        return self
-            .compile_schema(Some(full_path), link, None, self.dialects)
-            .await;
+        self.compile_schema(Some(full_path), link, None, self.dialects.clone())
+            .await
     }
 
     async fn compile_ancestor_then_find_descendant(
@@ -262,16 +269,20 @@ impl<'i> Compiler<'i> {
     ) -> Option<Key> {
         uri.set_fragment(Some(&path)).unwrap();
         let link = self.sources.get_link(&uri).unwrap().clone();
-        self.compile_schema(Some(path.clone()), link.clone(), None, self.dialects)
-            .await
-            .ok()
-            .map(|ancestor| {
-                self.schemas
-                    .descendants(ancestor, self.sources)
-                    .find_by_uri(&uri)
-                    .map(|s| s.key)
-            })
-            .flatten()
+        self.compile_schema(
+            Some(path.clone()),
+            link.clone(),
+            None,
+            self.dialects.clone(),
+        )
+        .await
+        .ok()
+        .and_then(|ancestor| {
+            self.schemas
+                .descendants(ancestor, self.sources)
+                .find_by_uri(&uri)
+                .map(|s| s.key)
+        })
     }
 
     async fn compile_subschemas(
@@ -281,10 +292,10 @@ impl<'i> Compiler<'i> {
         path: &Pointer,
         dialect: &Dialect,
         source: &Value,
-        dialects: &Dialects<'i>,
+        dialects: Dialects<'i>,
     ) -> Result<Vec<Key>, CompileError> {
         let mut subschemas = Vec::new();
-        for subschema_path in dialect.subschemas(&path, source) {
+        for subschema_path in dialect.subschemas(path, source) {
             let mut uri = base_uri.clone();
             uri.set_fragment(Some(&subschema_path))?;
             let (sub_link, _) = self
@@ -293,7 +304,7 @@ impl<'i> Compiler<'i> {
                 .await?;
             let sub_link = sub_link.clone();
             let subschema = self
-                .compile_schema(Some(subschema_path), sub_link, Some(key), dialects)
+                .compile_schema(Some(subschema_path), sub_link, Some(key), dialects.clone())
                 .await?;
             subschemas.push(subschema);
         }
@@ -312,7 +323,7 @@ impl<'i> Compiler<'i> {
         for mut keyword in dialect.keywords().iter().cloned() {
             let mut compile = Compile {
                 base_uri,
-                schemas: &self.schemas,
+                schemas: self.schemas,
                 rationals: self.rationals,
                 ints: self.ints,
                 values: self.values,
@@ -341,7 +352,7 @@ fn identify(
     source: &Value,
     dialect: &Dialect,
 ) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError> {
-    let (id, uris) = dialect.identify(link.uri.clone(), &link.path, &source)?;
+    let (id, uris) = dialect.identify(link.uri.clone(), &link.path, source)?;
     // if identify did not find a primary id, use the uri + pointer fragment
     // as the lookup which will be at the first position in the uris list
     let lookup_id = id.as_ref().unwrap_or(&uris[0]);

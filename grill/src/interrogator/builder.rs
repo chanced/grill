@@ -6,7 +6,7 @@ use crate::{
     error::{BuildError, SourceError, UriError},
     json_schema,
     keyword::{Numbers, Values},
-    schema::{Dialect, Dialects, Schemas},
+    schema::{Dialect, Schemas, dialect::Dialects},
     source::{deserialize_json, Deserialize, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator,
