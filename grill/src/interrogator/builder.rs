@@ -6,7 +6,7 @@ use crate::{
     error::{BuildError, SourceError, UriError},
     json_schema,
     keyword::{Numbers, Values},
-    schema::{Dialect, Schemas, dialect::Dialects},
+    schema::{dialect::Dialects, Dialect, Schemas},
     source::{deserialize_json, Deserialize, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator,
@@ -59,11 +59,14 @@ impl Builder {
     ///
     /// let interrogator = Builder::default()
     ///     .json_schema_2020_12()
-    ///     .default_dialect(json_schema_2020_12_absolute_uri())
+    ///     .with_default_dialect(json_schema_2020_12_absolute_uri())
     ///     .build()
     ///     .unwrap()
     /// ```
-    pub fn default_dialect(mut self, dialect: impl TryIntoAbsoluteUri) -> Result<Self, UriError> {
+    pub fn with_default_dialect(
+        mut self,
+        dialect: impl TryIntoAbsoluteUri,
+    ) -> Result<Self, UriError> {
         let dialect = dialect.try_into_absolute_uri()?;
         self.primary_dialect = Some(dialect);
         Ok(self)
@@ -266,7 +269,8 @@ impl Builder {
     /// Adds JSON Schema 2020-12 [`Dialect`]
     #[must_use]
     pub fn json_schema_2020_12(self) -> Self {
-        self.dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12.clone())
+        // self.dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12.clone())
+        todo!()
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -282,21 +286,21 @@ impl Builder {
 
     /// Adds JSON source [`Deserializer`] [`deserialize::json`](`crate::deserialize::json`)
     #[must_use]
-    pub fn json(self) -> Self {
+    pub fn with_json_support(self) -> Self {
         self.deserializer("json", deserialize_json)
     }
 
     /// Adds TOML source [`Deserializer`] [`deserialize::toml`](`crate::deserialize::toml`)
     #[cfg(feature = "toml")]
     #[must_use]
-    pub fn toml(self) -> Self {
+    pub fn toml_support(self) -> Self {
         self.deserializer("toml", crate::source::deserialize_toml)
     }
 
     /// Adds YAML source [`Deserializer`] [`deserialize::yaml`](`crate::deserialize::yaml`)
     #[cfg(feature = "yaml")]
     #[must_use]
-    pub fn yaml(self) -> Self {
+    pub fn yaml_support(self) -> Self {
         self.deserializer("yaml", crate::source::deserialize_yaml)
     }
 

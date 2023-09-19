@@ -1,18 +1,17 @@
 //! Keywords and semantics that can be used to evaluate a value against a
 //! schema.
 
-use crate::error::{AnchorError, DialectExistsError, UriError};
-use crate::keyword::Keyword;
-use crate::schema::Metaschema;
-
 use crate::{
-    error::{DialectError, IdentifyError},
+    error::{
+        AnchorError, DialectError, DialectExistsError, DialectsError, IdentifyError, Unimplemented,
+        UriError,
+    },
+    keyword::Keyword,
     uri::AbsoluteUri,
-    Object, Src,
+    Src,
 };
 use jsonptr::Pointer;
 use serde_json::{json, Value};
-use std::panic::{self, UnwindSafe};
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
@@ -23,7 +22,30 @@ use std::{
     ops::Deref,
 };
 
-use super::{Anchor, Identifier, Reference};
+use super::{Anchor, Metaschema, Reference};
+
+pub struct Builder {
+    id: AbsoluteUri,
+    metaschemas: Vec<Metaschema>,
+    keywords: Vec<Box<dyn Keyword>>,
+}
+
+impl Builder {
+    #[must_use]
+    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Value) -> Self {
+        self.metaschemas.push(Metaschema { id, schema });
+        self
+    }
+
+    #[must_use]
+    pub fn with_keyword(mut self, keyword: impl 'static + Keyword) -> Self {
+        self.keywords.push(Box::new(keyword));
+        self
+    }
+    pub fn build(mut self) -> Result<Dialect, DialectError> {
+        Dialect::create(self.id, self.metaschemas, self.keywords)
+    }
+}
 
 /// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
 /// schema.
@@ -33,11 +55,15 @@ pub struct Dialect {
     /// `metaschemas` with this `id`.
     id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
-    metaschemas: HashMap<AbsoluteUri, Object>,
+    metaschemas: HashMap<AbsoluteUri, Value>,
     /// Set of [`Keyword`]s defined by the dialect.
-    keywords: Vec<Keyword>,
-    is_pertinent_to_index: usize,
-    identify_indexes: Vec<usize>,
+    keywords: Box<[Box<dyn Keyword>]>,
+    is_pertinent_to_index: u16,
+    identify_indexes: Box<[u16]>,
+    dialect_indexes: Box<[u16]>,
+    subschemas_indexes: Box<[u16]>,
+    anchors_indexes: Box<[u16]>,
+    references_indexes: Box<[u16]>,
 }
 impl std::fmt::Display for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,66 +72,55 @@ impl std::fmt::Display for Dialect {
 }
 
 impl Dialect {
+    /// Returns a new `Dialect` [`Builder`].
+    #[must_use]
+    pub fn builder(id: AbsoluteUri) -> Builder {
+        Builder {
+            id,
+            metaschemas: Vec::new(),
+            keywords: Vec::new(),
+        }
+    }
+
     /// Creates a new [`Dialect`].
-    pub fn new<S, M, I, H>(
+    fn create(
         id: AbsoluteUri,
-        metaschemas: M,
-        keywords: H,
-    ) -> Result<Self, DialectError>
-    where
-        S: Borrow<Metaschema>,
-        M: IntoIterator<Item = S>,
-        I: Into<Keyword>,
-        H: IntoIterator<Item = I>,
-    {
-        let metaschemas: HashMap<AbsoluteUri, Object> = metaschemas
+        metaschemas: Vec<Metaschema>,
+        keywords: Vec<Box<dyn Keyword>>,
+    ) -> Result<Self, DialectError> {
+        let metaschemas: HashMap<AbsoluteUri, Value> = metaschemas
             .into_iter()
             .map(|m| {
                 let m = m.borrow();
                 (m.id.clone(), m.schema.clone())
             })
             .collect();
-        let keywords = keywords
-            .into_iter()
-            .map(Into::into)
-            .collect::<Vec<Keyword>>();
-        let Some(is_pertinent_to_index) = Self::find_is_pertinent_to_index(&keywords) else { return Err(DialectError::IsPertinentToNotImplemented(id.clone())); };
-        let identify_indexes = Self::find_identify_index(&keywords);
-        if identify_indexes.is_empty() {
-            return Err(DialectError::IdentifyNotImplemented(id.clone()));
-        }
+        let keywords = keywords.into_boxed_slice();
+
+        let identify_indexes = find_identify_indexes(&id, &keywords)?;
+        let is_pertinent_to_index = find_is_pertinent_to_index(&id, &keywords)?;
+        let dialect_indexes = find_dialect_indexes(&id, &keywords)?;
+        let subschemas_indexes = find_impl_indexes(&keywords, Keyword::subschemas);
+        let anchors_indexes = find_impl_indexes(&keywords, Keyword::anchors);
+        let references_indexes = find_impl_indexes(&keywords, Keyword::references);
+
         if !metaschemas.contains_key(&id) {
             return Err(DialectError::DefaultNotFound(id.clone()));
         }
+
         Ok(Self {
             id,
             metaschemas,
             keywords,
+            anchors_indexes,
+            dialect_indexes,
+            references_indexes,
+            subschemas_indexes,
             is_pertinent_to_index,
             identify_indexes,
         })
     }
 
-    fn find_is_pertinent_to_index(keywords: &[Keyword]) -> Option<usize> {
-        keywords
-            .iter()
-            .enumerate()
-            .find(|(_, keyword)| is_implemented(|schema| keyword.is_pertinent_to(schema)))
-            .map(|(idx, _)| idx)
-    }
-
-    fn find_identify_index(keywords: &[Keyword]) -> Vec<usize> {
-        let mut result = Vec::new();
-        for (idx, keyword) in keywords.iter().enumerate() {
-            #[allow(clippy::blocks_in_if_conditions)]
-            if is_implemented(|schema| {
-                let _ = keyword.identify(schema);
-            }) {
-                result.push(idx);
-            }
-        }
-        result
-    }
     /// Attempts to identify a `schema` based on the [`Keyword`]s associated with
     /// this `Dialect`, returning the primary (if any) and all [`AbsoluteUri`]s
     /// the [`Schema`](`crate::schema::Schema`) can be referenced by.
@@ -125,25 +140,22 @@ impl Dialect {
         let mut uris = Vec::new();
         base_uri.set_fragment(Some(path))?;
         uris.push(base_uri.clone());
-        // attempt to find a primary id
+
         let mut primary = None;
-        for idx in &self.identify_indexes {
-            if let Some(Identifier::Primary(id)) = self.keywords[*idx].identify(schema)? {
-                let uri = base_uri.resolve(&id)?;
-                primary = Some(uri);
-                break;
+        let mut secondary_uris = Vec::new();
+
+        for idx in self.identify_indexes.iter().cloned() {
+            let Some(id) = self.keywords[idx as usize].identify(schema).unwrap()? else { continue };
+            if id.is_primary() && primary.is_none() {
+                let uri = id.take_uri();
+                base_uri = base_uri.resolve(&uri)?;
+                primary = Some(base_uri.clone());
+            } else {
+                secondary_uris.push(id.take_uri());
             }
         }
-        // if a primary identifier was found, use it as the base_uri for
-        // subschemas. Otherwise, use the base_uri provided by the caller
-        // with the fragment set to the json pointer `path`.
-        let base_uri = primary.as_ref().unwrap_or(&base_uri);
-        for idx in &self.identify_indexes {
-            let keyword = &self.keywords[*idx];
-            if let Some(id) = keyword.identify(schema)? {
-                let uri = base_uri.resolve(id.uri())?;
-                uris.push(uri);
-            }
+        for uri in secondary_uris {
+            uris.push(base_uri.resolve(&uri)?);
         }
         Ok((primary, uris))
     }
@@ -159,25 +171,34 @@ impl Dialect {
     ///
     #[must_use]
     pub fn subschemas(&self, path: &Pointer, source: &Value) -> HashSet<Pointer> {
-        let mut locations = HashSet::new();
-        for keyword in &self.keywords {
-            locations.extend(keyword.subschemas(path, source));
-        }
-        locations
+        self.subschemas_indexes
+            .iter()
+            .flat_map(|&idx| self.keywords[idx as usize].subschemas(source).unwrap())
+            .collect()
     }
 
     pub fn references(&self, source: &Value) -> Result<Vec<Reference>, UriError> {
         let mut refs = Vec::new();
-        for keyword in &self.keywords {
-            refs.append(&mut keyword.references(source)?);
+        for res in self
+            .references_indexes
+            .iter()
+            .copied()
+            .map(|idx| self.keywords[idx as usize].references(source).unwrap())
+        {
+            refs.append(&mut res?);
         }
         Ok(refs)
     }
 
     pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
         let mut anchors = Vec::new();
-        for keyword in &self.keywords {
-            anchors.append(&mut keyword.anchors(source)?);
+        for res in self
+            .references_indexes
+            .iter()
+            .copied()
+            .map(|idx| self.keywords[idx as usize].anchors(source).unwrap())
+        {
+            anchors.append(&mut res?);
         }
         Ok(anchors)
     }
@@ -192,7 +213,9 @@ impl Dialect {
     /// [`Keywords`](`crate::dialect::Keywords`).
     #[must_use]
     pub fn is_pertinent_to(&self, schema: &Value) -> bool {
-        self.keywords[self.is_pertinent_to_index].is_pertinent_to(schema)
+        self.keywords[self.is_pertinent_to_index as usize]
+            .is_pertinent_to(schema)
+            .unwrap()
     }
 
     #[must_use]
@@ -203,13 +226,13 @@ impl Dialect {
 
     #[must_use]
     /// Returns the metaschemas of this `Dialect`.
-    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Object> {
+    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Value> {
         &self.metaschemas
     }
 
     #[must_use]
     /// Returns the [`Keyword`]s of this `Dialect`.
-    pub fn keywords(&self) -> &[Keyword] {
+    pub fn keywords(&self) -> &[Box<dyn Keyword>] {
         self.keywords.as_ref()
     }
 }
@@ -229,8 +252,14 @@ impl Debug for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Dialect")
             .field("id", &self.id)
-            .field("meta_schemas", &self.metaschemas)
+            .field("metaschemas", &self.metaschemas)
             .field("keywords", &self.keywords)
+            .field("anchors_indexes", &self.anchors_indexes)
+            .field("dialect_indexes", &self.dialect_indexes)
+            .field("identify_indexes", &self.identify_indexes)
+            .field("references_indexes", &self.references_indexes)
+            .field("is_pertinent_to_index", &self.is_pertinent_to_index)
+            .field("subschemas_indexes", &self.subschemas_indexes)
             .finish_non_exhaustive()
     }
 }
@@ -254,18 +283,18 @@ impl<'i> Dialects<'i> {
     pub fn new(
         dialects: Vec<Dialect>,
         default: Option<&AbsoluteUri>,
-    ) -> Result<Self, DialectError> {
+    ) -> Result<Self, DialectsError> {
         if dialects.is_empty() {
-            return Err(DialectError::Empty);
+            return Err(DialectsError::Empty);
         }
         let mut collected: Vec<Dialect> = Vec::with_capacity(dialects.len());
         let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(dialects.len());
         for (i, dialect) in dialects.into_iter().enumerate() {
             if dialect.id.fragment().is_some() && dialect.id.fragment() != Some("") {
-                return Err(DialectError::FragmentedId(dialect.id.clone()));
+                return Err(DialectError::FragmentedId(dialect.id.clone()).into());
             }
             if lookup.contains_key(&dialect.id) {
-                return Err(DialectError::Duplicate(DialectExistsError {
+                return Err(DialectsError::Duplicate(DialectExistsError {
                     id: dialect.id,
                 }));
             }
@@ -462,16 +491,55 @@ impl<'d> IntoIterator for &'d Dialects<'d> {
     }
 }
 
-fn is_implemented<M, R>(method: M) -> bool
+fn find_impl_indexes<'a, F, T>(keywords: &'a [Box<dyn Keyword>], func: F) -> Box<[u16]>
 where
-    R: std::panic::UnwindSafe,
-    M: UnwindSafe + FnOnce(&Value) -> R,
+    F: for<'b> Fn(&'a dyn Keyword, &'b Value) -> Result<T, Unimplemented>,
 {
-    let empty = json!({});
-    let result = panic::catch_unwind(|| {
-        let _ = method(&empty);
-    });
-    result.is_ok()
+    let value = json!({});
+    keywords
+        .iter()
+        .enumerate()
+        .fold(Vec::new(), |mut acc, (idx, keyword)| {
+            if func(keyword.as_ref(), &value).is_ok() {
+                #[allow(clippy::cast_possible_truncation)]
+                acc.push(idx as u16);
+            };
+            acc
+        })
+        .into_boxed_slice()
 }
+
+fn find_is_pertinent_to_index(
+    uri: &AbsoluteUri,
+    keywords: &[Box<dyn Keyword>],
+) -> Result<u16, DialectError> {
+    find_impl_indexes(keywords, Keyword::is_pertinent_to)
+        .first()
+        .copied()
+        .ok_or(DialectError::IsPertinentToNotImplemented(uri.clone()))
+}
+
+fn find_identify_indexes(
+    uri: &AbsoluteUri,
+    keywords: &[Box<dyn Keyword>],
+) -> Result<Box<[u16]>, DialectError> {
+    let indexes = find_impl_indexes(keywords, Keyword::identify);
+    if indexes.is_empty() {
+        return Err(DialectError::IdentifyNotImplemented(uri.clone()));
+    }
+    Ok(indexes)
+}
+
+fn find_dialect_indexes(
+    uri: &AbsoluteUri,
+    keywords: &[Box<dyn Keyword>],
+) -> Result<Box<[u16]>, DialectError> {
+    let indexes = find_impl_indexes(keywords, Keyword::dialect);
+    if indexes.is_empty() {
+        return Err(DialectError::DialectNotImplemented(uri.clone()));
+    }
+    Ok(indexes)
+}
+
 #[cfg(test)]
 mod tests {}

@@ -1,3 +1,7 @@
+mod metaschemas;
+
+pub use metaschemas::*;
+
 pub use super::draft_2019_09::identify_schema;
 use crate::{
     schema::{Dialect, Metaschema},
@@ -128,99 +132,6 @@ lazy_static::lazy_static! {
         JSON_SCHEMA_2020_12_BYTES
     ).unwrap();
 
-    /// [`Metaschema`] for JSON Schema Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_METASCHEMA: Metaschema = Metaschema::new(
-        JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CONTENT_BYTES).unwrap()
-            .as_object()
-            .cloned()
-            .unwrap()
-    );
-
-    /// [`Metaschema`] for JSON Hyper Schema Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_CONTENT_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/content").unwrap(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CONTENT_BYTES)
-            .unwrap()
-            .as_object()
-            .cloned()
-            .unwrap(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Core Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_CORE_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/core").unwrap(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_CORE_BYTES)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .clone(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Format Annotation Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-annotation").unwrap(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_BYTES)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .clone(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Format Assertion Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/format-assertion").unwrap(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_FORMAT_ASSERTION_BYTES)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .clone(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Meta Data Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_META_DATA_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/meta-data").unwrap(),
-        serde_json::from_slice::<Value>(JSON_SCHEMA_2020_12_META_DATA_BYTES)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .clone(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Unevaluated Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/unevaluated").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_UNEVALUATED_BYTES).unwrap(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Validation Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/validation").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_VALIDATION_BYTES).unwrap(),
-    );
-
-    /// [`Metaschema`] for JSON Schema Applicator Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2020-12/meta/applicator").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2020_12_APPLICATOR_BYTES).unwrap(),
-    );
-
-    /// [`Dialect`] for JSON Schema Draft 2020-12
-    pub static ref JSON_SCHEMA_2020_12: Dialect = Dialect::new(
-        JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-        [
-           JSON_SCHEMA_2020_12_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_CORE_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_FORMAT_ANNOTATION_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_FORMAT_ASSERTION_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_META_DATA_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_UNEVALUATED_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_VALIDATION_METASCHEMA.clone(),
-           JSON_SCHEMA_2020_12_APPLICATOR_METASCHEMA.clone(),
-        ],
-        [super::draft_07::ConstKeyword::new()], // TOOD: FIX
-    )
-    .unwrap();
 }
 
 /// Returns `true` if the `value` is definitively JSON Schema Draft 2020-12.

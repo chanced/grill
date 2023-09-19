@@ -18,7 +18,6 @@ use super::{traverse::Traverse, CompiledSchema, Dialect, Reference};
 pub(crate) struct Compiler<'i> {
     schemas: &'i mut Schemas,
     sources: &'i mut Sources,
-    local_state: State,
     global_state: &'i mut State,
     dialects: &'i Dialects<'i>,
     deserializers: &'i Deserializers,
@@ -33,7 +32,6 @@ impl<'i> Compiler<'i> {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
-            local_state: State::default(),
             global_state: &mut interrogator.state,
             dialects: &interrogator.dialects,
             deserializers: &interrogator.deserializers,
@@ -146,7 +144,7 @@ impl<'i> Compiler<'i> {
         self.schemas
             .ensure_not_cyclic(key, &uri, &references, self.sources)?;
 
-        let keywords = self.compile_keywords(key, &uri, dialect).await?;
+        let keywords = self.compile_keywords(key, &uri, dialect)?;
 
         let schema = self.schemas.get_mut(key).unwrap();
 
@@ -156,6 +154,7 @@ impl<'i> Compiler<'i> {
         Ok(key)
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn add_parent_uris_with_path(
         &mut self,
         mut uris: Vec<AbsoluteUri>,
@@ -169,8 +168,7 @@ impl<'i> Compiler<'i> {
             if fragment.is_empty() || fragment.starts_with('/') {
                 let mut uri = uri.clone();
                 let mut uri_path = Pointer::parse(fragment).unwrap();
-
-                uri.set_fragment(Some(&uri_path))?;
+                uri.set_fragment(Some(uri_path.append(path))).unwrap();
                 if !uris.contains(&uri) {
                     uris.push(uri);
                 }
@@ -311,12 +309,12 @@ impl<'i> Compiler<'i> {
         Ok(subschemas)
     }
 
-    async fn compile_keywords(
+    fn compile_keywords(
         &mut self,
         key: Key,
         base_uri: &AbsoluteUri,
         dialect: &Dialect,
-    ) -> Result<Box<[Keyword]>, CompileError> {
+    ) -> Result<Box<[Box<dyn Keyword>]>, CompileError> {
         let schema = self.schemas.get(key, self.sources).unwrap();
 
         let mut keywords = Vec::new();
@@ -327,8 +325,9 @@ impl<'i> Compiler<'i> {
                 rationals: self.rationals,
                 ints: self.ints,
                 values: self.values,
+                global_state: self.global_state,
             };
-            if keyword.compile(&mut compile, schema.clone()).await? {
+            if keyword.compile(&mut compile, schema.clone())? {
                 keywords.push(keyword);
             }
         }
@@ -357,4 +356,19 @@ fn identify(
     // as the lookup which will be at the first position in the uris list
     let lookup_id = id.as_ref().unwrap_or(&uris[0]);
     Ok((lookup_id.clone(), id, uris))
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_spike() {
+        let interrogator = Interrogator::with_json_schema_2020_12()
+            .with_json_support()
+            .build()
+            .await
+            .unwrap();
+    }
 }

@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use crate::{
     keyword,
-    keyword::{Compile, Context, Keyword, RationalKey, SyncKeyword, ValueKey},
-    output::{self, Node},
+    keyword::{Compile, Context, Keyword, RationalKey, ValueKey},
+    output::{self},
     Schema,
 };
 
@@ -28,7 +28,7 @@ impl ConstKeyword {
     }
 }
 
-impl SyncKeyword for ConstKeyword {
+impl Keyword for ConstKeyword {
     fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
@@ -53,11 +53,7 @@ impl SyncKeyword for ConstKeyword {
         todo!()
     }
 }
-impl From<ConstKeyword> for Keyword {
-    fn from(h: ConstKeyword) -> Keyword {
-        Keyword::Sync(Box::new(h))
-    }
-}
+
 // impl SyncKeyword for ConstKeyword {
 //     fn compile<'s>(
 //         &mut self,

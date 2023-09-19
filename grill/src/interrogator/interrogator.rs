@@ -551,10 +551,12 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2020_12() -> Builder {
+    pub fn with_json_schema_2020_12() -> Builder {
         Builder::default()
             .json_schema_2020_12()
-            .default_dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone())
+            .with_default_dialect(
+                json_schema::draft_2020_12::JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
+            )
             .unwrap()
     }
 
@@ -565,7 +567,9 @@ impl Interrogator {
     pub fn json_schema_2019_09() -> Builder {
         Builder::default()
             .json_schema_2019_09()
-            .default_dialect(json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone())
+            .with_default_dialect(
+                json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
+            )
             .unwrap()
     }
 
@@ -576,7 +580,7 @@ impl Interrogator {
     pub fn json_schema_07() -> Builder {
         Builder::default()
             .json_schema_07()
-            .default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
+            .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
             .unwrap()
     }
 
@@ -588,7 +592,7 @@ impl Interrogator {
         // safety: &AbsoluteUri::try_into_absolute_uri never returns an error
         Builder::default()
             .json_schema_04()
-            .default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
+            .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
             .unwrap()
     }
     /// Starts a new transaction.

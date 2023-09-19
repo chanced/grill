@@ -2,6 +2,7 @@ use serde_json::{Number, Value};
 
 use crate::{
     error::{CompileError, NumberError},
+    interrogator::state::State,
     schema::Schemas,
     AbsoluteUri, Key, Uri,
 };
@@ -15,6 +16,7 @@ pub struct Compile<'i> {
     pub(crate) rationals: &'i mut BigRationals,
     pub(crate) ints: &'i mut BigInts,
     pub(crate) values: &'i mut Values,
+    pub(crate) global_state: &'i mut State,
 }
 
 impl<'i> Compile<'i> {

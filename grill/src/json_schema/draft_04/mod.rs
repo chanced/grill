@@ -19,22 +19,22 @@ pub const JSON_HYPER_SCHEMA_04_LINKS_BYTES: &[u8] =
 lazy_static! {
     pub static ref JSON_SCHEMA_04_URL: Url = Url::parse(JSON_SCHEMA_04_URI_STR).unwrap();
     pub static ref JSON_SCHEMA_04_URI: Uri = Uri::Url(JSON_SCHEMA_04_URL.clone());
-    pub static ref JSON_SCHEMA_04_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_SCHEMA_04_URL.clone());
-    pub static ref JSON_HYPER_SCHEMA_04_URL: Url = Url::parse(JSON_HYPER_SCHEMA_04_URI_STR).unwrap();
+    pub static ref JSON_SCHEMA_04_ABSOLUTE_URI: AbsoluteUri =
+        AbsoluteUri::Url(JSON_SCHEMA_04_URL.clone());
+    pub static ref JSON_HYPER_SCHEMA_04_URL: Url =
+        Url::parse(JSON_HYPER_SCHEMA_04_URI_STR).unwrap();
     pub static ref JSON_HYPER_SCHEMA_04_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_04_URL.clone());
-    pub static ref JSON_HYPER_SCHEMA_04_ABSOLUTE_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_04_URL.clone());
-    pub static ref JSON_SCHEMA_04_VALUE: Value = serde_json::from_slice(JSON_SCHEMA_04_BYTES).unwrap();
-    pub static ref JSON_SCHEMA_04: Dialect =
-        Dialect::new(
+    pub static ref JSON_HYPER_SCHEMA_04_ABSOLUTE_URI: Uri =
+        Uri::Url(JSON_HYPER_SCHEMA_04_URL.clone());
+    pub static ref JSON_SCHEMA_04_VALUE: Value =
+        serde_json::from_slice(JSON_SCHEMA_04_BYTES).unwrap();
+    pub static ref JSON_SCHEMA_04: Dialect = Dialect::builder(JSON_SCHEMA_04_ABSOLUTE_URI.clone())
+        .with_metaschema(
             JSON_SCHEMA_04_ABSOLUTE_URI.clone(),
-            [Metaschema::new(
-                JSON_SCHEMA_04_ABSOLUTE_URI.clone(),
-                JSON_SCHEMA_04_VALUE.as_object().unwrap().clone(),
-            )],
-            [super::draft_07::ConstKeyword::new()], // TODO: FIX/FINISH,
+            JSON_SCHEMA_04_VALUE.clone()
         )
+        .build()
         .unwrap();
-
 }
 
 #[must_use]

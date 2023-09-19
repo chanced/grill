@@ -60,7 +60,7 @@ pub(crate) struct CompiledSchema {
     pub(crate) metaschema: AbsoluteUri,
 
     // Compiled keywords.
-    pub(crate) keywords: Box<[Keyword]>,
+    pub(crate) keywords: Box<[Box<dyn Keyword>]>,
 
     /// Absolute URI of the source and path to this schema.
     pub(crate) link: Link,
@@ -138,7 +138,7 @@ pub struct Schema<'i> {
     pub references: Cow<'i, [Reference]>,
 
     /// Compiled [`Keyword`]s.
-    pub keywords: Cow<'i, [Keyword]>,
+    pub keywords: Cow<'i, [Box<dyn Keyword>]>,
 
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]

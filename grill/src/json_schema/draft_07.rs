@@ -36,17 +36,10 @@ lazy_static::lazy_static! {
     pub static ref JSON_HYPER_SCHEMA_07_URI: Uri = Uri::Url(JSON_HYPER_SCHEMA_07_URL.clone());
     pub static ref JSON_HYPER_SCHEMA_07_ABSOLUTE_URI: AbsoluteUri = AbsoluteUri::Url(JSON_HYPER_SCHEMA_07_URL.clone());
     pub static ref JSON_SCHEMA_07_VALUE: Value = serde_json::from_slice(JSON_SCHEMA_07_BYTES).unwrap();
-    pub static ref JSON_SCHEMA_07_METASCHEMA: Metaschema = Metaschema::new(
-        JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
-        JSON_SCHEMA_07_VALUE.as_object().unwrap().clone(),
-    );
 
-    pub static ref JSON_SCHEMA_07: Dialect = Dialect::new(
-        JSON_SCHEMA_07_ABSOLUTE_URI.clone(),
-        [JSON_SCHEMA_07_METASCHEMA.clone()],
-        [ConstKeyword::new()],
-    )
-    .unwrap();
+    pub static ref JSON_SCHEMA_07: Dialect = Dialect::builder(JSON_SCHEMA_07_ABSOLUTE_URI.clone())
+        .build()
+        .unwrap();
 }
 
 /// Identifies JSON Schema Draft 2019-09, 2020-12 schemas.

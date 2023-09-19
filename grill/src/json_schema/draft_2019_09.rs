@@ -102,74 +102,62 @@ lazy_static! {
         JSON_HYPER_SCHEMA_2019_09_OUTPUT_BYTES
     ).unwrap();
 
-    /// [`Metaschema`] of JSON Schema Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_METASCHEMA: Metaschema =  Metaschema::new(
-        JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_METASCHEMA: Metaschema =  Metaschema::new(
+    //     JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Hyper Schema Draft 2019-09.
-    pub static ref JSON_HYPER_SCHEMA_2019_09_METASCHEMA: Metaschema = Metaschema::new(
-        JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
-        serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Hyper Schema Draft 2019-09.
+    // pub static ref JSON_HYPER_SCHEMA_2019_09_METASCHEMA: Metaschema = Metaschema::new(
+    //     JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
+    //     serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Hyper Schema Links Draft 2019-09.
-    pub static ref JSON_HYPER_SCHEMA_2019_09_LINKS_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/links").unwrap(),
-        serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_LINKS_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Hyper Schema Links Draft 2019-09.
+    // pub static ref JSON_HYPER_SCHEMA_2019_09_LINKS_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/links").unwrap(),
+    //     serde_json::from_slice(JSON_HYPER_SCHEMA_2019_09_LINKS_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Applicator Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/applicator").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_APPLICATOR_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Applicator Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/applicator").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_APPLICATOR_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Content Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_CONTENT_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/content").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_CONTENT_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Content Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_CONTENT_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/content").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_CONTENT_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Core Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_CORE_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/core").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_CORE_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Core Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_CORE_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/core").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_CORE_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Format Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_FORMAT_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/format").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_FORMAT_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Format Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_FORMAT_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/format").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_FORMAT_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Meta-Data Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_META_DATA_METASCHEMA: Metaschema =  Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/meta-data").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_META_DATA_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Meta-Data Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_META_DATA_METASCHEMA: Metaschema =  Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/meta-data").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_META_DATA_BYTES).unwrap(),
+    // );
 
-    /// [`Metaschema`] of JSON Schema Validation Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA: Metaschema = Metaschema::new(
-        AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/validation").unwrap(),
-        serde_json::from_slice(JSON_SCHEMA_2019_09_VALIDATION_BYTES).unwrap(),
-    );
+    // /// [`Metaschema`] of JSON Schema Validation Draft 2019-09.
+    // pub static ref JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA: Metaschema = Metaschema::new(
+    //     AbsoluteUri::parse("https://json-schema.org/draft/2019-09/meta/validation").unwrap(),
+    //     serde_json::from_slice(JSON_SCHEMA_2019_09_VALIDATION_BYTES).unwrap(),
+    // );
 
     /// [`Dialect`] for JSON Schema Draft 2019-09.
-    pub static ref JSON_SCHEMA_2019_09: Dialect = Dialect::new(
-        JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
-        [
-            JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_CONTENT_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_CORE_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_FORMAT_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_META_DATA_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA.clone(),
-            JSON_SCHEMA_2019_09_METASCHEMA.clone(),
-        ],
-        [super::draft_07::ConstKeyword::new()], // TOOD: FIX
-    ).unwrap();
+    pub static ref JSON_SCHEMA_2019_09: Dialect = Dialect::builder(JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone()).build().unwrap();
 }
 
 /// Returns `true` if the `value` is definitively JSON Schema Draft 2019-09.

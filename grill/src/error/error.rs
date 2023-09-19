@@ -1,11 +1,13 @@
 #[doc(no_inline)]
 pub use crate::output::ValidationError;
+
+pub use crate::keyword::Unimplemented;
+
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 #[doc(no_inline)]
 pub use url::ParseError as UrlError;
-
 pub use urn::Error as UrnError;
 
 use crate::{uri::AbsoluteUri, Output, Uri};
@@ -202,24 +204,28 @@ impl DeserializationError {
 /// Possible errors that may occur while creating a
 /// [`Dialects`](crate::dialect::Dialects)
 #[derive(Debug, Error)]
+pub enum DialectsError {
+    #[error("no dialects were provided")]
+    Empty,
+    #[error(transparent)]
+    Dialect(#[from] DialectError),
+    /// Multiple [`Dialect`]s with the same
+    /// [`AbsoluteUri`] id were provided.
+    #[error("duplicate dialect id provided: {0}")]
+    Duplicate(DialectExistsError),
+}
+
+/// Possible errors that may occur while creating a
+/// [`Dialect`](crate::dialect::Dialect)
+#[derive(Debug, Error)]
 pub enum DialectError {
     /// The default [`Dialect`] was not found.
     #[error("default dialect not found: {0}")]
     DefaultNotFound(AbsoluteUri),
 
-    /// Multiple [`Dialect`]s with the same
-    /// [`AbsoluteUri`] id were provided.
-    #[error("duplicate dialect id provided: {0}")]
-    Duplicate(DialectExistsError),
-
     /// A [`Dialect`] ID contained a non-empty fragment.
     #[error("dialect ids may not contain fragments; found: \"{0}\"")]
     FragmentedId(AbsoluteUri),
-
-    /// The [`Dialect`] did not have the minimum required number of
-    /// [`Keyword`](`crate::keyword::Keyword`)s (2).
-    #[error("at least one dialect is required to build an Interrogator; none were provided")]
-    Empty,
 
     /// `Dialect` was constructed but a metaschema with the `Dialect`'s `id` was
     /// not present.
@@ -235,12 +241,12 @@ pub enum DialectError {
 
     /// Exactly one [`Keyword`](crate::keyword::Keyword) must implement
     /// implement [`dialect`](`crate::keyword::Keyword::dialect`) but none were provided.
-    #[error("exactly one `Keyword` must implement the `dialect` method; none were found")]
+    #[error("at least one `Keyword` must implement the `dialect` method; none were found")]
     DialectNotImplemented(AbsoluteUri),
 
     /// At least one [`Keyword`](crate::keyword::Keyword) must implement
     /// implement [`identify`](`crate::keyword::Keyword::identify`) but none were provided.
-    #[error("exactly one `Keyword` must implement the `identify` method; none were found")]
+    #[error("at least one `Keyword` must implement the `identify` method; none were found")]
     IdentifyNotImplemented(AbsoluteUri),
 }
 
@@ -272,7 +278,7 @@ pub enum BuildError {
 
     #[error(transparent)]
     /// An issue with [`Dialect`]s occurred.
-    Dialect(#[from] DialectError),
+    Dialect(#[from] DialectsError),
 
     #[error(transparent)]
     /// An error occurred while adding, resolving, or deserializing a

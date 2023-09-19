@@ -1,14 +1,9 @@
-use crate::{AbsoluteUri, Object};
+use serde_json::Value;
+
+use crate::AbsoluteUri;
 
 #[derive(Clone, Debug)]
 pub struct Metaschema {
     pub id: AbsoluteUri,
-    pub schema: Object,
-}
-
-impl Metaschema {
-    #[must_use]
-    pub fn new(id: AbsoluteUri, schema: Object) -> Self {
-        Self { id, schema }
-    }
+    pub schema: Value,
 }
