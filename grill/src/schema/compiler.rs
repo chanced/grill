@@ -167,8 +167,9 @@ impl<'i> Compiler<'i> {
             let fragment = uri.fragment().unwrap_or_default();
             if fragment.is_empty() || fragment.starts_with('/') {
                 let mut uri = uri.clone();
-                let mut uri_path = Pointer::parse(fragment).unwrap();
-                uri.set_fragment(Some(uri_path.append(path))).unwrap();
+                let mut uri_path = Pointer::parse(fragment)
+                    .map_err(|e| CompileError::FailedToParsePointer(e.into()))?;
+                uri.set_fragment(Some(uri_path.append(path)))?;
                 if !uris.contains(&uri) {
                     uris.push(uri);
                 }

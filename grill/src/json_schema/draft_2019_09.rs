@@ -1,7 +1,7 @@
 use crate::{
     error::IdentifyError,
     keyword,
-    schema::{Dialect, Metaschema},
+    schema::Dialect,
     uri::{AbsoluteUri, AsUriRef, Uri},
 };
 use lazy_static::lazy_static;

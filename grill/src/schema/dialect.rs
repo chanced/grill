@@ -13,7 +13,7 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::{json, Value};
 use std::{
-    borrow::{Borrow, Cow},
+    borrow::Cow,
     collections::{HashMap, HashSet},
     convert::Into,
     fmt::Debug,
@@ -22,18 +22,18 @@ use std::{
     ops::Deref,
 };
 
-use super::{Anchor, Metaschema, Reference};
+use super::{Anchor, Reference};
 
 pub struct Builder {
     id: AbsoluteUri,
-    metaschemas: Vec<Metaschema>,
+    metaschemas: Vec<(AbsoluteUri, Value)>,
     keywords: Vec<Box<dyn Keyword>>,
 }
 
 impl Builder {
     #[must_use]
     pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Value) -> Self {
-        self.metaschemas.push(Metaschema { id, schema });
+        self.metaschemas.push((id, schema));
         self
     }
 
@@ -43,7 +43,7 @@ impl Builder {
         self
     }
     pub fn build(mut self) -> Result<Dialect, DialectError> {
-        Dialect::create(self.id, self.metaschemas, self.keywords)
+        Dialect::new(self.id, self.metaschemas, self.keywords)
     }
 }
 
@@ -83,18 +83,12 @@ impl Dialect {
     }
 
     /// Creates a new [`Dialect`].
-    fn create(
+    fn new(
         id: AbsoluteUri,
-        metaschemas: Vec<Metaschema>,
+        metaschemas: Vec<(AbsoluteUri, Value)>,
         keywords: Vec<Box<dyn Keyword>>,
     ) -> Result<Self, DialectError> {
-        let metaschemas: HashMap<AbsoluteUri, Value> = metaschemas
-            .into_iter()
-            .map(|m| {
-                let m = m.borrow();
-                (m.id.clone(), m.schema.clone())
-            })
-            .collect();
+        let metaschemas: HashMap<AbsoluteUri, Value> = metaschemas.into_iter().collect();
         let keywords = keywords.into_boxed_slice();
 
         let identify_indexes = find_identify_indexes(&id, &keywords)?;
@@ -112,12 +106,12 @@ impl Dialect {
             id,
             metaschemas,
             keywords,
-            anchors_indexes,
-            dialect_indexes,
-            references_indexes,
-            subschemas_indexes,
             is_pertinent_to_index,
             identify_indexes,
+            dialect_indexes,
+            subschemas_indexes,
+            anchors_indexes,
+            references_indexes,
         })
     }
 
@@ -174,6 +168,11 @@ impl Dialect {
         self.subschemas_indexes
             .iter()
             .flat_map(|&idx| self.keywords[idx as usize].subschemas(source).unwrap())
+            .map(|mut p| {
+                let mut path = path.clone();
+                path.append(&mut p);
+                path
+            })
             .collect()
     }
 
@@ -266,13 +265,12 @@ impl Debug for Dialect {
 
 #[derive(Debug, Clone)]
 pub struct Dialects<'i> {
-    dialects: Cow<'i, [Dialect]>,
-    lookup: Cow<'i, HashMap<AbsoluteUri, usize>>,
-    primary: usize,
+    dialects: Cow<'i, [Cow<'static, Dialect>]>,
+    default: usize,
 }
 
 impl<'d> Deref for Dialects<'d> {
-    type Target = [Dialect];
+    type Target = [Cow<'static, Dialect>];
 
     fn deref(&self) -> &Self::Target {
         self.dialects.as_ref()
@@ -281,13 +279,13 @@ impl<'d> Deref for Dialects<'d> {
 
 impl<'i> Dialects<'i> {
     pub fn new(
-        dialects: Vec<Dialect>,
+        dialects: Vec<Cow<Dialect>>,
         default: Option<&AbsoluteUri>,
     ) -> Result<Self, DialectsError> {
         if dialects.is_empty() {
             return Err(DialectsError::Empty);
         }
-        let mut collected: Vec<Dialect> = Vec::with_capacity(dialects.len());
+        let mut collected = Vec::with_capacity(dialects.len());
         let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(dialects.len());
         for (i, dialect) in dialects.into_iter().enumerate() {
             if dialect.id.fragment().is_some() && dialect.id.fragment() != Some("") {
@@ -305,15 +303,17 @@ impl<'i> Dialects<'i> {
         let default = Self::find_primary(&collected, &lookup, default)?;
         Ok(Self {
             dialects: Cow::Owned(collected),
-            lookup: Cow::Owned(lookup),
-            primary: default,
+            default,
         })
     }
 
     /// Returns the [`Dialect`](crate::dialect::Dialect).
     #[must_use]
     pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect> {
-        self.lookup.get(id).map(|&index| &self.dialects[index])
+        self.dialects
+            .iter()
+            .find(|d| d.id == *id)
+            .map(|d| d.deref())
     }
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
     /// upon the first [`Keyword`] in each
@@ -324,19 +324,17 @@ impl<'i> Dialects<'i> {
         self.dialects
             .iter()
             .find(|&dialect| dialect.is_pertinent_to(schema))
+            .map(|d| d.deref())
     }
 
     /// Appends a [`Dialect`].
     ///
     /// # Errors
     /// Returns the [`DialectExists`] if a `Dialect` already exists with the same `id`.
-    pub fn push(&mut self, dialect: Dialect) -> Result<(), DialectExistsError> {
-        if self.lookup.contains_key(&dialect.id) {
+    pub fn push(&mut self, dialect: Cow<'static, Dialect>) -> Result<(), DialectExistsError> {
+        if self.contains(&dialect.id) {
             return Err(DialectExistsError { id: dialect.id });
         }
-        self.lookup
-            .to_mut()
-            .insert(dialect.id.clone(), self.dialects.len());
         self.dialects.to_mut().push(dialect);
         Ok(())
     }
@@ -346,21 +344,16 @@ impl<'i> Dialects<'i> {
     /// # Errors
     /// Returns the `Err(&'static str)` if the `Dialect` is not currently in this `Dialects`.
     pub fn with_default(self, default: &Dialect) -> Result<Dialects<'i>, &'static str> {
-        let primary = self
-            .lookup
-            .get(&default.id)
-            .copied()
-            .ok_or("dialect not found")?;
+        let primary = self.get(&default.id).ok_or("dialect not found")?;
         Ok(Dialects {
             dialects: self.dialects,
-            primary,
-            lookup: self.lookup,
+            default: self.default,
         })
     }
 
     #[must_use]
     pub fn contains(&self, id: &AbsoluteUri) -> bool {
-        self.lookup.contains_key(id)
+        self.dialects.iter().any(|d| &d.id == id)
     }
 
     /// Returns the [`Dialect`] that is pertinent to the schema or the default
@@ -373,7 +366,7 @@ impl<'i> Dialects<'i> {
     #[must_use]
     pub fn pertinent_to_or_default_idx(&self, schema: &Value) -> usize {
         self.pertinent_to(schema)
-            .map_or(self.primary, |d| self.position(d).unwrap())
+            .map_or(self.default, |d| self.position(d).unwrap())
     }
 
     /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`](`crate::dialect::Dialect`).
@@ -386,10 +379,7 @@ impl<'i> Dialects<'i> {
         let mut result = Vec::with_capacity(self.dialects.len());
         for dialect in self.dialects.iter() {
             for metaschema in &dialect.metaschemas {
-                result.push(Src::Value(
-                    metaschema.0.clone(),
-                    metaschema.1.clone().into(),
-                ));
+                result.push(Src::Value(metaschema.0.clone(), metaschema.1.clone()));
             }
         }
         result
@@ -405,7 +395,7 @@ impl<'i> Dialects<'i> {
     /// [`Dialect`](`crate::dialect::Dialect`)
     #[must_use]
     pub fn default_index(&self) -> usize {
-        self.primary
+        self.default
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
     pub fn iter(&'i self) -> std::slice::Iter<'i, Dialect> {
@@ -415,7 +405,7 @@ impl<'i> Dialects<'i> {
     /// Returns the primary [`Dialect`](`crate::dialect::Dialect`).
     #[must_use]
     pub fn primary(&self) -> &Dialect {
-        &self.dialects[self.primary]
+        &self.dialects[self.default]
     }
 
     /// Sets the  [`Dialect`] to use when no other [`Dialect`] matches.
@@ -424,7 +414,7 @@ impl<'i> Dialects<'i> {
     /// Panics if the index is out of bounds.
     pub(crate) fn set_default_dialect_index(&mut self, index: usize) {
         assert!(index < self.dialects.len());
-        self.primary = index;
+        self.default = index;
     }
 
     /// Returns the number of [`Dialect`]s.
@@ -437,30 +427,30 @@ impl<'i> Dialects<'i> {
     /// Returns the index of the given [`Dialect`] in the list of [`Dialect`]s.
     #[must_use]
     pub fn position(&self, dialect: &Dialect) -> Option<usize> {
-        self.dialects.iter().position(|d| d == dialect)
+        self.dialects.iter().position(|d| d.as_ref() == dialect)
     }
 
     #[must_use]
     pub fn get_by_index(&self, idx: usize) -> Option<&Dialect> {
-        self.dialects.get(idx)
+        self.dialects.get(idx).map(AsRef::as_ref)
     }
 
     #[must_use]
     pub fn dialect_index_for(&self, schema: &Value) -> usize {
         let default = self.primary();
         if default.is_pertinent_to(schema) {
-            return self.primary;
+            return self.default;
         }
         for (idx, dialect) in self.dialects.iter().enumerate() {
             if dialect.id != default.id && dialect.is_pertinent_to(schema) {
                 return idx;
             }
         }
-        self.primary
+        self.default
     }
 
     fn find_primary(
-        dialects: &[Dialect],
+        dialects: &[Cow<'static, Dialect>],
         lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<&AbsoluteUri>,
     ) -> Result<usize, DialectError> {
@@ -476,7 +466,7 @@ impl<'i> Dialects<'i> {
         Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
             lookup: Cow::Borrowed(self.lookup.as_ref()),
-            primary: self.primary,
+            default: self.default,
         }
     }
 }

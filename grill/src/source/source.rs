@@ -95,7 +95,7 @@ impl Src {
 
 impl From<&Metaschema> for Src {
     fn from(value: &Metaschema) -> Self {
-        Self::Value(value.id.clone(), value.schema.clone().into())
+        Self::Value(value.id.clone(), value.schema.clone())
     }
 }
 

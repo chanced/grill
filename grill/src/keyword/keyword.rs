@@ -17,6 +17,8 @@ use super::{Compile, Context};
 #[derive(Debug)]
 pub struct Unimplemented;
 
+pub enum Evaluation {}
+
 impl Display for Unimplemented {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "not implemented")
@@ -46,6 +48,10 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     ) -> Result<Option<output::Node<'v>>, EvaluateError>;
     #[allow(unused_variables)]
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
+        let v = vec![String::new()];
+        let r = v.as_slice();
+        let x: Vec<String> = r.into();
+
         Err(Unimplemented)
     }
 

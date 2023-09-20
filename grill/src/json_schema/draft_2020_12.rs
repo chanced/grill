@@ -4,7 +4,7 @@ pub use metaschemas::*;
 
 pub use super::draft_2019_09::identify_schema;
 use crate::{
-    schema::{Dialect, Metaschema},
+    schema::Dialect,
     uri::{AbsoluteUri, AsUriRef, Uri},
 };
 use serde_json::Value;

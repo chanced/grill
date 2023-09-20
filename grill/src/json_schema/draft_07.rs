@@ -10,7 +10,7 @@ pub use type_keyword::{TypeInvalid, TypeKeyword};
 
 use crate::{
     error::IdentifyError,
-    schema::{Dialect, Metaschema},
+    schema::{Dialect, },
     uri::{AbsoluteUri, AsUriRef, Uri},
 };
 use serde_json::Value;

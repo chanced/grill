@@ -5,9 +5,6 @@ pub mod traverse;
 mod anchor;
 pub use anchor::Anchor;
 
-mod metaschema;
-pub use metaschema::Metaschema;
-
 pub mod dialect;
 pub use dialect::{Dialect, Dialects};
 

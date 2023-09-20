@@ -1,6 +1,6 @@
 use crate::{
     error::IdentifyError,
-    schema::{Dialect, Metaschema},
+    schema::Dialect,
     uri::{AbsoluteUri, AsUriRef},
     Uri,
 };
