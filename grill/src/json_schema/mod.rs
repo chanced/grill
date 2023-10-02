@@ -5,58 +5,52 @@ pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
 
-// pub use draft_04::{
-//     is_json_hyper_schema_04_absolute_uri, is_json_hyper_schema_04_uri, is_json_schema_04,
-//     is_json_schema_04_absolute_uri, is_json_schema_04_uri, JSON_HYPER_SCHEMA_04_ABSOLUTE_URI,
-//     JSON_HYPER_SCHEMA_04_BYTES, JSON_HYPER_SCHEMA_04_LINKS_BYTES, JSON_HYPER_SCHEMA_04_URI,
-//     JSON_HYPER_SCHEMA_04_URI_STR, JSON_HYPER_SCHEMA_04_URL, JSON_SCHEMA_04,
-//     JSON_SCHEMA_04_ABSOLUTE_URI, JSON_SCHEMA_04_BYTES, JSON_SCHEMA_04_URI, JSON_SCHEMA_04_URI_STR,
-//     JSON_SCHEMA_04_URL, JSON_SCHEMA_04_VALUE,
-// };
-
-// pub use draft_07::{
-//     is_json_hyper_schema_07_absolute_uri, is_json_hyper_schema_07_uri, is_json_schema_07,
-//     is_json_schema_07_absolute_uri, is_json_schema_07_uri, JSON_HYPER_SCHEMA_07_ABSOLUTE_URI,
-//     JSON_HYPER_SCHEMA_07_BYTES, JSON_HYPER_SCHEMA_07_LINKS_BYTES,
-//     JSON_HYPER_SCHEMA_07_OUTPUT_BYTES, JSON_HYPER_SCHEMA_07_URI, JSON_HYPER_SCHEMA_07_URI_STR,
-//     JSON_HYPER_SCHEMA_07_URL, JSON_SCHEMA_07, JSON_SCHEMA_07_ABSOLUTE_URI, JSON_SCHEMA_07_BYTES,
-//     JSON_SCHEMA_07_URI, JSON_SCHEMA_07_URI_STR, JSON_SCHEMA_07_URL, JSON_SCHEMA_07_VALUE,
-// };
-// pub use draft_2019_09::{
-//     is_json_hyper_schema_2019_09_absolute_uri, is_json_schema_2019_09,
-//     is_json_schema_2019_09_absolute_uri, is_json_schema_2019_09_uri,
-//     JSON_HYPER_SCHEMA_2019_09_ABSOLUTE_URI, JSON_HYPER_SCHEMA_2019_09_BYTES,
-//     JSON_HYPER_SCHEMA_2019_09_LINKS_BYTES, JSON_HYPER_SCHEMA_2019_09_LINKS_METASCHEMA,
-//     JSON_HYPER_SCHEMA_2019_09_METASCHEMA, JSON_HYPER_SCHEMA_2019_09_OUTPUT_BYTES,
-//     JSON_HYPER_SCHEMA_2019_09_OUTPUT_VALUE, JSON_HYPER_SCHEMA_2019_09_URI,
-//     JSON_HYPER_SCHEMA_2019_09_URI_STR, JSON_HYPER_SCHEMA_2019_09_URL, JSON_SCHEMA_2019_09,
-//     JSON_SCHEMA_2019_09_ABSOLUTE_URI, JSON_SCHEMA_2019_09_APPLICATOR_BYTES,
-//     JSON_SCHEMA_2019_09_APPLICATOR_METASCHEMA, JSON_SCHEMA_2019_09_BYTES,
-//     JSON_SCHEMA_2019_09_CONTENT_BYTES, JSON_SCHEMA_2019_09_CONTENT_METASCHEMA,
-//     JSON_SCHEMA_2019_09_CORE_BYTES, JSON_SCHEMA_2019_09_CORE_METASCHEMA,
-//     JSON_SCHEMA_2019_09_FORMAT_BYTES, JSON_SCHEMA_2019_09_FORMAT_METASCHEMA,
-//     JSON_SCHEMA_2019_09_METASCHEMA, JSON_SCHEMA_2019_09_META_DATA_BYTES,
-//     JSON_SCHEMA_2019_09_META_DATA_METASCHEMA, JSON_SCHEMA_2019_09_OUTPUT_BYTES,
-//     JSON_SCHEMA_2019_09_OUTPUT_VALUE, JSON_SCHEMA_2019_09_URI, JSON_SCHEMA_2019_09_URI_STR,
-//     JSON_SCHEMA_2019_09_URL, JSON_SCHEMA_2019_09_VALIDATION_BYTES,
-//     JSON_SCHEMA_2019_09_VALIDATION_METASCHEMA,
-// };
-
-// pub use draft_2020_12::{
-//     is_json_hyper_schema_2020_12_absolute_uri, is_json_hyper_schema_2020_12_uri,
-//     is_json_schema_2020_12, is_json_schema_2020_12_absolute_uri, is_json_schema_2020_12_uri,
-// };
-
 use crate::uri::{AsUriRef, Url};
 
 fn is_uri_for(target: &Url, other: impl AsUriRef) -> bool {
-    let Some(u) = other.as_uri_ref().as_url()  else { return false };
+    let Some(u) = other.as_uri_ref().as_url() else {
+        return false;
+    };
     let scheme = u.scheme();
     (scheme == "https" || scheme == "http")
         && u.domain() == target.domain()
         && u.path() == target.path()
         && u.fragment().unwrap_or_default().is_empty()
 }
+
+macro_rules! metaschema {
+    (
+        $(#[$meta:meta])*
+        [$($name:tt)+]($uri:literal)
+        $($json:tt)+
+    ) => {
+        paste::paste!{
+            #[doc = "Returns the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) for " $($name " ")+]
+            #[doc = ""]
+            #[doc = "<" $uri ">"]
+            #[must_use]
+            pub fn [<$($name:lower _)* uri>]() -> &'static crate::uri::AbsoluteUri {
+                use ::once_cell::sync::Lazy;
+                use crate::uri::AbsoluteUri;
+                static URI: Lazy<AbsoluteUri> = Lazy::new(|| AbsoluteUri::parse($uri).unwrap());
+                &URI
+            }
+            $(#[$meta])*
+            #[must_use]
+            #[doc = "Returns the [`Value`](`::serde_json::Value`) for " $($name " ")+]
+            #[doc = "```json\r"]
+            #[doc=grill_macros::json_pretty_str!($($json)+)]
+            #[doc = "```\r"]
+            pub fn [<$($name:lower _)* value>]() -> &'static ::serde_json::Value {
+                use ::once_cell::sync::Lazy;
+                use ::serde_json::{json, Value};
+                static VALUE: Lazy<Value> = Lazy::new(|| json!($($json)*));
+                &VALUE
+            }
+        }
+    };
+}
+use metaschema;
 
 #[cfg(test)]
 mod tests {}

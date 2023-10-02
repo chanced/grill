@@ -161,8 +161,11 @@ impl<'i> Compiler<'i> {
         path: &Pointer,
         parent: Option<Key>,
     ) -> Result<Vec<AbsoluteUri>, CompileError> {
-        let Some(parent) = parent else { return Ok(uris) };
+        let Some(parent) = parent else {
+            return Ok(uris);
+        };
         let parent = self.schemas.get(parent, self.sources).unwrap();
+        #[allow(clippy::explicit_iter_loop)]
         for uri in parent.uris.iter() {
             let fragment = uri.fragment().unwrap_or_default();
             if fragment.is_empty() || fragment.starts_with('/') {
@@ -366,8 +369,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_spike() {
-        let interrogator = Interrogator::with_json_schema_2020_12()
-            .with_json_support()
+        let interrogator = Interrogator::json_schema_2020_12()
+            .deserialize_json()
             .build()
             .await
             .unwrap();

@@ -1,10 +1,7 @@
 use jsonptr::Pointer;
-use num_rational::BigRational;
-use serde_json::{Number, Value};
 
 use crate::{
-    error::EvaluateError, interrogator::state::State, output::Node, schema::Schemas,
-    source::Sources, Key,
+    error::EvaluateError, interrogator::state::State, schema::Schemas, source::Sources, Key, Output,
 };
 
 use super::{BigInts, BigRationals, Values};
@@ -25,7 +22,7 @@ pub struct Context<'i> {
 }
 
 impl<'s> Context<'s> {
-    pub fn evalute<'v>(&self, key: Key) -> Result<Node<'v>, EvaluateError> {
+    pub fn evalute<'v>(&self, key: Key) -> Result<Output<'v>, EvaluateError> {
         let schema = self.schemas.get(key, self.sources)?;
         let abs_loc = schema.id.as_deref().unwrap_or(&schema.uris[0]);
         todo!()

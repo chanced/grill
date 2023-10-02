@@ -3,12 +3,15 @@ pub use source::Source;
 pub(crate) use source::{SourceKey, Sources, Src};
 
 mod deserialize;
+pub use deserialize::{deserialize_json, Deserializer};
+
 #[cfg(feature = "toml")]
 pub use deserialize::deserialize_toml;
+
 #[cfg(feature = "yaml")]
 pub use deserialize::deserialize_yaml;
+
 pub(crate) use deserialize::Deserializers;
-pub use deserialize::{deserialize_json, Deserialize};
 
 mod resolve;
 #[cfg(feature = "http")]

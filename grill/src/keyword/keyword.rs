@@ -45,7 +45,7 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
         ctx: &'i mut Context,
         schema: &'v Value,
         structure: Structure,
-    ) -> Result<Option<output::Node<'v>>, EvaluateError>;
+    ) -> Result<Option<output::Output<'v>>, EvaluateError>;
     #[allow(unused_variables)]
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
         let v = vec![String::new()];
@@ -111,21 +111,6 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     /// # Convention
     /// Exactly one `Keyword` must implement the method `is_pertinent_to` for a given `Dialect`.
     ///
-    /// # Example
-    /// ```rust
-    /// use grill::json_schema::draft_2020_12::SchemaKeyword;
-    ///
-    /// let schema = serde_json::json!({
-    ///     "$schema": "https://json-schema.org/draft/2020-12/schema
-    /// });
-    ///
-    /// let is_pertinent_to = SchemaKeyword.is_pertinent_to(&schema);
-    /// assert!(is_pertinent_to);
-    ///
-    /// let schema = serde_json::json!({"$schema": "https://json-schema.org/draft/2019-09/schema" });
-    /// let is_pertinent_to = SchemaKeyword.is_pertinent_to(&schema);
-    /// assert!(!is_pertinent_to);
-    /// ```
     #[allow(unused_variables)]
     fn is_pertinent_to(&self, schema: &Value) -> Result<bool, Unimplemented> {
         Err(Unimplemented)

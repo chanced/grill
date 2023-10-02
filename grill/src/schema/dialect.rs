@@ -26,13 +26,13 @@ use super::{Anchor, Reference};
 
 pub struct Builder {
     id: AbsoluteUri,
-    metaschemas: Vec<(AbsoluteUri, Value)>,
+    metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
     keywords: Vec<Box<dyn Keyword>>,
 }
 
 impl Builder {
     #[must_use]
-    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Value) -> Self {
+    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
         self.metaschemas.push((id, schema));
         self
     }
@@ -42,12 +42,12 @@ impl Builder {
         self.keywords.push(Box::new(keyword));
         self
     }
-    pub fn build(mut self) -> Result<Dialect, DialectError> {
+    pub fn build(self) -> Result<Dialect, DialectError> {
         Dialect::new(self.id, self.metaschemas, self.keywords)
     }
 }
 
-/// A set of keywords and semantics which are used to evaluate a [`Value`](serde_json::Value) against a
+/// A set of keywords and semantics which are used to evaluate a [`Value`] against a
 /// schema.
 #[derive(Clone)]
 pub struct Dialect {
@@ -124,7 +124,7 @@ impl Dialect {
     /// able, return the primary identifier.
     ///
     /// Secondary identifiers are determined by
-    /// [`Keyword`](crate::keyword::Keyword)s index `2` and greater.
+    /// [`Keyword`]s index `2` and greater.
     pub fn identify(
         &self,
         mut base_uri: AbsoluteUri,
@@ -138,8 +138,10 @@ impl Dialect {
         let mut primary = None;
         let mut secondary_uris = Vec::new();
 
-        for idx in self.identify_indexes.iter().cloned() {
-            let Some(id) = self.keywords[idx as usize].identify(schema).unwrap()? else { continue };
+        for idx in self.identify_indexes.iter().copied() {
+            let Some(id) = self.keywords[idx as usize].identify(schema).unwrap()? else {
+                continue;
+            };
             if id.is_primary() && primary.is_none() {
                 let uri = id.take_uri();
                 base_uri = base_uri.resolve(&uri)?;
@@ -168,9 +170,9 @@ impl Dialect {
         self.subschemas_indexes
             .iter()
             .flat_map(|&idx| self.keywords[idx as usize].subschemas(source).unwrap())
-            .map(|mut p| {
+            .map(|p| {
                 let mut path = path.clone();
-                path.append(&mut p);
+                path.append(&p);
                 path
             })
             .collect()
@@ -279,8 +281,8 @@ impl<'d> Deref for Dialects<'d> {
 
 impl<'i> Dialects<'i> {
     pub fn new(
-        dialects: Vec<Cow<Dialect>>,
-        default: Option<&AbsoluteUri>,
+        dialects: Vec<Cow<'static, Dialect>>,
+        default: Option<AbsoluteUri>,
     ) -> Result<Self, DialectsError> {
         if dialects.is_empty() {
             return Err(DialectsError::Empty);
@@ -293,14 +295,14 @@ impl<'i> Dialects<'i> {
             }
             if lookup.contains_key(&dialect.id) {
                 return Err(DialectsError::Duplicate(DialectExistsError {
-                    id: dialect.id,
+                    id: dialect.id.clone(),
                 }));
             }
             let id = dialect.id.clone();
             collected.push(dialect);
             lookup.insert(id, i);
         }
-        let default = Self::find_primary(&collected, &lookup, default)?;
+        let default = Self::find_primary(&collected, &lookup, default.as_ref())?;
         Ok(Self {
             dialects: Cow::Owned(collected),
             default,
@@ -333,7 +335,9 @@ impl<'i> Dialects<'i> {
     /// Returns the [`DialectExists`] if a `Dialect` already exists with the same `id`.
     pub fn push(&mut self, dialect: Cow<'static, Dialect>) -> Result<(), DialectExistsError> {
         if self.contains(&dialect.id) {
-            return Err(DialectExistsError { id: dialect.id });
+            return Err(DialectExistsError {
+                id: dialect.id.clone(),
+            });
         }
         self.dialects.to_mut().push(dialect);
         Ok(())
@@ -387,7 +391,7 @@ impl<'i> Dialects<'i> {
 
     /// Returns a slice of [`Dialect`](`crate::dialect::Dialect`).
     #[must_use]
-    pub fn as_slice(&self) -> &[Dialect] {
+    pub fn as_slice(&self) -> &[Cow<'static, Dialect>] {
         &self.dialects
     }
 
@@ -398,7 +402,7 @@ impl<'i> Dialects<'i> {
         self.default
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
-    pub fn iter(&'i self) -> std::slice::Iter<'i, Dialect> {
+    pub fn iter(&'i self) -> std::slice::Iter<'i, Cow<'static, Dialect>> {
         self.dialects.iter()
     }
 
@@ -465,16 +469,15 @@ impl<'i> Dialects<'i> {
     pub fn as_borrowed(&'i self) -> Dialects<'i> {
         Dialects {
             dialects: Cow::Borrowed(self.dialects.as_ref()),
-            lookup: Cow::Borrowed(self.lookup.as_ref()),
             default: self.default,
         }
     }
 }
 
 impl<'d> IntoIterator for &'d Dialects<'d> {
-    type Item = &'d Dialect;
+    type Item = &'d Cow<'static, Dialect>;
 
-    type IntoIter = std::slice::Iter<'d, Dialect>;
+    type IntoIter = std::slice::Iter<'d, Cow<'static, Dialect>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.dialects.iter()

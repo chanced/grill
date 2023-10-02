@@ -551,13 +551,10 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn with_json_schema_2020_12() -> Builder {
+    pub fn json_schema_2020_12() -> Builder {
         Builder::default()
             .json_schema_2020_12()
-            .with_default_dialect(
-                json_schema::draft_2020_12::JSON_SCHEMA_2020_12_ABSOLUTE_URI.clone(),
-            )
-            .unwrap()
+            .default_dialect(json_schema::draft_2020_12::dialect())
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
@@ -565,12 +562,12 @@ impl Interrogator {
     #[must_use]
     #[allow(unused_must_use)]
     pub fn json_schema_2019_09() -> Builder {
-        Builder::default()
-            .json_schema_2019_09()
-            .with_default_dialect(
-                json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
-            )
-            .unwrap()
+        // Builder::default()
+        //     .with_json_schema_2019_09()
+        //     .with_default_dialect(
+        //         json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
+        //     )
+        todo!()
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 07 [`Dialect`] that is
@@ -578,10 +575,11 @@ impl Interrogator {
     #[must_use]
     #[allow(unused_must_use)]
     pub fn json_schema_07() -> Builder {
-        Builder::default()
-            .json_schema_07()
-            .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
-            .unwrap()
+        // Builder::default()
+        //     .with_json_schema_07()
+        //     .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
+        //     .unwrap()
+        todo!()
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 04 [`Dialect`] that is
@@ -589,11 +587,11 @@ impl Interrogator {
     #[must_use]
     #[allow(unused_must_use)]
     pub fn json_schema_04() -> Builder {
-        // safety: &AbsoluteUri::try_into_absolute_uri never returns an error
-        Builder::default()
-            .json_schema_04()
-            .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
-            .unwrap()
+        // Builder::default()
+        //     .with_json_schema_04()
+        //     .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
+        //     .unwrap()
+        todo!()
     }
     /// Starts a new transaction.
     fn start_txn(&mut self) {

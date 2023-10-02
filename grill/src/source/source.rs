@@ -4,7 +4,6 @@ use crate::error::{
 };
 use crate::{
     error::{DeserializeError, SourceError},
-    schema::Metaschema,
     uri::AbsoluteUri,
 };
 
@@ -90,12 +89,6 @@ impl Src {
             Self::String(_, s) => Some(s),
             Self::Value(_, _) => None,
         }
-    }
-}
-
-impl From<&Metaschema> for Src {
-    fn from(value: &Metaschema) -> Self {
-        Self::Value(value.id.clone(), value.schema.clone())
     }
 }
 

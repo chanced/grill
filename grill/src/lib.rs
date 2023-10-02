@@ -9,7 +9,6 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::result_large_err,
-    clippy::large_enum_variant,
     clippy::enum_glob_use,
     clippy::implicit_hasher,
     clippy::needless_pass_by_value,
@@ -63,6 +62,44 @@ pub mod test;
 
 pub mod big;
 
-// mod integration;
-// pub use integration::Integration;
 
+/// Returns a string literal of the supplied JSON.
+/// 
+/// # Example
+/// ```rust
+/// # use grill_macros::json_str;
+/// let s = json_str!({"foo": "str", "bar": [34, 72]});
+/// assert_eq!(s, r#"{"foo":"str","bar":[34,72]}"#);
+/// ```
+#[macro_export]
+macro_rules! json_str {
+    ($($json:tt)+) => {
+        grill_macros::json_str($($json)+)
+    };
+}
+
+/// Returns a pretty-printed string literal of the supplied JSON.
+/// 
+/// ```rust
+/// # use grill_macros::json_pretty_str;
+/// let s = json_pretty_str!({
+///     "foo": "str",
+///     "bar": [
+///         34,
+///         72
+///     ]
+/// });
+/// assert_eq!(s, r#"{
+///     "foo": "str",
+///     "bar": [
+///         34,
+///         72
+///     ]
+/// }"#);
+/// ```
+#[macro_export]
+macro_rules! json_pretty_str {
+    ($($json:tt)+) => {
+        grill_macros::json_pretty_str($($json)+)
+    };
+}

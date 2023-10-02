@@ -6,8 +6,8 @@ use serde_json::Value;
 use crate::{
     keyword,
     keyword::{Compile, Context, Keyword, RationalKey, ValueKey},
-    output::{self},
-    Schema,
+    output::{self, Detail},
+    Output, Schema,
 };
 
 /// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
@@ -34,7 +34,9 @@ impl Keyword for ConstKeyword {
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
-        let Some(c) = schema.get(keyword::CONST) else { return Ok(false) };
+        let Some(c) = schema.get(keyword::CONST) else {
+            return Ok(false);
+        };
         if let Value::Number(n) = c {
             let rat = compile.rational(n)?;
             self.expected_key = Some(Either::Right(rat));
@@ -49,7 +51,7 @@ impl Keyword for ConstKeyword {
         ctx: &'i mut Context,
         value: &'v Value,
         _structure: crate::Structure,
-    ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
+    ) -> Result<Option<Output<'v>>, crate::error::EvaluateError> {
         todo!()
     }
 }
@@ -121,12 +123,20 @@ pub struct ConstInvalid<'v> {
     pub expected: Value,
     pub actual: Cow<'v, Value>,
 }
-// impl Display for ConstInvalid<'_> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "expected {}, found {}", self.actual, self.expected)
-//     }
-// }
-// impl<'v> ValidationError<'v> for ConstInvalid<'v> {}
+
+impl std::fmt::Display for ConstInvalid<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "expected {}, found {}", self.actual, self.expected)
+    }
+}
+impl<'v> Detail<'v> for ConstInvalid<'v> {
+    fn make_owned(self: Box<Self>) -> Box<dyn Detail<'static>> {
+        Box::new(ConstInvalid {
+            expected: self.expected,
+            actual: Cow::Owned(self.actual.into_owned()),
+        })
+    }
+}
 
 // #[cfg(test)]
 // mod tests {

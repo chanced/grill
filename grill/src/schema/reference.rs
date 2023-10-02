@@ -19,9 +19,6 @@ use crate::{source::SourceKey, AbsoluteUri, Key};
 pub struct Reference {
     pub(crate) src_key: SourceKey,
     /// Key to the referenced [`Schema`]
-    ///
-    /// [`Keyword`]s should use [`Reference::new`](`Reference::new`) or set this to [`Default::default`]
-    ///
     pub key: Key,
     /// Path to the $ref, $dynamicRef, $recursiveRef, etc
     pub ref_path: Pointer,

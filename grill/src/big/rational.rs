@@ -118,8 +118,7 @@ impl<'a> Parser<'a> {
         let integer = BigInt::from_str(parser.integer()).unwrap();
         let fraction = parser
             .fraction()
-            .map(|f| BigInt::from_str(f).unwrap())
-            .unwrap_or(BigInt::zero());
+            .map_or(BigInt::zero(), |f| BigInt::from_str(f).unwrap());
 
         let denom = parser
             .fraction()
@@ -159,7 +158,9 @@ impl<'a> Parser<'a> {
     }
 
     fn integer(&self) -> &str {
-        let Some(start) = self.integer_index else { return "0" };
+        let Some(start) = self.integer_index else {
+            return "0";
+        };
         let end = self
             .fraction_index
             .or(self.exponent_index)

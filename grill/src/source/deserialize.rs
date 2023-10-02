@@ -3,7 +3,6 @@
 use std::{collections::HashMap, ops::Deref};
 
 use dyn_clone::{clone_trait_object, DynClone};
-use inherent::inherent;
 use serde_json::Value;
 
 use crate::error::DeserializeError;
@@ -15,12 +14,10 @@ use crate::error::DeserializeError;
 /// - [`deserialize_json`](`deserialize_json`): Deserializes JSON data. Always enabled.
 /// - [`deserialize_yaml`](`deserialize_yaml`): Deserializes YAML data. Enabled with the `"yaml"` feature.
 /// - [`deserialize_toml`](`deserialize_toml`): Deserializes TOML data. Enabled with the `"toml"` feature.
-
 /// # Example
 /// Implementing a custom deserializer for a format that has serde integration
 /// is straightforward. `Deserializer` is implemented for `Fn(&str) ->
-/// Result<Value, erased_serde::Error>`, so it is as simple as a few lines of
-/// code:
+/// Result<Value, erased_serde::Error>`:
 /// ```rust
 /// pub fn deserialize_yaml(data: &str) -> Result<serde_json::Value, erased_serde::Error> {
 ///     use erased_serde::Deserializer;
@@ -28,11 +25,11 @@ use crate::error::DeserializeError;
 ///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
 /// }
 /// ```
-pub trait Deserialize: DynClone + Send + Sync + 'static {
+pub trait Deserializer: DynClone + Send + Sync + 'static {
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
-clone_trait_object!(Deserialize);
-impl<F> Deserialize for F
+clone_trait_object!(Deserializer);
+impl<F> Deserializer for F
 where
     F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,
 {
@@ -43,7 +40,7 @@ where
 
 #[derive(Clone)]
 pub struct Deserializers {
-    deserializers: Vec<(&'static str, Box<dyn Deserialize>)>,
+    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
 }
 impl std::fmt::Debug for Deserializers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,8 +51,11 @@ impl std::fmt::Debug for Deserializers {
 }
 
 impl Deserializers {
-    pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserialize>)>) -> Self {
-        if deserializers.is_empty() {
+    pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserializer>)>) -> Self {
+        if !deserializers
+            .iter()
+            .any(|(name, _)| name.to_lowercase() == "json")
+        {
             deserializers.push(("json", Box::new(deserialize_json)));
         }
         Self { deserializers }
@@ -74,7 +74,7 @@ impl Deserializers {
     }
 }
 impl Deref for Deserializers {
-    type Target = [(&'static str, Box<dyn Deserialize>)];
+    type Target = [(&'static str, Box<dyn Deserializer>)];
 
     fn deref(&self) -> &Self::Target {
         &self.deserializers

@@ -1,9 +1,10 @@
 [workspace]
-members  = ["grill", "tests"]
+members  = ["grill", "grill-macros", "tests"]
 resolver = "2"
 
 [workspace.dependencies]
-grill = { path = "grill" }
+grill        = { path = "grill" }
+grill-macros = { path = "grill-macros" }
 
 anyhow           = { version = "1.0.75" }
 anymap           = { version = "1.0.0-beta.2" }

@@ -1,4 +1,7 @@
-use std::{any, borrow::Borrow};
+use std::{
+    any,
+    borrow::{Borrow, Cow},
+};
 
 use serde_json::Value;
 
@@ -7,7 +10,7 @@ use crate::{
     json_schema,
     keyword::{Numbers, Values},
     schema::{dialect::Dialects, Dialect, Schemas},
-    source::{deserialize_json, Deserialize, Deserializers, Resolve, Resolvers, Sources, Src},
+    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator,
 };
@@ -16,11 +19,11 @@ use super::state::State;
 
 /// Constructs an [`Interrogator`].
 pub struct Builder {
-    dialects: Vec<Dialect>,
+    dialects: Vec<Cow<'static, Dialect>>,
     sources: Vec<Src>,
-    primary_dialect: Option<AbsoluteUri>,
+    default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
-    deserializers: Vec<(&'static str, Box<dyn Deserialize>)>,
+    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     state: State,
 }
 
@@ -38,38 +41,26 @@ impl Builder {
             resolvers: Vec::new(),
             deserializers: Vec::new(),
             state: State::new(),
-            primary_dialect: None,
+            default_dialect_idx: None,
         }
     }
 }
 impl Builder {
     #[must_use]
-    pub fn dialect(mut self, dialect: Dialect) -> Self {
+    pub fn dialect(mut self, dialect: Cow<'static, Dialect>) -> Self {
+        let idx = self.dialects.len();
         self.dialects.push(dialect);
+        if self.default_dialect_idx.is_none() {
+            self.default_dialect_idx = Some(idx);
+        }
         self
     }
-
-    /// Sets the default dialect to use when a `$schema` is not provided.
-    ///
-    /// If not set, the first `Dialect` added to the `Builder` is used.
-    ///
-    /// # Example
-    /// ```
-    /// use grill::{Builder, json_schema_2020_12_absolute_uri};
-    ///
-    /// let interrogator = Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .with_default_dialect(json_schema_2020_12_absolute_uri())
-    ///     .build()
-    ///     .unwrap()
-    /// ```
-    pub fn with_default_dialect(
-        mut self,
-        dialect: impl TryIntoAbsoluteUri,
-    ) -> Result<Self, UriError> {
-        let dialect = dialect.try_into_absolute_uri()?;
-        self.primary_dialect = Some(dialect);
-        Ok(self)
+    #[must_use]
+    pub fn default_dialect(mut self, dialect: Cow<'static, Dialect>) -> Self {
+        let idx = self.dialects.len();
+        self.dialects.push(dialect);
+        self.default_dialect_idx = Some(idx);
+        self
     }
 
     /// Adds a source schema from a slice of bytes that will be deserialized
@@ -251,26 +242,25 @@ impl Builder {
     /// Adds JSON Schema 04 [`Dialect`]
     #[must_use]
     pub fn json_schema_04(self) -> Self {
-        self.dialect(json_schema::draft_04::JSON_SCHEMA_04.clone())
+        self.dialect(Cow::Borrowed(json_schema::draft_04::dialect()))
     }
 
     /// Adds JSON Schema 07 [`Dialect`]
     #[must_use]
     pub fn json_schema_07(self) -> Self {
-        self.dialect(json_schema::draft_07::JSON_SCHEMA_07.clone())
+        self.dialect(Cow::Borrowed(json_schema::draft_07::dialect()))
     }
 
     /// Adds JSON Schema 2019-09 [`Dialect`]
     #[must_use]
     pub fn json_schema_2019_09(self) -> Self {
-        self.dialect(json_schema::draft_2019_09::JSON_SCHEMA_2019_09.clone())
+        self.dialect(Cow::Borrowed(json_schema::draft_2019_09::dialect()))
     }
 
     /// Adds JSON Schema 2020-12 [`Dialect`]
     #[must_use]
     pub fn json_schema_2020_12(self) -> Self {
-        // self.dialect(json_schema::draft_2020_12::JSON_SCHEMA_2020_12.clone())
-        todo!()
+        self.dialect(json_schema::draft_2020_12::dialect())
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -284,35 +274,38 @@ impl Builder {
         self
     }
 
-    /// Adds JSON source [`Deserializer`] [`deserialize::json`](`crate::deserialize::json`)
+    /// Enables support for deserializing JSON with
+    /// [`deserialize_json`](`crate::deserialize::deserialize_json`)
     #[must_use]
-    pub fn with_json_support(self) -> Self {
+    pub fn deserialize_json(self) -> Self {
         self.deserializer("json", deserialize_json)
     }
 
-    /// Adds TOML source [`Deserializer`] [`deserialize::toml`](`crate::deserialize::toml`)
+    /// Enables support for deserializing TOML with
+    /// [`deserialize_toml`](`crate::deserialize::deserialize_toml`)
     #[cfg(feature = "toml")]
     #[must_use]
     pub fn toml_support(self) -> Self {
         self.deserializer("toml", crate::source::deserialize_toml)
     }
 
-    /// Adds YAML source [`Deserializer`] [`deserialize::yaml`](`crate::deserialize::yaml`)
+    /// Enables support for deserializing YAML with
+    /// [`deserialize_yaml`](`crate::deserialize::deserialize_yaml`)
     #[cfg(feature = "yaml")]
     #[must_use]
     pub fn yaml_support(self) -> Self {
         self.deserializer("yaml", crate::source::deserialize_yaml)
     }
 
-    /// Inserts a source [`Deserializer`]. If a [`Deserializer`] for the given
-    /// format eists, it will be replaced.
+    /// Add an implementation [`Deserializer`]. If a `Deserializer` for the
+    /// given format exists, it will be replaced.
     ///
-    /// If a `Deserializer` is not provided prior to invoking [`build`](`Builder::build`), the default
-    /// [`json`] [`Deserializer`] will be added.
+    /// [`deserialize_json`] will be enabled by default.
+    ///.
     #[must_use]
     pub fn deserializer<R>(mut self, format: &'static str, deserializer: R) -> Self
     where
-        R: 'static + Deserialize,
+        R: 'static + Deserializer,
     {
         let f = format.to_lowercase();
         for (idx, (fmt, _)) in self.deserializers.iter().enumerate() {
@@ -331,11 +324,13 @@ impl Builder {
             mut sources,
             resolvers,
             deserializers,
-            primary_dialect,
+            default_dialect_idx,
             state,
         } = self;
-
-        let dialects = Dialects::new(dialects, primary_dialect.as_ref())?;
+        let default_dialect_id = default_dialect_idx
+            .as_ref()
+            .map(|idx| dialects[*idx].id().clone());
+        let dialects = Dialects::new(dialects, default_dialect_id)?;
         sources.append(&mut dialects.sources());
         let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(sources, &deserializers)?;

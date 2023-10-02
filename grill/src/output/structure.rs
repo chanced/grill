@@ -146,7 +146,6 @@ pub enum Structure {
     ///
     Detailed,
     Verbose,
-    Complete,
 }
 
 impl Structure {
@@ -180,13 +179,5 @@ impl Structure {
     #[must_use]
     pub fn is_verbose(&self) -> bool {
         matches!(self, Self::Verbose)
-    }
-
-    /// Returns `true` if the structure is [`Complete`].
-    ///
-    /// [`Complete`]: Structure::Complete
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        matches!(self, Self::Complete)
     }
 }

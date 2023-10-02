@@ -1,5 +1,5 @@
 #[doc(no_inline)]
-pub use crate::output::ValidationError;
+pub use crate::output::Detail;
 
 pub use crate::keyword::Unimplemented;
 

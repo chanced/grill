@@ -51,7 +51,8 @@ where
             return Ok(*key);
         }
         let value = V::parse(num.as_str())?;
-        for (key, val) in self.table.iter() {
+
+        for (key, val) in &self.table {
             if val == &value {
                 return Ok(key);
             }

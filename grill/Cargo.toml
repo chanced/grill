@@ -19,6 +19,7 @@ dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }
 fancy-regex      = { workspace = true }
+grill-macros     = { path = "../grill-macros" }
 inherent         = { workspace = true }
 jsonptr          = { workspace = true }
 lazy_static      = { workspace = true }
