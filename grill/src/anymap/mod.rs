@@ -1,9 +1,10 @@
-// AnyMap, TypIdHasher, and Downcast was sourced (and modified) from the anymap
-// crate:
-// https://github.com/chris-morgan/anymap/blob/2e9a570491664eea18ad61d98aa1c557d5e23e67/src/any.rs
-// The anymap crate is licensed under BlueOak-1.0.0 OR MIT OR Apache-2.0
-// The reason this was lifted rather than using anymap directly is due to `Downcast` not being exposed.
-// unsafe code can be removed once dyn upcasting is stable: https://github.com/rust-lang/rust/issues/65991
+//! [`AnyMap`] was sourced from the [anymap
+//! crate](https://crates.io/crates/anymap).
+//!
+//! The anymap crate is licensed under BlueOak-1.0.0 OR MIT OR Apache-2.0 The
+//! reason this was lifted rather than using anymap directly is due to
+//! `Downcast` not being exposed. unsafe code can be removed once dyn upcasting
+//! is stable: <https://github.com/rust-lang/rust/issues/65991>
 
 use std::{
     any::{Any, TypeId},
@@ -40,7 +41,7 @@ impl Downcast for dyn Item {
     }
 }
 
-type AnyMap = HashMap<TypeId, Box<dyn Item>, BuildHasherDefault<TypeIdHasher>>;
+type Map = HashMap<TypeId, Box<dyn Item>, BuildHasherDefault<TypeIdHasher>>;
 
 #[derive(Default)]
 struct TypeIdHasher(u64);
@@ -61,10 +62,10 @@ impl Hasher for TypeIdHasher {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct State {
-    map: AnyMap,
+pub struct AnyMap {
+    map: Map,
 }
-impl State {
+impl AnyMap {
     #[must_use]
     pub fn new() -> Self {
         Self::default()

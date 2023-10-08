@@ -1,6 +1,5 @@
-pub mod const_keyword;
-pub mod enum_keyword;
-pub mod id_keyword;
+pub use super::common::id;
+pub use super::common::schema;
 
 use super::metaschema;
 use crate::schema::Dialect;

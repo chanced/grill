@@ -1,22 +1,10 @@
 //! JSON Schema dialect implementations 04, 07, 2019-09, 2020-12.
 
+pub mod common;
 pub mod draft_04;
 pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
-
-use crate::uri::{AsUriRef, Url};
-
-fn is_uri_for(target: &Url, other: impl AsUriRef) -> bool {
-    let Some(u) = other.as_uri_ref().as_url() else {
-        return false;
-    };
-    let scheme = u.scheme();
-    (scheme == "https" || scheme == "http")
-        && u.domain() == target.domain()
-        && u.path() == target.path()
-        && u.fragment().unwrap_or_default().is_empty()
-}
 
 macro_rules! metaschema {
     (

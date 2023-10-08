@@ -6,7 +6,7 @@ use num::{pow, BigInt, BigRational, One, Zero};
 use crate::error::NumberError;
 
 pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
-    Parser::parse(value)
+    Parser::parse(value.as_ref())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -211,11 +211,6 @@ mod tests {
         }
     }
 
-    #[allow(clippy::unnecessary_box_returns)]
-    fn b<T: 'static>(t: T) -> Box<T> {
-        Box::new(t)
-    }
-
     fn assert_state_change(state: State, input: &str, expected: State) {
         let result = input.chars().fold(state, State::next);
         assert_eq!(
@@ -229,14 +224,6 @@ mod tests {
         assert_eq!(
             result, expected,
             "\n\nstate: {state:?}\ninput: \'{input:?}\'\nexpected: {expected:?}\nresult: {result:?}\n\n"
-        );
-    }
-
-    fn assert_failed_transition(state: State, input: char) {
-        assert!(
-            std::panic::catch_unwind(|| state.next(input)).is_err(),
-            "state: {state:?}\ninput: \'{input:?}\'\nexpected: panic\nresult: {:?}\n* \n",
-            state.next(input)
         );
     }
 }

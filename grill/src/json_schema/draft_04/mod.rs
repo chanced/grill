@@ -1,3 +1,6 @@
+pub use super::common::id;
+pub use super::common::schema;
+
 use crate::schema::Dialect;
 
 use super::metaschema;

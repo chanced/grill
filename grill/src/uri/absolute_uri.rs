@@ -247,6 +247,11 @@ impl AbsoluteUri {
         Ok(prev)
     }
 
+    #[must_use]
+    pub fn is_fragment_empty_or_none(&self) -> bool {
+        self.fragment().map_or(true, |f| f.trim().is_empty())
+    }
+
     /// returns a new `AbsoluteUri` that is the result of resolving the given
     /// reference against this `AbsoluteUri`.
     ///
@@ -329,7 +334,7 @@ impl AbsoluteUri {
         let scheme = scheme.trim_end_matches('/').trim_end_matches(':');
 
         let prev = self.scheme().to_string();
-        let to_uri_err = |_| UriError::InvalidScheme(scheme.to_string());
+        let to_uri_err = |()| UriError::InvalidScheme(scheme.to_string());
         match self {
             AbsoluteUri::Url(url) => {
                 if scheme == "urn" {
@@ -459,7 +464,7 @@ impl TryFrom<&Uri> for AbsoluteUri {
 }
 impl PartialOrd for AbsoluteUri {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        PartialOrd::partial_cmp(self.as_str(), other.as_str())
+        Some(self.cmp(other))
     }
 }
 

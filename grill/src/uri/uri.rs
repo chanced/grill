@@ -211,6 +211,11 @@ impl Uri {
         }
     }
 
+    #[must_use]
+    pub fn is_fragment_empty_or_none(&self) -> bool {
+        self.fragment().map_or(true, |f| f.trim().is_empty())
+    }
+
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UriError> {
@@ -540,7 +545,7 @@ impl Deref for Uri {
 
 impl PartialOrd for Uri {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        PartialOrd::partial_cmp(self.as_str(), other.as_str())
+        Some(self.cmp(other))
     }
 }
 

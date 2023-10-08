@@ -1,12 +1,15 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
-use either::Either;
+use crate::big::parse_rational;
+use crate::keyword::{define_translate, Kind};
+use num_rational::BigRational;
 use serde_json::Value;
 
+use crate::output::Error as OutputError;
+
 use crate::{
-    keyword,
-    keyword::{Compile, Context, Keyword, RationalKey, ValueKey},
-    output::{self, Detail},
+    error::EvaluateError,
+    keyword::{self, Compile, Context},
     Output, Schema,
 };
 
@@ -16,19 +19,27 @@ use crate::{
 ///
 /// An instance validates successfully against this keyword if its value is
 /// equal to the value of the keyword.
-#[derive(Default, Clone, Debug)]
-pub struct ConstKeyword {
-    pub expected_key: Option<Either<ValueKey, RationalKey>>,
+#[derive(Clone, Debug)]
+pub struct Keyword {
+    pub expected: Arc<Value>,
+    pub expected_number: Option<Arc<BigRational>>,
+    pub translate: Translate,
 }
 
-impl ConstKeyword {
+impl Keyword {
     #[must_use]
-    pub fn new() -> ConstKeyword {
-        Self::default()
+    pub fn new(translate: Option<Translate>) -> Keyword {
+        Self {
+            expected: Arc::new(Value::Null),
+            expected_number: None,
+            translate: translate.unwrap_or(Translate::Pointer(translate_en)),
+        }
     }
 }
-
-impl Keyword for ConstKeyword {
+impl keyword::Keyword for Keyword {
+    fn kind(&self) -> Kind {
+        keyword::CONST.into()
+    }
     fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
@@ -37,12 +48,11 @@ impl Keyword for ConstKeyword {
         let Some(c) = schema.get(keyword::CONST) else {
             return Ok(false);
         };
+        let expected = compile.value(c);
+        self.expected = expected;
         if let Value::Number(n) = c {
-            let rat = compile.rational(n)?;
-            self.expected_key = Some(Either::Right(rat));
-        } else {
-            let val = compile.value(c);
-            self.expected_key = Some(Either::Left(val));
+            let number = compile.number(n)?;
+            self.expected_number = Some(number);
         }
         Ok(true)
     }
@@ -50,91 +60,70 @@ impl Keyword for ConstKeyword {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-        _structure: crate::Structure,
-    ) -> Result<Option<Output<'v>>, crate::error::EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
+        if let Value::Number(n) = value {
+            if let Some(expected_number) = self.expected_number.as_deref() {
+                let actual_number = parse_rational(n.as_str())?;
+                if &actual_number == expected_number {
+                    return Ok(Some(ctx.annotate(Cow::Borrowed(value))));
+                }
+                return Ok(Some(ctx.error(Error {
+                    expected: self.expected.clone(),
+                    actual: Cow::Borrowed(value),
+                    translate: self.translate.clone(),
+                })));
+            }
+        }
         todo!()
     }
 }
 
-// impl SyncKeyword for ConstKeyword {
-//     fn compile<'s>(
-//         &mut self,
-//         _compile: &mut crate::keyword::Compile<'s>,
-//         _schema: &'s serde_json::Value,
-//     ) -> Result<bool, crate::error::CompileError> {
-//         todo!()
-//     }
+define_translate!(Error);
 
-//     fn evaluate<'v>(
-//         &self,
-//         _scope: &mut Scope,
-//         _value: &'v serde_json::Value,
-//         _structure: crate::Structure,
-//     ) -> Result<Option<output::Node<'v>>, crate::error::EvaluateError> {
-//         todo!()
-//     }
-// }
-// impl From<ConstKeyword> for Keyword {
-//     fn from(value: ConstKeyword) -> Self {
-//         value.into_keyword()
-//     }
-// }
-// impl From<&ConstKeyword> for Keyword {
-//     fn from(value: &ConstKeyword) -> Self {
-//         value.clone().into_keyword()
-//     }
-// }
-// impl SyncKeyword for ConstKeyword {
-//     fn compile<'s>(
-//         &mut self,
-//         _compiler: &mut crate::Compiler<'s>,
-//         schema: &'s Schema,
-//     ) -> Result<bool, crate::error::SetupError> {
-//         match schema {
-//             Schema::Object(obj) if obj.constant.is_some() => {
-//                 self.expected = obj.constant.clone();
-//                 Ok(true)
-//             }
-//             _ => Ok(false),
-//         }
-//     }
-//     fn evaluate<'v>(
-//         &self,
-//         scope: &mut crate::Scope,
-//         schema: &CompiledSchema,
-//         value: &'v serde_json::Value,
-//         _structure: crate::Structure,
-//     ) -> Result<Option<crate::output::Annotation<'v>>, Box<dyn snafu::Error>> {
-//         let expected = self.expected.as_ref().unwrap();
-//         let mut annotation = scope.annotate("const", value);
-//         if value != expected {
-//             annotation.error(ConstInvalid {
-//                 actual: value,
-//                 expected: expected.clone(),
-//             });
-//         }
-//         Ok(Some(annotation))
-//     }
-// }
+pub fn translate_en(f: &mut std::fmt::Formatter<'_>, error: &Error<'_>) -> std::fmt::Result {
+    write!(f, "expected {}, found {}", error.expected, error.actual)
+}
 
 /// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstKeyword`].
 #[derive(Clone, Debug)]
-pub struct ConstInvalid<'v> {
-    pub expected: Value,
+pub struct Error<'v> {
+    pub expected: Arc<Value>,
     pub actual: Cow<'v, Value>,
+    pub translate: Translate,
 }
 
-impl std::fmt::Display for ConstInvalid<'_> {
+impl<'v> std::fmt::Display for Error<'v> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "expected {}, found {}", self.actual, self.expected)
     }
 }
-impl<'v> Detail<'v> for ConstInvalid<'v> {
-    fn make_owned(self: Box<Self>) -> Box<dyn Detail<'static>> {
-        Box::new(ConstInvalid {
-            expected: self.expected,
-            actual: Cow::Owned(self.actual.into_owned()),
-        })
+
+impl<'v> OutputError<'v> for Error<'v> {
+    fn make_owned(self: Box<Self>) -> Box<dyn OutputError<'static>> {
+        match self.actual {
+            Cow::Borrowed(actual) => Box::new(Error {
+                translate: self.translate,
+                expected: self.expected,
+                actual: Cow::Owned(actual.clone()),
+            }) as Box<dyn OutputError<'static>>,
+            Cow::Owned(actual) => Box::new(Error {
+                actual: Cow::Owned(actual),
+                expected: self.expected,
+                translate: self.translate,
+            }) as Box<dyn OutputError<'static>>,
+        }
+    }
+
+    fn translate_error(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        lang: &crate::output::Translations,
+    ) -> std::fmt::Result {
+        if let Some(translate) = lang.get::<Translate>() {
+            translate.run(f, self)
+        } else {
+            self.translate.run(f, self)
+        }
     }
 }
 

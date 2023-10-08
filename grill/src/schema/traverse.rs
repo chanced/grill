@@ -357,6 +357,8 @@ type Instances<'i> =
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::*;
 
     use crate::{
@@ -659,7 +661,7 @@ mod tests {
     fn create_schema(uri: impl ToString, sources: &mut Sources) -> CompiledSchema {
         let uri: AbsoluteUri = create_test_uri(uri);
         let (_, link, _) = sources
-            .insert_value(uri.clone(), json!({"$id": uri.clone()}))
+            .insert_value(uri.clone(), Cow::Owned(json!({"$id": uri.clone()})))
             .unwrap();
         let metaschema = metaschema();
         CompiledSchema {

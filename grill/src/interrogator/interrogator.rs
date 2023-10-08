@@ -1,7 +1,5 @@
-use std::{borrow::Borrow, fmt::Debug, ops::Deref};
+use std::{borrow::Cow, fmt::Debug, ops::Deref};
 
-use num::BigInt;
-use num_rational::BigRational;
 use serde_json::Value;
 use tap::TapFallible;
 
@@ -11,7 +9,7 @@ use crate::{
         UnknownKeyError,
     },
     json_schema, keyword,
-    keyword::{IntKey, Numbers, RationalKey, Values},
+    keyword::{NumberCache, ValueCache},
     output::{Output, Structure},
     schema::{
         iter::{Iter, IterUnchecked},
@@ -25,7 +23,7 @@ use crate::{
     Builder,
 };
 
-use super::state::State;
+use crate::anymap::AnyMap;
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
@@ -35,10 +33,9 @@ pub struct Interrogator {
     pub(crate) resolvers: Resolvers,
     pub(crate) schemas: Schemas,
     pub(crate) deserializers: Deserializers,
-    pub(crate) rationals: Numbers<RationalKey, BigRational>,
-    pub(crate) ints: Numbers<IntKey, BigInt>,
-    pub(crate) values: Values,
-    pub(crate) state: State,
+    pub(crate) numbers: NumberCache,
+    pub(crate) values: ValueCache,
+    pub(crate) state: AnyMap,
 }
 
 impl Debug for Interrogator {
@@ -396,9 +393,12 @@ impl Interrogator {
 
         self.source(source)
     }
-    fn source(&mut self, source: Src) -> Result<&Value, SourceError> {
-        // self.sources.insert(source, &self.deserializers)
-        todo!()
+    fn source(&mut self, src: Src) -> Result<&Value, SourceError> {
+        match src {
+            Src::String(uri, s) => self.sources.insert_string(uri, s, &self.deserializers),
+            Src::Value(uri, v) => self.sources.insert_value(uri, v),
+        }
+        .map(|(key, _, _)| self.sources.get(key))
     }
 
     /// Adds a schema source from a `&str`
@@ -438,12 +438,9 @@ impl Interrogator {
     pub fn source_value(
         &mut self,
         uri: impl TryIntoAbsoluteUri,
-        source: impl Borrow<Value>,
+        source: Cow<'static, Value>,
     ) -> Result<&Value, SourceError> {
-        self.source(Src::Value(
-            uri.try_into_absolute_uri()?,
-            source.borrow().clone(),
-        ))
+        self.source(Src::Value(uri.try_into_absolute_uri()?, source))
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
@@ -528,14 +525,13 @@ impl Interrogator {
     /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
     ///
-    pub fn source_values<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
     where
         K: TryIntoAbsoluteUri,
-        V: Borrow<Value>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (K, Cow<'static, Value>)>,
     {
         for (k, v) in sources {
-            self.source(Src::Value(k.try_into_absolute_uri()?, v.borrow().clone()))?;
+            self.source(Src::Value(k.try_into_absolute_uri()?, v))?;
         }
         Ok(())
     }
@@ -554,7 +550,7 @@ impl Interrogator {
     pub fn json_schema_2020_12() -> Builder {
         Builder::default()
             .json_schema_2020_12()
-            .default_dialect(json_schema::draft_2020_12::dialect())
+            .default_dialect(Cow::Borrowed(json_schema::draft_2020_12::dialect()))
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is

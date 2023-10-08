@@ -55,10 +55,9 @@ pub struct Dialect {
     /// `metaschemas` with this `id`.
     id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
-    metaschemas: HashMap<AbsoluteUri, Value>,
+    metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>>,
     /// Set of [`Keyword`]s defined by the dialect.
     keywords: Box<[Box<dyn Keyword>]>,
-    is_pertinent_to_index: u16,
     identify_indexes: Box<[u16]>,
     dialect_indexes: Box<[u16]>,
     subschemas_indexes: Box<[u16]>,
@@ -85,28 +84,24 @@ impl Dialect {
     /// Creates a new [`Dialect`].
     fn new(
         id: AbsoluteUri,
-        metaschemas: Vec<(AbsoluteUri, Value)>,
+        metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
         keywords: Vec<Box<dyn Keyword>>,
     ) -> Result<Self, DialectError> {
-        let metaschemas: HashMap<AbsoluteUri, Value> = metaschemas.into_iter().collect();
+        let metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>> =
+            metaschemas.into_iter().collect();
         let keywords = keywords.into_boxed_slice();
-
         let identify_indexes = find_identify_indexes(&id, &keywords)?;
-        let is_pertinent_to_index = find_is_pertinent_to_index(&id, &keywords)?;
         let dialect_indexes = find_dialect_indexes(&id, &keywords)?;
         let subschemas_indexes = find_impl_indexes(&keywords, Keyword::subschemas);
         let anchors_indexes = find_impl_indexes(&keywords, Keyword::anchors);
         let references_indexes = find_impl_indexes(&keywords, Keyword::references);
-
         if !metaschemas.contains_key(&id) {
-            return Err(DialectError::DefaultNotFound(id.clone()));
+            return Err(DialectError::DefaultNotFound(id));
         }
-
         Ok(Self {
             id,
             metaschemas,
             keywords,
-            is_pertinent_to_index,
             identify_indexes,
             dialect_indexes,
             subschemas_indexes,
@@ -194,7 +189,7 @@ impl Dialect {
     pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
         let mut anchors = Vec::new();
         for res in self
-            .references_indexes
+            .anchors_indexes
             .iter()
             .copied()
             .map(|idx| self.keywords[idx as usize].anchors(source).unwrap())
@@ -214,9 +209,47 @@ impl Dialect {
     /// [`Keywords`](`crate::dialect::Keywords`).
     #[must_use]
     pub fn is_pertinent_to(&self, schema: &Value) -> bool {
-        self.keywords[self.is_pertinent_to_index as usize]
-            .is_pertinent_to(schema)
-            .unwrap()
+        for idx in &*self.dialect_indexes {
+            let idx = *idx as usize;
+            let dialect = self.keywords[idx].dialect(schema).unwrap();
+            if dialect.is_err() {
+                continue;
+            }
+            let dialect = dialect.unwrap();
+            if dialect.is_none() {
+                continue;
+            }
+            let dialect = dialect.unwrap();
+            if dialect == self.id {
+                return true;
+            }
+
+            let both_have_similar_fragments = (self.id.is_fragment_empty_or_none()
+                && dialect.is_fragment_empty_or_none())
+                || self.id.fragment() == dialect.fragment();
+
+            let is_http_or_https = |scheme: &str| scheme == "https" || scheme == "http";
+            let has_http_or_https_scheme = |uri: &AbsoluteUri| is_http_or_https(uri.scheme());
+            let both_are_http_or_https =
+                has_http_or_https_scheme(&self.id) && has_http_or_https_scheme(&dialect);
+
+            let both_are_urls = dialect.is_url() && self.id.is_url();
+            let both_have_same_paths = dialect.path_or_nss() == self.id.path_or_nss();
+            let both_have_same_queries = dialect.query() == self.id.query();
+            let both_have_same_namespaces =
+                dialect.authority_or_namespace() == self.id.authority_or_namespace();
+
+            if both_are_urls
+                && both_are_http_or_https
+                && both_have_same_paths
+                && both_have_same_queries
+                && both_have_same_namespaces
+                && both_have_similar_fragments
+            {
+                return true;
+            }
+        }
+        false
     }
 
     #[must_use]
@@ -227,7 +260,7 @@ impl Dialect {
 
     #[must_use]
     /// Returns the metaschemas of this `Dialect`.
-    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Value> {
+    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Cow<'static, Value>> {
         &self.metaschemas
     }
 
@@ -259,7 +292,6 @@ impl Debug for Dialect {
             .field("dialect_indexes", &self.dialect_indexes)
             .field("identify_indexes", &self.identify_indexes)
             .field("references_indexes", &self.references_indexes)
-            .field("is_pertinent_to_index", &self.is_pertinent_to_index)
             .field("subschemas_indexes", &self.subschemas_indexes)
             .finish_non_exhaustive()
     }
@@ -312,10 +344,15 @@ impl<'i> Dialects<'i> {
     /// Returns the [`Dialect`](crate::dialect::Dialect).
     #[must_use]
     pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect> {
+        self.index_of(id).map(|idx| self.dialects[idx].as_ref())
+    }
+
+    fn index_of(&self, id: &AbsoluteUri) -> Option<usize> {
         self.dialects
             .iter()
-            .find(|d| d.id == *id)
-            .map(|d| d.deref())
+            .enumerate()
+            .find(|(_, d)| d.id == *id)
+            .map(|(idx, _)| idx)
     }
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
     /// upon the first [`Keyword`] in each
@@ -326,7 +363,7 @@ impl<'i> Dialects<'i> {
         self.dialects
             .iter()
             .find(|&dialect| dialect.is_pertinent_to(schema))
-            .map(|d| d.deref())
+            .map(|d| &**d)
     }
 
     /// Appends a [`Dialect`].
@@ -347,11 +384,11 @@ impl<'i> Dialects<'i> {
     ///
     /// # Errors
     /// Returns the `Err(&'static str)` if the `Dialect` is not currently in this `Dialects`.
-    pub fn with_default(self, default: &Dialect) -> Result<Dialects<'i>, &'static str> {
-        let primary = self.get(&default.id).ok_or("dialect not found")?;
+    pub fn with_default(self, default: &AbsoluteUri) -> Result<Dialects<'i>, &'static str> {
+        let default = self.index_of(default).ok_or("Dialect not found")?;
         Ok(Dialects {
             dialects: self.dialects,
-            default: self.default,
+            default,
         })
     }
 
@@ -381,7 +418,7 @@ impl<'i> Dialects<'i> {
     #[must_use]
     pub(crate) fn sources(&self) -> Vec<Src> {
         let mut result = Vec::with_capacity(self.dialects.len());
-        for dialect in self.dialects.iter() {
+        for dialect in &*self.dialects {
             for metaschema in &dialect.metaschemas {
                 result.push(Src::Value(metaschema.0.clone(), metaschema.1.clone()));
             }
@@ -502,16 +539,6 @@ where
         .into_boxed_slice()
 }
 
-fn find_is_pertinent_to_index(
-    uri: &AbsoluteUri,
-    keywords: &[Box<dyn Keyword>],
-) -> Result<u16, DialectError> {
-    find_impl_indexes(keywords, Keyword::is_pertinent_to)
-        .first()
-        .copied()
-        .ok_or(DialectError::IsPertinentToNotImplemented(uri.clone()))
-}
-
 fn find_identify_indexes(
     uri: &AbsoluteUri,
     keywords: &[Box<dyn Keyword>],
@@ -535,4 +562,45 @@ fn find_dialect_indexes(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::borrow::Cow;
+
+    use serde_json::json;
+
+    use crate::{json_schema, keyword, AbsoluteUri, Uri};
+
+    use super::Dialect;
+
+    #[test]
+    fn test_is_pertinent_to() {
+        let valid = [
+            "http://json-schema.org/draft-04/schema#",
+            "http://json-schema.org/draft-04/schema",
+            "https://json-schema.org/draft-04/schema#",
+            "https://JSON-schema.org/draft-04/schema#",
+        ];
+        let invalid = [
+            "http://json-schema.org/draft-04/schema#fragmented",
+            "http://json-schema.org/draft-04",
+        ];
+        let id = crate::json_schema::draft_04::json_schema_04_uri();
+        let dialect = Dialect::builder(id.clone())
+            .with_metaschema(id.clone(), Cow::Owned(json!({})))
+            .with_keyword(json_schema::common::schema::Schema::new(
+                keyword::SCHEMA,
+                true,
+            ))
+            .with_keyword(json_schema::common::id::Id::new(keyword::ID, true))
+            .build()
+            .unwrap();
+
+        for valid in valid {
+            let schema = json!({ "$schema": valid });
+            assert!(dialect.is_pertinent_to(&schema));
+        }
+        for invalid in invalid {
+            let schema = json!({ "$schema": invalid });
+            assert!(!dialect.is_pertinent_to(&schema));
+        }
+    }
+}

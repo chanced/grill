@@ -5,9 +5,9 @@ use jsonptr::Pointer;
 use serde_json::Value;
 
 use crate::{
+    anymap::AnyMap,
     error::{CompileError, SourceError, UnknownAnchorError},
-    interrogator::state::State,
-    keyword::{BigInts, BigRationals, Compile, Keyword, Values},
+    keyword::{Compile, Keyword, NumberCache, ValueCache},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     AbsoluteUri, Interrogator, Key,
@@ -18,13 +18,12 @@ use super::{traverse::Traverse, CompiledSchema, Dialect, Reference};
 pub(crate) struct Compiler<'i> {
     schemas: &'i mut Schemas,
     sources: &'i mut Sources,
-    global_state: &'i mut State,
+    global_state: &'i mut AnyMap,
     dialects: &'i Dialects<'i>,
     deserializers: &'i Deserializers,
     resolvers: &'i Resolvers,
-    ints: &'i mut BigInts,
-    rationals: &'i mut BigRationals,
-    values: &'i mut Values,
+    numbers: &'i mut NumberCache,
+    values: &'i mut ValueCache,
 }
 
 impl<'i> Compiler<'i> {
@@ -36,8 +35,7 @@ impl<'i> Compiler<'i> {
             dialects: &interrogator.dialects,
             deserializers: &interrogator.deserializers,
             resolvers: &interrogator.resolvers,
-            ints: &mut interrogator.ints,
-            rationals: &mut interrogator.rationals,
+            numbers: &mut interrogator.numbers,
             values: &mut interrogator.values,
         }
     }
@@ -326,9 +324,8 @@ impl<'i> Compiler<'i> {
             let mut compile = Compile {
                 base_uri,
                 schemas: self.schemas,
-                rationals: self.rationals,
-                ints: self.ints,
-                values: self.values,
+                numbers: self.numbers,
+                value_cache: self.values,
                 global_state: self.global_state,
             };
             if keyword.compile(&mut compile, schema.clone())? {

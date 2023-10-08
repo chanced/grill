@@ -62,6 +62,7 @@ pub mod test;
 
 pub mod big;
 
+pub mod anymap;
 
 /// Returns a string literal of the supplied JSON.
 /// 

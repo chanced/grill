@@ -1,6 +1,3 @@
-#[doc(no_inline)]
-pub use crate::output::Detail;
-
 pub use crate::keyword::Unimplemented;
 
 use jsonptr::Pointer;
@@ -811,7 +808,7 @@ pub enum RelativeUriError {
 pub enum IdentifyError {
     /// The URI could not be parsed.
     #[error(transparent)]
-    FailedToParseUri(#[from] UriError),
+    InvalidUri(#[from] UriError),
 
     /// The URI is not absolute (i.e. contains a non-empty fragment).
     #[error("the $id of a schema is not absolute: {0}")]
@@ -821,6 +818,13 @@ pub enum IdentifyError {
     /// to return.
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
+
+    /// The value of `$id` was not a string
+    #[error("the {keyword} of a schema must be a string in the form of a uri; found {value:?}")]
+    NotAString {
+        keyword: &'static str,
+        value: Box<Value>,
+    },
 }
 
 /// A [`Dialect`] with the [`AbsoluteUri`] was not able to be found.

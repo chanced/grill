@@ -1,23 +1,17 @@
+use super::{Compile, Context};
 use crate::{
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, UriError},
-    output::{self, Structure},
+    output::{self, Translations},
     schema::{Anchor, Identifier, Reference},
     AbsoluteUri, Schema,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde_json::Value;
-use std::{
-    fmt::{self, Display},
-    panic::RefUnwindSafe,
-};
-
-use super::{Compile, Context};
+use std::fmt::{self, Display};
 
 #[derive(Debug)]
 pub struct Unimplemented;
-
-pub enum Evaluation {}
 
 impl Display for Unimplemented {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -25,8 +19,38 @@ impl Display for Unimplemented {
     }
 }
 
+#[derive(Clone, Debug, Copy)]
+pub enum Kind {
+    /// The [`Keyword`] is singular, evaluating the logic of a specific
+    /// JSON Schema Keyword.
+    Single(&'static str),
+    /// The [`Keyword`] is a composite of multiple keywords with additional
+    /// logic which handles co-dependencies between the embedded keywords.
+    ///
+    /// The output of this keyword should be a transient
+    /// [`Output`](`crate::Output`), with `is_transient` set to `true`.
+    /// Depending on the specified `Structure`, the [`Output`] may be expanded
+    /// into multiple nodes.
+    Composite(&'static [&'static str]),
+}
+
+impl From<&'static str> for Kind {
+    fn from(s: &'static str) -> Self {
+        Kind::Single(s)
+    }
+}
+impl From<&'static [&'static str]> for Kind {
+    fn from(s: &'static [&'static str]) -> Self {
+        Kind::Composite(s)
+    }
+}
+
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
+#[allow(unused_variables)]
+pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
+    /// the name of the keyword which this `Keyword` handles.
+    fn kind(&self) -> Kind;
+
     /// For each `Schema` compiled by the [`Interrogator`], this `Keyword` is
     /// cloned and [`setup`] is called.
     ///
@@ -37,26 +61,28 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
-    ) -> Result<bool, CompileError>;
+    ) -> Result<bool, CompileError> {
+        Ok(false)
+    }
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
-        schema: &'v Value,
-        structure: Structure,
-    ) -> Result<Option<output::Output<'v>>, EvaluateError>;
-    #[allow(unused_variables)]
-    fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
-        let v = vec![String::new()];
-        let r = v.as_slice();
-        let x: Vec<String> = r.into();
+        value: &'v Value,
+    ) -> Result<Option<output::Output<'v>>, EvaluateError> {
+        Ok(None)
+    }
 
+    fn set_translate(&mut self, lang: Translations) -> Result<(), Unimplemented> {
+        Err(Unimplemented)
+    }
+
+    fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
         Err(Unimplemented)
     }
 
     /// Returns a list of [`Anchor`]s which are handled by this `Keyword`
-    #[allow(unused_variables)]
     fn anchors(&self, schema: &Value) -> Result<Result<Vec<Anchor>, AnchorError>, Unimplemented> {
         Err(Unimplemented)
     }
@@ -74,7 +100,6 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     /// let id = Id.identify(&json!({"$id": "https://example.com/schema.json" }));
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".parse().unwrap())));
     /// ```
-    #[allow(unused_variables)]
     fn identify(
         &self,
         schema: &Value,
@@ -97,28 +122,15 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
     /// let dialect = SchemaKeyword.dialect(&json!({ "$schema": draft }));
     /// assert_eq!(dialect.as_str(), draft);
     /// ```
-    #[allow(unused_variables)]
     fn dialect(
         &self,
         schema: &Value,
-    ) -> Result<Result<Option<AbsoluteUri>, UriError>, Unimplemented> {
-        Err(Unimplemented)
-    }
-
-    /// Determines if the schema is of a specific
-    /// [`Dialect`](`crate::dialect::Dialect`).
-    ///
-    /// # Convention
-    /// Exactly one `Keyword` must implement the method `is_pertinent_to` for a given `Dialect`.
-    ///
-    #[allow(unused_variables)]
-    fn is_pertinent_to(&self, schema: &Value) -> Result<bool, Unimplemented> {
+    ) -> Result<Result<Option<AbsoluteUri>, IdentifyError>, Unimplemented> {
         Err(Unimplemented)
     }
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
-    #[allow(unused_variables)]
     fn references(
         &self,
         schema: &Value,
@@ -129,32 +141,13 @@ pub trait Keyword: RefUnwindSafe + Send + Sync + DynClone + fmt::Debug {
 
 clone_trait_object!(Keyword);
 
-// impl Keyword for &dyn Keyword {
-//     fn compile<'i>(
-//         &mut self,
-//         compile: &mut Compile<'i>,
-//         schema: Schema<'i>,
-//     ) -> Result<bool, CompileError> {
-//         self.compile(compile, schema)
-//     }
-
-//     fn evaluate<'i, 'v>(
-//         &'i self,
-//         ctx: &'i mut Context,
-//         schema: &'v Value,
-//         structure: Structure,
-//     ) -> Result<Option<output::Node<'v>>, EvaluateError> {
-//         self.evaluate(ctx, schema, structure)
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
-    use crate::interrogator::state::State;
+    use crate::anymap::AnyMap;
 
     #[test]
     fn test_get() {
-        let mut state = State::new();
+        let mut state = AnyMap::new();
         let i: i32 = 1;
         state.insert(i);
         let x = state.get_mut::<i32>().unwrap();

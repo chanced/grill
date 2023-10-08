@@ -1,15 +1,18 @@
 use crate::{
-    error::{CompileError, CyclicDependencyError, SourceConflictError, UnknownKeyError},
-    keyword::{BigInts, BigRationals, Keyword, Values},
+    anymap::AnyMap,
+    error::{
+        CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
+    },
+    keyword::{Context, Keyword},
     schema::{
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
         },
-        Anchor, Dialect, Reference,
+        Anchor, Reference,
     },
-    source::{Deserializers, Link, Resolvers, Source, Sources},
-    AbsoluteUri,
+    source::{Link, Source, Sources},
+    AbsoluteUri, Output, Structure,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -19,8 +22,6 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Deref,
 };
-
-use super::dialect::Dialects;
 
 new_key_type! {
     pub struct Key;
@@ -180,6 +181,11 @@ impl<'i> Schema<'i> {
             subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
     }
+
+    #[must_use]
+    pub fn absolute_location(&self) -> &AbsoluteUri {
+        self.id.as_deref().unwrap_or(&self.uris[0])
+    }
 }
 impl std::ops::Index<&str> for Schema<'_> {
     type Output = Value;
@@ -278,6 +284,44 @@ impl Schemas {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn evaluate<'v>(
+        &self,
+        structure: Structure,
+        key: Key,
+        value: &'v Value,
+        instance_location: Pointer,
+        keyword_location: Pointer,
+        sources: &Sources,
+        state: &mut AnyMap,
+    ) -> Result<Output<'v>, EvaluateError> {
+        let schema = self.get(key, sources)?;
+
+        let mut ctx = Context {
+            absolute_keyword_location: schema.absolute_location(),
+            keyword_location: keyword_location.clone(),
+            instance_location: instance_location.clone(),
+            structure,
+            state,
+            schemas: self,
+            sources,
+        };
+        let schema = self.get(key, ctx.sources)?;
+        let mut output = Output::new(
+            structure,
+            schema.absolute_location().clone(),
+            keyword_location,
+            instance_location,
+            Ok(None),
+            false,
+        );
+        for keyword in &*schema.keywords {
+            if let Some(op) = keyword.evaluate(&mut ctx, value)? {
+                output.add(op);
+            }
+        }
+        Ok(output)
+    }
     pub(crate) fn ensure_not_cyclic(
         &mut self,
         key: Key,
@@ -429,11 +473,6 @@ impl Schemas {
     #[must_use]
     pub(crate) fn get_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
         self.get_index(id)
-    }
-
-    pub(crate) fn has_path_connecting(&self, from: Key, to: Key) -> bool {
-        let from = self.store().get(from).unwrap();
-        todo!()
     }
 
     /// Starts a new transaction.

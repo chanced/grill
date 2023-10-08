@@ -1,21 +1,18 @@
-use std::{
-    any,
-    borrow::{Borrow, Cow},
-};
+use std::{any, borrow::Cow};
 
 use serde_json::Value;
 
 use crate::{
     error::{BuildError, SourceError, UriError},
     json_schema,
-    keyword::{Numbers, Values},
+    keyword::{NumberCache, ValueCache},
     schema::{dialect::Dialects, Dialect, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator,
 };
 
-use super::state::State;
+use crate::anymap::AnyMap;
 
 /// Constructs an [`Interrogator`].
 pub struct Builder {
@@ -24,7 +21,7 @@ pub struct Builder {
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
-    state: State,
+    state: AnyMap,
 }
 
 impl Default for Builder {
@@ -40,7 +37,7 @@ impl Builder {
             sources: Vec::new(),
             resolvers: Vec::new(),
             deserializers: Vec::new(),
-            state: State::new(),
+            state: AnyMap::new(),
             default_dialect_idx: None,
         }
     }
@@ -132,12 +129,10 @@ impl Builder {
     pub fn source_value(
         mut self,
         uri: impl TryIntoAbsoluteUri,
-        source: impl Borrow<Value>,
+        source: Cow<'static, Value>,
     ) -> Result<Self, UriError> {
-        self.sources.push(Src::Value(
-            uri.try_into_absolute_uri()?,
-            source.borrow().clone(),
-        ));
+        self.sources
+            .push(Src::Value(uri.try_into_absolute_uri()?, source));
         Ok(self)
     }
 
@@ -229,12 +224,10 @@ impl Builder {
     pub fn source_values<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
     where
         K: TryIntoAbsoluteUri,
-        V: Borrow<Value>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (K, Cow<'static, Value>)>,
     {
         for (k, v) in sources {
-            self.sources
-                .push(Src::Value(k.try_into_absolute_uri()?, v.borrow().clone()));
+            self.sources.push(Src::Value(k.try_into_absolute_uri()?, v));
         }
         Ok(self)
     }
@@ -260,7 +253,7 @@ impl Builder {
     /// Adds JSON Schema 2020-12 [`Dialect`]
     #[must_use]
     pub fn json_schema_2020_12(self) -> Self {
-        self.dialect(json_schema::draft_2020_12::dialect())
+        self.dialect(Cow::Borrowed(json_schema::draft_2020_12::dialect()))
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -345,9 +338,8 @@ impl Builder {
             schemas,
             deserializers,
             state,
-            rationals: Numbers::default(),
-            ints: Numbers::default(),
-            values: Values::default(),
+            numbers: NumberCache::default(),
+            values: ValueCache::default(),
         };
 
         for id in precompile {

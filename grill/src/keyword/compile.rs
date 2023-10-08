@@ -1,44 +1,40 @@
+use std::sync::Arc;
+
+use either::Either;
+use num::BigInt;
+use num_rational::BigRational;
 use serde_json::{Number, Value};
 
 use crate::{
+    anymap::AnyMap,
     error::{CompileError, NumberError},
-    interrogator::state::State,
     schema::Schemas,
     AbsoluteUri, Key, Uri,
 };
 
-use super::{BigInts, BigRationals, IntKey, RationalKey, ValueKey, Values};
+use super::{NumberCache, ValueCache};
 
 #[derive(Debug)]
 pub struct Compile<'i> {
     pub(crate) base_uri: &'i AbsoluteUri,
     pub(crate) schemas: &'i Schemas,
-    pub(crate) rationals: &'i mut BigRationals,
-    pub(crate) ints: &'i mut BigInts,
-    pub(crate) values: &'i mut Values,
-    pub(crate) global_state: &'i mut State,
+    pub(crate) numbers: &'i mut NumberCache,
+    pub(crate) value_cache: &'i mut ValueCache,
+    pub(crate) global_state: &'i mut AnyMap,
 }
 
 impl<'i> Compile<'i> {
-    /// Parses a [`Number`] into a [`BigRational`], stores it and returns the
-    /// [`RationalKey`].
+    /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
+    /// `Arc` to it.
     ///
     /// # Errors
     /// Returns `NumberError` if the number fails to parse
-    pub fn rational(&mut self, value: &Number) -> Result<RationalKey, NumberError> {
-        self.rationals.insert(value)
+    pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
+        self.numbers.number(num)
     }
-    /// Parses a [`Number`] into a [`BigInt`], stores it and returns the
-    /// [`IntKey`].
-    ///
-    /// # Errors
-    /// Returns `NumberError` if the number fails to parse
-    pub fn int(&mut self, num: &Number) -> Result<IntKey, NumberError> {
-        self.ints.insert(num)
-    }
-    /// Stores a [`Value`] and returns the [`ValueKey`].
-    pub fn value(&mut self, value: &Value) -> ValueKey {
-        self.values.insert(value)
+
+    pub fn value(&mut self, value: &Value) -> Arc<Value> {
+        self.value_cache.value(value)
     }
 
     /// Resolves a schema `Key` by URI

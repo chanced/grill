@@ -12,12 +12,47 @@ use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
+use std::convert::AsRef;
 use std::ops::Deref;
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 
 new_key_type! {
     pub struct SourceKey;
+}
+
+pub(crate) enum Src {
+    String(AbsoluteUri, String),
+    Value(AbsoluteUri, Cow<'static, Value>),
+}
+
+impl Src {
+    pub(crate) fn deserialize_or_take_value(
+        self,
+        deserializers: &Deserializers,
+    ) -> Result<Cow<'static, Value>, DeserializeError> {
+        match self {
+            Self::Value(_uri, val) => Ok(val),
+            Self::String(_uri, str) => {
+                let src = deserializers.deserialize(&str)?;
+                Ok(Cow::Owned(src))
+            }
+        }
+    }
+    #[must_use]
+    pub fn uri(&self) -> &AbsoluteUri {
+        match self {
+            Self::Value(uri, _) | Self::String(uri, _) => uri,
+        }
+    }
+
+    #[must_use]
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(_, s) => Some(s),
+            Self::Value(_, _) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,51 +93,17 @@ impl Deref for Source<'_> {
     }
 }
 
-pub(crate) enum Src {
-    String(AbsoluteUri, String),
-    Value(AbsoluteUri, Value),
-}
-
-impl Src {
-    pub(crate) fn deserialize_or_take_value(
-        self,
-        deserializers: &Deserializers,
-    ) -> Result<Value, DeserializeError> {
-        match self {
-            Self::Value(_uri, val) => Ok(val),
-            Self::String(_uri, str) => {
-                let src = deserializers.deserialize(&str)?;
-                Ok(src)
-            }
-        }
-    }
-    #[must_use]
-    pub fn uri(&self) -> &AbsoluteUri {
-        match self {
-            Self::Value(uri, _) | Self::String(uri, _) => uri,
-        }
-    }
-
-    #[must_use]
-    pub fn as_string(&self) -> Option<&str> {
-        match self {
-            Self::String(_, s) => Some(s),
-            Self::Value(_, _) => None,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default)]
 struct Store {
-    table: SlotMap<SourceKey, Value>,
+    table: SlotMap<SourceKey, Cow<'static, Value>>,
     index: HashMap<AbsoluteUri, Link>,
 }
 impl Store {
     fn check_and_get_occupied(
         &self,
         uri: AbsoluteUri,
-        src: Value,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        src: Cow<'static, Value>,
+    ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         let key = self.index.get(&uri).unwrap().key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
@@ -114,8 +115,8 @@ impl Store {
     fn insert_vacant(
         &mut self,
         uri: AbsoluteUri,
-        src: Value,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        src: Cow<'static, Value>,
+    ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         let table = &mut self.table;
         let index = &mut self.index;
         let mut base_uri = uri.clone();
@@ -135,7 +136,7 @@ impl Store {
             index.insert(uri.clone(), Link::new(key, uri.clone(), ptr.clone()));
             let key = index.get(&uri).unwrap().key;
             let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
-            return Ok((key, link, src));
+            return Ok((key, link, Cow::Owned(src)));
         }
         Ok((key, link, src))
     }
@@ -143,8 +144,8 @@ impl Store {
     fn insert(
         &mut self,
         uri: AbsoluteUri,
-        src: Value,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        src: Cow<'static, Value>,
+    ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         let fragment = uri.fragment().unwrap_or_default();
         if !fragment.trim().is_empty() {
             return Err(SourceError::UnexpectedUriFragment(uri.clone()));
@@ -169,6 +170,7 @@ impl Store {
         self.index
             .get(uri)
             .map(|link| self.table.get(link.key).unwrap())
+            .map(AsRef::as_ref)
     }
 
     fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
@@ -199,7 +201,10 @@ impl Sources {
     /// - a [`Source`]'s [`AbsoluteUri`] has a fragment.
     /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
-    pub fn new(sources: Vec<Src>, deserializers: &Deserializers) -> Result<Self, SourceError> {
+    pub(crate) fn new(
+        sources: Vec<Src>,
+        deserializers: &Deserializers,
+    ) -> Result<Self, SourceError> {
         let mut store = Store::default();
         let iter = sources.into_iter();
         for src in iter {
@@ -308,8 +313,8 @@ impl Sources {
     pub(crate) fn insert_value(
         &mut self,
         uri: AbsoluteUri,
-        src: Value,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
+        src: Cow<'static, Value>,
+    ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         self.store_mut().insert(uri, src)
     }
 
@@ -318,11 +323,11 @@ impl Sources {
         uri: AbsoluteUri,
         source: String,
         deserializers: &Deserializers,
-    ) -> Result<(SourceKey, Link, Value), SourceError> {
+    ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         let src = deserializers
             .deserialize(&source)
             .map_err(|e| DeserializationError::new(uri.clone(), e))?;
-        self.insert_value(uri, src)
+        self.insert_value(uri, Cow::Owned(src))
     }
 
     fn check_existing_link(&mut self, link: Link) -> Result<&Link, LinkError> {
@@ -378,7 +383,8 @@ impl Sources {
             .deserialize(&resolved)
             .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
 
-        self.store_mut().insert_vacant(base_uri.clone(), src)?;
+        self.store_mut()
+            .insert_vacant(base_uri.clone(), Cow::Owned(src))?;
 
         if fragment.is_empty() || !fragment.starts_with('/') {
             let link = self.store().get_link(&base_uri).unwrap();
