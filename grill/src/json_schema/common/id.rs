@@ -1,21 +1,22 @@
 use std::fmt::Display;
 
+use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
     error::{IdentifyError, Unimplemented},
-    keyword::{Keyword, Kind},
+    keyword::{self, Kind},
     schema::Identifier,
     Uri,
 };
 
 #[derive(Debug, Clone)]
-pub struct Id {
+pub struct Keyword {
     pub keyword: &'static str,
     pub allow_fragment: bool,
 }
 
-impl Id {
+impl Keyword {
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
@@ -33,13 +34,14 @@ impl Id {
     }
 }
 
-impl Display for Id {
+impl Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} keyword", self.keyword)
     }
 }
 
-impl Keyword for Id {
+#[async_trait]
+impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }
@@ -66,19 +68,19 @@ impl Keyword for Id {
         })
     }
 
-    fn compile<'i>(
+    async fn compile<'i>(
         &mut self,
-        _compile: &mut crate::keyword::Compile<'i>,
+        _compile: &mut keyword::Compile<'i>,
         _schema: crate::Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
         Ok(false)
     }
 
-    fn evaluate<'i, 'v>(
+    async fn evaluate<'i, 'v>(
         &'i self,
-        _ctx: &'i mut crate::keyword::Context,
+        _ctx: &'i mut keyword::Context,
         _value: &'v Value,
     ) -> Result<Option<crate::output::Output<'v>>, crate::error::EvaluateError> {
-        todo!()
+        Ok(None)
     }
 }

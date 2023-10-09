@@ -1,10 +1,12 @@
-use std::borrow::Cow;
-
 use jsonptr::Pointer;
 use serde_json::Value;
 
 use crate::{
-    anymap::AnyMap, error::EvaluateError, output::Error, schema::Schemas, source::Sources,
+    anymap::AnyMap,
+    error::EvaluateError,
+    output::{Annotation, AnnotationOrError, Error},
+    schema::Schemas,
+    source::Sources,
     AbsoluteUri, Key, Output, Structure,
 };
 
@@ -17,13 +19,14 @@ pub struct Context<'i> {
     pub(crate) instance_location: Pointer,
     pub(crate) structure: Structure,
     /// global state of the interrogator
-    pub(crate) state: &'i mut AnyMap,
+    pub(crate) global_state: &'i AnyMap,
+    pub(crate) eval_state: &'i mut AnyMap,
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
 }
 
 impl<'s> Context<'s> {
-    pub fn evalute<'v>(
+    pub async fn evalute<'v>(
         &mut self,
         key: Key,
         instance: &str,
@@ -34,25 +37,37 @@ impl<'s> Context<'s> {
         instance_location.push_back(token.clone());
         let mut keyword_location = self.keyword_location.clone();
         keyword_location.push_back(token);
-        self.schemas.evaluate(
-            self.structure,
-            key,
-            value,
-            instance_location,
-            keyword_location,
-            self.sources,
-            self.state,
-        )
+        self.schemas
+            .evaluate(
+                self.structure,
+                key,
+                value,
+                instance_location,
+                keyword_location,
+                self.sources,
+                self.global_state,
+                self.eval_state,
+            )
+            .await
     }
 
-    pub fn annotate<'v>(&self, annotation: Cow<'v, Value>) -> Output<'v> {
-        self.output(Ok(Some(annotation.into())), false)
+    #[must_use]
+    pub fn global_state(&self) -> &AnyMap {
+        self.global_state
+    }
+
+    pub fn eval_state(&mut self) -> &AnyMap {
+        self.eval_state
+    }
+
+    #[must_use]
+    pub fn annotate<'v>(&self, annotation: Option<Annotation<'v>>) -> Output<'v> {
+        self.output(Ok(annotation), false)
     }
 
     pub fn error<'v, E: 'v + Error<'v>>(&self, error: E) -> Output<'v> {
         self.output(Err(Some(Box::new(error))), false)
     }
-
     pub fn transient<'v>(
         &self,
         is_valid: bool,
@@ -66,7 +81,7 @@ impl<'s> Context<'s> {
 
     fn output<'v>(
         &self,
-        annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+        annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Output<'v> {
         Output::new(

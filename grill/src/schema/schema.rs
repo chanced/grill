@@ -285,7 +285,7 @@ impl Schemas {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn evaluate<'v>(
+    pub(crate) async fn evaluate<'v>(
         &self,
         structure: Structure,
         key: Key,
@@ -293,7 +293,8 @@ impl Schemas {
         instance_location: Pointer,
         keyword_location: Pointer,
         sources: &Sources,
-        state: &mut AnyMap,
+        global_state: &AnyMap,
+        eval_state: &mut AnyMap,
     ) -> Result<Output<'v>, EvaluateError> {
         let schema = self.get(key, sources)?;
 
@@ -302,9 +303,10 @@ impl Schemas {
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
             structure,
-            state,
             schemas: self,
             sources,
+            global_state,
+            eval_state,
         };
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(
@@ -316,7 +318,7 @@ impl Schemas {
             false,
         );
         for keyword in &*schema.keywords {
-            if let Some(op) = keyword.evaluate(&mut ctx, value)? {
+            if let Some(op) = keyword.evaluate(&mut ctx, value).await? {
                 output.add(op);
             }
         }

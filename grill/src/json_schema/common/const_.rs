@@ -2,6 +2,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use crate::big::parse_rational;
 use crate::keyword::{define_translate, Kind};
+use async_trait::async_trait;
 use num_rational::BigRational;
 use serde_json::Value;
 
@@ -36,11 +37,12 @@ impl Keyword {
         }
     }
 }
+#[async_trait]
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         keyword::CONST.into()
     }
-    fn compile<'i>(
+    async fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
@@ -56,7 +58,7 @@ impl keyword::Keyword for Keyword {
         }
         Ok(true)
     }
-    fn evaluate<'i, 'v>(
+    async fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
@@ -65,7 +67,7 @@ impl keyword::Keyword for Keyword {
             if let Some(expected_number) = self.expected_number.as_deref() {
                 let actual_number = parse_rational(n.as_str())?;
                 if &actual_number == expected_number {
-                    return Ok(Some(ctx.annotate(Cow::Borrowed(value))));
+                    return Ok(Some(ctx.annotate(Some(value.into()))));
                 }
                 return Ok(Some(ctx.error(Error {
                     expected: self.expected.clone(),
@@ -74,7 +76,15 @@ impl keyword::Keyword for Keyword {
                 })));
             }
         }
-        todo!()
+        if self.expected.as_ref() == value {
+            Ok(Some(ctx.annotate(Some(value.into()))))
+        } else {
+            Ok(Some(ctx.error(Error {
+                expected: self.expected.clone(),
+                actual: Cow::Borrowed(value),
+                translate: self.translate.clone(),
+            })))
+        }
     }
 }
 
@@ -127,66 +137,95 @@ impl<'v> OutputError<'v> for Error<'v> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use serde_json::json;
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
 
-//     use crate::{Location, State, Structure};
+    use crate::{
+        json_schema::{
+            common::{id, schema},
+            draft_2020_12::json_schema_2020_12_uri,
+        },
+        schema::Dialect,
+        Interrogator, Structure,
+    };
 
-//     use super::*;
+    use super::{Keyword, *};
+    async fn create_interrogator(const_value: Value) -> Interrogator {
+        let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
+            .keyword(schema::Keyword::new(keyword::SCHEMA, false))
+            .keyword(id::Keyword::new(keyword::ID, false))
+            .keyword(Keyword::new(None))
+            .metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+            .build()
+            .unwrap();
+        Interrogator::builder()
+            .dialect(Cow::Owned(dialect))
+            .source_value(
+                "https://example.com/with_const",
+                Cow::Owned(json!({
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "const": const_value
+                })),
+            )
+            .unwrap()
+            .source_value(
+                "https://example.com/without_const",
+                Cow::Owned(json!({
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                })),
+            )
+            .unwrap()
+            .build()
+            .await
+            .unwrap()
+    }
 
-//     #[test]
-//     fn test_const_setup() {
-//         let mut compiler = crate::Compiler::default();
-//         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-//         let mut keyword = ConstKeyword::default();
-//         assert!(keyword.compile(&mut compiler, &schema).unwrap());
-//         assert_eq!(keyword.expected, Some(serde_json::json!(1)));
+    #[tokio::test]
+    async fn test_const_setup() {
+        let mut interrogator = create_interrogator(json!(34.34)).await;
+        let key = interrogator
+            .compile("https://example.com/with_const")
+            .await
+            .unwrap();
+        let schema = interrogator.schema(key).unwrap();
+        assert!(schema
+            .keywords
+            .iter()
+            .map(|kw| kw.kind())
+            .any(|k| k == keyword::CONST));
+        let key = interrogator
+            .compile("https://example.com/without_const")
+            .await
+            .unwrap();
+        let schema = interrogator.schema(key).unwrap();
+        assert!(!schema
+            .keywords
+            .iter()
+            .map(|kw| kw.kind())
+            .any(|k| k == keyword::CONST));
+    }
 
-//         let schema: Schema = serde_json::from_value(json!({})).unwrap();
-//         let mut keyword = ConstKeyword::default();
-//         assert!(!keyword.compile(&mut compiler, &schema).unwrap());
-//     }
-
-//     #[test]
-//     fn test_const_evaluate() {
-//         let mut compiler = crate::Compiler::default();
-//         let schema: Schema = serde_json::from_value(json!({"const": 1})).unwrap();
-//         let mut keyword = ConstKeyword::default();
-//         keyword.compile(&mut compiler, &schema).unwrap();
-//         let mut state = State::new();
-//         let mut scope = crate::Scope::new(Location::default(), &mut state);
-//         let value = serde_json::json!(1);
-//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
-//         assert!(result.is_ok());
-//         let result = result.unwrap();
-//         assert!(result.is_some());
-//         let result = result.unwrap();
-//         assert!(result.is_valid());
-//         let value = serde_json::json!(2);
-//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
-//         assert!(result.is_ok());
-//         let result = result.unwrap();
-//         assert!(result.is_some());
-//         let result = result.unwrap();
-//         assert!(result.is_invalid());
-//     }
-//     #[test]
-//     fn test_const_obj() {
-//         let mut compiler = crate::Compiler::default();
-//         let schema: Schema =
-//             serde_json::from_value(json!({"const": {"a": "a", "b": "b"}})).unwrap();
-//         let mut keyword = ConstKeyword::default();
-//         keyword.compile(&mut compiler, &schema).unwrap();
-//         let mut state = State::new();
-//         let mut scope = crate::Scope::new(Location::default(), &mut state);
-
-//         let value = serde_json::json!({"b": "b", "a":"a"});
-//         let result = keyword.evaluate(&mut scope, &value, Structure::Complete);
-//         assert!(result.is_ok());
-//         let result = result.unwrap();
-//         assert!(result.is_some());
-//         let result = result.unwrap();
-//         assert!(result.is_valid());
-//     }
-// }
+    #[tokio::test]
+    async fn test_const_evaluate() {
+        let mut interrogator = create_interrogator(json!(34.34)).await;
+        let key = interrogator
+            .compile("https://example.com/with_const")
+            .await
+            .unwrap();
+        let value = json!(34.34);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &value)
+            .await
+            .unwrap();
+        assert!(output.is_valid());
+        let value = json!(34.3434);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &value)
+            .await
+            .unwrap();
+        assert!(!output.is_valid());
+    }
+    #[test]
+    fn test_const_obj() {}
+}

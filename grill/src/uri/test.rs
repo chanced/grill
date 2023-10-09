@@ -505,10 +505,3 @@ fn test_set_path() {
         assert_eq!(expected_path, uri.path_or_nss());
     }
 }
-
-#[test]
-fn test_join_paths() {
-    let base = "/a/b/c";
-    let other = "/d/e/f";
-    // println!("{}", join_paths(base, other));
-}

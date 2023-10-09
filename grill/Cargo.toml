@@ -15,6 +15,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 anyhow           = { workspace = true }
 async-recursion  = { workspace = true }
 async-trait      = { workspace = true }
+derive_more      = { workspace = true }
 dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }

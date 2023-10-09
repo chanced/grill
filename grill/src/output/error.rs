@@ -3,6 +3,8 @@ use core::fmt::{Debug, Display};
 use dyn_clone::{clone_trait_object, DynClone};
 use serde::{Deserialize, Deserializer, Serialize};
 
+pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
+
 /// An validation error, used as the value of `"error"` in [`Output`](`crate::Output`).
 ///
 ///
@@ -18,7 +20,7 @@ pub trait Error<'v>: DynClone + Display + Debug + Send + Sync {
 
 clone_trait_object!(<'v> Error<'v>);
 
-impl Serialize for dyn Error<'_> {
+impl<'v> Serialize for Box<dyn 'v + Send + Sync + Error<'v>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
@@ -37,7 +39,6 @@ impl Error<'_> for String {
     fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         self
     }
-
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,

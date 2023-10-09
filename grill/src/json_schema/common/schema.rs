@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
@@ -7,12 +8,12 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Schema {
+pub struct Keyword {
     pub keyword: &'static str,
     pub allow_fragment: bool,
 }
 
-impl Schema {
+impl Keyword {
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
@@ -21,7 +22,8 @@ impl Schema {
         }
     }
 }
-impl keyword::Keyword for Schema {
+#[async_trait]
+impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }
@@ -57,7 +59,7 @@ impl keyword::Keyword for Schema {
         Ok(Ok(Some(uri)))
     }
 
-    fn compile<'i>(
+    async fn compile<'i>(
         &mut self,
         _compile: &mut crate::keyword::Compile<'i>,
         _schema: crate::Schema<'i>,
@@ -65,7 +67,7 @@ impl keyword::Keyword for Schema {
         Ok(false)
     }
 
-    fn evaluate<'i, 'v>(
+    async fn evaluate<'i, 'v>(
         &'i self,
         _ctx: &'i mut crate::keyword::Context,
         _value: &'v Value,

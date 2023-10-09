@@ -1044,13 +1044,13 @@ macro_rules! define_translate {
         pub enum Translate {
             Closure(
                 ::std::sync::Arc<
-                    dyn Send + Sync + Fn(&mut std::fmt::Formatter<'_>, &$error) -> std::fmt::Result,
+                    dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
                 >,
             ),
-            Pointer(fn(&mut std::fmt::Formatter<'_>, &$error) -> std::fmt::Result),
+            Pointer(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
         }
         impl Translate {
-            pub fn run(&self, f: &mut std::fmt::Formatter<'_>, v: &$error) -> std::fmt::Result {
+            pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
                 match self {
                     Translate::Closure(c) => c(f, v),
                     Translate::Pointer(p) => p(f, v),
@@ -1058,7 +1058,7 @@ macro_rules! define_translate {
             }
         }
         impl ::std::fmt::Debug for Translate {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 match self {
                     Self::Closure(_) => f.debug_tuple("Closure").finish(),
                     Self::Pointer(_) => f.debug_tuple("Pointer").finish(),

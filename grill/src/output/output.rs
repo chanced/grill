@@ -1,4 +1,4 @@
-use super::{Error, ERROR_MSG, SUCCESS_MSG};
+use super::{annotation::Annotation, BoxedError, ERROR_MSG, SUCCESS_MSG};
 use crate::{AbsoluteUri, Structure, Uri};
 use jsonptr::Pointer;
 use serde::{
@@ -11,6 +11,7 @@ use std::{
     borrow::Cow,
     collections::{BTreeMap, VecDeque},
     fmt::{self},
+    sync::Arc,
 };
 
 const EXPECTED_FMT: &str = "a string equal to \"flag\", \"basic\", \"detailed\", or \"verbose\"";
@@ -38,6 +39,8 @@ const KEYS: [&str; 7] = [
     VALID,
 ];
 
+pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>;
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -63,7 +66,7 @@ impl<'v> Output<'v> {
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+        annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
         match structure {
@@ -390,9 +393,7 @@ pub struct Flag<'v> {
 
 impl<'v> Flag<'v> {
     #[must_use]
-    pub fn new(
-        err_or_annotation: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
-    ) -> Self {
+    pub fn new(err_or_annotation: Result<Option<Annotation>, Option<BoxedError<'v>>>) -> Self {
         match err_or_annotation {
             Ok(_) => Self {
                 is_valid: true,
@@ -455,7 +456,7 @@ pub struct BasicNode<'v> {
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub absolute_keyword_location: Uri,
-    pub annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+    pub annotation_or_error: AnnotationOrError<'v>,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
 }
 
@@ -528,7 +529,7 @@ impl<'v> Basic<'v> {
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+        annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
         let is_valid = annotation_or_error.is_ok();
@@ -632,7 +633,7 @@ pub struct Detailed<'v> {
     pub keyword_location: Pointer,
     pub absolute_keyword_location: Option<Uri>,
     pub is_valid: bool,
-    annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+    annotation_or_error: AnnotationOrError<'v>,
     pub nodes: Vec<Detailed<'v>>,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
     /// Indicates that this node is not part of the final output and is only
@@ -649,7 +650,7 @@ impl<'v> Detailed<'v> {
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+        annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
         let is_valid = annotation_or_error.is_ok();
@@ -765,7 +766,7 @@ pub struct Verbose<'v> {
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub absolute_keyword_location: Option<Uri>,
-    pub annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+    pub annotation_or_error: AnnotationOrError<'v>,
     pub nodes: Vec<Verbose<'v>>,
     pub is_valid: bool,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
@@ -782,7 +783,7 @@ impl<'v> Verbose<'v> {
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        annotation_or_error: Result<Option<Cow<'v, Value>>, Option<Box<dyn Error<'v>>>>,
+        annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
         let is_valid = annotation_or_error.is_ok();
@@ -1015,9 +1016,9 @@ fn contains_mixed(obj: &Map<String, Value>) -> bool {
 fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     annotation_or_error: Option<Value>,
     is_valid: bool,
-) -> Result<Result<Option<Cow<'static, Value>>, Option<Box<dyn Error<'static>>>>, D::Error> {
+) -> Result<AnnotationOrError<'static>, D::Error> {
     if is_valid {
-        return Ok(Ok(annotation_or_error.map(Cow::Owned)));
+        return Ok(Ok(annotation_or_error.map(Into::into)));
     }
     if annotation_or_error.is_none() {
         if is_valid {
@@ -1029,7 +1030,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     match annotation_or_error {
         Value::String(s) => {
             if is_valid {
-                Ok(Ok(Some(Cow::Owned(Value::String(s)))))
+                Ok(Ok(Some(Arc::new(Value::String(s)).into())))
             } else {
                 Ok(Err(Some(Box::new(s))))
             }
@@ -1042,7 +1043,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
         }
         Value::Bool(b) => {
             if is_valid {
-                Ok(Ok(Some(Cow::Owned(Value::Bool(b)))))
+                Ok(Ok(Some(Arc::new(Value::Bool(b)).into())))
             } else {
                 Err(de::Error::invalid_type(
                     Unexpected::Bool(b),
@@ -1052,7 +1053,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
         }
         Value::Number(n) => {
             if is_valid {
-                Ok(Ok(Some(Cow::Owned(Value::Number(n)))))
+                Ok(Ok(Some(Arc::new(Value::Number(n)).into())))
             } else {
                 Err(de::Error::invalid_type(
                     Unexpected::Other(&format!("number {n}")),
@@ -1062,7 +1063,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
         }
         Value::Array(arr) => {
             if is_valid {
-                Ok(Ok(Some(Cow::Owned(Value::Array(arr)))))
+                Ok(Ok(Some(Arc::new(Value::Array(arr)).into())))
             } else {
                 Err(de::Error::invalid_type(
                     Unexpected::Seq,
@@ -1072,7 +1073,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
         }
         Value::Object(obj) => {
             if is_valid {
-                Ok(Ok(Some(Cow::Owned(Value::Object(obj)))))
+                Ok(Ok(Some(Arc::new(Value::Object(obj)).into())))
             } else {
                 Err(de::Error::invalid_type(
                     Unexpected::Map,
@@ -1083,13 +1084,13 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     }
 }
 
-fn serialize_annotation_or_error<S: SerializeMap>(
+fn serialize_annotation_or_error<'v, S: SerializeMap>(
     s: &mut S,
-    annotation_or_error: Result<&Option<Cow<'_, Value>>, &Option<Box<dyn Error<'_>>>>,
+    annotation_or_error: Result<&Option<Annotation<'v>>, &Option<BoxedError<'v>>>,
 ) -> Result<(), S::Error> {
     match annotation_or_error {
         Ok(Some(annotation)) => s.serialize_entry(ANNOTATION, &annotation)?,
-        Err(Some(error)) => s.serialize_entry(ERROR, &error)?,
+        Err(Some(error)) => s.serialize_entry(ERROR, error)?,
         _ => {}
     };
     Ok(())

@@ -6,7 +6,7 @@ use num::{pow, BigInt, BigRational, One, Zero};
 use crate::error::NumberError;
 
 pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
-    Parser::parse(value.as_ref())
+    Parser::parse(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -11,7 +11,7 @@ use super::metaschema;
 pub fn dialect() -> &'static Dialect {
     static DIALECT: Lazy<Dialect> = Lazy::new(|| {
         Dialect::builder(json_schema_2020_12_uri().clone())
-            .with_metaschema(
+            .metaschema(
                 json_schema_2020_12_uri().clone(),
                 Cow::Borrowed(json_schema_2020_12_value()),
             )

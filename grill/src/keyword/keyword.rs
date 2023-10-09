@@ -5,6 +5,7 @@ use crate::{
     schema::{Anchor, Identifier, Reference},
     AbsoluteUri, Schema,
 };
+use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -34,6 +35,16 @@ pub enum Kind {
     Composite(&'static [&'static str]),
 }
 
+impl PartialEq<&str> for Kind {
+    fn eq(&self, other: &&str) -> bool {
+        if let Kind::Single(s) = self {
+            s == other
+        } else {
+            false
+        }
+    }
+}
+
 impl From<&'static str> for Kind {
     fn from(s: &'static str) -> Self {
         Kind::Single(s)
@@ -47,8 +58,11 @@ impl From<&'static [&'static str]> for Kind {
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
+#[async_trait]
 pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
-    /// the name of the keyword which this `Keyword` handles.
+    /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
+    /// be the name of the keyword or `Composite`, which will be a list of
+    /// keywords.
     fn kind(&self) -> Kind;
 
     /// For each `Schema` compiled by the [`Interrogator`], this `Keyword` is
@@ -57,22 +71,18 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// If the keyword is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`evaluate`](`Self::evaluate`) should not
     /// be called for the given [`Schema`].
-    fn compile<'i>(
+    async fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
-    ) -> Result<bool, CompileError> {
-        Ok(false)
-    }
+    ) -> Result<bool, CompileError>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
-    fn evaluate<'i, 'v>(
+    async fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<output::Output<'v>>, EvaluateError> {
-        Ok(None)
-    }
+    ) -> Result<Option<output::Output<'v>>, EvaluateError>;
 
     fn set_translate(&mut self, lang: Translations) -> Result<(), Unimplemented> {
         Err(Unimplemented)

@@ -32,13 +32,13 @@ pub struct Builder {
 
 impl Builder {
     #[must_use]
-    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
+    pub fn metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
         self.metaschemas.push((id, schema));
         self
     }
 
     #[must_use]
-    pub fn with_keyword(mut self, keyword: impl 'static + Keyword) -> Self {
+    pub fn keyword(mut self, keyword: impl 'static + Keyword) -> Self {
         self.keywords.push(Box::new(keyword));
         self
     }
@@ -585,12 +585,12 @@ mod tests {
         ];
         let id = crate::json_schema::draft_04::json_schema_04_uri();
         let dialect = Dialect::builder(id.clone())
-            .with_metaschema(id.clone(), Cow::Owned(json!({})))
-            .with_keyword(json_schema::common::schema::Schema::new(
+            .metaschema(id.clone(), Cow::Owned(json!({})))
+            .keyword(json_schema::common::schema::Keyword::new(
                 keyword::SCHEMA,
                 true,
             ))
-            .with_keyword(json_schema::common::id::Id::new(keyword::ID, true))
+            .keyword(json_schema::common::id::Keyword::new(keyword::ID, true))
             .build()
             .unwrap();
 

@@ -1,8 +1,11 @@
 mod output;
-pub use output::{Basic, BasicNode, Detailed, Flag, Output, Verbose};
+pub use output::{AnnotationOrError, Basic, BasicNode, Detailed, Flag, Output, Verbose};
+
+mod annotation;
+pub use annotation::Annotation;
 
 mod error;
-pub use error::Error;
+pub use error::{BoxedError, Error};
 
 mod structure;
 pub use structure::Structure;

@@ -612,9 +612,27 @@ pub enum CompileError {
     #[error(transparent)]
     FailedToParsePointer(#[from] PointerError),
 
+    #[error(transparent)]
+    InvalidType(#[from] InvalidTypeError),
+
     /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]
     Custom(#[from] Box<anyhow::Error>),
+}
+#[derive(Clone, Copy, Debug, strum::EnumVariantNames, strum::Display)]
+pub enum ExpectedType {
+    Bool,
+    Number,
+    String,
+    Array,
+    Object,
+}
+
+#[derive(Debug, Error)]
+#[error("expected value with type {expected_type}, found {found:?}")]
+pub struct InvalidTypeError {
+    pub expected_type: ExpectedType,
+    pub found: Value,
 }
 
 #[derive(Debug, Error)]

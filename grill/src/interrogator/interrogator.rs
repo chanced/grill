@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt::Debug, ops::Deref};
 
+use jsonptr::Pointer;
 use serde_json::Value;
 use tap::TapFallible;
 
@@ -341,13 +342,23 @@ impl Interrogator {
         }
     }
 
-    pub fn evaluate(
+    pub async fn evaluate<'v>(
         &self,
-        _key: Key,
-        _value: &Value,
-        _structure: Structure,
-    ) -> Result<Output, EvaluateError> {
-        todo!()
+        key: Key,
+        structure: Structure,
+        value: &'v Value,
+    ) -> Result<Output<'v>, EvaluateError> {
+        let mut eval_state = AnyMap::new();
+        self.schemas.evaluate(
+            structure,
+            key,
+            value,
+            Pointer::default(),
+            Pointer::default(),
+            &self.sources,
+            &self.state,
+            &mut eval_state,
+        ).await
     }
 
     /// Returns the schema's `Key` if it exists

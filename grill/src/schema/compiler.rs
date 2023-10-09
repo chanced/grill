@@ -142,7 +142,7 @@ impl<'i> Compiler<'i> {
         self.schemas
             .ensure_not_cyclic(key, &uri, &references, self.sources)?;
 
-        let keywords = self.compile_keywords(key, &uri, dialect)?;
+        let keywords = self.compile_keywords(key, &uri, dialect).await?;
 
         let schema = self.schemas.get_mut(key).unwrap();
 
@@ -311,7 +311,7 @@ impl<'i> Compiler<'i> {
         Ok(subschemas)
     }
 
-    fn compile_keywords(
+    async fn compile_keywords(
         &mut self,
         key: Key,
         base_uri: &AbsoluteUri,
@@ -326,9 +326,9 @@ impl<'i> Compiler<'i> {
                 schemas: self.schemas,
                 numbers: self.numbers,
                 value_cache: self.values,
-                global_state: self.global_state,
+                state: self.global_state,
             };
-            if keyword.compile(&mut compile, schema.clone())? {
+            if keyword.compile(&mut compile, schema.clone()).await? {
                 keywords.push(keyword);
             }
         }
