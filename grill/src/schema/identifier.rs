@@ -1,6 +1,6 @@
-use std::str::FromStr;
 
-use crate::{error::UriError, AbsoluteUri, Uri};
+
+use crate::{AbsoluteUri, Uri};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identifier {

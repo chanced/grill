@@ -25,8 +25,7 @@ const QUERY: &AsciiSet = &CONTROLS
     .add(b'\'');
 
 pub(super) use urn::percent::{
-    encode_f_component as f_component, encode_nss as nss, encode_q_component as q_component,
-    encode_r_component as r_component,
+    encode_f_component as f_component, encode_nss as nss,
 };
 
 #[inline]

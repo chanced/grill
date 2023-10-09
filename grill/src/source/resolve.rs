@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
 
 use crate::{
-    error::{NotFoundError, ResolveError, ResolveErrors},
+    error::{ResolveError, ResolveErrors},
     uri::AbsoluteUri,
 };
 

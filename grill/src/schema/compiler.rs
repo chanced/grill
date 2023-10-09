@@ -366,7 +366,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spike() {
-        let interrogator = Interrogator::json_schema_2020_12()
+        let _interrogator = Interrogator::json_schema_2020_12()
             .deserialize_json()
             .build()
             .await

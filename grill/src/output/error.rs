@@ -42,7 +42,7 @@ impl Error<'_> for String {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        lang: &Translations,
+        _lang: &Translations,
     ) -> std::fmt::Result {
         write!(f, "{self}")
     }

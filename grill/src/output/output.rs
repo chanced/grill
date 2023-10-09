@@ -408,7 +408,7 @@ impl<'v> Flag<'v> {
 
     /// Updates `is_valid` based on the validity
     /// of `node` and merges `additional_props` of `node`.
-    pub fn add(&mut self, mut node: Flag<'v>) {
+    pub fn add(&mut self, node: Flag<'v>) {
         self.is_valid &= node.is_valid;
         self.push(node);
     }
@@ -558,7 +558,7 @@ impl<'v> Basic<'v> {
 
     /// Appends nodes of `node` to the output and updates `is_valid` based on
     /// the validity.
-    pub fn add(&mut self, mut node: Basic<'v>) {
+    pub fn add(&mut self, node: Basic<'v>) {
         self.is_valid &= node.is_valid;
     }
 

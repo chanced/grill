@@ -567,7 +567,7 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::{json_schema, keyword, AbsoluteUri, Uri};
+    use crate::{json_schema, keyword};
 
     use super::Dialect;
 

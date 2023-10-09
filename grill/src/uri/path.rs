@@ -52,6 +52,6 @@ pub fn merge(base: &str, path: &str) -> String {
 /// assert_eq!(resolve("/path/to/other", "../file"), "/path/to/file");
 /// ```
 pub fn resolve(base: &str, path: &str) -> String {
-    let mut buf = merge(base, path);
+    let buf = merge(base, path);
     crate::uri::path::normalize(&buf).into_owned()
 }
