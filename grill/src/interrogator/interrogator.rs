@@ -2,20 +2,20 @@ use std::{borrow::Cow, fmt::Debug, ops::Deref};
 
 use jsonptr::Pointer;
 use serde_json::Value;
-use tap::TapFallible;
 
 use crate::{
     error::{
         CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceError,
         UnknownKeyError,
     },
-    json_schema, keyword,
-    keyword::{NumberCache, ValueCache},
+    json_schema,
+    keyword::{self, NumberCache, ValueCache},
     output::{Output, Structure},
     schema::{
         iter::{Iter, IterUnchecked},
         traverse::{
-            Ancestors, Descendants, DirectDependencies, DirectDependents, TransitiveDependencies,
+            AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
+            TransitiveDependencies,
         },
         Compiler, Dialect, Dialects, Key, Schema, Schemas,
     },
@@ -80,8 +80,8 @@ impl Interrogator {
         self.schemas.contains_key(key)
     }
 
-    /// Returns [`Ancestors`] which is an [`Iterator`] over the descendants,
-    /// i.e. embedded schemas, of a given [`Schema`].
+    /// Returns [`Ancestors`] which is an [`Iterator`] over the [`Schema`]s
+    /// that contain the specified [`Schema`] by [`Key`].
     ///
     ///
     /// Note that the JSON Schema specification states that if a schema is
@@ -91,12 +91,13 @@ impl Interrogator {
     /// if the [`Schema`] is embedded.
     ///
     /// # Errors
-    /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
+    /// Returns `UnknownKeyError` if `key` does not belong to this
+    /// `Interrogator`
     pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
     }
-    /// Returns [`Ancestors`] which is an [`Iterator`] over the descendants,
-    /// i.e. embedded schemas, of a given [`Schema`].
+    /// Returns [`Ancestors`] which is an [`Iterator`] over the [`Schema`]s
+    /// that contain the specified [`Schema`] by [`Key`].
     ///
     ///
     /// Note that the JSON Schema specification states that if a schema is
@@ -190,7 +191,7 @@ impl Interrogator {
         self.schemas.transitive_dependencies(key, &self.sources)
     }
 
-    /// Return [`Schema`](crate::schema::Schema)s which is an [`Iterator`] over
+    /// Returns [`DirectDependents`] which is an [`Iterator`] over
     /// [`Schema`]s which directly depend on a specified
     /// [`Schema`](crate::schema::Schema)
     ///
@@ -200,7 +201,7 @@ impl Interrogator {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
-    /// Return [`Schema`](crate::schema::Schema)s which is an [`Iterator`] over
+    /// Return [`DirectDependents`] which is an [`Iterator`] over
     /// [`Schema`]s which directly depend on a specified
     /// [`Schema`](crate::schema::Schema)
     ///
@@ -211,6 +212,12 @@ impl Interrogator {
         key: Key,
     ) -> Result<DirectDependents<'_>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
+    }
+
+    /// Returns [`AllDependents`] which is an [`Iterator`] over [`Schema`]s which
+    /// depend on a specified [`Schema`](crate::schema::Schema)
+    pub fn all_dependents(&self, key: Key) -> Result<AllDependents<'_>, UnknownKeyError> {
+        self.ensure_key_exists(key, || self.schemas.all_dependents(key, &self.sources))
     }
 
     /// A helper method that returns `UnknownKeyError` if `key` does not belong
@@ -254,21 +261,17 @@ impl Interrogator {
         I::Item: TryIntoAbsoluteUri,
     {
         let uris = uris.into_iter();
-        let (lower, upper) = uris.size_hint();
-        let mut keys = Vec::with_capacity(upper.unwrap_or(lower));
         self.start_txn();
-        for uri in uris {
-            let uri = uri
-                .try_into_absolute_uri()
-                .tap_err(|_| self.rollback_txn())?;
-            let key = self
-                .compile_schema(uri.clone())
-                .await
-                .tap_err(|_| self.rollback_txn())?;
-            keys.push((uri, key));
+        match Compiler::new(self).compile_all(uris).await {
+            Ok(key) => {
+                self.commit_txn();
+                Ok(key)
+            }
+            Err(err) => {
+                self.rollback_txn();
+                Err(err)
+            }
         }
-        self.commit_txn();
-        Ok(keys)
     }
 
     /// Attempts to compile the schema at the given URI if not already compiled,
@@ -283,8 +286,8 @@ impl Interrogator {
     #[allow(clippy::unused_async)]
     pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
         // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
-        self.start_txn();
         let uri = uri.try_into_absolute_uri()?;
+        self.start_txn();
         match self.compile_schema(uri).await {
             Ok(key) => {
                 self.commit_txn();
@@ -349,16 +352,18 @@ impl Interrogator {
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut eval_state = AnyMap::new();
-        self.schemas.evaluate(
-            structure,
-            key,
-            value,
-            Pointer::default(),
-            Pointer::default(),
-            &self.sources,
-            &self.state,
-            &mut eval_state,
-        ).await
+        self.schemas
+            .evaluate(
+                structure,
+                key,
+                value,
+                Pointer::default(),
+                Pointer::default(),
+                &self.sources,
+                &self.state,
+                &mut eval_state,
+            )
+            .await
     }
 
     /// Returns the schema's `Key` if it exists

@@ -12,7 +12,7 @@ use crate::{
         Anchor, Reference,
     },
     source::{Link, Source, Sources},
-    AbsoluteUri, Output, Structure,
+    AbsoluteUri, Output, Structure, Uri,
 };
 use jsonptr::Pointer;
 use serde_json::Value;
@@ -20,12 +20,23 @@ use slotmap::{new_key_type, SlotMap};
 use std::{
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
+    hash::Hash,
     ops::Deref,
 };
 
 new_key_type! {
     pub struct Key;
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                             CompiledSchema                            ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompiledSchema {
@@ -49,6 +60,10 @@ pub(crate) struct CompiledSchema {
 
     ///  Referenced dependencies of this `Schema`.
     pub(crate) references: Vec<Reference>,
+
+    /// A map of URIs to `Key`s for all schemas which are referenced by this
+    /// schema
+    pub(crate) ref_lookup: HashMap<Uri, Key>,
 
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
@@ -86,6 +101,7 @@ impl CompiledSchema {
             subschemas: Vec::new(),
             dependents: Vec::new(),
             references: Vec::new(),
+            ref_lookup: HashMap::new(),
             anchors,
             keywords: Box::default(),
         }
@@ -98,6 +114,16 @@ impl PartialEq for CompiledSchema {
 }
 
 impl Eq for CompiledSchema {}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Schema                                ║
+║                                 ¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Clone, Debug)]
 pub struct Schema<'i> {
@@ -138,6 +164,10 @@ pub struct Schema<'i> {
     ///  Dependencies of this `Schema`.
     pub references: Cow<'i, [Reference]>,
 
+    /// A map of URIs to `Key`s for all schemas which are referenced by this
+    /// schema
+    pub ref_lookup: Cow<'i, HashMap<Uri, Key>>,
+
     /// Compiled [`Keyword`]s.
     pub keywords: Cow<'i, [Box<dyn Keyword>]>,
 
@@ -147,23 +177,6 @@ pub struct Schema<'i> {
 }
 
 impl<'i> Schema<'i> {
-    pub(crate) fn new(key: Key, compiled: &'i CompiledSchema, sources: &'i Sources) -> Self {
-        Self {
-            key,
-            id: compiled.id.as_ref().map(Cow::Borrowed),
-            path: Cow::Borrowed(&compiled.path),
-            uris: Cow::Borrowed(&compiled.uris),
-            metaschema: Cow::Borrowed(&compiled.metaschema),
-            anchors: Cow::Borrowed(&compiled.anchors),
-            source: Source::new(&compiled.link, sources),
-            parent: compiled.parent,
-            subschemas: Cow::Borrowed(&compiled.subschemas),
-            dependents: Cow::Borrowed(&compiled.dependents),
-            references: Cow::Borrowed(&compiled.references),
-            keywords: Cow::Borrowed(&compiled.keywords),
-        }
-    }
-
     #[must_use]
     pub fn into_owned(self) -> Schema<'static> {
         Schema {
@@ -177,6 +190,7 @@ impl<'i> Schema<'i> {
             anchors: Cow::Owned(self.anchors.into_owned()),
             dependents: Cow::Owned(self.dependents.into_owned()),
             references: Cow::Owned(self.references.into_owned()),
+            ref_lookup: Cow::Owned(self.ref_lookup.into_owned()),
             keywords: Cow::Owned(self.keywords.into_owned()),
             subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
@@ -184,6 +198,13 @@ impl<'i> Schema<'i> {
 
     #[must_use]
     pub fn absolute_location(&self) -> &AbsoluteUri {
+        self.id.as_deref().unwrap_or(&self.uris[0])
+    }
+
+    /// Returns most relevant URI for the schema, either using the `$id` or the
+    /// most relevant as determined by the schema's ancestory or source.
+    #[must_use]
+    pub fn absolute_uri(&self) -> &AbsoluteUri {
         self.id.as_deref().unwrap_or(&self.uris[0])
     }
 }
@@ -217,6 +238,16 @@ impl<'i> PartialEq for Schema<'i> {
 }
 impl<'i> Eq for Schema<'i> {}
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Store                                 ║
+║                                 ¯¯¯¯¯                                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 #[derive(Debug, Clone, Default)]
 struct Store {
     table: SlotMap<Key, CompiledSchema>,
@@ -227,9 +258,6 @@ struct Store {
 impl Store {
     fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
         self.table.get_mut(key)
-    }
-    fn iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
-        self.table.iter()
     }
     fn get(&self, key: Key) -> Option<&CompiledSchema> {
         self.table.get(key)
@@ -269,6 +297,17 @@ impl Store {
         Ok(key)
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Schemas                               ║
+║                                 ¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 #[derive(Clone, Debug, Default)]
 pub struct Schemas {
     store: Store,
@@ -338,7 +377,7 @@ impl Schemas {
             {
                 return Err(CyclicDependencyError {
                     from: uri.clone(),
-                    to: reference.uri.clone(),
+                    to: reference.absolute_uri.clone(),
                 }
                 .into());
             }
@@ -367,12 +406,15 @@ impl Schemas {
     pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
         self.sandbox().insert(schema)
     }
-    pub(crate) fn compiled_iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
-        self.store().iter()
-    }
+
+    // pub(crate) fn compiled_iter(&self) -> slotmap::basic::Iter<'_, Key, CompiledSchema> {
+    //     self.store().iter()
+    // }
+
     pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i> {
         Ancestors::new(key, self, sources)
     }
+
     pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i> {
         Descendants::new(key, self, sources)
     }
@@ -395,6 +437,7 @@ impl Schemas {
     ) -> DirectDependents<'i> {
         DirectDependents::new(key, self, sources)
     }
+
     pub(crate) fn all_dependents<'i>(
         &'i self,
         key: Key,
@@ -402,6 +445,7 @@ impl Schemas {
     ) -> AllDependents<'i> {
         AllDependents::new(key, self, sources)
     }
+
     pub(crate) fn transitive_dependencies<'i>(
         &'i self,
         key: Key,
@@ -439,6 +483,7 @@ impl Schemas {
             keywords: Cow::Borrowed(&schema.keywords),
             parent: schema.parent,
             references: Cow::Borrowed(&schema.references),
+            ref_lookup: Cow::Borrowed(&schema.ref_lookup),
             dependents: Cow::Borrowed(&schema.dependents),
             subschemas: Cow::Borrowed(&schema.subschemas),
             anchors: Cow::Borrowed(&schema.anchors),
@@ -451,15 +496,6 @@ impl Schemas {
     /// Panics if a transaction has not been started.
     pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema> {
         self.sandbox().get_mut(key)
-    }
-    /// Returns a mutable reference to the [`CompiledSchema`] with the given `Key`.
-    ///
-    /// # Panics
-    /// Panics if:
-    /// - a transaction has not been started.
-    /// - the `Key` does not exist.
-    pub(crate) fn get_mut_unchecked(&mut self, key: Key) -> &mut CompiledSchema {
-        self.get_mut(key).unwrap()
     }
 
     #[must_use]
@@ -503,6 +539,4 @@ impl Schemas {
     }
 }
 #[cfg(test)]
-mod tests {
-    
-}
+mod tests {}

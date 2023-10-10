@@ -22,13 +22,13 @@ impl<'i> Iter<'i> {
         IterUnchecked { inner: self }
     }
 
-    pub(crate) fn from_vec(keys: Vec<Key>, schemas: &'i Schemas, sources: &'i Sources) -> Self {
-        Self {
-            sources,
-            schemas,
-            inner: Either::Right(keys.into_iter()),
-        }
-    }
+    // pub(crate) fn from_vec(keys: Vec<Key>, schemas: &'i Schemas, sources: &'i Sources) -> Self {
+    //     Self {
+    //         sources,
+    //         schemas,
+    //         inner: Either::Right(keys.into_iter()),
+    //     }
+    // }
 }
 impl<'i> Iterator for Iter<'i> {
     type Item = Result<Schema<'i>, UnknownKeyError>;

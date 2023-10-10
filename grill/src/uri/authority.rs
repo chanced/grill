@@ -1,10 +1,4 @@
-use std::{
-    borrow::Cow,
-    fmt::{Display, Write},
-    ops::Deref,
-};
-
-use url::Url;
+use std::{borrow::Cow, fmt::Display, ops::Deref};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 /// The Authority component of a Relative URI.
@@ -119,21 +113,21 @@ impl<'a> Authority<'a> {
     }
 }
 
-fn url_authority(url: &Url) -> Option<Cow<'_, str>> {
-    let mut result = String::default();
-    let host = url.host()?;
-    if !url.username().is_empty() {
-        result.write_str(url.username()).unwrap();
-        if let Some(password) = url.password() {
-            result.write_char(':').unwrap();
-            result.write_str(password).unwrap();
-        }
-        result.write_char('@').unwrap();
-    }
-    result.write_str(&host.to_string()).unwrap();
-    if let Some(port) = url.port() {
-        result.write_char(':').unwrap();
-        result.write_str(&port.to_string()).unwrap();
-    }
-    Some(result.to_string().into())
-}
+// fn url_authority(url: &Url) -> Option<Cow<'_, str>> {
+//     let mut result = String::default();
+//     let host = url.host()?;
+//     if !url.username().is_empty() {
+//         result.write_str(url.username()).unwrap();
+//         if let Some(password) = url.password() {
+//             result.write_char(':').unwrap();
+//             result.write_str(password).unwrap();
+//         }
+//         result.write_char('@').unwrap();
+//     }
+//     result.write_str(&host.to_string()).unwrap();
+//     if let Some(port) = url.port() {
+//         result.write_char(':').unwrap();
+//         result.write_str(&port.to_string()).unwrap();
+//     }
+//     Some(result.to_string().into())
+// }

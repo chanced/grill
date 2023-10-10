@@ -1,7 +1,8 @@
-use super::Translations;
 use core::fmt::{Debug, Display};
 use dyn_clone::{clone_trait_object, DynClone};
 use serde::{Deserialize, Deserializer, Serialize};
+
+use super::Translator;
 
 pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 
@@ -14,7 +15,7 @@ pub trait Error<'v>: DynClone + Display + Debug + Send + Sync {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        lang: &Translations,
+        lang: &Translator,
     ) -> std::fmt::Result;
 }
 
@@ -42,7 +43,7 @@ impl Error<'_> for String {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        _lang: &Translations,
+        _translator: &Translator,
     ) -> std::fmt::Result {
         write!(f, "{self}")
     }
@@ -56,7 +57,7 @@ impl<'v> Error<'v> for &'v str {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        _lang: &Translations,
+        _translator: &Translator,
     ) -> std::fmt::Result {
         write!(f, "{self}")
     }

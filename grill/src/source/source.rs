@@ -45,14 +45,6 @@ impl Src {
             Self::Value(uri, _) | Self::String(uri, _) => uri,
         }
     }
-
-    #[must_use]
-    pub fn as_string(&self) -> Option<&str> {
-        match self {
-            Self::String(_, s) => Some(s),
-            Self::Value(_, _) => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -166,12 +158,12 @@ impl Store {
         self.table.get(key).unwrap()
     }
 
-    fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
-        self.index
-            .get(uri)
-            .map(|link| self.table.get(link.key).unwrap())
-            .map(AsRef::as_ref)
-    }
+    // fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
+    //     self.index
+    //         .get(uri)
+    //         .map(|link| self.table.get(link.key).unwrap())
+    //         .map(AsRef::as_ref)
+    // }
 
     fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
         self.index.get(uri)
@@ -181,9 +173,9 @@ impl Store {
         self.index.entry(uri)
     }
 
-    fn get_mut(&mut self, key: SourceKey) -> &Value {
-        self.table.get_mut(key).unwrap()
-    }
+    // fn get_mut(&mut self, key: SourceKey) -> &Value {
+    //     self.table.get_mut(key).unwrap()
+    // }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -305,10 +297,10 @@ impl Sources {
         self.store.get(key)
     }
 
-    #[must_use]
-    pub(crate) fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
-        self.store().get_by_uri(uri)
-    }
+    // #[must_use]
+    // pub(crate) fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Value> {
+    //     self.store().get_by_uri(uri)
+    // }
 
     pub(crate) fn insert_value(
         &mut self,

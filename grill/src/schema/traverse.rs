@@ -357,10 +357,7 @@ type Instances<'i> =
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use super::*;
-
     use crate::{
         keyword,
         schema::{CompiledSchema, Reference},
@@ -369,6 +366,7 @@ mod tests {
     };
     use jsonptr::Pointer;
     use serde_json::json;
+    use std::{borrow::Cow, collections::HashMap};
 
     fn id_paths(schema: Schema<'_>) -> String {
         schema.id.unwrap().path_or_nss().to_owned()
@@ -535,22 +533,22 @@ mod tests {
                 let id = format!("{r}/subschema_{n}");
                 let sub_key = schemas.insert(create_schema(id, &mut sources)).unwrap();
                 {
-                    let sub = schemas.get_mut_unchecked(sub_key);
+                    let sub = schemas.get_mut(sub_key).unwrap();
                     sub.parent = Some(root_key);
                 }
                 {
-                    let root = schemas.get_mut_unchecked(root_key);
+                    let root = schemas.get_mut(root_key).unwrap();
                     root.subschemas.push(sub_key);
                 }
                 for n2 in 'a'..'d' {
                     let id = format!("{r}/subschema_{n}/nested_subschema_{n2}");
                     let sub_sub_key = schemas.insert(create_schema(id, &mut sources)).unwrap();
                     {
-                        let sub_sub = schemas.get_mut_unchecked(sub_sub_key);
+                        let sub_sub = schemas.get_mut(sub_sub_key).unwrap();
                         sub_sub.parent = Some(sub_key);
                     }
                     {
-                        let parent = schemas.get_mut_unchecked(sub_key);
+                        let parent = schemas.get_mut(sub_key).unwrap();
                         parent.subschemas.push(sub_sub_key);
                     }
                     for n3 in 'a'..'d' {
@@ -560,11 +558,11 @@ mod tests {
                             ), &mut sources))
                             .unwrap();
                         {
-                            let sub_sub_sub = schemas.get_mut_unchecked(sub_sub_sub_key);
+                            let sub_sub_sub = schemas.get_mut(sub_sub_sub_key).unwrap();
                             sub_sub_sub.parent = Some(sub_sub_key);
                         }
                         {
-                            let parent = schemas.get_mut_unchecked(sub_sub_key);
+                            let parent = schemas.get_mut(sub_sub_key).unwrap();
                             parent.subschemas.push(sub_sub_key);
                         }
                     }
@@ -576,17 +574,17 @@ mod tests {
                     .insert(create_schema(uri.clone(), &mut sources))
                     .unwrap();
                 {
-                    let root = schemas.get_mut_unchecked(root_key);
+                    let root = schemas.get_mut(root_key).unwrap();
                     root.references.push(Reference {
                         src_key: SourceKey::default(),
                         key: dep_key,
-                        ref_path: Pointer::default(),
-                        uri: uri.clone(),
+                        absolute_uri: uri.clone(),
+                        uri: uri.clone().into(),
                         keyword: keyword::REF,
                     });
                 }
                 {
-                    let dep = schemas.get_mut_unchecked(dep_key);
+                    let dep = schemas.get_mut(dep_key).unwrap();
                     dep.dependents.push(root_key);
                 }
                 for t in 'a'..='d' {
@@ -595,17 +593,17 @@ mod tests {
                         .insert(create_schema(uri.clone(), &mut sources))
                         .unwrap();
                     {
-                        let dep = schemas.get_mut_unchecked(dep_key);
+                        let dep = schemas.get_mut(dep_key).unwrap();
                         dep.references.push(Reference {
                             src_key: SourceKey::default(),
                             key: transitive_dep_key,
-                            ref_path: Pointer::default(),
-                            uri: uri.clone(),
+                            absolute_uri: uri.clone(),
+                            uri: uri.clone().into(),
                             keyword: keyword::REF,
                         });
                     }
                     {
-                        let transitive_dep = schemas.get_mut_unchecked(transitive_dep_key);
+                        let transitive_dep = schemas.get_mut(transitive_dep_key).unwrap();
                         transitive_dep.dependents.push(dep_key);
                     }
                     for t2 in 'a'..'d' {
@@ -618,7 +616,7 @@ mod tests {
                             ))
                             .unwrap();
                         {
-                            let transitive_dep = schemas.get_mut_unchecked(transitive_dep_key);
+                            let transitive_dep = schemas.get_mut(transitive_dep_key).unwrap();
                             let uri = create_test_uri(
                                 "{r}/dependency_{d}/transitive_{t}/distant_transitive_{t2}",
                             );
@@ -626,13 +624,13 @@ mod tests {
                             transitive_dep.references.push(Reference {
                                 src_key: SourceKey::default(),
                                 key: transitive_dep_key_2,
-                                ref_path: Pointer::default(),
-                                uri: uri.clone(),
+                                absolute_uri: uri.clone(),
+                                uri: uri.clone().into(),
                                 keyword: keyword::REF,
                             });
                         }
                         {
-                            let transitive_dep_2 = schemas.get_mut_unchecked(transitive_dep_key_2);
+                            let transitive_dep_2 = schemas.get_mut(transitive_dep_key_2).unwrap();
                             transitive_dep_2.dependents.push(transitive_dep_key);
                         }
                     }
@@ -668,9 +666,10 @@ mod tests {
             id: Some(uri.clone()),
             anchors: Vec::default(),
             parent: None,
-            references: vec![],
-            dependents: vec![],
-            keywords: vec![].into_boxed_slice(),
+            references: Vec::new(),
+            dependents: Vec::new(),
+            keywords: Vec::new().into_boxed_slice(),
+            ref_lookup: HashMap::default(),
             subschemas: vec![],
             uris: vec![uri.clone()],
             link,

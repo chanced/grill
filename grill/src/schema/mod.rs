@@ -9,7 +9,7 @@ pub mod dialect;
 pub use dialect::{Dialect, Dialects};
 
 mod reference;
-pub use reference::Reference;
+pub use reference::{Ref, Reference};
 
 mod schema;
 pub(crate) use schema::{CompiledSchema, Schemas};

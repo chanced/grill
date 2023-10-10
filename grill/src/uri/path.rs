@@ -38,6 +38,7 @@ pub fn normalize(path: &str) -> Cow<'_, str> {
 /// use grill::uri::path::merge;
 /// assert_eq!(merge("/path/to", "file"), "/path/to/file");
 /// ```
+#[must_use]
 pub fn merge(base: &str, path: &str) -> String {
     let mut buf = PathBuf::from(base);
     buf.push(path);
@@ -51,6 +52,7 @@ pub fn merge(base: &str, path: &str) -> String {
 /// use grill::uri::path::resolve;
 /// assert_eq!(resolve("/path/to/other", "../file"), "/path/to/file");
 /// ```
+#[must_use]
 pub fn resolve(base: &str, path: &str) -> String {
     let buf = merge(base, path);
     crate::uri::path::normalize(&buf).into_owned()

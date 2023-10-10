@@ -1,8 +1,8 @@
 use super::{Compile, Context};
 use crate::{
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, UriError},
-    output::{self, Translations},
-    schema::{Anchor, Identifier, Reference},
+    output::{self, Translator},
+    schema::{Anchor, Identifier, Ref},
     AbsoluteUri, Schema,
 };
 use async_trait::async_trait;
@@ -84,7 +84,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
         value: &'v Value,
     ) -> Result<Option<output::Output<'v>>, EvaluateError>;
 
-    fn set_translate(&mut self, lang: Translations) -> Result<(), Unimplemented> {
+    fn set_translate(&mut self, translator: &Translator) -> Result<(), Unimplemented> {
         Err(Unimplemented)
     }
 
@@ -141,10 +141,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
-    fn references(
-        &self,
-        schema: &Value,
-    ) -> Result<Result<Vec<Reference>, UriError>, Unimplemented> {
+    fn refs(&self, schema: &Value) -> Result<Result<Vec<Ref>, UriError>, Unimplemented> {
         Err(Unimplemented)
     }
 }

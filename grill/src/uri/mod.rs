@@ -185,6 +185,7 @@ mod write;
 
 mod encode;
 mod path;
+pub use path::{merge, normalize, resolve};
 
 #[cfg(test)]
 mod test;

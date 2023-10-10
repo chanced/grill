@@ -419,11 +419,6 @@ impl Borrow<[u8]> for AbsoluteUri {
     }
 }
 
-impl AsRef<str> for AbsoluteUri {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
 impl From<&AbsoluteUri> for AbsoluteUri {
     fn from(value: &AbsoluteUri) -> Self {
         value.clone()

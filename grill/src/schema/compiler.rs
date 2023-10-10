@@ -10,6 +10,7 @@ use crate::{
     keyword::{Compile, Keyword, NumberCache, ValueCache},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
+    uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator, Key,
 };
 
@@ -48,10 +49,19 @@ impl<'i> Compiler<'i> {
             .await
     }
 
-    pub(crate) async fn compile_all(
+    pub(crate) async fn compile_all<I>(
         mut self,
-        uris: impl IntoIterator<Item = AbsoluteUri>,
-    ) -> Result<Vec<(AbsoluteUri, Key)>, CompileError> {
+        uris: I,
+    ) -> Result<Vec<(AbsoluteUri, Key)>, CompileError>
+    where
+        I: IntoIterator,
+        I::Item: TryIntoAbsoluteUri,
+    {
+        let uris = uris
+            .into_iter()
+            .map(TryIntoAbsoluteUri::try_into_absolute_uri)
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mut keys = Vec::new();
         for uri in uris {
             let (link, _) = self
@@ -67,6 +77,8 @@ impl<'i> Compiler<'i> {
         }
         Ok(keys)
     }
+
+    // TODO: make this linear, dropping recursion
 
     #[async_recursion]
     async fn compile_schema(
@@ -185,19 +197,35 @@ impl<'i> Compiler<'i> {
         source: &Value,
         dialect: &Dialect,
     ) -> Result<Vec<Reference>, CompileError> {
-        let mut references = dialect.references(source)?;
-        for reference in &mut references {
+        let refs = dialect.refs(source)?;
+        let base_uri = self
+            .schemas
+            .get(key, self.sources)
+            .unwrap()
+            .absolute_uri()
+            .clone();
+        let mut references = Vec::with_capacity(refs.len());
+        for ref_ in refs {
+            let absolute_uri = base_uri.resolve(&ref_.uri)?;
             let (ref_link, _) = self
                 .sources
-                .resolve(reference.uri.clone(), self.resolvers, self.deserializers)
+                .resolve(absolute_uri.clone(), self.resolvers, self.deserializers)
                 .await?;
             let ref_link = ref_link.clone();
+
             let ref_key = self
-                .compile_schema(None, ref_link, None, self.dialects.clone())
+                .compile_schema(None, ref_link.clone(), None, self.dialects.clone())
                 .await?;
-            reference.key = ref_key;
+            let reference = Reference {
+                src_key: ref_link.key,
+                key: ref_key,
+                uri: ref_.uri,
+                absolute_uri,
+                keyword: ref_.keyword,
+            };
             let ref_schema = self.schemas.get_mut(ref_key).unwrap();
             ref_schema.dependents.push(key);
+            references.push(reference);
         }
         Ok(references)
     }

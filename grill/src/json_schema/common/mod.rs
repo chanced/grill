@@ -1,7 +1,9 @@
 pub mod comment;
 pub mod const_;
+pub mod defs;
 pub mod enum_;
 pub mod id;
 pub mod read_only;
+pub mod ref_;
 pub mod schema;
 pub mod write_only;

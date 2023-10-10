@@ -127,9 +127,9 @@ impl<'v> OutputError<'v> for Error<'v> {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        lang: &crate::output::Translations,
+        translator: &crate::output::Translator,
     ) -> std::fmt::Result {
-        if let Some(translate) = lang.get::<Translate>() {
+        if let Some(translate) = translator.get::<Translate>() {
             translate.run(f, self)
         } else {
             self.translate.run(f, self)

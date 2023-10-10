@@ -18,26 +18,27 @@ impl keyword::Keyword for Keyword {
     }
     async fn compile<'i>(
         &mut self,
-        _compile: &mut Compile<'i>,
+        compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
         let Some(value) = schema.get(keyword::READ_ONLY) else {
             return Ok(false);
         };
-        let Value::Bool(_value) = value else {
+        if !matches!(value, Value::Bool(_)) {
             return Err(InvalidTypeError {
                 expected_type: ExpectedType::Bool,
                 found: value.clone(),
             }
             .into());
-        };
-		todo!()
+        }
+        self.value = compile.value(value);
+        Ok(true)
     }
     async fn evaluate<'i, 'v>(
         &'i self,
-        _ctx: &'i mut keyword::Context,
+        ctx: &'i mut keyword::Context,
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
-        Ok(None)
+        Ok(Some(ctx.annotate(Some(self.value.clone().into()))))
     }
 }

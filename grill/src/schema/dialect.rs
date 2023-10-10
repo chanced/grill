@@ -22,7 +22,7 @@ use std::{
     ops::Deref,
 };
 
-use super::{Anchor, Reference};
+use super::{Anchor, Ref};
 
 pub struct Builder {
     id: AbsoluteUri,
@@ -94,7 +94,7 @@ impl Dialect {
         let dialect_indexes = find_dialect_indexes(&id, &keywords)?;
         let subschemas_indexes = find_impl_indexes(&keywords, Keyword::subschemas);
         let anchors_indexes = find_impl_indexes(&keywords, Keyword::anchors);
-        let references_indexes = find_impl_indexes(&keywords, Keyword::references);
+        let references_indexes = find_impl_indexes(&keywords, Keyword::refs);
         if !metaschemas.contains_key(&id) {
             return Err(DialectError::DefaultNotFound(id));
         }
@@ -173,13 +173,13 @@ impl Dialect {
             .collect()
     }
 
-    pub fn references(&self, source: &Value) -> Result<Vec<Reference>, UriError> {
+    pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, UriError> {
         let mut refs = Vec::new();
         for res in self
             .references_indexes
             .iter()
             .copied()
-            .map(|idx| self.keywords[idx as usize].references(source).unwrap())
+            .map(|idx| self.keywords[idx as usize].refs(source).unwrap())
         {
             refs.append(&mut res?);
         }
