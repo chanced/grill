@@ -9,15 +9,16 @@ use crate::{
         UnknownKeyError,
     },
     json_schema,
-    keyword::{self, NumberCache, ValueCache},
+    keyword::{self, Numbers, Values},
     output::{Output, Structure},
     schema::{
+        compiler::Compiler,
         iter::{Iter, IterUnchecked},
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
         },
-        Compiler, Dialect, Dialects, Key, Schema, Schemas,
+        Dialect, Dialects, Key, Schema, Schemas,
     },
     source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
@@ -34,8 +35,8 @@ pub struct Interrogator {
     pub(crate) resolvers: Resolvers,
     pub(crate) schemas: Schemas,
     pub(crate) deserializers: Deserializers,
-    pub(crate) numbers: NumberCache,
-    pub(crate) values: ValueCache,
+    pub(crate) numbers: Numbers,
+    pub(crate) values: Values,
     pub(crate) state: AnyMap,
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    error::{CompileError, EvaluateError, ExpectedType, InvalidTypeError},
+    error::{CompileError, EvaluateError, Expected, UnexpectedTypeError},
     keyword::{self, Compile},
     Output, Schema,
 };
@@ -25,9 +25,9 @@ impl keyword::Keyword for Keyword {
             return Ok(false);
         };
         if !matches!(value, Value::Bool(_)) {
-            return Err(InvalidTypeError {
-                expected_type: ExpectedType::Bool,
-                found: value.clone(),
+            return Err(UnexpectedTypeError {
+                expected: Expected::Bool,
+                actual: value.clone(),
             }
             .into());
         }

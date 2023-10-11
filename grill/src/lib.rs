@@ -57,9 +57,6 @@ pub mod source;
 pub(crate) use source::Src;
 
 
-#[cfg(test)]
-pub mod test;
-
 pub mod big;
 
 pub mod anymap;

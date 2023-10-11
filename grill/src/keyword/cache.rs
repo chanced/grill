@@ -20,21 +20,21 @@ lazy_static! {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                              Value Cache                              ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
+║                                Values                                 ║
+║                                ¯¯¯¯¯¯                                 ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 #[derive(Clone, Debug, Default)]
-pub struct ValueCache {
+pub struct Values {
     strings: Vec<Arc<Value>>,
     numbers: Vec<Arc<Value>>,
     objects: HashMap<usize, Vec<Arc<Value>>, BuildHasherDefault<LenHasher>>,
     arrays: HashMap<usize, Vec<Arc<Value>>, BuildHasherDefault<LenHasher>>,
 }
 
-impl ValueCache {
+impl Values {
     /// Returns an `Arc<Value>` representation of `value`, either by returning
     /// an existing cached instance or inserts and returns a new instance.
     #[must_use]
@@ -110,19 +110,19 @@ fn get_bool(value: bool) -> Arc<Value> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                              Number Cache                             ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯¯                             ║
+║                                Numbers                                ║
+║                                ¯¯¯¯¯¯¯                                ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 #[derive(Debug, Default, Clone)]
-pub struct NumberCache {
+pub struct Numbers {
     rationals: HashMap<String, Arc<BigRational>>,
     // ints: HashMap<String, Arc<BigInt>>,
 }
 
-impl NumberCache {
+impl Numbers {
     pub fn number(&mut self, value: &Number) -> Result<Arc<BigRational>, NumberError> {
         use std::collections::hash_map::Entry::{Occupied, Vacant};
         match self.rationals.entry(value.to_string()) {

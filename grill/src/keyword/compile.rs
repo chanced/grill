@@ -10,14 +10,14 @@ use crate::{
     AbsoluteUri, Key, Uri,
 };
 
-use super::{NumberCache, ValueCache};
+use super::{Numbers, Values};
 
 #[derive(Debug)]
 pub struct Compile<'i> {
     pub(crate) base_uri: &'i AbsoluteUri,
     pub(crate) schemas: &'i Schemas,
-    pub(crate) numbers: &'i mut NumberCache,
-    pub(crate) value_cache: &'i mut ValueCache,
+    pub(crate) numbers: &'i mut Numbers,
+    pub(crate) value_cache: &'i mut Values,
     pub(crate) state: &'i mut AnyMap,
 }
 
@@ -56,7 +56,7 @@ impl<'i> Compile<'i> {
         let uri: Uri = uri.parse()?;
         let uri = self.base_uri.resolve(&uri)?;
         self.schemas
-            .get_key_by_id(&uri)
+            .get_key(&uri)
             .ok_or(CompileError::SchemaNotFound(uri))
     }
 }

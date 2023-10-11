@@ -275,13 +275,13 @@ impl Sources {
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<Link, SourceError> {
-        let (link, _) = self.resolve(uri, resolvers, deserializers).await?;
+        let (link, _) = self.resolve(&uri, resolvers, deserializers).await?;
         Ok(link.clone())
     }
 
     pub(crate) async fn resolve(
         &mut self,
-        uri: AbsoluteUri,
+        uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
@@ -361,7 +361,7 @@ impl Sources {
     }
     async fn resolve_external(
         &mut self,
-        uri: AbsoluteUri,
+        uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
@@ -401,8 +401,8 @@ impl Sources {
         Ok((link, src))
     }
 
-    fn resolve_internal(&self, uri: AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
-        let link = self.store().get_link(&uri).unwrap();
+    fn resolve_internal(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
+        let link = self.store().get_link(uri).unwrap();
         let mut src = self.store().get(link.key);
         if !link.path.is_empty() {
             src = src.resolve(&link.path).map_err(PointerError::from)?;
@@ -446,7 +446,7 @@ mod tests {
         let deserializers = Deserializers::new(vec![]);
         sources.start_txn();
         let (link, src) = sources
-            .resolve(uri.clone(), &resolvers, &deserializers)
+            .resolve(&uri, &resolvers, &deserializers)
             .await
             .unwrap();
         assert_eq!(src, &get_value());
@@ -461,7 +461,7 @@ mod tests {
         let mut uri: AbsoluteUri = base_uri.clone();
         uri.set_fragment(Some("/foo")).unwrap();
         let (link, src) = sources
-            .resolve(uri.clone(), &resolvers, &deserializers)
+            .resolve(&uri, &resolvers, &deserializers)
             .await
             .unwrap();
         assert_eq!(src, &value["foo"]);
@@ -469,7 +469,7 @@ mod tests {
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
         let (link, src) = sources
-            .resolve(base_uri.clone(), &resolvers, &deserializers)
+            .resolve(&base_uri, &resolvers, &deserializers)
             .await
             .unwrap();
         assert_eq!(src, &value);
@@ -488,7 +488,7 @@ mod tests {
         uri.set_fragment(Some("foo")).unwrap();
 
         let (link, src) = sources
-            .resolve(uri.clone(), &resolvers, &deserializers)
+            .resolve(&uri, &resolvers, &deserializers)
             .await
             .unwrap();
         assert_eq!(link.path, Pointer::default());

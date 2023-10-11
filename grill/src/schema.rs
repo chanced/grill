@@ -1,17 +1,23 @@
+pub mod iter;
+
+pub mod traverse;
+
+pub mod dialect;
+pub use dialect::{Dialect, Dialects};
+
+pub(crate) mod compiler;
+
 use crate::{
     anymap::AnyMap,
     error::{
         CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
     },
     keyword::{Context, Keyword},
-    schema::{
-        traverse::{
-            AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
-            TransitiveDependencies,
-        },
-        Anchor, Reference,
+    schema::traverse::{
+        AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
+        TransitiveDependencies,
     },
-    source::{Link, Source, Sources},
+    source::{Link, Source, SourceKey, Sources},
     AbsoluteUri, Output, Structure, Uri,
 };
 use jsonptr::Pointer;
@@ -24,8 +30,30 @@ use std::{
     ops::Deref,
 };
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                  Key                                  ║
+║                                  ¯¯¯                                  ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 new_key_type! {
     pub struct Key;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Anchor {
+    /// Value of the anchor.  
+    pub name: String,
+    /// Path to the anchor
+    pub path: Pointer,
+    /// Path to the object which contains the anchor
+    pub container_path: Pointer,
+    /// The keyword of the anchor, e.g. `"$anchor"`, `"$dynamicAnchor"`, `"$recursiveAnchor"`
+    pub keyword: &'static str,
 }
 
 /*
@@ -60,10 +88,6 @@ pub(crate) struct CompiledSchema {
 
     ///  Referenced dependencies of this `Schema`.
     pub(crate) references: Vec<Reference>,
-
-    /// A map of URIs to `Key`s for all schemas which are referenced by this
-    /// schema
-    pub(crate) ref_lookup: HashMap<Uri, Key>,
 
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
@@ -101,7 +125,6 @@ impl CompiledSchema {
             subschemas: Vec::new(),
             dependents: Vec::new(),
             references: Vec::new(),
-            ref_lookup: HashMap::new(),
             anchors,
             keywords: Box::default(),
         }
@@ -164,10 +187,6 @@ pub struct Schema<'i> {
     ///  Dependencies of this `Schema`.
     pub references: Cow<'i, [Reference]>,
 
-    /// A map of URIs to `Key`s for all schemas which are referenced by this
-    /// schema
-    pub ref_lookup: Cow<'i, HashMap<Uri, Key>>,
-
     /// Compiled [`Keyword`]s.
     pub keywords: Cow<'i, [Box<dyn Keyword>]>,
 
@@ -178,7 +197,7 @@ pub struct Schema<'i> {
 
 impl<'i> Schema<'i> {
     #[must_use]
-    pub fn into_owned(self) -> Schema<'static> {
+    pub fn make_owned(self) -> Schema<'static> {
         Schema {
             key: self.key,
             parent: self.parent,
@@ -190,7 +209,6 @@ impl<'i> Schema<'i> {
             anchors: Cow::Owned(self.anchors.into_owned()),
             dependents: Cow::Owned(self.dependents.into_owned()),
             references: Cow::Owned(self.references.into_owned()),
-            ref_lookup: Cow::Owned(self.ref_lookup.into_owned()),
             keywords: Cow::Owned(self.keywords.into_owned()),
             subschemas: Cow::Owned(self.subschemas.into_owned()),
         }
@@ -397,7 +415,7 @@ impl Schemas {
         }
         &self.store
     }
-    pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
+    pub(crate) fn get_key(&self, id: &AbsoluteUri) -> Option<Key> {
         self.store().get_index(id)
     }
     pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
@@ -483,7 +501,6 @@ impl Schemas {
             keywords: Cow::Borrowed(&schema.keywords),
             parent: schema.parent,
             references: Cow::Borrowed(&schema.references),
-            ref_lookup: Cow::Borrowed(&schema.ref_lookup),
             dependents: Cow::Borrowed(&schema.dependents),
             subschemas: Cow::Borrowed(&schema.subschemas),
             anchors: Cow::Borrowed(&schema.anchors),
@@ -506,11 +523,6 @@ impl Schemas {
     ) -> Option<Schema<'i>> {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
-    }
-
-    #[must_use]
-    pub(crate) fn get_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
-        self.get_index(id)
     }
 
     /// Starts a new transaction.
@@ -538,5 +550,88 @@ impl Schemas {
         self.store().contains_uri(uri)
     }
 }
+
+#[derive(Debug)]
+pub struct Ref {
+    pub uri: Uri,
+    pub keyword: &'static str,
+}
+
+/// A reference to a schema.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+    pub(crate) src_key: SourceKey,
+    /// Key to the referenced [`Schema`]
+    pub key: Key,
+    /// The referenced URI
+    pub uri: Uri,
+    /// The resolved Absolute URI
+    pub absolute_uri: AbsoluteUri,
+    /// The keyword of the reference (e.g. $ref, $dynamicRef, $recursiveRef, etc)
+    pub keyword: &'static str,
+}
+
+impl Reference {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Identifier {
+    Primary(Uri),
+    Secondary(Uri),
+}
+
+impl Identifier {
+    /// Returns `true` if the identifier is [`Primary`].
+    ///
+    /// [`Primary`]: Identifier::Primary
+    #[must_use]
+    pub fn is_primary(&self) -> bool {
+        matches!(self, Self::Primary(..))
+    }
+
+    /// Returns `true` if the identifier is [`Secondary`].
+    ///
+    /// [`Secondary`]: Identifier::Secondary
+    #[must_use]
+    pub fn is_secondary(&self) -> bool {
+        matches!(self, Self::Secondary(..))
+    }
+
+    #[must_use]
+    pub fn uri(&self) -> &Uri {
+        match self {
+            Self::Secondary(uri) | Self::Primary(uri) => uri,
+        }
+    }
+
+    #[must_use]
+    pub fn take_uri(self) -> Uri {
+        match self {
+            Self::Secondary(uri) | Self::Primary(uri) => uri,
+        }
+    }
+}
+
+impl PartialEq<Uri> for Identifier {
+    fn eq(&self, other: &Uri) -> bool {
+        match self {
+            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
+        }
+    }
+}
+impl PartialEq<AbsoluteUri> for Identifier {
+    fn eq(&self, other: &AbsoluteUri) -> bool {
+        match self {
+            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
+        }
+    }
+}
+impl PartialEq<str> for Identifier {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {}

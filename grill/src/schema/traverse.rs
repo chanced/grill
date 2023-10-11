@@ -58,7 +58,7 @@ where
     type Item = Schema<'static>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(Schema::into_owned)
+        self.iter.next().map(Schema::make_owned)
     }
 }
 
@@ -359,14 +359,14 @@ type Instances<'i> =
 mod tests {
     use super::*;
     use crate::{
-        keyword,
+        json_schema,
         schema::{CompiledSchema, Reference},
         source::{deserialize_json, Deserializers, SourceKey},
         AbsoluteUri, Key,
     };
     use jsonptr::Pointer;
     use serde_json::json;
-    use std::{borrow::Cow, collections::HashMap};
+    use std::borrow::Cow;
 
     fn id_paths(schema: Schema<'_>) -> String {
         schema.id.unwrap().path_or_nss().to_owned()
@@ -393,7 +393,7 @@ mod tests {
         let (_, schemas, sources) = build_graph();
         let leaf_id =
             create_test_uri("/a/subschema_a/nested_subschema_a/deeply_nested_subschema_a");
-        let leaf_key = schemas.get_key_by_id(&leaf_id).unwrap();
+        let leaf_key = schemas.get_key(&leaf_id).unwrap();
         let traverse = Ancestors::new(leaf_key, &schemas, &sources);
         let ids = traverse.map(id_paths).collect::<Vec<_>>();
 
@@ -407,7 +407,7 @@ mod tests {
     fn test_all_dependents() {
         let (_, schemas, sources) = build_graph();
         let leaf_id = create_test_uri("/a/dependency_b/transitive_b/distant_transitive_c");
-        let leaf_key = schemas.get_key_by_id(&leaf_id).unwrap();
+        let leaf_key = schemas.get_key(&leaf_id).unwrap();
 
         let traverse = AllDependents::new(leaf_key, &schemas, &sources);
 
@@ -580,7 +580,7 @@ mod tests {
                         key: dep_key,
                         absolute_uri: uri.clone(),
                         uri: uri.clone().into(),
-                        keyword: keyword::REF,
+                        keyword: json_schema::REF,
                     });
                 }
                 {
@@ -599,7 +599,7 @@ mod tests {
                             key: transitive_dep_key,
                             absolute_uri: uri.clone(),
                             uri: uri.clone().into(),
-                            keyword: keyword::REF,
+                            keyword: json_schema::REF,
                         });
                     }
                     {
@@ -626,7 +626,7 @@ mod tests {
                                 key: transitive_dep_key_2,
                                 absolute_uri: uri.clone(),
                                 uri: uri.clone().into(),
-                                keyword: keyword::REF,
+                                keyword: json_schema::REF,
                             });
                         }
                         {
@@ -669,7 +669,6 @@ mod tests {
             references: Vec::new(),
             dependents: Vec::new(),
             keywords: Vec::new().into_boxed_slice(),
-            ref_lookup: HashMap::default(),
             subschemas: vec![],
             uris: vec![uri.clone()],
             link,

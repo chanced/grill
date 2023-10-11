@@ -97,8 +97,8 @@ fn test_base_path_segments() {
 #[test]
 fn test_join() {
     let base = "/a/b/c";
-    assert_eq!(crate::uri::path::merge(base, "x/y/z"), "/a/b/c/x/y/z");
-    assert_eq!(crate::uri::path::merge(base, "/x/y/z"), "/x/y/z");
+    assert_eq!(super::merge(base, "x/y/z"), "/a/b/c/x/y/z");
+    assert_eq!(super::merge(base, "/x/y/z"), "/x/y/z");
 }
 
 #[test]

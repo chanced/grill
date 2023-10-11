@@ -3,8 +3,8 @@
 
 use crate::{
     error::{
-        AnchorError, DialectError, DialectExistsError, DialectsError, IdentifyError, Unimplemented,
-        UriError,
+        AnchorError, DialectError, DialectExistsError, DialectsError, IdentifyError, RefError,
+        Unimplemented,
     },
     keyword::Keyword,
     uri::AbsoluteUri,
@@ -161,10 +161,10 @@ impl Dialect {
     /// `Keyword` of this `Dialect`.
     ///
     #[must_use]
-    pub fn subschemas(&self, path: &Pointer, source: &Value) -> HashSet<Pointer> {
+    pub fn subschemas(&self, path: &Pointer, src: &Value) -> HashSet<Pointer> {
         self.subschemas_indexes
             .iter()
-            .flat_map(|&idx| self.keywords[idx as usize].subschemas(source).unwrap())
+            .flat_map(|&idx| self.keywords[idx as usize].subschemas(src).unwrap())
             .map(|p| {
                 let mut path = path.clone();
                 path.append(&p);
@@ -173,7 +173,7 @@ impl Dialect {
             .collect()
     }
 
-    pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, UriError> {
+    pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, RefError> {
         let mut refs = Vec::new();
         for res in self
             .references_indexes
@@ -354,6 +354,7 @@ impl<'i> Dialects<'i> {
             .find(|(_, d)| d.id == *id)
             .map(|(idx, _)| idx)
     }
+
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
     /// upon the first [`Keyword`] in each
     /// [`Dialect`](`crate::dialect::Dialect`) or `None` if a [`Dialect`] cannot
@@ -364,6 +365,15 @@ impl<'i> Dialects<'i> {
             .iter()
             .find(|&dialect| dialect.is_pertinent_to(schema))
             .map(|d| &**d)
+    }
+
+    #[must_use]
+    pub fn pertinent_to_idx(&self, schema: &Value) -> Option<usize> {
+        self.dialects
+            .iter()
+            .enumerate()
+            .find(|(_, dialect)| dialect.is_pertinent_to(schema))
+            .map(|(idx, _)| idx)
     }
 
     /// Appends a [`Dialect`].
