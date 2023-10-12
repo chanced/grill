@@ -4,12 +4,9 @@ use jsonptr::Pointer;
 use serde_json::Value;
 
 use crate::{
-    error::{
-        CompileError, DeserializeError, DialectUnknownError, EvaluateError, SourceError,
-        UnknownKeyError,
-    },
+    error::{CompileError, DeserializeError, EvaluateError, SourceError, UnknownKeyError},
     json_schema,
-    keyword::{self, Numbers, Values},
+    keyword::{Numbers, Values},
     output::{Output, Structure},
     schema::{
         compiler::Compiler,
@@ -30,7 +27,7 @@ use crate::anymap::AnyMap;
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator {
-    pub(crate) dialects: Dialects<'static>,
+    pub(crate) dialects: Dialects,
     pub(crate) sources: Sources,
     pub(crate) resolvers: Resolvers,
     pub(crate) schemas: Schemas,
@@ -316,8 +313,8 @@ impl Interrogator {
     }
 
     #[must_use]
-    pub fn dialects(&self) -> Dialects<'_> {
-        self.dialects.as_borrowed()
+    pub fn dialects(&self) -> &Dialects {
+        &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
@@ -326,25 +323,25 @@ impl Interrogator {
         self.dialects.primary()
     }
 
-    /// Returns the [`Dialect`] for the given schema, if any.
-    pub fn determine_dialect(
-        &self,
-        schema: &Value,
-    ) -> Result<Option<&Dialect>, DialectUnknownError> {
-        if let Some(schema) = self.dialects.pertinent_to(schema) {
-            return Ok(Some(schema));
-        }
-        // TODO: this is the only place outside of a Keyword that a specific
-        // json schema keyword is used. This should be refactored.
-        match schema
-            .get(keyword::SCHEMA)
-            .and_then(Value::as_str)
-            .map(ToString::to_string)
-        {
-            Some(metaschema_id) => Err(DialectUnknownError { metaschema_id }),
-            None => Ok(None),
-        }
-    }
+    // /// Returns the [`Dialect`] for the given schema, if any.
+    // pub fn determine_dialect(
+    //     &self,
+    //     schema: &Value,
+    // ) -> Result<Option<&Dialect>, DialectUnknownError> {
+    //     if let Some(schema) = self.dialects.pertinent_to(schema) {
+    //         return Ok(Some(schema));
+    //     }
+    //     // TODO: this is the only place outside of a Keyword that a specific
+    //     // json schema keyword is used. This should be refactored.
+    //     match schema
+    //         .get(json_schema::SCHEMA)
+    //         .and_then(Value::as_str)
+    //         .map(ToString::to_string)
+    //     {
+    //         Some(metaschema_id) => Err(DialectUnknownError { metaschema_id }),
+    //         None => Ok(None),
+    //     }
+    // }
 
     pub async fn evaluate<'v>(
         &self,

@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
-    error::{IdentifyError, Unimplemented},
-    keyword::{self, Kind},
+    error::IdentifyError,
+    keyword::{self, Kind, Unimplemented},
     uri::AbsoluteUri,
 };
 
@@ -59,7 +59,7 @@ impl keyword::Keyword for Keyword {
         Ok(Ok(Some(uri)))
     }
 
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut crate::keyword::Compile<'i>,
         _schema: crate::Schema<'i>,
@@ -67,7 +67,7 @@ impl keyword::Keyword for Keyword {
         Ok(false)
     }
 
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         _ctx: &'i mut crate::keyword::Context,
         _value: &'v Value,

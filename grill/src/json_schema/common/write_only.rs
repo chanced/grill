@@ -1,9 +1,9 @@
 use crate::{
     error::{CompileError, EvaluateError, Expected, UnexpectedTypeError},
+    json_schema,
     keyword::{self, Compile},
     Output, Schema,
 };
-use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -11,17 +11,16 @@ use std::sync::Arc;
 pub struct Keyword {
     pub value: Arc<Value>,
 }
-#[async_trait]
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(keyword::WRITE_ONLY)
+        keyword::Kind::Single(json_schema::WRITE_ONLY)
     }
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
-        let Some(value) = schema.get(keyword::WRITE_ONLY) else {
+        let Some(value) = schema.get(json_schema::WRITE_ONLY) else {
             return Ok(false);
         };
         if !matches!(value, Value::Bool(_)) {
@@ -34,7 +33,7 @@ impl keyword::Keyword for Keyword {
         self.value = compile.value(value);
         Ok(true)
     }
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut keyword::Context,
         _value: &'v Value,

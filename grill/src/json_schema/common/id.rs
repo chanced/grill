@@ -1,11 +1,10 @@
 use std::fmt::Display;
 
-use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
-    error::{IdentifyError, Unimplemented},
-    keyword::{self, Kind},
+    error::IdentifyError,
+    keyword::{self, Kind, Unimplemented},
     schema::Identifier,
     Uri,
 };
@@ -40,7 +39,6 @@ impl Display for Keyword {
     }
 }
 
-#[async_trait]
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         self.keyword.into()
@@ -68,7 +66,7 @@ impl keyword::Keyword for Keyword {
         })
     }
 
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut keyword::Compile<'i>,
         _schema: crate::Schema<'i>,
@@ -76,7 +74,7 @@ impl keyword::Keyword for Keyword {
         Ok(false)
     }
 
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         _ctx: &'i mut keyword::Context,
         _value: &'v Value,

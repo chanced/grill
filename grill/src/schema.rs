@@ -113,7 +113,6 @@ impl CompiledSchema {
         uris: Vec<AbsoluteUri>,
         link: Link,
         parent: Option<Key>,
-        anchors: Vec<Anchor>,
     ) -> Self {
         Self {
             id,
@@ -122,10 +121,10 @@ impl CompiledSchema {
             metaschema: link.uri.clone(),
             parent,
             link,
-            subschemas: Vec::new(),
-            dependents: Vec::new(),
-            references: Vec::new(),
-            anchors,
+            subschemas: Vec::default(),
+            dependents: Vec::default(),
+            references: Vec::default(),
+            anchors: Vec::default(),
             keywords: Box::default(),
         }
     }
@@ -375,7 +374,7 @@ impl Schemas {
             false,
         );
         for keyword in &*schema.keywords {
-            if let Some(op) = keyword.evaluate(&mut ctx, value).await? {
+            if let Some(op) = keyword.evaluate(&mut ctx, value)? {
                 output.add(op);
             }
         }
@@ -401,6 +400,21 @@ impl Schemas {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn remove(&mut self, key: Key) {
+        let uri = self.get_uri(key);
+        self.sandbox().table.remove(key);
+        if let Some(uri) = uri {
+            self.sandbox().index.remove(uri);
+        }
+    }
+    pub(crate) fn get_uri(&mut self, key: Key) -> Option<&AbsoluteUri> {
+        self.store()
+            .index
+            .iter()
+            .find(|(_, v)| **v == key)
+            .map(|(k, _)| k)
     }
 
     fn sandbox(&mut self) -> &mut Store {
@@ -515,6 +529,14 @@ impl Schemas {
         self.sandbox().get_mut(key)
     }
 
+    pub(crate) fn add_reference(&mut self, referrer: Key, reference: Reference) {
+        todo!()
+    }
+
+    pub(crate) fn add_dependent(&mut self, dependent: Key, dependency: Key) {
+        todo!()
+    }
+
     #[must_use]
     pub(crate) fn get_by_uri<'i>(
         &'i self,
@@ -551,7 +573,7 @@ impl Schemas {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ref {
     pub uri: Uri,
     pub keyword: &'static str,
@@ -560,7 +582,6 @@ pub struct Ref {
 /// A reference to a schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reference {
-    pub(crate) src_key: SourceKey,
     /// Key to the referenced [`Schema`]
     pub key: Key,
     /// The referenced URI

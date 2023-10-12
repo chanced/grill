@@ -6,12 +6,11 @@ pub mod cache;
 use crate::{
     anymap::AnyMap,
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError},
-    output::{self, Annotation, Error, Translator, AnnotationOrError},
+    output::{self, Annotation, AnnotationOrError, Error, Translator},
     schema::{Anchor, Identifier, Ref, Schemas},
     source::Sources,
     AbsoluteUri, Key, Output, Schema, Structure,
 };
-use async_trait::async_trait;
 pub use cache::{Numbers, Values};
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
@@ -48,6 +47,8 @@ macro_rules! define_translate {
         }
     };
 }
+
+pub use define_translate;
 
 /// Contains global and evaluation level [`State`], schemas, and location
 /// information needed to [`evaluate`](`crate::Interrogator::evaluate`) a
@@ -187,7 +188,6 @@ impl From<&'static [&'static str]> for Kind {
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-#[async_trait]
 pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
     /// be the name of the keyword or `Composite`, which will be a list of
@@ -200,14 +200,14 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// If the keyword is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`evaluate`](`Self::evaluate`) should not
     /// be called for the given [`Schema`].
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,

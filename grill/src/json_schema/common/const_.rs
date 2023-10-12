@@ -1,8 +1,8 @@
 use std::{borrow::Cow, sync::Arc};
 
 use crate::big::parse_rational;
+use crate::json_schema;
 use crate::keyword::{define_translate, Kind};
-use async_trait::async_trait;
 use num_rational::BigRational;
 use serde_json::Value;
 
@@ -37,17 +37,16 @@ impl Keyword {
         }
     }
 }
-#[async_trait]
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
-        keyword::CONST.into()
+        json_schema::CONST.into()
     }
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
-        let Some(c) = schema.get(keyword::CONST) else {
+        let Some(c) = schema.get(json_schema::CONST) else {
             return Ok(false);
         };
         let expected = compile.value(c);
@@ -58,7 +57,7 @@ impl keyword::Keyword for Keyword {
         }
         Ok(true)
     }
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
@@ -153,8 +152,8 @@ mod tests {
     use super::{Keyword, *};
     async fn create_interrogator(const_value: Value) -> Interrogator {
         let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
-            .keyword(schema::Keyword::new(keyword::SCHEMA, false))
-            .keyword(id::Keyword::new(keyword::ID, false))
+            .keyword(schema::Keyword::new(json_schema::SCHEMA, false))
+            .keyword(id::Keyword::new(json_schema::ID, false))
             .keyword(Keyword::new(None))
             .metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .build()
@@ -193,7 +192,7 @@ mod tests {
             .keywords
             .iter()
             .map(|kw| kw.kind())
-            .any(|k| k == keyword::CONST));
+            .any(|k| k == json_schema::CONST));
         let key = interrogator
             .compile("https://example.com/without_const")
             .await
@@ -203,7 +202,7 @@ mod tests {
             .keywords
             .iter()
             .map(|kw| kw.kind())
-            .any(|k| k == keyword::CONST));
+            .any(|k| k == json_schema::CONST));
     }
 
     #[tokio::test]

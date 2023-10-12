@@ -576,7 +576,6 @@ mod tests {
                 {
                     let root = schemas.get_mut(root_key).unwrap();
                     root.references.push(Reference {
-                        src_key: SourceKey::default(),
                         key: dep_key,
                         absolute_uri: uri.clone(),
                         uri: uri.clone().into(),
@@ -595,7 +594,6 @@ mod tests {
                     {
                         let dep = schemas.get_mut(dep_key).unwrap();
                         dep.references.push(Reference {
-                            src_key: SourceKey::default(),
                             key: transitive_dep_key,
                             absolute_uri: uri.clone(),
                             uri: uri.clone().into(),
@@ -622,7 +620,6 @@ mod tests {
                             );
 
                             transitive_dep.references.push(Reference {
-                                src_key: SourceKey::default(),
                                 key: transitive_dep_key_2,
                                 absolute_uri: uri.clone(),
                                 uri: uri.clone().into(),

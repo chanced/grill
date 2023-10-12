@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use keyword::Unimplemented;
 use serde_json::Value;
 
@@ -15,12 +14,12 @@ pub struct Keyword {
     /// The key of the referenced schema.
     pub ref_key: Key,
 }
-#[async_trait]
+
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         Kind::Single(self.keyword)
     }
-    async fn compile<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
@@ -30,7 +29,7 @@ impl keyword::Keyword for Keyword {
         };
         todo!()
     }
-    async fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
