@@ -8,17 +8,14 @@ use crate::schema::Dialect;
 use super::metaschema;
 
 #[must_use]
-pub fn dialect() -> &'static Dialect {
-    static DIALECT: Lazy<Dialect> = Lazy::new(|| {
-        Dialect::builder(json_schema_2020_12_uri().clone())
-            .metaschema(
-                json_schema_2020_12_uri().clone(),
-                Cow::Borrowed(json_schema_2020_12_value()),
-            )
-            .build()
-            .unwrap()
-    });
-    &DIALECT
+pub fn dialect() -> Dialect {
+    Dialect::builder(json_schema_2020_12_uri().clone())
+        .metaschema(
+            json_schema_2020_12_uri().clone(),
+            Cow::Borrowed(json_schema_2020_12_value()),
+        )
+        .build()
+        .unwrap()
 }
 
 #[must_use]

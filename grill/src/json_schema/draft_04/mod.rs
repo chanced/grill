@@ -5,7 +5,7 @@ use crate::schema::Dialect;
 
 use super::metaschema;
 #[must_use]
-pub fn dialect() -> &'static Dialect {
+pub fn dialect() -> Dialect {
     todo!()
 }
 

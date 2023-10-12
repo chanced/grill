@@ -16,7 +16,7 @@ use crate::anymap::AnyMap;
 
 /// Constructs an [`Interrogator`].
 pub struct Builder {
-    dialects: Vec<Cow<'static, Dialect>>,
+    dialects: Vec<Dialect>,
     sources: Vec<Src>,
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
@@ -44,7 +44,7 @@ impl Builder {
 }
 impl Builder {
     #[must_use]
-    pub fn dialect(mut self, dialect: Cow<'static, Dialect>) -> Self {
+    pub fn dialect(mut self, dialect: Dialect) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         if self.default_dialect_idx.is_none() {
@@ -53,7 +53,7 @@ impl Builder {
         self
     }
     #[must_use]
-    pub fn default_dialect(mut self, dialect: Cow<'static, Dialect>) -> Self {
+    pub fn default_dialect(mut self, dialect: Dialect) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         self.default_dialect_idx = Some(idx);
@@ -235,25 +235,25 @@ impl Builder {
     /// Adds JSON Schema 04 [`Dialect`]
     #[must_use]
     pub fn json_schema_04(self) -> Self {
-        self.dialect(Cow::Borrowed(json_schema::draft_04::dialect()))
+        self.dialect(json_schema::draft_04::dialect().clone())
     }
 
     /// Adds JSON Schema 07 [`Dialect`]
     #[must_use]
     pub fn json_schema_07(self) -> Self {
-        self.dialect(Cow::Borrowed(json_schema::draft_07::dialect()))
+        self.dialect(json_schema::draft_07::dialect().clone())
     }
 
     /// Adds JSON Schema 2019-09 [`Dialect`]
     #[must_use]
     pub fn json_schema_2019_09(self) -> Self {
-        self.dialect(Cow::Borrowed(json_schema::draft_2019_09::dialect()))
+        self.dialect(json_schema::draft_2019_09::dialect().clone())
     }
 
     /// Adds JSON Schema 2020-12 [`Dialect`]
     #[must_use]
     pub fn json_schema_2020_12(self) -> Self {
-        self.dialect(Cow::Borrowed(json_schema::draft_2020_12::dialect()))
+        self.dialect(json_schema::draft_2020_12::dialect().clone())
     }
 
     /// Adds a [`Resolve`] for resolving schema references.

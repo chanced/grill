@@ -1,5 +1,5 @@
-use super::{annotation::Annotation, BoxedError, ERROR_MSG, SUCCESS_MSG};
-use crate::{AbsoluteUri, Structure, Uri};
+use crate::{anymap::AnyMap, AbsoluteUri, Uri};
+use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde::{
     de::{self, Unexpected},
@@ -8,12 +8,16 @@ use serde::{
 };
 use serde_json::{Map, Value};
 use std::{
+    any::Any,
     borrow::Cow,
     collections::{BTreeMap, VecDeque},
     fmt::{self},
+    ops::Deref,
     sync::Arc,
 };
 
+const ERROR_MSG: &str = "one or more validation errors occurred";
+const SUCCESS_MSG: &str = "validation passed";
 const EXPECTED_FMT: &str = "a string equal to \"flag\", \"basic\", \"detailed\", or \"verbose\"";
 const INSTANCE_LOCATION: &str = "instanceLocation";
 const ABSOLUTE_KEYWORD_LOCATION: &str = "absoluteKeywordLocation";
@@ -39,7 +43,332 @@ const KEYS: [&str; 7] = [
     VALID,
 ];
 
+pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
+
+/// An validation error, used as the value of `"error"` in [`Output`](`crate::Output`).
+///
+///
+/// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
+pub trait Error<'v>: DynClone + std::fmt::Display + std::fmt::Debug + Send + Sync {
+    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
+    fn translate_error(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        lang: &Translator,
+    ) -> std::fmt::Result;
+}
+
+clone_trait_object!(<'v> Error<'v>);
+
+impl<'v> Serialize for Box<dyn 'v + Send + Sync + Error<'v>> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn Error<'static>> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Box::new(String::deserialize(deserializer)?))
+    }
+}
+
+impl Error<'_> for String {
+    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+        self
+    }
+    fn translate_error(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        _translator: &Translator,
+    ) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
+impl<'v> Error<'v> for &'v str {
+    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+        Box::new(self.to_string())
+    }
+
+    fn translate_error(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        _translator: &Translator,
+    ) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>;
+
+#[derive(Debug, Clone, Serialize, strum_macros::Display)]
+#[serde(untagged)]
+pub enum Annotation<'v> {
+    Cow(Cow<'v, Value>),
+    Arc(Arc<Value>),
+}
+
+impl<'de> Deserialize<'de> for Annotation<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        Ok(Self::Arc(Arc::from(value)))
+    }
+}
+impl<'v> From<&'v Value> for Annotation<'v> {
+    fn from(value: &'v Value) -> Self {
+        Self::Cow(Cow::Borrowed(value))
+    }
+}
+impl From<Value> for Annotation<'static> {
+    fn from(value: Value) -> Self {
+        Self::Cow(Cow::Owned(value))
+    }
+}
+impl From<Arc<Value>> for Annotation<'_> {
+    fn from(value: Arc<Value>) -> Self {
+        Self::Arc(value)
+    }
+}
+impl From<&Arc<Value>> for Annotation<'_> {
+    fn from(value: &Arc<Value>) -> Self {
+        Self::Arc(value.clone())
+    }
+}
+
+impl Deref for Annotation<'_> {
+    type Target = Value;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Cow(value) => value,
+            Self::Arc(value) => value,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Translator {
+    lang: String,
+    map: AnyMap,
+}
+
+impl Translator {
+    #[must_use]
+    pub fn new(lang: String) -> Self {
+        Self {
+            lang,
+            map: AnyMap::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn lang(&self) -> &str {
+        &self.lang
+    }
+
+    pub fn insert<T>(&mut self, translate: T)
+    where
+        T: 'static + Clone + std::fmt::Debug + Send + Sync,
+    {
+        self.map.insert(translate);
+    }
+    #[must_use]
+    pub fn get<T>(&self) -> Option<&T>
+    where
+        T: Any + std::fmt::Debug + Clone + Send + Sync,
+    {
+        self.map.get()
+    }
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, strum::Display,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum Structure {
+    /// A concise [`Output`] [`Structure`] which only contains a single
+    /// `"valid"` `bool` field.
+    ///
+    /// This `Structure` may have a positive impact on
+    /// performance as [`Keyword`]s are expected to short circuit and return errors as
+    /// soon as possible.
+    ///
+    /// # Example
+    /// ```json
+    /// { "valid": false }
+    /// ```
+    ///
+    /// - [JSON Schema Core 2020-12 # 12.4.1
+    ///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
+    Flag,
+    /// The `Basic` structure is a flat list of output units.
+    /// # Example
+    /// ```json
+    /// {
+    ///   "valid": false,
+    ///   "errors": [
+    ///     {
+    ///       "keywordLocation": "",
+    ///       "instanceLocation": "",
+    ///       "error": "A subschema had errors."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point",
+    ///       "instanceLocation": "/1",
+    ///       "error": "A subschema had errors."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref/required",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point/required",
+    ///       "instanceLocation": "/1",
+    ///       "error": "Required property 'y' not found."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/items/$ref/additionalProperties",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///       "instanceLocation": "/1/z",
+    ///       "error": "Additional property 'z' found but was invalid."
+    ///     },
+    ///     {
+    ///       "keywordLocation": "/minItems",
+    ///       "instanceLocation": "",
+    ///       "error": "Expected at least 3 items but found 2"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    Basic,
+    /// The `Detailed` structure is based on the schema and can be more readable
+    /// for both humans and machines. Having the structure organized this way
+    /// makes associations between the errors more apparent. For example, the
+    /// fact that the missing "y" property and the extra "z" property both stem
+    /// from the same location in the instance is not immediately obvious in the
+    /// "Basic" structure. In a hierarchy, the correlation is more easily
+    /// identified.
+    ///
+    /// The following rules govern the construction of the results object:
+    ///
+    /// - All applicator keywords (`"*Of"`, `"$ref"`, `"if"`/`"then"`/`"else"`,
+    ///   etc.) require a node.
+    /// - Nodes that have no children are removed.
+    /// - Nodes that have a single child are replaced by the child.
+    /// - Branch nodes do not require an error message or an annotation.
+    ///
+    /// # Example
+    ///
+    /// ## Schema:
+    /// ```json
+    /// {
+    ///   "$id": "https://example.com/polygon",
+    ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
+    ///   "$defs": {
+    ///     "point": {
+    ///       "type": "object",
+    ///       "properties": {
+    ///         "x": { "type": "number" },
+    ///         "y": { "type": "number" }
+    ///       },
+    ///       "additionalProperties": false,
+    ///       "required": [ "x", "y" ]
+    ///     }
+    ///   },
+    ///   "type": "array",
+    ///   "items": { "$ref": "#/$defs/point" },
+    ///   "minItems": 3
+    /// }
+    /// ```
+    /// ## Instance:
+    /// ```json
+    /// [ { "x": 2.5, "y": 1.3 }, { "x": 1, "z": 6.7 } ]
+    /// ```
+    /// ## Output:
+    ///
+    /// ```json
+    /// {
+    ///   "valid": false,
+    ///   "keywordLocation": "",
+    ///   "instanceLocation": "",
+    ///   "errors": [
+    ///     {
+    ///       "valid": false,
+    ///       "keywordLocation": "/items/$ref",
+    ///       "absoluteKeywordLocation":
+    ///         "https://example.com/polygon#/$defs/point",
+    ///       "instanceLocation": "/1",
+    ///       "errors": [
+    ///         {
+    ///           "valid": false,
+    ///           "keywordLocation": "/items/$ref/required",
+    ///           "absoluteKeywordLocation":
+    ///             "https://example.com/polygon#/$defs/point/required",
+    ///           "instanceLocation": "/1",
+    ///           "error": "Required property 'y' not found."
+    ///         },
+    ///         {
+    ///           "valid": false,
+    ///           "keywordLocation": "/items/$ref/additionalProperties",
+    ///           "absoluteKeywordLocation":
+    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///           "instanceLocation": "/1/z",
+    ///           "error": "Additional property 'z' found but was invalid."
+    ///         }
+    ///       ]
+    ///     },
+    ///     {
+    ///       "valid": false,
+    ///       "keywordLocation": "/minItems",
+    ///       "instanceLocation": "",
+    ///       "error": "Expected at least 3 items but found 2"
+    ///     }
+    ///   ]
+    /// }
+    ///
+    Detailed,
+    Verbose,
+}
+
+impl Structure {
+    /// Returns `true` if the structure is [`Flag`].
+    ///
+    /// [`Flag`]: Structure::Flag
+    #[must_use]
+    pub fn is_flag(&self) -> bool {
+        matches!(self, Self::Flag)
+    }
+
+    /// Returns `true` if the structure is [`Basic`].
+    ///
+    /// [`Basic`]: Structure::Basic
+    #[must_use]
+    pub fn is_basic(&self) -> bool {
+        matches!(self, Self::Basic)
+    }
+
+    /// Returns `true` if the structure is [`Detailed`].
+    ///
+    /// [`Detailed`]: Structure::Detailed
+    #[must_use]
+    pub fn is_detailed(&self) -> bool {
+        matches!(self, Self::Detailed)
+    }
+
+    /// Returns `true` if the structure is [`Verbose`].
+    ///
+    /// [`Verbose`]: Structure::Verbose
+    #[must_use]
+    pub fn is_verbose(&self) -> bool {
+        matches!(self, Self::Verbose)
+    }
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -447,7 +776,6 @@ impl fmt::Display for Flag<'_> {
 ║                                 ¯¯¯¯¯                                 ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
 */
 
 #[derive(Clone, Debug)]

@@ -1,9 +1,9 @@
 use serde_json::Value;
 
-use crate::json_schema::metaschema;
+use crate::{json_schema::metaschema, schema::Dialect};
 
 #[must_use]
-pub fn dialect() -> &'static crate::schema::Dialect {
+pub fn dialect() -> Dialect {
     todo!()
 }
 

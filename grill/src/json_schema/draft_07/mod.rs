@@ -6,7 +6,7 @@ use crate::schema::Dialect;
 use serde_json::Value;
 
 #[must_use]
-pub fn dialect() -> &'static Dialect {
+pub fn dialect() -> Dialect {
     todo!()
 }
 
