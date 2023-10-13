@@ -17,7 +17,7 @@ use crate::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
     },
-    source::{Link, Source, SourceKey, Sources},
+    source::{Link, Source, Sources},
     AbsoluteUri, Output, Structure, Uri,
 };
 use jsonptr::Pointer;
@@ -525,11 +525,11 @@ impl Schemas {
         self.sandbox().get_mut(key)
     }
 
-    pub(crate) fn add_reference(&mut self, referrer: Key, reference: Reference) {
+    pub(crate) fn add_reference(&mut self, _referrer: Key, _reference: Reference) {
         todo!()
     }
 
-    pub(crate) fn add_dependent(&mut self, dependent: Key, dependency: Key) {
+    pub(crate) fn add_dependent(&mut self, _dependent: Key, _dependency: Key) {
         todo!()
     }
 

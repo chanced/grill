@@ -21,18 +21,18 @@ impl keyword::Keyword for Keyword {
     }
     fn setup<'i>(
         &mut self,
-        compile: &mut Compile<'i>,
+        _compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
-        let Some(v) = schema.get(self.keyword) else {
+        let Some(_v) = schema.get(self.keyword) else {
             return Ok(false);
         };
         todo!()
     }
     fn evaluate<'i, 'v>(
         &'i self,
-        ctx: &'i mut Context,
-        value: &'v Value,
+        _ctx: &'i mut Context,
+        _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         todo!()
     }
@@ -42,7 +42,7 @@ impl keyword::Keyword for Keyword {
         let Some(v) = schema.get(self.keyword) else {
             return Ok(Ok(Vec::default()));
         };
-        let Value::String(v) = v else {
+        let Value::String(_v) = v else {
             return Ok(Err(UnexpectedTypeError {
                 expected: Expected::String,
                 actual: v.clone(),

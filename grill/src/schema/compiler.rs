@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, fmt};
+use std::collections::VecDeque;
 
 use jsonptr::Pointer;
 use serde_json::Value;

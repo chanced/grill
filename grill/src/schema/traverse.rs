@@ -361,7 +361,7 @@ mod tests {
     use crate::{
         json_schema,
         schema::{CompiledSchema, Reference},
-        source::{deserialize_json, Deserializers, SourceKey},
+        source::{deserialize_json, Deserializers},
         AbsoluteUri, Key,
     };
     use jsonptr::Pointer;
