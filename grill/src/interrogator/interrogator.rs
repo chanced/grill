@@ -343,25 +343,23 @@ impl Interrogator {
     //     }
     // }
 
-    pub async fn evaluate<'v>(
+    pub fn evaluate<'v>(
         &self,
         key: Key,
         structure: Structure,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut eval_state = AnyMap::new();
-        self.schemas
-            .evaluate(
-                structure,
-                key,
-                value,
-                Pointer::default(),
-                Pointer::default(),
-                &self.sources,
-                &self.state,
-                &mut eval_state,
-            )
-            .await
+        self.schemas.evaluate(
+            structure,
+            key,
+            value,
+            Pointer::default(),
+            Pointer::default(),
+            &self.sources,
+            &self.state,
+            &mut eval_state,
+        )
     }
 
     /// Returns the schema's `Key` if it exists
@@ -562,9 +560,7 @@ impl Interrogator {
     #[must_use]
     #[allow(unused_must_use)]
     pub fn json_schema_2020_12() -> Builder {
-        Builder::default()
-            .json_schema_2020_12()
-            .default_dialect(Cow::Borrowed(json_schema::draft_2020_12::dialect()))
+        Builder::default().default_dialect(json_schema::draft_2020_12::dialect())
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is

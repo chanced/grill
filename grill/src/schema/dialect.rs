@@ -126,7 +126,11 @@ impl Dialect {
         schema: &Value,
     ) -> Result<(Option<AbsoluteUri>, Vec<AbsoluteUri>), IdentifyError> {
         let mut uris = Vec::new();
-        base_uri.set_fragment(Some(path))?;
+        if path.is_empty() {
+            base_uri.set_fragment(None)?;
+        } else {
+            base_uri.set_fragment(Some(path))?;
+        }
         uris.push(base_uri.clone());
 
         let mut primary = None;

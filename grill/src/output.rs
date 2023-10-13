@@ -1634,6 +1634,5 @@ mod tests {
 
         let op: Output = serde_json::from_str(json).unwrap();
         assert!(matches!(op, Output::Verbose(_)));
-        println!("{}", serde_json::to_string_pretty(&op).unwrap());
     }
 }

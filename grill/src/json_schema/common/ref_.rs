@@ -19,7 +19,7 @@ impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         Kind::Single(self.keyword)
     }
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

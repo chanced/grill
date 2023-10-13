@@ -16,7 +16,7 @@ impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         Kind::Single(json_schema::READ_ONLY)
     }
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

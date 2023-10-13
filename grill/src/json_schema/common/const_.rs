@@ -41,7 +41,7 @@ impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         json_schema::CONST.into()
     }
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
@@ -159,7 +159,7 @@ mod tests {
             .build()
             .unwrap();
         Interrogator::builder()
-            .dialect(Cow::Owned(dialect))
+            .dialect(dialect)
             .source_value(
                 "https://example.com/with_const",
                 Cow::Owned(json!({
@@ -215,13 +215,11 @@ mod tests {
         let value = json!(34.34);
         let output = interrogator
             .evaluate(key, Structure::Verbose, &value)
-            .await
             .unwrap();
         assert!(output.is_valid());
         let value = json!(34.3434);
         let output = interrogator
             .evaluate(key, Structure::Verbose, &value)
-            .await
             .unwrap();
         assert!(!output.is_valid());
     }

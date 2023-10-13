@@ -66,7 +66,7 @@ pub struct Context<'i> {
 }
 
 impl<'s> Context<'s> {
-    pub async fn evalute<'v>(
+    pub fn evalute<'v>(
         &mut self,
         key: Key,
         instance: &str,
@@ -77,18 +77,16 @@ impl<'s> Context<'s> {
         instance_location.push_back(token.clone());
         let mut keyword_location = self.keyword_location.clone();
         keyword_location.push_back(token);
-        self.schemas
-            .evaluate(
-                self.structure,
-                key,
-                value,
-                instance_location,
-                keyword_location,
-                self.sources,
-                self.global_state,
-                self.eval_state,
-            )
-            .await
+        self.schemas.evaluate(
+            self.structure,
+            key,
+            value,
+            instance_location,
+            keyword_location,
+            self.sources,
+            self.global_state,
+            self.eval_state,
+        )
     }
 
     #[must_use]
@@ -200,7 +198,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// If the keyword is applicable to the given [`Schema`], it must return
     /// `true`. A return value of `false` indicates that [`evaluate`](`Self::evaluate`) should not
     /// be called for the given [`Schema`].
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

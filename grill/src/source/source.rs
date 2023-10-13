@@ -396,7 +396,7 @@ impl Sources {
             .get(link.key)
             .resolve(&ptr)
             .map_err(PointerError::from)?;
-        let link = self.store().get_link(&uri).unwrap();
+        let link = self.store().get_link(uri).unwrap();
 
         Ok((link, src))
     }

@@ -953,7 +953,6 @@ impl Ord for AbsoluteUri {
 }
 impl PartialEq<&str> for AbsoluteUri {
     fn eq(&self, other: &&str) -> bool {
-        println!("{} == {other} = {}", self.as_str(), self.as_str() == *other);
         self.as_str() == *other
     }
 }

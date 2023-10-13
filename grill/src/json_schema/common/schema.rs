@@ -59,7 +59,7 @@ impl keyword::Keyword for Keyword {
         Ok(Ok(Some(uri)))
     }
 
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         _compile: &mut crate::keyword::Compile<'i>,
         _schema: crate::Schema<'i>,

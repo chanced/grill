@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use crate::{
     anymap::AnyMap,
-    error::CompileError,
-    keyword::{Numbers, Values},
+    error::{CompileError, UnknownAnchorError},
+    keyword::{Compile, Numbers, Values},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
@@ -67,7 +67,7 @@ impl<'i> Compiler<'i> {
             ref_: None,
         });
         self.run(q).await?;
-        Ok(self.compiled_key(&uri))
+        Ok(self.schemas.get_key(&uri).unwrap())
     }
 
     pub(crate) async fn compile_all<I>(
@@ -96,45 +96,21 @@ impl<'i> Compiler<'i> {
         self.run(q).await?;
         Ok(uris.into_iter().map(|uri| self.compiled(uri)).collect())
     }
-    fn compiled_key(&self, uri: &AbsoluteUri) -> Key {
-        self.schemas.get_key(uri).unwrap()
-    }
+
     fn compiled(&self, uri: AbsoluteUri) -> (AbsoluteUri, Key) {
-        let key = self.compiled_key(&uri);
+        let key = self.schemas.get_key(&uri).unwrap();
         (uri, key)
     }
 
     async fn run(&mut self, mut q: VecDeque<SchemaToCompile>) -> Result<(), CompileError> {
-        while q.len() > 0 {
-            let SchemaToCompile {
-                uri,
-                path,
-                parent,
-                default_dialect_idx,
-                /// This will be set to `true` when a schema references a URI with a pointer
-                /// fragment but has not been compiled. Each layer of the pointer is queued.
-                continue_on_err,
-                ref_,
-            } = q.pop_front().unwrap();
-            match self
-                .compile_schema(
-                    uri,
-                    path,
-                    parent,
-                    default_dialect_idx,
-                    ref_,
-                    continue_on_err,
-                    &mut q,
-                )
-                .await
-            {
-                Ok(_) => {}
-                Err((continue_on_err, err)) => {
-                    if continue_on_err {
-                        continue;
-                    }
-                    return Err(err);
+        while !q.is_empty() {
+            let schema_to_compile = q.pop_front().unwrap();
+            let result = self.compile_schema(schema_to_compile, &mut q).await;
+            if let Err((continue_on_err, err)) = result {
+                if continue_on_err {
+                    continue;
                 }
+                return Err(err);
             }
         }
         Ok(())
@@ -146,7 +122,7 @@ impl<'i> Compiler<'i> {
         continue_on_err: bool,
         uri: &AbsoluteUri,
     ) -> (bool, CompileError) {
-        let key = self.schemas.get_key(&uri);
+        let key = self.schemas.get_key(uri);
         match &err {
             CompileError::FailedToResolve(_)
             | CompileError::FailedToSource(_)
@@ -163,17 +139,63 @@ impl<'i> Compiler<'i> {
             _ => (false, err),
         }
     }
-
-    async fn compile_schema(
+    fn queue_pathed(
         &mut self,
-        uri: AbsoluteUri,
-        mut path: Option<Pointer>,
-        mut parent: Option<Key>,
-        default_dialect_idx: usize,
-        ref_: Option<RefToResolve>,
-        continue_on_err: bool,
+        s: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), (bool, CompileError)> {
+        // if parent is None and this schema is not a document root (does
+        // not have an $id/id) then find the most relevant ancestor and
+        // compile it. Doing so will also compile this schema.
+        self.queue_ancestors(&s.uri, q)
+            .map_err(|err| self.handle_err(err, s.continue_on_err, &s.uri))?;
+        q.push_back(s);
+        Ok(())
+    }
+
+    fn queue_anchored(
+        &mut self,
+        s: SchemaToCompile,
+        q: &mut VecDeque<SchemaToCompile>,
+    ) -> Result<(), (bool, CompileError)> {
+        let mut root_uri = s.uri.clone();
+        root_uri.set_fragment(None).unwrap();
+        let anchor = s.uri.fragment().unwrap_or_default();
+        if self.schemas.contains_uri(&root_uri) {
+            return Err((
+                false,
+                UnknownAnchorError {
+                    anchor: anchor.to_string(),
+                    uri: s.uri.clone(),
+                }
+                .into(),
+            ));
+        }
+        q.push_front(s);
+        q.push_front(SchemaToCompile {
+            uri: root_uri,
+            path: Some(Pointer::default()),
+            parent: None,
+            default_dialect_idx: self.dialects.default_index(),
+            continue_on_err: false,
+            ref_: None,
+        });
+        Ok(())
+    }
+    async fn compile_schema(
+        &mut self,
+        schema_to_compile: SchemaToCompile,
+        q: &mut VecDeque<SchemaToCompile>,
+    ) -> Result<(), (bool, CompileError)> {
+        let SchemaToCompile {
+            uri,
+            mut path,
+            mut parent,
+            default_dialect_idx,
+            continue_on_err,
+            ref_,
+        } = schema_to_compile;
+
         let (link, src) = self
             .source(&uri)
             .await
@@ -185,57 +207,103 @@ impl<'i> Compiler<'i> {
             path = Some(Pointer::default());
             parent = None;
         } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
-            // if parent is None and this schema is not a document root (does
-            // not have an $id/id) then find the most relevant ancestor and
-            // compile it. Doing so will also compile this schema.
-            self.queue_ancestors(&uri, q)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            return self.queue_pathed(
+                SchemaToCompile {
+                    uri,
+                    path,
+                    parent,
+                    default_dialect_idx,
+                    continue_on_err,
+                    ref_,
+                },
+                q,
+            );
         } else if is_anchored(&uri) {
-            self.queue_root(&uri, q)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            return self.queue_anchored(
+                SchemaToCompile {
+                    uri,
+                    path,
+                    parent,
+                    default_dialect_idx,
+                    continue_on_err,
+                    ref_,
+                },
+                q,
+            );
         } else if parent.is_none() && path.is_none() {
             // if the uri does not have a pointer fragment, then it should be
             // compiled as document root
             path = Some(Pointer::default());
         }
 
-        // let path = path.expect("path should be set");
         // // path should now have a value
-        // self.add_parent_uris_with_path(&mut uris, &path, parent)?;
-        // self.sources.link_all(id.as_ref(), &uris, &link)?;
-        // let key = self.insert(id.clone(), path.clone(), uris.clone(), parent.clone(), link)?;
-        // self.queue_subschemas(key, &uri, &path, dialect_idx, &src, &mut q)?;
-        // self.queue_refs(key, &src, &mut q)?;
+        let path = path.expect("path should be set");
 
-        // let (link, source) = self.source(&uri).await?;
-        // let dialect_idx = self.dialect_idx(&source, default_dialect_idx);
-        // let dialect = self.dialects[dialect_idx];
-        // let (uri, id, uris) = identify(&link, &source, &dialect)?;
-        // let key = self.insert(id, path, uris, parent, link)?;
-        // self.queue_refs(key, &source, &mut q)?;
-        // self.queue_subschemas(key, &uri, &path, dialect_idx, &source, &mut q)?;
-        // self.queue_ancestors(&uri, &mut q)?;
-        // self.maybe_resolve_ref(uri.clone(), ref_)?;
-        // self.queue_root(&uri, &mut q)?;
+        self.add_parent_uris_with_path(&mut uris, &path, parent)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        self.sources
+            .link_all(id.as_ref(), &uris, &link)
+            .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
+
+        let key = self
+            .insert(id.clone(), path.clone(), uris.clone(), parent, link)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        self.queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        self.queue_refs(key, &src, &self.dialects[dialect_idx], q)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        if let Some(ref_) = ref_ {
+            self.resolve_ref(uri.clone(), ref_)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        }
+        self.setup_keywords(key, &self.dialects[dialect_idx])
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
         Ok(())
     }
 
-    fn maybe_resolve_ref(
+    fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
+        let keywords = {
+            let schema = self.schemas.get(key, self.sources).unwrap();
+            let mut keywords = Vec::new();
+            for mut keyword in dialect.keywords().iter().cloned() {
+                let mut compile = Compile {
+                    base_uri: schema.absolute_uri(),
+                    schemas: self.schemas,
+                    numbers: self.numbers,
+                    value_cache: self.values,
+                    state: self.global_state,
+                };
+                if keyword.setup(&mut compile, schema.clone())? {
+                    keywords.push(keyword);
+                }
+            }
+            keywords.into_boxed_slice()
+        };
+        self.schemas.get_mut(key).unwrap().keywords = keywords;
+        Ok(())
+    }
+
+    fn resolve_ref(
         &mut self,
         absolute_uri: AbsoluteUri,
-        ref_: Option<(Key, Ref)>,
+        ref_: RefToResolve,
     ) -> Result<(), CompileError> {
-        let Some((dependent_key, Ref { uri, keyword })) = ref_ else {
-            return Ok(());
-        };
+        let RefToResolve {
+            dependent_key,
+            ref_,
+        } = ref_;
         let referenced_key = self.schemas.get_key(&absolute_uri).unwrap();
         self.schemas.add_reference(
             dependent_key,
             Reference {
                 key: referenced_key,
-                uri,
+                uri: ref_.uri,
                 absolute_uri,
-                keyword,
+                keyword: ref_.keyword,
             },
         );
         self.schemas.add_dependent(referenced_key, dependent_key);
@@ -246,12 +314,37 @@ impl<'i> Compiler<'i> {
         &mut self,
         key: Key,
         src: &Value,
+        dialect: &Dialect,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), CompileError> {
-        todo!()
+        let refs = dialect.refs(src)?;
+        let dependent_uri = self
+            .schemas
+            .get(key, self.sources)
+            .unwrap()
+            .absolute_uri()
+            .clone();
+        let mut base_uri = dependent_uri.clone();
+        base_uri.set_fragment(None).unwrap();
+
+        for ref_ in refs {
+            let absolute_uri = base_uri.resolve(&ref_.uri)?;
+            q.push_front(SchemaToCompile {
+                uri: absolute_uri,
+                path: None,
+                parent: None,
+                default_dialect_idx: self.dialects.default_index(),
+                continue_on_err: false,
+                ref_: Some(RefToResolve {
+                    dependent_key: key,
+                    ref_,
+                }),
+            });
+        }
+        Ok(())
     }
     fn dialect_idx(&self, src: &Value, default: usize) -> usize {
-        self.dialects.pertinent_to_idx(&src).unwrap_or(default)
+        self.dialects.pertinent_to_idx(src).unwrap_or(default)
     }
     fn insert(
         &mut self,
@@ -265,23 +358,6 @@ impl<'i> Compiler<'i> {
             .schemas
             .insert(CompiledSchema::new(id, path, uris, link, parent))?;
         Ok(key)
-    }
-    fn queue_root(
-        &mut self,
-        uri: &AbsoluteUri,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), CompileError> {
-        let mut uri = uri.clone();
-        uri.set_fragment(None).unwrap();
-        q.push_front(SchemaToCompile {
-            uri,
-            path: Some(Pointer::default()),
-            parent: None,
-            default_dialect_idx: self.dialects.default_index(),
-            continue_on_err: false,
-            ref_: None,
-        });
-        Ok(())
     }
 
     fn queue_subschemas(
@@ -297,7 +373,11 @@ impl<'i> Compiler<'i> {
         let subschemas = dialect.subschemas(path, src);
         for subschema_path in subschemas {
             let mut uri = uri.clone();
-            uri.set_fragment(Some(&subschema_path))?;
+            if subschema_path.is_empty() {
+                uri.set_fragment(None)?;
+            } else {
+                uri.set_fragment(Some(&subschema_path))?;
+            }
             q.push_front(SchemaToCompile {
                 uri,
                 path: Some(subschema_path),
@@ -321,7 +401,11 @@ impl<'i> Compiler<'i> {
             let mut path = path.clone();
             path.pop_back();
             let mut uri = target_uri.clone();
-            uri.set_fragment(Some(&path));
+            if path.is_empty() {
+                uri.set_fragment(None)?;
+            } else {
+                uri.set_fragment(Some(&path))?;
+            }
             if self.schemas.contains_uri(&uri) {
                 return Err(CompileError::SchemaNotFound(target_uri.clone()));
             }
@@ -332,7 +416,7 @@ impl<'i> Compiler<'i> {
                 default_dialect_idx: self.dialects.default_index(),
                 continue_on_err: true,
                 ref_: None,
-            })
+            });
         }
         Ok(())
     }
@@ -363,7 +447,8 @@ impl<'i> Compiler<'i> {
                 let mut uri = uri.clone();
                 let mut uri_path = Pointer::parse(fragment)
                     .map_err(|e| CompileError::FailedToParsePointer(e.into()))?;
-                uri.set_fragment(Some(uri_path.append(path)))?;
+                uri_path.append(path);
+                uri.set_fragment(Some(&uri_path))?;
                 if !uris.contains(&uri) {
                     uris.push(uri);
                 }

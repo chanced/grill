@@ -213,11 +213,6 @@ impl<'i> Schema<'i> {
         }
     }
 
-    #[must_use]
-    pub fn absolute_location(&self) -> &AbsoluteUri {
-        self.id.as_deref().unwrap_or(&self.uris[0])
-    }
-
     /// Returns most relevant URI for the schema, either using the `$id` or the
     /// most relevant as determined by the schema's ancestory or source.
     #[must_use]
@@ -341,7 +336,7 @@ impl Schemas {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn evaluate<'v>(
+    pub(crate) fn evaluate<'v>(
         &self,
         structure: Structure,
         key: Key,
@@ -355,7 +350,7 @@ impl Schemas {
         let schema = self.get(key, sources)?;
 
         let mut ctx = Context {
-            absolute_keyword_location: schema.absolute_location(),
+            absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
             structure,
@@ -367,7 +362,7 @@ impl Schemas {
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(
             structure,
-            schema.absolute_location().clone(),
+            schema.absolute_uri().clone(),
             keyword_location,
             instance_location,
             Ok(None),
@@ -403,12 +398,13 @@ impl Schemas {
     }
 
     pub(crate) fn remove(&mut self, key: Key) {
-        let uri = self.get_uri(key);
+        let uri = self.get_uri(key).cloned();
         self.sandbox().table.remove(key);
         if let Some(uri) = uri {
-            self.sandbox().index.remove(uri);
+            self.sandbox().index.remove(&uri);
         }
     }
+
     pub(crate) fn get_uri(&mut self, key: Key) -> Option<&AbsoluteUri> {
         self.store()
             .index

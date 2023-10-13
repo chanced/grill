@@ -66,7 +66,7 @@ impl keyword::Keyword for Keyword {
         })
     }
 
-    fn compile<'i>(
+    fn setup<'i>(
         &mut self,
         _compile: &mut keyword::Compile<'i>,
         _schema: crate::Schema<'i>,
