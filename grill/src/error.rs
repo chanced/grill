@@ -1285,7 +1285,7 @@ pub struct DialectExistsError {
 #[derive(Debug, Error)]
 pub enum RefError {
     #[error(transparent)]
-    InvalidType(#[from] UnexpectedTypeError),
+    UnexpectedType(#[from] UnexpectedTypeError),
     #[error(transparent)]
     UriError(#[from] UriError),
 }

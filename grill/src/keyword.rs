@@ -69,14 +69,16 @@ impl<'s> Context<'s> {
     pub fn evalute<'v>(
         &mut self,
         key: Key,
-        instance: &str,
+        instance: Option<&str>,
+        keyword: &str,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
-        let token = jsonptr::Token::from(instance);
         let mut instance_location = self.instance_location.clone();
-        instance_location.push_back(token.clone());
+        if let Some(instance) = instance {
+            instance_location.push_back(instance.into());
+        }
         let mut keyword_location = self.keyword_location.clone();
-        keyword_location.push_back(token);
+        keyword_location.push_back(keyword.into());
         self.schemas.evaluate(
             self.structure,
             key,

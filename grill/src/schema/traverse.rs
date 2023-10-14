@@ -7,6 +7,15 @@ use std::{
     vec::IntoIter,
 };
 
+// TODO: create an impl for each mode of traversal for `CompiledSchema`
+// the current way of handling any internal op, which doesn't need the
+// source currently has to pull it anyway.
+// However... the bump in WASM / binary output size and compile time may not warrant this.
+
+// TODO: Before creating an impl of traversal for `CompiledSchema`, benchmark
+// & measure WASM output & compile time. This is low priority as this only
+// pertains to "compile"/setup
+
 /// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
 pub trait Traverse<'i, Iter>: Iterator<Item = Schema<'i>>
 where

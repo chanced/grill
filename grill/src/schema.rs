@@ -23,12 +23,7 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{
-    borrow::Cow,
-    collections::{hash_map::Entry, HashMap},
-    hash::Hash,
-    ops::Deref,
-};
+use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -129,6 +124,15 @@ impl CompiledSchema {
         }
     }
 }
+impl CompiledSchema {
+    ///// Returns most relevant URI for the schema, either using the `$id` or the
+    ///// most relevant as determined by the schema's ancestory or source.
+    // #[must_use]
+    // pub(crate) fn absolute_uri(&self) -> &AbsoluteUri {
+    //     self.id.as_ref().unwrap_or(&self.uris[0])
+    // }
+}
+
 impl PartialEq for CompiledSchema {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema && self.link == other.link
@@ -277,9 +281,9 @@ impl Store {
     pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
         self.index.get(id).copied()
     }
-    pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
-        self.index.entry(id)
-    }
+    // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+    //     self.index.entry(id)
+    // }
     pub(crate) fn contains_key(&self, key: Key) -> bool {
         self.table.contains_key(key)
     }
@@ -383,9 +387,10 @@ impl Schemas {
         sources: &Sources,
     ) -> Result<(), CompileError> {
         for reference in references {
-            if self
-                .transitive_dependencies(reference.key, sources)
-                .any(|schema| schema.key == key)
+            if key == reference.key
+                || self
+                    .transitive_dependencies(reference.key, sources)
+                    .any(|schema| schema.key == key)
             {
                 return Err(CyclicDependencyError {
                     from: uri.clone(),
@@ -404,7 +409,9 @@ impl Schemas {
             self.sandbox().index.remove(&uri);
         }
     }
-
+    pub(crate) fn has_keywords(&self, key: Key) -> bool {
+        !self.store().get(key).unwrap().keywords.is_empty()
+    }
     pub(crate) fn get_uri(&mut self, key: Key) -> Option<&AbsoluteUri> {
         self.store()
             .index
@@ -428,9 +435,9 @@ impl Schemas {
     pub(crate) fn get_key(&self, id: &AbsoluteUri) -> Option<Key> {
         self.store().get_index(id)
     }
-    pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
-        self.sandbox().index_entry(id)
-    }
+    // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
+    //     self.sandbox().index_entry(id)
+    // }
     pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
         self.sandbox().insert(schema)
     }
@@ -493,6 +500,15 @@ impl Schemas {
     pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i> {
         self.get(key, sources).unwrap()
     }
+
+    pub(crate) fn get_compiled(&self, key: Key) -> Option<CompiledSchema> {
+        self.store().get(key).cloned()
+    }
+
+    pub(crate) fn get_compiled_unchecked(&self, key: Key) -> CompiledSchema {
+        self.store().get(key).cloned().unwrap()
+    }
+
     /// Returns the [`Schema`] with the given `Key` if it exists.
     pub(crate) fn get<'i>(
         &'i self,
@@ -525,12 +541,20 @@ impl Schemas {
         self.sandbox().get_mut(key)
     }
 
-    pub(crate) fn add_reference(&mut self, _referrer: Key, _reference: Reference) {
-        todo!()
+    pub(crate) fn add_reference(
+        &mut self,
+        key: Key,
+        ref_: Reference,
+        sources: &Sources,
+    ) -> Result<(), CompileError> {
+        let references = self.get_compiled(ref_.key).unwrap().references.clone();
+        self.ensure_not_cyclic(key, &ref_.absolute_uri, &references, sources)?;
+        self.get_mut(key).unwrap().references.push(ref_);
+        Ok(())
     }
-
-    pub(crate) fn add_dependent(&mut self, _dependent: Key, _dependency: Key) {
-        todo!()
+    ///
+    pub(crate) fn add_dependent(&mut self, referencer: Key, dependent: Key) {
+        self.get_mut(dependent).unwrap().dependents.push(referencer);
     }
 
     #[must_use]
@@ -541,6 +565,11 @@ impl Schemas {
     ) -> Option<Schema<'i>> {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
+    }
+    #[must_use]
+    pub(crate) fn get_compiled_by_uri(&self, uri: &AbsoluteUri) -> Option<CompiledSchema> {
+        let key = self.store().index.get(uri).copied()?;
+        Some(self.get_compiled_unchecked(key))
     }
 
     /// Starts a new transaction.

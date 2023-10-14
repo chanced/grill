@@ -15,6 +15,7 @@ use crate::{
 
 use super::{CompiledSchema, Dialect, Ref, Reference};
 
+#[derive(Clone, Debug)]
 struct RefToResolve {
     dependent_key: Key,
     ref_: Ref,
@@ -116,6 +117,111 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
+    async fn compile_schema(
+        &mut self,
+        schema_to_compile: SchemaToCompile,
+        q: &mut VecDeque<SchemaToCompile>,
+    ) -> Result<(), (bool, CompileError)> {
+        let SchemaToCompile {
+            uri,
+            mut path,
+            mut parent,
+            default_dialect_idx,
+            continue_on_err,
+            ref_,
+        } = schema_to_compile;
+
+        let (link, src) = self
+            .source(&uri)
+            .await
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
+
+        if let Some(key) = self.schemas.get_key(&uri) {
+            if let Some(ref_) = ref_ {
+                self.resolve_ref(key, uri.clone(), ref_)
+                    .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            }
+            if !self.schemas.has_keywords(key) {
+                self.setup_keywords(key, &self.dialects[dialect_idx])
+                    .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            }
+            return Ok(());
+        }
+
+        let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        if id.is_some() {
+            path = Some(Pointer::default());
+            parent = None;
+        } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
+            return self.queue_pathed(
+                SchemaToCompile {
+                    uri,
+                    path,
+                    parent,
+                    default_dialect_idx,
+                    continue_on_err,
+                    ref_,
+                },
+                q,
+            );
+        } else if is_anchored(&uri) {
+            return self.queue_anchored(
+                SchemaToCompile {
+                    uri,
+                    path,
+                    parent,
+                    default_dialect_idx,
+                    continue_on_err,
+                    ref_,
+                },
+                q,
+            );
+        } else if parent.is_none() && path.is_none() {
+            // if the uri does not have a pointer fragment, then it should be
+            // compiled as document root
+            path = Some(Pointer::default());
+        }
+
+        // // path should now have a value
+        let path = path.expect("path should be set");
+
+        self.add_parent_uris_with_path(&mut uris, &path, parent)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        self.sources
+            .link_all(id.as_ref(), &uris, &link)
+            .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
+
+        let key = self
+            .insert(id.clone(), path.clone(), uris.clone(), parent, link)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        self.queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        if self
+            .queue_refs(key, &uri, &path, parent, dialect_idx, &src, ref_.clone(), q)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?
+        {
+            // kicking resolve_ref and setup_keywords down the road until all
+            // refs are resolved
+            return Ok(());
+        }
+
+        if let Some(ref_) = ref_ {
+            self.resolve_ref(key, uri.clone(), ref_)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        }
+
+        self.setup_keywords(key, &self.dialects[dialect_idx])
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        Ok(())
+    }
+
     fn handle_err(
         &mut self,
         err: CompileError,
@@ -182,88 +288,6 @@ impl<'i> Compiler<'i> {
         });
         Ok(())
     }
-    async fn compile_schema(
-        &mut self,
-        schema_to_compile: SchemaToCompile,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, CompileError)> {
-        let SchemaToCompile {
-            uri,
-            mut path,
-            mut parent,
-            default_dialect_idx,
-            continue_on_err,
-            ref_,
-        } = schema_to_compile;
-
-        let (link, src) = self
-            .source(&uri)
-            .await
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
-        let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        if id.is_some() {
-            path = Some(Pointer::default());
-            parent = None;
-        } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
-            return self.queue_pathed(
-                SchemaToCompile {
-                    uri,
-                    path,
-                    parent,
-                    default_dialect_idx,
-                    continue_on_err,
-                    ref_,
-                },
-                q,
-            );
-        } else if is_anchored(&uri) {
-            return self.queue_anchored(
-                SchemaToCompile {
-                    uri,
-                    path,
-                    parent,
-                    default_dialect_idx,
-                    continue_on_err,
-                    ref_,
-                },
-                q,
-            );
-        } else if parent.is_none() && path.is_none() {
-            // if the uri does not have a pointer fragment, then it should be
-            // compiled as document root
-            path = Some(Pointer::default());
-        }
-
-        // // path should now have a value
-        let path = path.expect("path should be set");
-
-        self.add_parent_uris_with_path(&mut uris, &path, parent)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        self.sources
-            .link_all(id.as_ref(), &uris, &link)
-            .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
-
-        let key = self
-            .insert(id.clone(), path.clone(), uris.clone(), parent, link)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        self.queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        self.queue_refs(key, &src, &self.dialects[dialect_idx], q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        if let Some(ref_) = ref_ {
-            self.resolve_ref(uri.clone(), ref_)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        }
-        self.setup_keywords(key, &self.dialects[dialect_idx])
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        Ok(())
-    }
 
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
@@ -289,6 +313,7 @@ impl<'i> Compiler<'i> {
 
     fn resolve_ref(
         &mut self,
+        key: Key,
         absolute_uri: AbsoluteUri,
         ref_: RefToResolve,
     ) -> Result<(), CompileError> {
@@ -296,27 +321,45 @@ impl<'i> Compiler<'i> {
             dependent_key,
             ref_,
         } = ref_;
-        let referenced_key = self.schemas.get_key(&absolute_uri).unwrap();
+        // TODO: check if ref is already resolved
+        self.add_reference(key, absolute_uri, dependent_key, ref_)?;
+        self.schemas.add_dependent(key, dependent_key);
+        Ok(())
+    }
+
+    fn add_reference(
+        &mut self,
+        key: Key,
+        absolute_uri: AbsoluteUri,
+        dependent_key: Key,
+        ref_: Ref,
+    ) -> Result<(), CompileError> {
         self.schemas.add_reference(
             dependent_key,
             Reference {
-                key: referenced_key,
+                key,
                 uri: ref_.uri,
                 absolute_uri,
                 keyword: ref_.keyword,
             },
-        );
-        self.schemas.add_dependent(referenced_key, dependent_key);
-        todo!()
+            self.sources,
+        )?;
+        Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn queue_refs(
         &mut self,
         key: Key,
+        absolute_uri: &AbsoluteUri,
+        path: &Pointer,
+        parent: Option<Key>,
+        default_dialect_idx: usize,
         src: &Value,
-        dialect: &Dialect,
+        ref_: Option<RefToResolve>,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<bool, CompileError> {
+        let dialect = &self.dialects[default_dialect_idx];
         let refs = dialect.refs(src)?;
         let dependent_uri = self
             .schemas
@@ -326,7 +369,7 @@ impl<'i> Compiler<'i> {
             .clone();
         let mut base_uri = dependent_uri.clone();
         base_uri.set_fragment(None).unwrap();
-
+        let has_keywords = !refs.is_empty();
         for ref_ in refs {
             let absolute_uri = base_uri.resolve(&ref_.uri)?;
             q.push_front(SchemaToCompile {
@@ -341,7 +384,17 @@ impl<'i> Compiler<'i> {
                 }),
             });
         }
-        Ok(())
+        if has_keywords {
+            q.push_back(SchemaToCompile {
+                uri: absolute_uri.clone(),
+                path: Some(path.clone()),
+                parent,
+                default_dialect_idx,
+                continue_on_err: false,
+                ref_,
+            });
+        }
+        Ok(has_keywords)
     }
     fn dialect_idx(&self, src: &Value, default: usize) -> usize {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
@@ -439,7 +492,7 @@ impl<'i> Compiler<'i> {
         let Some(parent) = parent else {
             return Ok(());
         };
-        let parent = self.schemas.get(parent, self.sources).unwrap();
+        let parent = self.schemas.get_compiled(parent).unwrap();
         #[allow(clippy::explicit_iter_loop)]
         for uri in parent.uris.iter() {
             let fragment = uri.fragment().unwrap_or_default();

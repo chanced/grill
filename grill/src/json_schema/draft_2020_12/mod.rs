@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-
 use serde_json::Value;
 
 use crate::schema::Dialect;

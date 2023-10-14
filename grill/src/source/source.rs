@@ -265,9 +265,9 @@ impl Sources {
         Ok(())
     }
 
-    pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
-        self.store().get_link(uri)
-    }
+    // pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
+    //     self.store().get_link(uri)
+    // }
 
     pub(crate) async fn resolve_link(
         &mut self,

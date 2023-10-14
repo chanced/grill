@@ -449,15 +449,6 @@ impl Dialects {
         &self.dialects[self.default]
     }
 
-    /// Sets the  [`Dialect`] to use when no other [`Dialect`] matches.
-    ///
-    /// # Panics
-    /// Panics if the index is out of bounds.
-    pub(crate) fn set_default_dialect_index(&mut self, index: usize) {
-        assert!(index < self.dialects.len());
-        self.default = index;
-    }
-
     /// Returns the number of [`Dialect`]s.
     #[must_use]
     #[allow(clippy::len_without_is_empty)]

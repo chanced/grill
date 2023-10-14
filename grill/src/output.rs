@@ -1,4 +1,4 @@
-use crate::{anymap::AnyMap, AbsoluteUri, Uri};
+use crate::{anymap::AnyMap, error::CompileError, AbsoluteUri, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde::{
@@ -700,6 +700,13 @@ impl<'v> From<Verbose<'v>> for Output<'v> {
         Self::Verbose(verbose)
     }
 }
+
+impl<'v, E> From<Output<'v>> for Result<Option<Output<'v>>, E> {
+    fn from(value: Output<'v>) -> Self {
+        Ok(Some(value))
+    }
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗

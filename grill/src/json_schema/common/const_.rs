@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_const_setup() {
+    async fn test_setup() {
         let mut interrogator = create_interrogator(json!(34.34)).await;
         let key = interrogator
             .compile("https://example.com/with_const")
