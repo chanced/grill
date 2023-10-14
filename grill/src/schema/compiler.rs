@@ -6,7 +6,10 @@ use serde_json::Value;
 use crate::{
     anymap::AnyMap,
     error::{CompileError, UnknownAnchorError},
-    keyword::{Compile, cache::{Numbers, Values}},
+    keyword::{
+        cache::{Numbers, Values},
+        Compile,
+    },
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
@@ -228,23 +231,24 @@ impl<'i> Compiler<'i> {
         continue_on_err: bool,
         uri: &AbsoluteUri,
     ) -> (bool, CompileError) {
-        let key = self.schemas.get_key(uri);
-        match &err {
-            CompileError::FailedToResolve(_)
+        if !continue_on_err {
+            return (false, err);
+        }
+        match err {
+            CompileError::SchemaNotFound(_)
             | CompileError::FailedToSource(_)
             | CompileError::CyclicGraph(_)
             | CompileError::FailedToLinkSource(_)
             | CompileError::Custom(_) => {
-                if continue_on_err {
-                    if let Some(key) = key {
-                        self.schemas.remove(key);
-                    }
+                if let Some(key) = self.schemas.get_key(uri) {
+                    self.schemas.remove(key);
                 }
                 (continue_on_err, err)
             }
             _ => (false, err),
         }
     }
+
     fn queue_pathed(
         &mut self,
         s: SchemaToCompile,
