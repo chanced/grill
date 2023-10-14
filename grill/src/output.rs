@@ -1,4 +1,4 @@
-use crate::{anymap::AnyMap, error::CompileError, AbsoluteUri, Uri};
+use crate::{anymap::AnyMap, AbsoluteUri, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde::{
@@ -104,7 +104,7 @@ impl<'v> Error<'v> for &'v str {
 
 pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>;
 
-#[derive(Debug, Clone, Serialize, strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, strum::Display)]
 #[serde(untagged)]
 pub enum Annotation<'v> {
     Cow(Cow<'v, Value>),
@@ -1150,12 +1150,9 @@ impl<'v> Verbose<'v> {
 
 impl<'v> fmt::Display for Verbose<'v> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.annotation_or_error {
-            Ok(Some(v)) => write!(f, "{v}"),
-            Err(Some(v)) => write!(f, "{v}"),
-            Ok(_) => write!(f, "{SUCCESS_MSG}"),
-            Err(_) => write!(f, "{ERROR_MSG}"),
-        }
+        serde_json::to_string_pretty(self)
+            .map_err(|_| fmt::Error)?
+            .fmt(f)
     }
 }
 

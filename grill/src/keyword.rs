@@ -1,21 +1,23 @@
-mod compile;
-pub use compile::Compile;
+use ahash::AHashMap;
+use num_rational::BigRational;
 
 pub mod cache;
 
 use crate::{
     anymap::AnyMap,
-    error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError},
+    error::{AnchorError, CompileError, EvaluateError, IdentifyError, NumberError, RefError},
     output::{self, Annotation, AnnotationOrError, Error, Translator},
     schema::{Anchor, Identifier, Ref, Schemas},
     source::Sources,
-    AbsoluteUri, Key, Output, Schema, Structure,
+    AbsoluteUri, Key, Output, Schema, Structure, Uri,
 };
-pub use cache::{Numbers, Values};
 use dyn_clone::{clone_trait_object, DynClone};
-use jsonptr::Pointer;
-use serde_json::Value;
-use std::fmt::{self, Display};
+use jsonptr::{Pointer, Token};
+use serde_json::{Number, Value};
+use std::{
+    fmt::{self, Display},
+    sync::Arc,
+};
 
 #[macro_export]
 macro_rules! define_translate {
@@ -48,7 +50,58 @@ macro_rules! define_translate {
     };
 }
 
+#[derive(Debug)]
+pub struct Compile<'i> {
+    pub(crate) base_uri: &'i AbsoluteUri,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) numbers: &'i mut Numbers,
+    pub(crate) value_cache: &'i mut Values,
+    pub(crate) state: &'i mut AnyMap,
+}
+
+impl<'i> Compile<'i> {
+    /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
+    /// `Arc` to it.
+    ///
+    /// # Errors
+    /// Returns `NumberError` if the number fails to parse
+    pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
+        self.numbers.number(num)
+    }
+    /// Caches a [`Value`] and returns an `Arc` to it.
+    pub fn value(&mut self, value: &Value) -> Arc<Value> {
+        self.value_cache.value(value)
+    }
+
+    /// Returns an immutable reference to the global state [`AnyMap`].
+    #[must_use]
+    pub fn state(&self) -> &AnyMap {
+        self.state
+    }
+
+    /// Returns a mutable reference to the global state [`AnyMap`].
+    #[must_use]
+    pub fn state_mut(&mut self) -> &mut AnyMap {
+        self.state
+    }
+
+    /// Resolves a schema `Key` by URI
+    ///
+    /// # Errors
+    /// - `CompileError::SchemaNotFound` if the schema is not found
+    /// - `CompileError::UriParsingFailed` if the URI is invalid
+    pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
+        let uri: Uri = uri.parse()?;
+        let uri = self.base_uri.resolve(&uri)?;
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+}
+
 pub use define_translate;
+
+use self::cache::{Numbers, Values};
 
 /// Contains global and evaluation level [`State`], schemas, and location
 /// information needed to [`evaluate`](`crate::Interrogator::evaluate`) a
@@ -101,12 +154,19 @@ impl<'s> Context<'s> {
     }
 
     #[must_use]
-    pub fn annotate<'v>(&self, annotation: Option<Annotation<'v>>) -> Output<'v> {
-        self.output(Ok(annotation), false)
+    pub fn annotate<'v>(
+        &self,
+        keyword: &'static str,
+        annotation: Option<Annotation<'v>>,
+    ) -> Output<'v> {
+        self.output(Some(keyword), Ok(annotation), false)
     }
 
-    pub fn error<'v, E: 'v + Error<'v>>(&self, error: E) -> Output<'v> {
-        self.output(Err(Some(Box::new(error))), false)
+    pub fn error<'v, E>(&self, keyword: &'static str, error: E) -> Output<'v>
+    where
+        E: 'v + Error<'v>,
+    {
+        self.output(Some(keyword), Err(Some(Box::new(error))), false)
     }
     pub fn transient<'v>(
         &self,
@@ -114,20 +174,25 @@ impl<'s> Context<'s> {
         nodes: impl IntoIterator<Item = Output<'v>>,
     ) -> Output<'v> {
         let op = if is_valid { Ok(None) } else { Err(None) };
-        let mut output = self.output(op, true);
+        let mut output = self.output(None, op, true);
         output.append(nodes.into_iter());
         output
     }
 
     fn output<'v>(
         &self,
+        keyword: Option<&'static str>,
         annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Output<'v> {
+        let mut keyword_location = self.keyword_location.clone();
+        if let Some(keyword) = keyword {
+            keyword_location.push_back(keyword.into());
+        }
         Output::new(
             self.structure,
             self.absolute_keyword_location.clone(),
-            self.keyword_location.clone(),
+            keyword_location,
             self.instance_location.clone(),
             annotation_or_error,
             is_transient,
@@ -278,18 +343,61 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
 
 clone_trait_object!(Keyword);
 
+/// A collection of evaluated paths in the form of a trie of JSON pointers.
+///
+/// # Example
+/// ```
+/// # use grill::keyword::Evaluated;
+#[derive(Debug, Clone)]
+pub struct Evaluated {
+    pub children: AHashMap<Token, Evaluated>,
+}
+impl Evaluated {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            children: AHashMap::new(),
+        }
+    }
+    pub fn insert(&mut self, ptr: &Pointer) {
+        let mut props = self;
+        for tok in ptr.tokens() {
+            props = props.children.entry(tok).or_default();
+        }
+    }
+
+    #[must_use]
+    pub fn contains(&self, ptr: &Pointer) -> bool {
+        let mut node = self;
+        for tok in ptr.tokens() {
+            if node.children.contains_key(&tok) {
+                node = node.children.get(&tok).unwrap();
+                continue;
+            }
+            return false;
+        }
+        true
+    }
+}
+
+impl Default for Evaluated {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::anymap::AnyMap;
+
+    use super::*;
 
     #[test]
-    fn test_get() {
-        let mut state = AnyMap::new();
-        let i: i32 = 1;
-        state.insert(i);
-        let x = state.get_mut::<i32>().unwrap();
-        *x += 1;
-
-        assert_eq!(state.get::<i32>(), Some(&2));
+    fn test_evaluated_insert() {
+        let ptr = Pointer::new(["a", "b", "c"]);
+        let mut props = Evaluated::default();
+        props.insert(&ptr);
+        dbg!(&props);
+        assert!(props.contains(&ptr));
+        assert!(!props.contains(&Pointer::new(["a", "b", "d"])));
     }
 }

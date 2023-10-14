@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use ahash::AHashMap;
 use lazy_static::lazy_static;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
@@ -15,6 +16,8 @@ lazy_static! {
     static ref FALSE: Arc<Value> = Arc::new(Value::Bool(false));
     static ref NULL: Arc<Value> = Arc::new(Value::Null);
 }
+
+type Map<K, V> = HashMap<K, V, BuildHasherDefault<LenHasher>>;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -30,8 +33,8 @@ lazy_static! {
 pub struct Values {
     strings: Vec<Arc<Value>>,
     numbers: Vec<Arc<Value>>,
-    objects: HashMap<usize, Vec<Arc<Value>>, BuildHasherDefault<LenHasher>>,
-    arrays: HashMap<usize, Vec<Arc<Value>>, BuildHasherDefault<LenHasher>>,
+    objects: Map<usize, Vec<Arc<Value>>>,
+    arrays: Map<usize, Vec<Arc<Value>>>,
 }
 
 impl Values {
@@ -118,7 +121,7 @@ fn get_bool(value: bool) -> Arc<Value> {
 
 #[derive(Debug, Default, Clone)]
 pub struct Numbers {
-    rationals: HashMap<String, Arc<BigRational>>,
+    rationals: AHashMap<String, Arc<BigRational>>,
     // ints: HashMap<String, Arc<BigInt>>,
 }
 

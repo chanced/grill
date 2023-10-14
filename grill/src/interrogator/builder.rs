@@ -5,7 +5,7 @@ use serde_json::Value;
 use crate::{
     error::{BuildError, SourceError, UriError},
     json_schema,
-    keyword::{Numbers, Values},
+    keyword::cache::{Numbers, Values},
     schema::{dialect::Dialects, Dialect, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::TryIntoAbsoluteUri,

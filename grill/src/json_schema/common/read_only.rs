@@ -1,6 +1,6 @@
 use crate::{
     error::{CompileError, EvaluateError, Expected, UnexpectedTypeError},
-    json_schema,
+    json_schema::READ_ONLY,
     keyword::{self, Compile, Kind},
     Output, Schema,
 };
@@ -14,14 +14,14 @@ pub struct Keyword {
 
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
-        Kind::Single(json_schema::READ_ONLY)
+        Kind::Single(READ_ONLY)
     }
     fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
-        let Some(value) = schema.get(json_schema::READ_ONLY) else {
+        let Some(value) = schema.get(READ_ONLY) else {
             return Ok(false);
         };
         if !matches!(value, Value::Bool(_)) {
@@ -39,6 +39,8 @@ impl keyword::Keyword for Keyword {
         ctx: &'i mut keyword::Context,
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
-        Ok(Some(ctx.annotate(Some(self.value.clone().into()))))
+        Ok(Some(
+            ctx.annotate(READ_ONLY, Some(self.value.clone().into())),
+        ))
     }
 }

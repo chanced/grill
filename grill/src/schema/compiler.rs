@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::{
     anymap::AnyMap,
     error::{CompileError, UnknownAnchorError},
-    keyword::{Compile, Numbers, Values},
+    keyword::{Compile, cache::{Numbers, Values}},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,

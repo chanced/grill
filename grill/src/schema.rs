@@ -3,6 +3,7 @@ pub mod iter;
 pub mod traverse;
 
 pub mod dialect;
+use ahash::AHashMap;
 pub use dialect::{Dialect, Dialects};
 
 pub(crate) mod compiler;
@@ -23,7 +24,7 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
+use std::{borrow::Cow, hash::Hash, ops::Deref};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -267,7 +268,7 @@ impl<'i> Eq for Schema<'i> {}
 #[derive(Debug, Clone, Default)]
 struct Store {
     table: SlotMap<Key, CompiledSchema>,
-    index: HashMap<AbsoluteUri, Key>,
+    index: AHashMap<AbsoluteUri, Key>,
 }
 
 #[allow(clippy::unnecessary_box_returns)]
@@ -505,9 +506,9 @@ impl Schemas {
         self.store().get(key).cloned()
     }
 
-    pub(crate) fn get_compiled_unchecked(&self, key: Key) -> CompiledSchema {
-        self.store().get(key).cloned().unwrap()
-    }
+    // pub(crate) fn get_compiled_unchecked(&self, key: Key) -> CompiledSchema {
+    //     self.store().get(key).cloned().unwrap()
+    // }
 
     /// Returns the [`Schema`] with the given `Key` if it exists.
     pub(crate) fn get<'i>(
@@ -566,11 +567,11 @@ impl Schemas {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
-    #[must_use]
-    pub(crate) fn get_compiled_by_uri(&self, uri: &AbsoluteUri) -> Option<CompiledSchema> {
-        let key = self.store().index.get(uri).copied()?;
-        Some(self.get_compiled_unchecked(key))
-    }
+    // #[must_use]
+    // pub(crate) fn get_compiled_by_uri(&self, uri: &AbsoluteUri) -> Option<CompiledSchema> {
+    //     let key = self.store().index.get(uri).copied()?;
+    //     Some(self.get_compiled_unchecked(key))
+    // }
 
     /// Starts a new transaction.
     pub(crate) fn start_txn(&mut self) {

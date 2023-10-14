@@ -256,3 +256,14 @@ impl<'a, T> From<hash_map::Entry<'a, TypeId, Box<dyn Item>>> for Entry<'a, T> {
         }
     }
 }
+
+#[test]
+fn test_anymap_get() {
+    let mut state = AnyMap::new();
+    let i: i32 = 1;
+    state.insert(i);
+    let x = state.get_mut::<i32>().unwrap();
+    *x += 1;
+
+    assert_eq!(state.get::<i32>(), Some(&2));
+}

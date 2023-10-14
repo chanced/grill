@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
@@ -8,7 +9,6 @@ pub use urn::Error as UrnError;
 use crate::{uri::AbsoluteUri, Output, Uri};
 use serde_json::Value;
 use std::{
-    collections::HashMap,
     error::Error as StdError,
     fmt::{self, Debug, Display},
     num::ParseIntError,
@@ -535,7 +535,7 @@ pub struct EvaluateRegexError {
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug, Default)]
 pub struct DeserializeError {
-    pub formats: HashMap<&'static str, erased_serde::Error>,
+    pub formats: AHashMap<&'static str, erased_serde::Error>,
 }
 
 impl DeserializeError {

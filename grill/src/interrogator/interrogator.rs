@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::{
     error::{CompileError, DeserializeError, EvaluateError, SourceError, UnknownKeyError},
     json_schema,
-    keyword::{Numbers, Values},
+    keyword::cache::{Numbers, Values},
     output::{Output, Structure},
     schema::{
         compiler::Compiler,

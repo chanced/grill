@@ -7,11 +7,12 @@ use crate::{
     uri::AbsoluteUri,
 };
 
+use ahash::AHashMap;
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::borrow::Cow;
-use std::collections::hash_map::{Entry, HashMap};
+use std::collections::hash_map::Entry;
 use std::convert::AsRef;
 use std::ops::Deref;
 
@@ -88,7 +89,7 @@ impl Deref for Source<'_> {
 #[derive(Clone, Debug, Default)]
 struct Store {
     table: SlotMap<SourceKey, Cow<'static, Value>>,
-    index: HashMap<AbsoluteUri, Link>,
+    index: AHashMap<AbsoluteUri, Link>,
 }
 impl Store {
     fn check_and_get_occupied(

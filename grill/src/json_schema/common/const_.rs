@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use crate::big::parse_rational;
-use crate::json_schema;
+use crate::json_schema::CONST;
 use crate::keyword::{define_translate, Kind};
 use num_rational::BigRational;
 use serde_json::Value;
@@ -39,14 +39,14 @@ impl Keyword {
 }
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
-        json_schema::CONST.into()
+        CONST.into()
     }
     fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
-        let Some(c) = schema.get(json_schema::CONST) else {
+        let Some(c) = schema.get(CONST) else {
             return Ok(false);
         };
         let expected = compile.value(c);
@@ -66,23 +66,29 @@ impl keyword::Keyword for Keyword {
             if let Some(expected_number) = self.expected_number.as_deref() {
                 let actual_number = parse_rational(n.as_str())?;
                 if &actual_number == expected_number {
-                    return Ok(Some(ctx.annotate(Some(value.into()))));
+                    return Ok(Some(ctx.annotate(CONST, Some(value.into()))));
                 }
-                return Ok(Some(ctx.error(Error {
-                    expected: self.expected.clone(),
-                    actual: Cow::Borrowed(value),
-                    translate: self.translate.clone(),
-                })));
+                return Ok(Some(ctx.error(
+                    CONST,
+                    Error {
+                        expected: self.expected.clone(),
+                        actual: Cow::Borrowed(value),
+                        translate: self.translate.clone(),
+                    },
+                )));
             }
         }
         if self.expected.as_ref() == value {
-            Ok(Some(ctx.annotate(Some(value.into()))))
+            Ok(Some(ctx.annotate(CONST, Some(value.into()))))
         } else {
-            Ok(Some(ctx.error(Error {
-                expected: self.expected.clone(),
-                actual: Cow::Borrowed(value),
-                translate: self.translate.clone(),
-            })))
+            Ok(Some(ctx.error(
+                CONST,
+                Error {
+                    expected: self.expected.clone(),
+                    actual: Cow::Borrowed(value),
+                    translate: self.translate.clone(),
+                },
+            )))
         }
     }
 }
@@ -142,8 +148,10 @@ mod tests {
 
     use crate::{
         json_schema::{
+            self,
             common::{id, schema},
             draft_2020_12::json_schema_2020_12_uri,
+            ID, SCHEMA,
         },
         schema::Dialect,
         Interrogator, Structure,
@@ -152,8 +160,8 @@ mod tests {
     use super::{Keyword, *};
     async fn create_interrogator(const_value: Value) -> Interrogator {
         let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
-            .keyword(schema::Keyword::new(json_schema::SCHEMA, false))
-            .keyword(id::Keyword::new(json_schema::ID, false))
+            .keyword(schema::Keyword::new(SCHEMA, false))
+            .keyword(id::Keyword::new(ID, false))
             .keyword(Keyword::new(None))
             .metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .build()

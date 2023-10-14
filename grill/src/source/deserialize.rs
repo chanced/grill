@@ -1,7 +1,8 @@
 //! Trait and common implementations for deserializing source data into schemas.
 
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
+use ahash::AHashMap;
 use dyn_clone::{clone_trait_object, DynClone};
 use serde_json::Value;
 
@@ -61,7 +62,7 @@ impl Deserializers {
         Self { deserializers }
     }
     pub fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
-        let mut errs = HashMap::new();
+        let mut errs = AHashMap::new();
         for (name, deserializer) in &self.deserializers {
             match deserializer.deserialize(data) {
                 Ok(value) => return Ok(value),

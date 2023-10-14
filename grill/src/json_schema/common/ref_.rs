@@ -81,7 +81,7 @@ impl keyword::Keyword for Keyword {
         value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         if !self.must_eval {
-            return ctx.annotate(Some(self.ref_uri_value.clone().into())).into();
+            return ctx.annotate(self.keyword, Some(self.ref_uri_value.clone().into())).into();
         }
         ctx.evalute(self.ref_key, None, self.keyword, value)?.into()
     }
@@ -107,7 +107,7 @@ mod tests {
             draft_2020_12::json_schema_2020_12_uri,
         },
         schema::Dialect,
-        Interrogator,
+        Interrogator, Structure,
     };
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
@@ -173,5 +173,28 @@ mod tests {
             .map(|kw| kw.kind())
             .any(|k| k == json_schema::REF));
         dbg!(interrogator.schemas);
+    }
+    #[tokio::test]
+    async fn test_evaluate() {
+        let mut interrogator = create_interrogator("https://example.com/referenced").await;
+        let key = interrogator
+            .compile("https://example.com/with_$ref")
+            .await
+            .unwrap();
+        let schema = interrogator.schema(key).unwrap();
+        assert!(schema
+            .keywords
+            .iter()
+            .map(|kw| kw.kind())
+            .any(|k| k == json_schema::REF));
+        let _ = interrogator
+            .compile("https://example.com/without_$ref")
+            .await
+            .unwrap();
+        let value = json!(34.34);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &value)
+            .unwrap();
+        println!("output:\n{output}");
     }
 }
