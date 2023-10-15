@@ -81,7 +81,9 @@ impl keyword::Keyword for Keyword {
         value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         if !self.must_eval {
-            return ctx.annotate(self.keyword, Some(self.ref_uri_value.clone().into())).into();
+            return ctx
+                .annotate(self.keyword, Some(self.ref_uri_value.clone().into()))
+                .into();
         }
         ctx.evalute(self.ref_key, None, self.keyword, value)?.into()
     }
@@ -144,7 +146,7 @@ mod tests {
                 })),
             )
             .unwrap()
-            .build()
+            .finish()
             .await
             .unwrap()
     }
@@ -195,6 +197,10 @@ mod tests {
         let output = interrogator
             .evaluate(key, Structure::Verbose, &value)
             .unwrap();
-        println!("output:\n{output}");
+        println!("++ verbose:\n{output}");
+        let basic_output = interrogator
+            .evaluate(key, Structure::Basic, &value)
+            .unwrap();
+        println!("++ basic:\n{basic_output}");
     }
 }

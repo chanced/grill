@@ -895,6 +895,7 @@ impl<'v> Basic<'v> {
     /// the validity.
     pub fn add(&mut self, node: Basic<'v>) {
         self.is_valid &= node.is_valid;
+        self.push(node);
     }
 
     /// Appends `node` to the output but does *not* update `is_valid`
@@ -944,11 +945,7 @@ impl Serialize for Basic<'_> {
 
 impl fmt::Display for Basic<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_valid {
-            write!(f, "{SUCCESS_MSG}")
-        } else {
-            write!(f, "{ERROR_MSG}")
-        }
+        write_json(f, self)
     }
 }
 
@@ -1077,12 +1074,7 @@ impl<'de> Deserialize<'de> for Detailed<'static> {
 
 impl fmt::Display for Detailed<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.annotation_or_error {
-            Ok(Some(v)) => write!(f, "{v}"),
-            Err(Some(v)) => write!(f, "{v}"),
-            Ok(_) => write!(f, "{SUCCESS_MSG}"),
-            Err(_) => write!(f, "{ERROR_MSG}"),
-        }
+        write_json(f, self)
     }
 }
 
@@ -1344,6 +1336,7 @@ fn contains_mixed(obj: &Map<String, Value>) -> bool {
     }
     false
 }
+
 #[allow(clippy::type_complexity)]
 fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     annotation_or_error: Option<Value>,
@@ -1482,6 +1475,14 @@ fn determine_fmt<E: de::Error>(obj: &Map<String, Value>) -> Result<&'_ str, E> {
         return Ok(BASIC);
     }
     Ok(FLAG)
+}
+
+fn fmt_err<T>(_err: T) -> fmt::Error {
+    fmt::Error
+}
+
+fn write_json<V: Serialize>(f: &mut fmt::Formatter<'_>, v: &V) -> fmt::Result {
+    write!(f, "{}", serde_json::to_string_pretty(v).map_err(fmt_err)?)
 }
 
 /*

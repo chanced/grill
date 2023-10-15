@@ -237,13 +237,12 @@ impl<'i> Compiler<'i> {
         match err {
             CompileError::SchemaNotFound(_)
             | CompileError::FailedToSource(_)
-            | CompileError::CyclicGraph(_)
             | CompileError::FailedToLinkSource(_)
             | CompileError::Custom(_) => {
                 if let Some(key) = self.schemas.get_key(uri) {
                     self.schemas.remove(key);
                 }
-                (continue_on_err, err)
+                (false, err)
             }
             _ => (false, err),
         }
@@ -299,7 +298,7 @@ impl<'i> Compiler<'i> {
             let mut keywords = Vec::new();
             for mut keyword in dialect.keywords().iter().cloned() {
                 let mut compile = Compile {
-                    base_uri: schema.absolute_uri(),
+                    base_uri: schema.absolute_keyword_location(),
                     schemas: self.schemas,
                     numbers: self.numbers,
                     value_cache: self.values,
@@ -369,7 +368,7 @@ impl<'i> Compiler<'i> {
             .schemas
             .get(key, self.sources)
             .unwrap()
-            .absolute_uri()
+            .absolute_keyword_location()
             .clone();
         let mut base_uri = dependent_uri.clone();
         base_uri.set_fragment(None).unwrap();
@@ -537,18 +536,3 @@ fn identify(
     let uri = id.as_ref().unwrap_or(&uris[0]);
     Ok((uri.clone(), id, uris))
 }
-
-// #[cfg(test)]
-// mod tests {
-
-//     use super::*;
-
-//     #[tokio::test]
-//     async fn test_spike() {
-//         let _interrogator = Interrogator::json_schema_2020_12()
-//             .deserialize_json()
-//             .build()
-//             .await
-//             .unwrap();
-//     }
-// }

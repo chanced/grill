@@ -23,7 +23,7 @@
 
 
 mod interrogator;
-pub use interrogator::{Interrogator, Builder};
+pub use interrogator::{Interrogator, Build};
 
 pub mod error;
 

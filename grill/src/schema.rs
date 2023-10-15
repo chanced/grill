@@ -13,7 +13,7 @@ use crate::{
     error::{
         CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
     },
-    keyword::{Context, Keyword},
+    keyword::{Context, Evaluated, Keyword},
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
@@ -221,7 +221,7 @@ impl<'i> Schema<'i> {
     /// Returns most relevant URI for the schema, either using the `$id` or the
     /// most relevant as determined by the schema's ancestory or source.
     #[must_use]
-    pub fn absolute_uri(&self) -> &AbsoluteUri {
+    pub fn absolute_keyword_location(&self) -> &AbsoluteUri {
         self.id.as_deref().unwrap_or(&self.uris[0])
     }
 }
@@ -353,9 +353,9 @@ impl Schemas {
         eval_state: &mut AnyMap,
     ) -> Result<Output<'v>, EvaluateError> {
         let schema = self.get(key, sources)?;
-
+        let mut evaluated = Evaluated::new();
         let mut ctx = Context {
-            absolute_keyword_location: schema.absolute_uri(),
+            absolute_keyword_location: schema.absolute_keyword_location(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
             structure,
@@ -363,11 +363,12 @@ impl Schemas {
             sources,
             global_state,
             eval_state,
+            evaluated: &mut evaluated,
         };
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(
             structure,
-            schema.absolute_uri().clone(),
+            schema.absolute_keyword_location().clone(),
             keyword_location,
             instance_location,
             Ok(None),

@@ -183,7 +183,7 @@ mod tests {
                 })),
             )
             .unwrap()
-            .build()
+            .finish()
             .await
             .unwrap()
     }

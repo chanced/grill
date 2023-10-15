@@ -3,6 +3,8 @@ use num_rational::BigRational;
 
 pub mod cache;
 
+use self::cache::{Numbers, Values};
+
 use crate::{
     anymap::AnyMap,
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, NumberError, RefError},
@@ -18,6 +20,16 @@ use std::{
     fmt::{self, Display},
     sync::Arc,
 };
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                           define_translate!                           ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[macro_export]
 macro_rules! define_translate {
@@ -39,6 +51,7 @@ macro_rules! define_translate {
                 }
             }
         }
+
         impl ::std::fmt::Debug for Translate {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 match self {
@@ -49,6 +62,18 @@ macro_rules! define_translate {
         }
     };
 }
+
+pub use define_translate;
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Compile                                ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Debug)]
 pub struct Compile<'i> {
@@ -99,9 +124,15 @@ impl<'i> Compile<'i> {
     }
 }
 
-pub use define_translate;
-
-use self::cache::{Numbers, Values};
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Context                                ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 /// Contains global and evaluation level [`State`], schemas, and location
 /// information needed to [`evaluate`](`crate::Interrogator::evaluate`) a
@@ -116,6 +147,7 @@ pub struct Context<'i> {
     pub(crate) eval_state: &'i mut AnyMap,
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
+    pub(crate) evaluated: &'i mut Evaluated,
 }
 
 impl<'s> Context<'s> {
@@ -155,10 +187,11 @@ impl<'s> Context<'s> {
 
     #[must_use]
     pub fn annotate<'v>(
-        &self,
+        &mut self,
         keyword: &'static str,
         annotation: Option<Annotation<'v>>,
     ) -> Output<'v> {
+        self.evaluated.insert(&self.instance_location);
         self.output(Some(keyword), Ok(annotation), false)
     }
 
@@ -186,12 +219,25 @@ impl<'s> Context<'s> {
         is_transient: bool,
     ) -> Output<'v> {
         let mut keyword_location = self.keyword_location.clone();
+        let mut absolute_keyword_location = self.absolute_keyword_location.clone();
+
         if let Some(keyword) = keyword {
-            keyword_location.push_back(keyword.into());
+            let tok: Token = keyword.into();
+            keyword_location.push_back(tok.clone());
+            if let Ok(mut ptr) = absolute_keyword_location
+                .fragment()
+                .unwrap_or_default()
+                .parse::<Pointer>()
+            {
+                ptr.push_back(tok);
+                // TODO: this probably needs
+                absolute_keyword_location.set_fragment(Some(&ptr)).unwrap();
+            }
         }
+
         Output::new(
             self.structure,
-            self.absolute_keyword_location.clone(),
+            absolute_keyword_location,
             keyword_location,
             self.instance_location.clone(),
             annotation_or_error,
@@ -206,6 +252,16 @@ impl<'s> Context<'s> {
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                             Unimplemented                             ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯                             ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 #[derive(Debug)]
 pub struct Unimplemented;
 
@@ -214,6 +270,16 @@ impl Display for Unimplemented {
         write!(f, "not implemented")
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Kind                                  ║
+║                                 ¯¯¯¯                                  ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Clone, Debug, Copy)]
 pub enum Kind {
@@ -250,6 +316,16 @@ impl From<&'static [&'static str]> for Kind {
         Kind::Composite(s)
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Keyword                                ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
@@ -343,6 +419,16 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
 
 clone_trait_object!(Keyword);
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                               Evaluated                               ║
+║                               ¯¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 /// A collection of evaluated paths in the form of a trie of JSON pointers.
 ///
 /// # Example
@@ -350,7 +436,7 @@ clone_trait_object!(Keyword);
 /// # use grill::keyword::Evaluated;
 #[derive(Debug, Clone)]
 pub struct Evaluated {
-    pub children: AHashMap<Token, Evaluated>,
+    children: AHashMap<String, Evaluated>,
 }
 impl Evaluated {
     #[must_use]
@@ -361,17 +447,17 @@ impl Evaluated {
     }
     pub fn insert(&mut self, ptr: &Pointer) {
         let mut props = self;
-        for tok in ptr.tokens() {
-            props = props.children.entry(tok).or_default();
+        for tok in ptr.split('/') {
+            props = props.children.entry(tok.to_string()).or_default();
         }
     }
 
     #[must_use]
     pub fn contains(&self, ptr: &Pointer) -> bool {
         let mut node = self;
-        for tok in ptr.tokens() {
-            if node.children.contains_key(&tok) {
-                node = node.children.get(&tok).unwrap();
+        for tok in ptr.split('/') {
+            if node.children.contains_key(tok) {
+                node = node.children.get(tok).unwrap();
                 continue;
             }
             return false;
@@ -385,6 +471,16 @@ impl Default for Evaluated {
         Self::new()
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Tests                                 ║
+║                                 ¯¯¯¯¯                                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[cfg(test)]
 mod tests {

@@ -19,7 +19,7 @@ use crate::{
     },
     source::{Deserializers, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Builder,
+    Build,
 };
 
 use crate::anymap::AnyMap;
@@ -551,23 +551,23 @@ impl Interrogator {
     /// Returns a new, empty [`Builder`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn builder() -> Builder {
-        Builder::new()
+    pub fn builder() -> Build {
+        Build::new()
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 2020-12 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2020_12() -> Builder {
-        Builder::default().default_dialect(json_schema::draft_2020_12::dialect())
+    pub fn json_schema_2020_12() -> Build {
+        Build::default().default_dialect(json_schema::draft_2020_12::dialect())
     }
 
     /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2019_09() -> Builder {
+    pub fn json_schema_2019_09() -> Build {
         // Builder::default()
         //     .with_json_schema_2019_09()
         //     .with_default_dialect(
@@ -580,7 +580,7 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_07() -> Builder {
+    pub fn json_schema_07() -> Build {
         // Builder::default()
         //     .with_json_schema_07()
         //     .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
@@ -592,7 +592,7 @@ impl Interrogator {
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_04() -> Builder {
+    pub fn json_schema_04() -> Build {
         // Builder::default()
         //     .with_json_schema_04()
         //     .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
@@ -644,11 +644,11 @@ mod tests {
     use std::io::prelude::*;
     #[tokio::test]
     async fn test_build() {
-        let interrogator = Builder::default()
+        let interrogator = Build::default()
             .json_schema_2020_12()
             .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
             .unwrap()
-            .build()
+            .finish()
             .await
             .unwrap();
 

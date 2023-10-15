@@ -15,7 +15,7 @@ use crate::{
 use crate::anymap::AnyMap;
 
 /// Constructs an [`Interrogator`].
-pub struct Builder {
+pub struct Build {
     dialects: Vec<Dialect>,
     sources: Vec<Src>,
     default_dialect_idx: Option<usize>,
@@ -24,12 +24,12 @@ pub struct Builder {
     state: AnyMap,
 }
 
-impl Default for Builder {
+impl Default for Build {
     fn default() -> Self {
         Self::new()
     }
 }
-impl Builder {
+impl Build {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -42,7 +42,7 @@ impl Builder {
         }
     }
 }
-impl Builder {
+impl Build {
     #[must_use]
     pub fn dialect(mut self, dialect: Dialect) -> Self {
         let idx = self.dialects.len();
@@ -311,7 +311,7 @@ impl Builder {
         self
     }
 
-    pub async fn build(self) -> Result<Interrogator, BuildError> {
+    pub async fn finish(self) -> Result<Interrogator, BuildError> {
         let Self {
             dialects,
             mut sources,
