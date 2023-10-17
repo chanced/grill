@@ -4,7 +4,6 @@ use serde_json::Value;
 
 use crate::{
     error::{BuildError, SourceError, UriError},
-    json_schema,
     keyword::cache::{Numbers, Values},
     schema::{dialect::Dialects, Dialect, Schemas},
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
@@ -230,30 +229,6 @@ impl Build {
             self.sources.push(Src::Value(k.try_into_absolute_uri()?, v));
         }
         Ok(self)
-    }
-
-    /// Adds JSON Schema 04 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_04(self) -> Self {
-        self.dialect(json_schema::draft_04::dialect().clone())
-    }
-
-    /// Adds JSON Schema 07 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_07(self) -> Self {
-        self.dialect(json_schema::draft_07::dialect().clone())
-    }
-
-    /// Adds JSON Schema 2019-09 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_2019_09(self) -> Self {
-        self.dialect(json_schema::draft_2019_09::dialect().clone())
-    }
-
-    /// Adds JSON Schema 2020-12 [`Dialect`]
-    #[must_use]
-    pub fn json_schema_2020_12(self) -> Self {
-        self.dialect(json_schema::draft_2020_12::dialect().clone())
     }
 
     /// Adds a [`Resolve`] for resolving schema references.

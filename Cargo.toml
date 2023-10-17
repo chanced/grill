@@ -3,9 +3,9 @@ members  = ["grill", "grill-core", "grill-macros", "grill-json-schema", "tests"]
 resolver = "2"
 
 [workspace.dependencies]
-grill        = { path = "grill" }
-grill-core   = { path = "grill-core" }
-grill-macros = { path = "grill-macros" }
+grill        = { version = "0.1.0" }
+grill-core   = { version = "0.1.0" }
+grill-macros = { version = "0.1.0" }
 
 ahash            = { version = "0.8.3" }
 anyhow           = { version = "1.0.75" }
@@ -37,9 +37,12 @@ strum            = { version = "0.24", features = ["derive"] }
 strum_macros     = { version = "0.24" }
 tap              = { version = "1.0.1" }
 thiserror        = { version = "1.0.25" }
-toml             = { version = "0.7.4" }
+toml             = { version = "0.8.2" }
 url              = { version = "2.2.2" }
 urn              = { version = "0.7.0" }
 
-[replace]
-"serde_json:1.0.107" = { git = "https://github.com/serde-rs/json" }
+[patch.crates-io]
+grill             = { path = "grill" }
+grill-core        = { path = "grill-core" }
+grill-json-schema = { path = "grill-json-schema" }
+grill-macros      = { path = "grill-macros" }

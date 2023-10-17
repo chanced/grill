@@ -5,42 +5,16 @@ edition     = "2021"
 license     = "MIT OR Apache-2.0"
 name        = "grill"
 repository  = "https://github.com/chanced/grill"
-version     = "0.0.0"
+version     = "0.1.0"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-ahash            = { workspace = true }
-anyhow           = { workspace = true }
-async-trait      = { workspace = true }
-derive_more      = { workspace = true }
-dyn-clone        = { workspace = true }
-either           = { workspace = true }
-erased-serde     = { workspace = true }
-fancy-regex      = { workspace = true }
-grill-macros     = { path = "../grill-macros" }
-inherent         = { workspace = true }
-jsonptr          = { workspace = true }
-lazy_static      = { workspace = true }
-num              = { workspace = true }
-num-rational     = { workspace = true }
-once_cell        = { workspace = true }
-paste            = { workspace = true }
-percent-encoding = { workspace = true }
-regex            = { workspace = true }
-reqwest          = { workspace = true, optional = true }
-serde            = { workspace = true }
-serde_json       = { version = "1.0.106", features = ["arbitrary_precision"] }
-serde_yaml       = { workspace = true, optional = true }
-slotmap          = { workspace = true }
-strum            = { workspace = true }
-tap              = { workspace = true }
-thiserror        = { workspace = true }
-toml             = { workspace = true, optional = true }
-url              = { workspace = true }
-urn              = { workspace = true }
+grill-core        = { version = "0.1.0" }
+grill-json-schema = { version = "0.1.0" }
+grill-macros      = { version = "0.1.0" }
 
 [dev-dependencies]
 mockall  = { workspace = true }
@@ -50,13 +24,13 @@ tokio    = { version = "1.28", features = ["full"] }
 
 [features]
 default = ["http", "toml", "yaml"]
-http    = ["reqwest"]
-toml    = ["dep:toml"]
-yaml    = ["dep:serde_yaml"]
+http    = ["grill-core/http"]
+toml    = ["grill-core/toml"]
+yaml    = ["grill-core/yaml"]
 
 [[bench]]
 harness = false
 name    = "benchmark"
 
 [replace]
-"serde_json:1.0.106" = { git = "https://github.com/serde-rs/json" }
+"serde_json:1.0.107" = { git = "https://github.com/serde-rs/json" }
