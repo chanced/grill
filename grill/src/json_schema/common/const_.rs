@@ -46,6 +46,10 @@ impl keyword::Keyword for Keyword {
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, crate::error::CompileError> {
+        println!("setup const");
+        println!("{}", schema.absolute_uri());
+        println!("{}", serde_json::to_string_pretty(&schema).unwrap());
+
         let Some(c) = schema.get(CONST) else {
             return Ok(false);
         };
@@ -159,12 +163,12 @@ mod tests {
 
     use super::{Keyword, *};
     async fn create_interrogator(const_value: Value) -> Interrogator {
-        let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
-            .keyword(schema::Keyword::new(SCHEMA, false))
-            .keyword(id::Keyword::new(ID, false))
-            .keyword(Keyword::new(None))
-            .metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
-            .build()
+        let dialect = Dialect::build(json_schema_2020_12_uri().clone())
+            .with_keyword(schema::Keyword::new(SCHEMA, false))
+            .with_keyword(id::Keyword::new(ID, false))
+            .with_keyword(Keyword::new(None))
+            .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+            .finish()
             .unwrap();
         Interrogator::builder()
             .dialect(dialect)
@@ -209,8 +213,7 @@ mod tests {
         assert!(!schema
             .keywords
             .iter()
-            .map(|kw| kw.kind())
-            .any(|k| k == json_schema::CONST));
+            .any(|k| k.kind() == json_schema::CONST));
     }
 
     #[tokio::test]

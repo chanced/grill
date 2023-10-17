@@ -77,7 +77,7 @@ pub use define_translate;
 
 #[derive(Debug)]
 pub struct Compile<'i> {
-    pub(crate) base_uri: &'i AbsoluteUri,
+    pub(crate) absolute_uri: &'i AbsoluteUri,
     pub(crate) schemas: &'i Schemas,
     pub(crate) numbers: &'i mut Numbers,
     pub(crate) value_cache: &'i mut Values,
@@ -85,6 +85,11 @@ pub struct Compile<'i> {
 }
 
 impl<'i> Compile<'i> {
+    #[must_use]
+    pub fn absolute_uri(&self) -> &AbsoluteUri {
+        self.absolute_uri
+    }
+
     /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
     /// `Arc` to it.
     ///
@@ -117,7 +122,15 @@ impl<'i> Compile<'i> {
     /// - `CompileError::UriParsingFailed` if the URI is invalid
     pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
         let uri: Uri = uri.parse()?;
-        let uri = self.base_uri.resolve(&uri)?;
+        let uri = self.absolute_uri.resolve(&uri)?;
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+
+    pub fn subschema(&self, path: Pointer) -> Result<Key, CompileError> {
+        let mut uri = self.absolute_uri().clone();
+        uri.set_fragment(Some(&path))?;
         self.schemas
             .get_key(&uri)
             .ok_or(CompileError::SchemaNotFound(uri))
@@ -155,7 +168,7 @@ impl<'s> Context<'s> {
         &mut self,
         key: Key,
         instance: Option<&str>,
-        keyword: &str,
+        keyword: &Pointer,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut instance_location = self.instance_location.clone();
@@ -163,7 +176,7 @@ impl<'s> Context<'s> {
             instance_location.push_back(instance.into());
         }
         let mut keyword_location = self.keyword_location.clone();
-        keyword_location.push_back(keyword.into());
+        keyword_location.append(keyword);
         self.schemas.evaluate(
             self.structure,
             key,
@@ -191,35 +204,40 @@ impl<'s> Context<'s> {
         keyword: &'static str,
         annotation: Option<Annotation<'v>>,
     ) -> Output<'v> {
-        self.evaluated.insert(&self.instance_location);
-        self.output(Some(keyword), Ok(annotation), false)
+        self.create_output(Some(keyword), Ok(annotation), false)
     }
 
-    pub fn error<'v, E>(&self, keyword: &'static str, error: E) -> Output<'v>
+    pub fn error<'v, E>(&mut self, keyword: &'static str, error: E) -> Output<'v>
     where
         E: 'v + Error<'v>,
     {
-        self.output(Some(keyword), Err(Some(Box::new(error))), false)
+        self.create_output(Some(keyword), Err(Some(Box::new(error))), false)
     }
     pub fn transient<'v>(
-        &self,
+        &mut self,
         is_valid: bool,
         nodes: impl IntoIterator<Item = Output<'v>>,
     ) -> Output<'v> {
         let op = if is_valid { Ok(None) } else { Err(None) };
-        let mut output = self.output(None, op, true);
+        let mut output = self.create_output(None, op, true);
         output.append(nodes.into_iter());
         output
     }
 
-    fn output<'v>(
-        &self,
+    pub fn new_output<'v>(&mut self, value: &'v Value) -> Output<'v> {
+        self.create_output(None, Ok(None), false)
+    }
+
+    fn create_output<'v>(
+        &mut self,
         keyword: Option<&'static str>,
         annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Output<'v> {
         let mut keyword_location = self.keyword_location.clone();
         let mut absolute_keyword_location = self.absolute_keyword_location.clone();
+
+        self.evaluated.insert(&self.instance_location);
 
         if let Some(keyword) = keyword {
             let tok: Token = keyword.into();
@@ -484,15 +502,12 @@ impl Default for Evaluated {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-
     #[test]
     fn test_evaluated_insert() {
         let ptr = Pointer::new(["a", "b", "c"]);
         let mut props = Evaluated::default();
         props.insert(&ptr);
-        dbg!(&props);
         assert!(props.contains(&ptr));
         assert!(!props.contains(&Pointer::new(["a", "b", "d"])));
     }

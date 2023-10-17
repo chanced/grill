@@ -59,11 +59,13 @@ pub struct Source<'i> {
 
 impl<'i> Source<'i> {
     pub(crate) fn new(src: &'i Link, sources: &'i Sources) -> Source<'i> {
-        let value = sources.get(src.key);
+        let mut value = sources.get(src.key);
+        if !src.path.is_empty() {
+            value = value.resolve(&src.path).unwrap();
+        }
         Self {
             key: src.key,
-            uri: Cow::Borrowed(&src.uri),
-            path: Cow::Borrowed(&src.path),
+            uri: Cow::Borrowed(&src.uri), path: Cow::Borrowed(&src.path),
             value: Cow::Borrowed(value),
         }
     }
@@ -100,6 +102,12 @@ impl Store {
         let key = self.index.get(&uri).unwrap().key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
+            println!("src: {}", serde_json::to_string_pretty(&src).unwrap());
+            println!(
+                "existing_src: {}",
+                serde_json::to_string_pretty(&existing_src).unwrap()
+            );
+
             return Err(SourceConflictError { uri: uri.clone() }.into());
         }
         let link = self.index.get(&uri).unwrap().clone();
@@ -290,7 +298,10 @@ impl Sources {
         match entry {
             // if the value has already been indexed, return it
             Entry::Occupied(_) => self.resolve_internal(uri),
-            Entry::Vacant(_) => self.resolve_external(uri, resolvers, deserializers).await,
+            Entry::Vacant(_) => {
+                self.resolve_ptr_or_external(uri, resolvers, deserializers)
+                    .await
+            }
         }
     }
 
@@ -336,15 +347,15 @@ impl Sources {
     }
 
     fn create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
-        match self.store_mut().link_entry(link.uri.clone()) {
+        match self.store_mut().link_entry(link.root_uri.clone()) {
             Entry::Occupied(_) => {
-                let root = self.store().get_link(&link.uri).unwrap();
+                let root = self.store().get_link(&link.root_uri).unwrap();
                 let root_src = self.store().get(root.key);
-                let _ = root_src.resolve(&link.path)?;
+                root_src.resolve(&link.path)?;
                 let link = self.store_mut().link_entry(from).or_insert(link);
                 Ok(link)
             }
-            Entry::Vacant(_) => Err(LinkError::NotFound(link.uri.clone())),
+            Entry::Vacant(_) => Err(LinkError::NotFound(link.root_uri.clone())),
         }
     }
 
@@ -360,7 +371,7 @@ impl Sources {
         }
         &self.store
     }
-    async fn resolve_external(
+    async fn resolve_ptr_or_external(
         &mut self,
         uri: &AbsoluteUri,
         resolvers: &Resolvers,
@@ -369,6 +380,21 @@ impl Sources {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = fragment.trim();
+
+        if fragment.starts_with('/') {
+            let link = self.store().get_link(&base_uri).unwrap().clone();
+            let src = self.store().get(link.key).clone();
+            let ptr = Pointer::parse(fragment)?;
+            ptr.resolve(&src).map_err(PointerError::from)?;
+            self.create_link(uri.clone(), Link::new(link.key, uri.clone(), ptr.clone()))?;
+            let src = self
+                .store()
+                .get(link.key)
+                .resolve(&ptr)
+                .map_err(PointerError::from)?;
+            let link = self.store().get_link(uri).unwrap();
+            return Ok((link, src));
+        }
 
         let resolved = resolvers.resolve(&base_uri).await?;
 

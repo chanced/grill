@@ -24,17 +24,17 @@ pub struct Builder {
 
 impl Builder {
     #[must_use]
-    pub fn metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
+    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
         self.metaschemas.push((id, schema));
         self
     }
 
     #[must_use]
-    pub fn keyword(mut self, keyword: impl 'static + Keyword) -> Self {
+    pub fn with_keyword(mut self, keyword: impl 'static + Keyword) -> Self {
         self.keywords.push(Box::new(keyword));
         self
     }
-    pub fn build(self) -> Result<Dialect, DialectError> {
+    pub fn finish(self) -> Result<Dialect, DialectError> {
         Dialect::new(self.id, self.metaschemas, self.keywords)
     }
 }
@@ -65,7 +65,7 @@ impl std::fmt::Display for Dialect {
 impl Dialect {
     /// Returns a new `Dialect` [`Builder`].
     #[must_use]
-    pub fn builder(id: AbsoluteUri) -> Builder {
+    pub fn build(id: AbsoluteUri) -> Builder {
         Builder {
             id,
             metaschemas: Vec::new(),
@@ -118,6 +118,10 @@ impl Dialect {
         path: &Pointer,
         schema: &Value,
     ) -> Result<(Option<AbsoluteUri>, Vec<AbsoluteUri>), IdentifyError> {
+        // println!(
+        //     "IDENTIFY\nBASE_URI:{base_uri}\nPATH:{path}\nSCHEMA:\n{}",
+        //     serde_json::to_string_pretty(schema).unwrap()
+        // );
         let mut uris = Vec::new();
         if path.is_empty() {
             base_uri.set_fragment(None)?;
@@ -560,14 +564,14 @@ mod tests {
             "http://json-schema.org/draft-04",
         ];
         let id = crate::json_schema::draft_04::json_schema_04_uri();
-        let dialect = Dialect::builder(id.clone())
-            .metaschema(id.clone(), Cow::Owned(json!({})))
-            .keyword(json_schema::common::schema::Keyword::new(
+        let dialect = Dialect::build(id.clone())
+            .with_metaschema(id.clone(), Cow::Owned(json!({})))
+            .with_keyword(json_schema::common::schema::Keyword::new(
                 json_schema::SCHEMA,
                 true,
             ))
-            .keyword(json_schema::common::id::Keyword::new(json_schema::ID, true))
-            .build()
+            .with_keyword(json_schema::common::id::Keyword::new(json_schema::ID, true))
+            .finish()
             .unwrap();
 
         for valid in valid {

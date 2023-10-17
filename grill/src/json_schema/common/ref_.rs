@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
+use jsonptr::Pointer;
 use keyword::Unimplemented;
 use serde_json::Value;
 
 use crate::{
-    error::{CompileError, EvaluateError, Expected, RefError, UnexpectedTypeError},
+    error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
     schema::Ref,
     Key, Output, Schema, Uri,
@@ -13,6 +14,7 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct Keyword {
     pub keyword: &'static str,
+    pub keyword_ptr: Pointer,
     /// The key of the referenced schema.
     pub ref_key: Key,
     pub ref_uri_value: Arc<Value>,
@@ -26,6 +28,7 @@ impl Keyword {
     pub fn new(keyword: &'static str, must_eval: bool) -> Self {
         Self {
             keyword,
+            keyword_ptr: Pointer::new([keyword]),
             ref_key: Key::default(),
             ref_uri_value: Arc::new(Value::Null),
             must_eval,
@@ -36,7 +39,7 @@ impl Keyword {
             return Ok(Vec::default());
         };
         let Value::String(uri) = v else {
-            return Err(UnexpectedTypeError {
+            return Err(InvalidTypeError {
                 expected: Expected::String,
                 actual: v.clone(),
             }
@@ -65,7 +68,7 @@ impl keyword::Keyword for Keyword {
         };
         self.ref_uri_value = compile.value(v);
         let Value::String(uri) = v else {
-            return Err(UnexpectedTypeError {
+            return Err(InvalidTypeError {
                 expected: Expected::String,
                 actual: v.clone(),
             }
@@ -85,7 +88,8 @@ impl keyword::Keyword for Keyword {
                 .annotate(self.keyword, Some(self.ref_uri_value.clone().into()))
                 .into();
         }
-        ctx.evalute(self.ref_key, None, self.keyword, value)?.into()
+        ctx.evalute(self.ref_key, None, &self.keyword_ptr, value)?
+            .into()
     }
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
@@ -112,13 +116,13 @@ mod tests {
         Interrogator, Structure,
     };
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
-        let dialect = Dialect::builder(json_schema_2020_12_uri().clone())
-            .keyword(schema::Keyword::new(json_schema::SCHEMA, false))
-            .keyword(const_::Keyword::new(None))
-            .keyword(id::Keyword::new(json_schema::ID, false))
-            .keyword(Keyword::new(json_schema::REF, true))
-            .metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
-            .build()
+        let dialect = Dialect::build(json_schema_2020_12_uri().clone())
+            .with_keyword(schema::Keyword::new(json_schema::SCHEMA, false))
+            .with_keyword(const_::Keyword::new(None))
+            .with_keyword(id::Keyword::new(json_schema::ID, false))
+            .with_keyword(Keyword::new(json_schema::REF, true))
+            .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+            .finish()
             .unwrap();
         Interrogator::builder()
             .dialect(dialect)

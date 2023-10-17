@@ -445,14 +445,8 @@ impl<'v> Output<'v> {
     /// of `output`.
     ///
     /// # Panics
-    /// Panics if `output` does not match the variant of `self`. For
-    /// evaluations, use [`evaluate`](crate::keyword::Context::evaluate)
-    /// [`error`](crate::keyword::Context::error),
-    /// [`annotate`](crate::keyword::Context::annotate), or
-    /// [`transitive`](crate::keyword::Context::transitive) methods of
-    /// [`Context`](crate::keyword::Context) to construct the `Output` to ensure
-    /// the variants align.
-    pub(crate) fn add(&mut self, output: Output<'v>) {
+    /// Panics if `output` does not match the variant of `self`.
+    pub fn add(&mut self, output: Output<'v>) {
         let structure = output.structure();
         match self {
             Output::Flag(flag) => flag.add(output.try_into_flag().unwrap_or_else(|_| {

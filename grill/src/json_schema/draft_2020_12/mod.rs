@@ -8,12 +8,12 @@ use super::metaschema;
 
 #[must_use]
 pub fn dialect() -> Dialect {
-    Dialect::builder(json_schema_2020_12_uri().clone())
-        .metaschema(
+    Dialect::build(json_schema_2020_12_uri().clone())
+        .with_metaschema(
             json_schema_2020_12_uri().clone(),
             Cow::Borrowed(json_schema_2020_12_value()),
         )
-        .build()
+        .finish()
         .unwrap()
 }
 

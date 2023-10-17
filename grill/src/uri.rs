@@ -501,11 +501,16 @@ impl<'a> Iterator for PathSegments<'a> {
 }
 
 /// A URI in the form of a fully qualified [`Url`] or [`Urn`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive( Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum AbsoluteUri {
     Url(Url),
     Urn(Urn),
+}
+impl std::fmt::Debug for AbsoluteUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl AbsoluteUri {

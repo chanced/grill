@@ -1,5 +1,5 @@
 use crate::{
-    error::{CompileError, EvaluateError, Expected, UnexpectedTypeError},
+    error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     json_schema::READ_ONLY,
     keyword::{self, Compile, Kind},
     Output, Schema,
@@ -25,7 +25,7 @@ impl keyword::Keyword for Keyword {
             return Ok(false);
         };
         if !matches!(value, Value::Bool(_)) {
-            return Err(UnexpectedTypeError {
+            return Err(InvalidTypeError {
                 expected: Expected::Bool,
                 actual: value.clone(),
             }

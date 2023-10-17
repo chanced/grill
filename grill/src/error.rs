@@ -235,8 +235,18 @@ pub enum SourceError {
     #[error("source URIs may not contain fragments, found \"{0}\"")]
     UnexpectedUriFragment(AbsoluteUri),
 
+    /// A JSON Pointer failed to parse or resolve.
     #[error("failed to locate json pointer path:\n{0}")]
     PointerFailedToParseOrResolve(#[from] PointerError),
+
+    /// Failed to create a source link.
+    #[error(transparent)]
+    FailedToLinkSource(#[from] LinkError),
+}
+impl From<jsonptr::MalformedPointerError> for SourceError {
+    fn from(err: jsonptr::MalformedPointerError) -> Self {
+        Self::PointerFailedToParseOrResolve(err.into())
+    }
 }
 
 /*
@@ -831,7 +841,7 @@ pub enum CompileError {
     /// A keyword encountered a value type which was not expected
     /// and was not caught by the schema
     #[error(transparent)]
-    UnexpectedValueType(#[from] UnexpectedTypeError),
+    InvalidType(#[from] InvalidTypeError),
 
     /// An error occurred while parsing a ref field (e.g. `"$ref"`,
     /// `"$recursiveRef"`, `"$recursiveAnchor"`)
@@ -845,6 +855,11 @@ pub enum CompileError {
 impl From<SourceConflictError> for CompileError {
     fn from(value: SourceConflictError) -> Self {
         Self::FailedToSource(value.into())
+    }
+}
+impl From<MalformedPointerError> for CompileError {
+    fn from(err: MalformedPointerError) -> Self {
+        Self::FailedToParsePointer(err.into())
     }
 }
 
@@ -871,15 +886,15 @@ pub enum Expected {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                          UnexpectedTypeError                          ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
+║                           InvalidTypeError                            ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 #[derive(Debug, Error)]
 #[error("expected value with type {expected}, found {actual:?}")]
-pub struct UnexpectedTypeError {
+pub struct InvalidTypeError {
     pub expected: Expected,
     pub actual: Value,
 }
@@ -1285,7 +1300,7 @@ pub struct DialectExistsError {
 #[derive(Debug, Error)]
 pub enum RefError {
     #[error(transparent)]
-    UnexpectedType(#[from] UnexpectedTypeError),
+    UnexpectedType(#[from] InvalidTypeError),
     #[error(transparent)]
     UriError(#[from] UriError),
 }

@@ -1,9 +1,10 @@
 [workspace]
-members  = ["grill", "grill-macros", "tests"]
+members  = ["grill", "grill-core", "grill-macros", "grill-json-schema", "tests"]
 resolver = "2"
 
 [workspace.dependencies]
 grill        = { path = "grill" }
+grill-core   = { path = "grill-core" }
 grill-macros = { path = "grill-macros" }
 
 ahash            = { version = "0.8.3" }
@@ -16,7 +17,7 @@ either           = { version = "1.8.1" }
 erased-serde     = { version = "0.3.25" }
 fancy-regex      = { version = "0.11.0" }
 inherent         = { version = "1" }
-jsonptr          = { version = "0.4.3" }
+jsonptr          = { version = "0.4.4" }
 lazy_static      = { version = "1.4.0" }
 mockall          = { version = "0.11.4" }
 num              = { version = "0.4", features = ["serde"] }
@@ -39,5 +40,6 @@ thiserror        = { version = "1.0.25" }
 toml             = { version = "0.7.4" }
 url              = { version = "2.2.2" }
 urn              = { version = "0.7.0" }
+
 [replace]
 "serde_json:1.0.107" = { git = "https://github.com/serde-rs/json" }

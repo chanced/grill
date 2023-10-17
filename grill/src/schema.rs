@@ -5,6 +5,7 @@ pub mod traverse;
 pub mod dialect;
 use ahash::AHashMap;
 pub use dialect::{Dialect, Dialects};
+use serde::{Deserialize, Serialize, Serializer};
 
 pub(crate) mod compiler;
 
@@ -109,12 +110,13 @@ impl CompiledSchema {
         uris: Vec<AbsoluteUri>,
         link: Link,
         parent: Option<Key>,
+        metaschema: AbsoluteUri,
     ) -> Self {
         Self {
             id,
             path,
             uris,
-            metaschema: link.uri.clone(),
+            metaschema,
             parent,
             link,
             subschemas: Vec::default(),
@@ -199,6 +201,12 @@ pub struct Schema<'i> {
     pub source: Source<'i>,
 }
 
+impl Serialize for Schema<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.source.serialize(serializer)
+    }
+}
+
 impl<'i> Schema<'i> {
     #[must_use]
     pub fn make_owned(self) -> Schema<'static> {
@@ -221,7 +229,7 @@ impl<'i> Schema<'i> {
     /// Returns most relevant URI for the schema, either using the `$id` or the
     /// most relevant as determined by the schema's ancestory or source.
     #[must_use]
-    pub fn absolute_keyword_location(&self) -> &AbsoluteUri {
+    pub fn absolute_uri(&self) -> &AbsoluteUri {
         self.id.as_deref().unwrap_or(&self.uris[0])
     }
 }
@@ -355,7 +363,7 @@ impl Schemas {
         let schema = self.get(key, sources)?;
         let mut evaluated = Evaluated::new();
         let mut ctx = Context {
-            absolute_keyword_location: schema.absolute_keyword_location(),
+            absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
             structure,
@@ -368,7 +376,7 @@ impl Schemas {
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(
             structure,
-            schema.absolute_keyword_location().clone(),
+            schema.absolute_uri().clone(),
             keyword_location,
             instance_location,
             Ok(None),

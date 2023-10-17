@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use jsonptr::Pointer;
+use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 
 use crate::{
@@ -133,11 +133,14 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
-
+        println!("---------------------------------------------------------");
+        println!("COMPILING: {uri}");
         let (link, src) = self
             .source(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        println!("LINK:\n{link:#?}");
+        println!("SOURCE:\n{}", serde_json::to_string_pretty(&src).unwrap());
 
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
@@ -150,6 +153,7 @@ impl<'i> Compiler<'i> {
                 self.setup_keywords(key, &self.dialects[dialect_idx])
                     .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
             }
+
             return Ok(());
         }
 
@@ -199,19 +203,30 @@ impl<'i> Compiler<'i> {
             .link_all(id.as_ref(), &uris, &link)
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
+        let dialect_uri = self.dialects[dialect_idx].id().clone();
         let key = self
-            .insert(id.clone(), path.clone(), uris.clone(), parent, link)
+            .schemas
+            .insert(CompiledSchema::new(
+                id,
+                path.clone(),
+                uris,
+                link,
+                parent,
+                dialect_uri,
+            ))
+            .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
+
+        let has_subschemas = self
+            .queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-        self.queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        if self
+        let has_refs = self
             .queue_refs(key, &uri, &path, parent, dialect_idx, &src, ref_.clone(), q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?
-        {
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        if has_subschemas || has_refs {
             // kicking resolve_ref and setup_keywords down the road until all
-            // refs are resolved
+            // subschemas are compiled and refs are resolved
             return Ok(());
         }
 
@@ -295,10 +310,11 @@ impl<'i> Compiler<'i> {
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
+            println!("SETUP KEYWORDS: {}", schema.absolute_uri());
             let mut keywords = Vec::new();
             for mut keyword in dialect.keywords().iter().cloned() {
                 let mut compile = Compile {
-                    base_uri: schema.absolute_keyword_location(),
+                    absolute_uri: schema.absolute_uri(),
                     schemas: self.schemas,
                     numbers: self.numbers,
                     value_cache: self.values,
@@ -368,7 +384,7 @@ impl<'i> Compiler<'i> {
             .schemas
             .get(key, self.sources)
             .unwrap()
-            .absolute_keyword_location()
+            .absolute_uri()
             .clone();
         let mut base_uri = dependent_uri.clone();
         base_uri.set_fragment(None).unwrap();
@@ -402,19 +418,6 @@ impl<'i> Compiler<'i> {
     fn dialect_idx(&self, src: &Value, default: usize) -> usize {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
     }
-    fn insert(
-        &mut self,
-        id: Option<AbsoluteUri>,
-        path: Pointer,
-        uris: Vec<AbsoluteUri>,
-        parent: Option<Key>,
-        link: Link,
-    ) -> Result<Key, CompileError> {
-        let key = self
-            .schemas
-            .insert(CompiledSchema::new(id, path, uris, link, parent))?;
-        Ok(key)
-    }
 
     fn queue_subschemas(
         &mut self,
@@ -424,9 +427,10 @@ impl<'i> Compiler<'i> {
         dialect_idx: usize,
         src: &Value,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<bool, CompileError> {
         let dialect = &self.dialects[dialect_idx];
         let subschemas = dialect.subschemas(path, src);
+        let has_subschemas = !subschemas.is_empty();
         for subschema_path in subschemas {
             let mut uri = uri.clone();
             if subschema_path.is_empty() {
@@ -443,7 +447,17 @@ impl<'i> Compiler<'i> {
                 ref_: None,
             });
         }
-        Ok(())
+        if has_subschemas {
+            q.push_back(SchemaToCompile {
+                uri: uri.clone(),
+                path: Some(path.clone()),
+                parent: None,
+                default_dialect_idx: dialect_idx,
+                continue_on_err: false,
+                ref_: None,
+            });
+        }
+        Ok(has_subschemas)
     }
 
     fn queue_ancestors(
@@ -481,7 +495,11 @@ impl<'i> Compiler<'i> {
             .sources
             .resolve_link(uri.clone(), self.resolvers, self.deserializers)
             .await?;
-        let source = self.sources.get(link.key).clone();
+        let mut source = self.sources.get(link.key);
+        if !link.path.is_empty() {
+            source = source.resolve(&link.path).unwrap();
+        }
+        let source = source.clone();
         Ok((link, source))
     }
 
