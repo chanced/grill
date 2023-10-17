@@ -24,9 +24,7 @@ const QUERY: &AsciiSet = &CONTROLS
     .add(b'>')
     .add(b'\'');
 
-pub(super) use urn::percent::{
-    encode_f_component as f_component, encode_nss as nss,
-};
+pub(super) use urn::percent::{encode_f_component as f_component, encode_nss as nss};
 
 #[inline]
 pub(super) fn path_segment(s: &str) -> String {

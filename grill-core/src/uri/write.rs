@@ -9,7 +9,9 @@ pub(super) fn username<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     username: Option<T>,
 ) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
-    let Some(authority) = username else { return Ok(None) };
+    let Some(authority) = username else {
+        return Ok(None);
+    };
     let authority = authority.into();
     if !buf.ends_with("//") && !authority.starts_with("//") {
         buf.push_str("//");
@@ -22,7 +24,9 @@ pub(super) fn password<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     password: Option<T>,
 ) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
-    let Some(password) = password else { return Ok(None) };
+    let Some(password) = password else {
+        return Ok(None);
+    };
     let password = password.into();
     _ = buf.trim_end_matches(':');
     if password.is_empty() {
@@ -113,7 +117,9 @@ pub(super) fn fragment<'a, T: Into<Cow<'a, str>>>(
     buf: &mut String,
     fragment: Option<T>,
 ) -> Result<Option<u32>, OverflowError<usize, { u32::MAX as u64 }>> {
-    let Some(fragment) = fragment else { return Ok(None) };
+    let Some(fragment) = fragment else {
+        return Ok(None);
+    };
     let fragment = fragment.into();
     _ = buf.trim_end_matches('#');
     let buf_len = buf.len();

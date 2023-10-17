@@ -36,7 +36,9 @@ impl HttpResolver {
 #[async_trait]
 impl Resolve for HttpResolver {
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError> {
-        let Some(url) = uri.as_url() else { return Ok(None) };
+        let Some(url) = uri.as_url() else {
+            return Ok(None);
+        };
         let scheme = url.scheme();
         if scheme != "http" && scheme != "https" {
             return Ok(None);

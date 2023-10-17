@@ -1,7 +1,7 @@
 pub use super::common::id;
 pub use super::common::schema;
 
-use crate::schema::Dialect;
+use grill_core::schema::Dialect;
 
 use super::metaschema;
 #[must_use]

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use serde_json::Value;
 
-use crate::schema::Dialect;
+use grill_core::schema::Dialect;
 
 use super::metaschema;
 

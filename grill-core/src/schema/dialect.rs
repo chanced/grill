@@ -16,13 +16,13 @@ use std::{borrow::Cow, convert::Into, fmt::Debug, hash::Hash, iter::IntoIterator
 
 use super::{Anchor, Ref};
 
-pub struct Builder {
+pub struct Build {
     id: AbsoluteUri,
     metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
     keywords: Vec<Box<dyn Keyword>>,
 }
 
-impl Builder {
+impl Build {
     #[must_use]
     pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
         self.metaschemas.push((id, schema));
@@ -63,10 +63,10 @@ impl std::fmt::Display for Dialect {
 }
 
 impl Dialect {
-    /// Returns a new `Dialect` [`Builder`].
+    /// Returns a new `Dialect` [`Build`].
     #[must_use]
-    pub fn build(id: AbsoluteUri) -> Builder {
-        Builder {
+    pub fn build(id: AbsoluteUri) -> Build {
+        Build {
             id,
             metaschemas: Vec::new(),
             keywords: Vec::new(),

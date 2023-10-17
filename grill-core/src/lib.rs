@@ -20,10 +20,8 @@
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 
-
-
 mod interrogator;
-pub use interrogator::{Interrogator, Build};
+pub use interrogator::{Build, Interrogator};
 
 pub mod error;
 
@@ -33,33 +31,32 @@ pub use output::{Output, Structure};
 pub mod keyword;
 
 pub mod uri;
-pub use uri::{Uri, AbsoluteUri, RelativeUri};
-
+pub use uri::{AbsoluteUri, RelativeUri, Uri};
 
 pub mod schema;
-pub use schema::{Schema, Key};
-
+pub use schema::{Key, Schema};
 
 /// A JSON object.
-/// 
+///
 /// Alias for [`serde_json::Map<String, serde_json::Value>`](`serde_json::Map`).
 pub type Object = serde_json::Map<String, serde_json::Value>;
 /// A JSON array.
-/// 
+///
 /// Alias for `Vec<serde_json::Value>`.
 pub type Array = Vec<serde_json::Value>;
 
-
 pub mod source;
 pub(crate) use source::Src;
-
 
 pub mod big;
 
 pub mod anymap;
 
+#[cfg(test)]
+pub mod test;
+
 /// Returns a string literal of the supplied JSON.
-/// 
+///
 /// # Example
 /// ```rust
 /// # use grill_macros::json_str;
@@ -74,7 +71,7 @@ macro_rules! json_str {
 }
 
 /// Returns a pretty-printed string literal of the supplied JSON.
-/// 
+///
 /// ```rust
 /// # use grill_macros::json_pretty_str;
 /// let s = json_pretty_str!({

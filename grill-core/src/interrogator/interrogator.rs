@@ -237,7 +237,7 @@ impl Interrogator {
     ///
     /// # Example
     /// ```rust
-    /// use grill::{ Interrogator };
+    /// use grill::{ Interrogator, json_schema::Build };
     /// #[tokio::main]
     /// async fn main() {
     ///     let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
@@ -547,22 +547,14 @@ impl Interrogator {
         Ok(())
     }
 
-    /// Returns a new, empty [`Builder`].
+    /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
     pub fn builder() -> Build {
         Build::new()
     }
 
-    /// Returns a new [`Builder`] with the JSON Schema Draft 2020-12 [`Dialect`] that is
-    /// set as the default dialect.
-    #[must_use]
-    #[allow(unused_must_use)]
-    pub fn json_schema_2020_12() -> Build {
-        Build::default().default_dialect(json_schema::draft_2020_12::dialect())
-    }
-
-    /// Returns a new [`Builder`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
+    /// Returns a new [`Build`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
@@ -575,7 +567,7 @@ impl Interrogator {
         todo!()
     }
 
-    /// Returns a new [`Builder`] with the JSON Schema Draft 07 [`Dialect`] that is
+    /// Returns a new [`Build`] with the JSON Schema Draft 07 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
@@ -587,7 +579,7 @@ impl Interrogator {
         todo!()
     }
 
-    /// Returns a new [`Builder`] with the JSON Schema Draft 04 [`Dialect`] that is
+    /// Returns a new [`Build`] with the JSON Schema Draft 04 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]

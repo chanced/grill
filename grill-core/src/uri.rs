@@ -501,7 +501,7 @@ impl<'a> Iterator for PathSegments<'a> {
 }
 
 /// A URI in the form of a fully qualified [`Url`] or [`Urn`].
-#[derive( Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum AbsoluteUri {
     Url(Url),

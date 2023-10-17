@@ -740,7 +740,9 @@ mod tests {
     {
         // decent sized sampling
         for i in 0..70_000 {
-            let Some(input) = char::from_u32(i) else { continue };
+            let Some(input) = char::from_u32(i) else {
+                continue;
+            };
             assert_transition(state, input, expect(input));
         }
     }

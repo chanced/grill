@@ -65,7 +65,8 @@ impl<'i> Source<'i> {
         }
         Self {
             key: src.key,
-            uri: Cow::Borrowed(&src.uri), path: Cow::Borrowed(&src.path),
+            uri: Cow::Borrowed(&src.uri),
+            path: Cow::Borrowed(&src.path),
             value: Cow::Borrowed(value),
         }
     }

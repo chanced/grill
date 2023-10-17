@@ -2,7 +2,7 @@ pub use super::common::id;
 pub use super::common::schema;
 
 use super::metaschema;
-use crate::schema::Dialect;
+use grill_core::schema::Dialect;
 use serde_json::Value;
 
 #[must_use]
