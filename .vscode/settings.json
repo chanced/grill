@@ -1,5 +1,0 @@
-{
-	"rust-analyzer.linkedProjects": [
-		"./grill/Cargo.toml"
-	]
-}
