@@ -2578,7 +2578,7 @@ impl Uri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");

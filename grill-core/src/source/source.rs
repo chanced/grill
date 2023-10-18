@@ -371,6 +371,37 @@ impl Sources {
         }
         &self.store
     }
+    async fn resolve_ptr(
+        &mut self,
+        uri: &AbsoluteUri,
+        base_uri: &AbsoluteUri,
+        fragment: &str,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(&Link, &Value), SourceError> {
+        let link = if let Some(link) = self.store().get_link(base_uri) {
+            link
+        } else {
+            let (link, _) = self
+                .resolve_external(uri, base_uri, fragment, resolvers, deserializers)
+                .await?;
+            link
+        }
+        .clone();
+
+        let src = self.store().get(link.key).clone();
+        let ptr = Pointer::parse(fragment)?;
+        ptr.resolve(&src).map_err(PointerError::from)?;
+        self.create_link(uri.clone(), Link::new(link.key, uri.clone(), ptr.clone()))?;
+        let src = self
+            .store()
+            .get(link.key)
+            .resolve(&ptr)
+            .map_err(PointerError::from)?;
+        let link = self.store().get_link(uri).unwrap();
+        Ok((link, src))
+    }
+
     async fn resolve_ptr_or_external(
         &mut self,
         uri: &AbsoluteUri,
@@ -379,25 +410,24 @@ impl Sources {
     ) -> Result<(&Link, &Value), SourceError> {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
-        let fragment = fragment.trim();
-
-        // this is incorrect.
         if fragment.starts_with('/') {
-            let link = self.store().get_link(&base_uri).unwrap().clone();
-            let src = self.store().get(link.key).clone();
-            let ptr = Pointer::parse(fragment)?;
-            ptr.resolve(&src).map_err(PointerError::from)?;
-            self.create_link(uri.clone(), Link::new(link.key, uri.clone(), ptr.clone()))?;
-            let src = self
-                .store()
-                .get(link.key)
-                .resolve(&ptr)
-                .map_err(PointerError::from)?;
-            let link = self.store().get_link(uri).unwrap();
-            return Ok((link, src));
+            self.resolve_ptr(uri, &base_uri, &fragment, resolvers, deserializers)
+                .await
+        } else {
+            self.resolve_external(uri, &base_uri, &fragment, resolvers, deserializers)
+                .await
         }
+    }
 
-        let resolved = resolvers.resolve(&base_uri).await?;
+    async fn resolve_external(
+        &mut self,
+        uri: &AbsoluteUri,
+        base_uri: &AbsoluteUri,
+        fragment: &str,
+        resolvers: &Resolvers,
+        deserializers: &Deserializers,
+    ) -> Result<(&Link, &Value), SourceError> {
+        let resolved = resolvers.resolve(base_uri).await?;
 
         let src = deserializers
             .deserialize(&resolved)
@@ -407,14 +437,14 @@ impl Sources {
             .insert_vacant(base_uri.clone(), Cow::Owned(src))?;
 
         if fragment.is_empty() || !fragment.starts_with('/') {
-            let link = self.store().get_link(&base_uri).unwrap();
+            let link = self.store().get_link(base_uri).unwrap();
             let src = self.store().get(link.key);
             return Ok((link, src));
         }
 
         let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
 
-        let link = self.store().get_link(&base_uri).unwrap().clone();
+        let link = self.store().get_link(base_uri).unwrap().clone();
 
         self.store_mut()
             .insert_link(link.key, uri.clone(), ptr.clone());
@@ -428,7 +458,6 @@ impl Sources {
 
         Ok((link, src))
     }
-
     fn resolve_internal(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
         let link = self.store().get_link(uri).unwrap();
         let mut src = self.store().get(link.key);
@@ -514,19 +543,19 @@ mod tests {
         //                           anchor                            \\
         //=============================================================\\
 
-        // let mut sources = Sources::default();
-        // sources.start_txn();
-        // let mut uri = base_uri.clone();
-        // uri.set_fragment(Some("foo")).unwrap();
+        let mut sources = Sources::default();
+        sources.start_txn();
+        let mut uri = base_uri.clone();
+        uri.set_fragment(Some("foo")).unwrap();
 
-        // let (link, src) = sources
-        //     .resolve(&uri, &resolvers, &deserializers)
-        //     .await
-        //     .unwrap();
-        // assert_eq!(link.path, Pointer::default());
-        // assert_eq!(link.uri, base_uri);
-        // assert_eq!(src, &value);
-        // assert_eq!(sources.store_mut().index.len(), 1);
-        // assert_eq!(sources.store_mut().table.len(), 1);
+        let (link, src) = sources
+            .resolve(&uri, &resolvers, &deserializers)
+            .await
+            .unwrap();
+        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.uri, base_uri);
+        assert_eq!(src, &value);
+        assert_eq!(sources.store_mut().index.len(), 1);
+        assert_eq!(sources.store_mut().table.len(), 1);
     }
 }
