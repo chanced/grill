@@ -531,6 +531,7 @@ mod tests {
         let deserializers = Deserializers::new(vec![("json", Box::new(deserialize_json))]);
         let mut sources = Sources::new(vec![], &deserializers).unwrap();
         schemas.start_txn();
+        sources.start_txn();
         let mut root_keys = vec![];
         // builds subschemas
         for r in 'a'..='d' {
@@ -644,6 +645,7 @@ mod tests {
             }
         }
         schemas.commit_txn();
+        sources.commit_txn();
 
         (root_keys, schemas, sources)
     }
