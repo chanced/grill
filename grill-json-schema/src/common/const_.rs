@@ -1,18 +1,21 @@
 use std::{borrow::Cow, sync::Arc};
 
-use crate::big::parse_rational;
-use crate::json_schema::CONST;
-use crate::keyword::{define_translate, Kind};
-use num_rational::BigRational;
+use grill_core::{
+    big::{parse_rational, BigRational},
+    error::CompileError,
+    keyword::{define_translate, Kind},
+};
+
+use grill_core::output::Error as OutputError;
 use serde_json::Value;
 
-use crate::output::Error as OutputError;
-
-use crate::{
+use grill_core::{
     error::EvaluateError,
     keyword::{self, Compile, Context},
     Output, Schema,
 };
+
+use crate::CONST;
 
 /// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
 ///
@@ -45,7 +48,7 @@ impl keyword::Keyword for Keyword {
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
-    ) -> Result<bool, crate::error::CompileError> {
+    ) -> Result<bool, CompileError> {
         println!("setup const");
         println!("{}", schema.absolute_uri());
         println!("{}", serde_json::to_string_pretty(&schema).unwrap());
@@ -136,7 +139,7 @@ impl<'v> OutputError<'v> for Error<'v> {
     fn translate_error(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        translator: &crate::output::Translator,
+        translator: &grill_core::output::Translator,
     ) -> std::fmt::Result {
         if let Some(translate) = translator.get::<Translate>() {
             translate.run(f, self)
@@ -148,17 +151,13 @@ impl<'v> OutputError<'v> for Error<'v> {
 
 #[cfg(test)]
 mod tests {
+    use grill_core::{schema::Dialect, Interrogator, Structure};
     use serde_json::json;
 
     use crate::{
-        json_schema::{
-            self,
-            common::{id, schema},
-            draft_2020_12::json_schema_2020_12_uri,
-            ID, SCHEMA,
-        },
-        schema::Dialect,
-        Interrogator, Structure,
+        common::{id, schema},
+        draft_2020_12::json_schema_2020_12_uri,
+        ID, SCHEMA,
     };
 
     use super::{Keyword, *};
@@ -204,16 +203,13 @@ mod tests {
             .keywords
             .iter()
             .map(|kw| kw.kind())
-            .any(|k| k == json_schema::CONST));
+            .any(|k| k == crate::CONST));
         let key = interrogator
             .compile("https://example.com/without_const")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
-        assert!(!schema
-            .keywords
-            .iter()
-            .any(|k| k.kind() == json_schema::CONST));
+        assert!(!schema.keywords.iter().any(|k| k.kind() == crate::CONST));
     }
 
     #[tokio::test]

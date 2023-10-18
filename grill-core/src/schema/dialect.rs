@@ -547,7 +547,7 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::json_schema;
+    use crate::{test, AbsoluteUri};
 
     use super::Dialect;
 
@@ -563,14 +563,11 @@ mod tests {
             "http://json-schema.org/draft-04/schema#fragmented",
             "http://json-schema.org/draft-04",
         ];
-        let id = crate::json_schema::draft_04::json_schema_04_uri();
+        let id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
         let dialect = Dialect::build(id.clone())
             .with_metaschema(id.clone(), Cow::Owned(json!({})))
-            .with_keyword(json_schema::common::schema::Keyword::new(
-                json_schema::SCHEMA,
-                true,
-            ))
-            .with_keyword(json_schema::common::id::Keyword::new(json_schema::ID, true))
+            .with_keyword(test::keyword::schema::Keyword::new("$schema", true))
+            .with_keyword(test::keyword::id::Keyword::new("$id", true))
             .finish()
             .unwrap();
 

@@ -4,7 +4,7 @@ use jsonptr::Pointer;
 use keyword::Unimplemented;
 use serde_json::Value;
 
-use crate::{
+use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
     schema::Ref,
@@ -107,20 +107,18 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        json_schema::{
-            self,
-            common::{const_, id, schema},
-            draft_2020_12::json_schema_2020_12_uri,
-        },
-        schema::Dialect,
-        Interrogator, Structure,
+        common::{const_, id, schema},
+        draft_2020_12::json_schema_2020_12_uri,
+        ID, REF, SCHEMA,
     };
+    use grill_core::{schema::Dialect, Interrogator, Structure};
+
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
-            .with_keyword(schema::Keyword::new(json_schema::SCHEMA, false))
+            .with_keyword(schema::Keyword::new(SCHEMA, false))
             .with_keyword(const_::Keyword::new(None))
-            .with_keyword(id::Keyword::new(json_schema::ID, false))
-            .with_keyword(Keyword::new(json_schema::REF, true))
+            .with_keyword(id::Keyword::new(ID, false))
+            .with_keyword(Keyword::new(REF, true))
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();
@@ -163,22 +161,13 @@ mod tests {
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
-        assert!(schema
-            .keywords
-            .iter()
-            .map(|kw| kw.kind())
-            .any(|k| k == json_schema::REF));
+        assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let key = interrogator
             .compile("https://example.com/without_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
-        assert!(!schema
-            .keywords
-            .iter()
-            .map(|kw| kw.kind())
-            .any(|k| k == json_schema::REF));
-        dbg!(interrogator.schemas);
+        assert!(!schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
     }
     #[tokio::test]
     async fn test_evaluate() {
@@ -188,11 +177,7 @@ mod tests {
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
-        assert!(schema
-            .keywords
-            .iter()
-            .map(|kw| kw.kind())
-            .any(|k| k == json_schema::REF));
+        assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let _ = interrogator
             .compile("https://example.com/without_$ref")
             .await

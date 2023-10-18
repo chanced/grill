@@ -6,8 +6,16 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ahash        = { workspace = true }
 grill-core   = { version = "0.1.0" }
 grill-macros = { version = "0.1.0" }
+jsonptr      = { workspace = true }
 once_cell    = { workspace = true }
 paste        = { workspace = true }
 serde_json   = { workspace = true }
+
+[dev-dependencies]
+mockall  = { workspace = true }
+proptest = { workspace = true }
+similar  = { workspace = true }
+tokio    = { version = "1.28", features = ["full"] }

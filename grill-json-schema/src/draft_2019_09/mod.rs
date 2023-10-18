@@ -1,6 +1,6 @@
+use crate::metaschema;
+use grill_core::schema::Dialect;
 use serde_json::Value;
-
-use crate::{json_schema::metaschema, schema::Dialect};
 
 #[must_use]
 pub fn dialect() -> Dialect {

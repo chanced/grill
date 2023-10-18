@@ -1,19 +1,20 @@
-use crate::{
+use grill_core::{
     error::{CompileError, EvaluateError},
-    json_schema,
-    keyword::{self, Compile},
+    keyword::{self, Compile, Kind},
     Output, Schema,
 };
 use serde_json::Value;
 use std::sync::Arc;
+
+use crate::WRITE_ONLY;
 
 #[derive(Debug, Clone, Default)]
 pub struct Keyword {
     pub value: Arc<Value>,
 }
 impl keyword::Keyword for Keyword {
-    fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(json_schema::WRITE_ONLY)
+    fn kind(&self) -> Kind {
+        Kind::Single(WRITE_ONLY)
     }
     fn setup<'i>(
         &mut self,

@@ -2,13 +2,14 @@ use ahash::AHashMap;
 use jsonptr::{Pointer, Token};
 use serde_json::Value;
 
-use crate::{
-    error::{EvaluateError, Expected, InvalidTypeError},
-    json_schema,
+use grill_core::{
+    error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, Compile, Context, Unimplemented},
     output::Output,
     Key, Schema,
 };
+
+use crate::PROPERTIES;
 
 #[derive(Debug, Clone)]
 pub struct Keyword {
@@ -32,17 +33,17 @@ impl Default for Keyword {
 
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(json_schema::PROPERTIES)
+        keyword::Kind::Single(PROPERTIES)
     }
 
     fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
-    ) -> Result<bool, crate::error::CompileError> {
+    ) -> Result<bool, CompileError> {
         let j = serde_json::to_string_pretty(&schema).unwrap();
         println!("{j}");
-        let Some(value) = schema.get(json_schema::PROPERTIES) else {
+        let Some(value) = schema.get(PROPERTIES) else {
             return Ok(false);
         };
         if !matches!(value, Value::Object(_)) {
@@ -69,7 +70,7 @@ impl keyword::Keyword for Keyword {
             return Ok(None);
         };
         let mut output = ctx.new_output(value);
-        let mut ptr = Pointer::new([json_schema::PROPERTIES]);
+        let mut ptr = Pointer::new([PROPERTIES]);
         for (prop, key) in &self.subschemas {
             if let Some(v) = obj.get(prop) {
                 ptr.push_back(prop.into());
@@ -108,15 +109,11 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        json_schema::{
-            self,
-            common::{const_, id, schema},
-            draft_2020_12::json_schema_2020_12_uri,
-            ID, SCHEMA,
-        },
-        schema::Dialect,
-        Interrogator, Structure,
+        common::{const_, id, schema},
+        draft_2020_12::json_schema_2020_12_uri,
+        ID, SCHEMA,
     };
+    use grill_core::{schema::Dialect, Interrogator, Structure};
 
     use super::*;
 
@@ -170,7 +167,7 @@ mod tests {
         assert!(schema
             .keywords
             .iter()
-            .any(|k| k.kind() == json_schema::PROPERTIES));
+            .any(|k| k.kind() == crate::PROPERTIES));
     }
 
     #[tokio::test]

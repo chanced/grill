@@ -1,6 +1,6 @@
-use crate::{
+use crate::WRITE_ONLY;
+use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    json_schema::WRITE_ONLY,
     keyword::{self, Compile},
     Output, Schema,
 };

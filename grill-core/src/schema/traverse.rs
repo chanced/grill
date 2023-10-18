@@ -368,7 +368,6 @@ type Instances<'i> =
 mod tests {
     use super::*;
     use crate::{
-        json_schema,
         schema::{CompiledSchema, Reference},
         source::{deserialize_json, Deserializers},
         AbsoluteUri, Key,
@@ -431,7 +430,6 @@ mod tests {
     #[test]
     fn test_transitive_dependencies() {
         use similar::{ChangeTag, TextDiff};
-
         let (root_keys, schemas, sources) = build_graph();
         let traverse = TransitiveDependencies::new(root_keys[0], &schemas, &sources);
         let ids = traverse
@@ -527,6 +525,8 @@ mod tests {
     }
 
     fn build_graph() -> (Vec<Key>, Schemas, Sources) {
+        const REF: &str = "$ref";
+
         let mut schemas: Schemas = Schemas::new();
         let deserializers = Deserializers::new(vec![("json", Box::new(deserialize_json))]);
         let mut sources = Sources::new(vec![], &deserializers).unwrap();
@@ -588,7 +588,7 @@ mod tests {
                         key: dep_key,
                         absolute_uri: uri.clone(),
                         uri: uri.clone().into(),
-                        keyword: json_schema::REF,
+                        keyword: REF,
                     });
                 }
                 {
@@ -606,7 +606,7 @@ mod tests {
                             key: transitive_dep_key,
                             absolute_uri: uri.clone(),
                             uri: uri.clone().into(),
-                            keyword: json_schema::REF,
+                            keyword: REF,
                         });
                     }
                     {
@@ -632,7 +632,7 @@ mod tests {
                                 key: transitive_dep_key_2,
                                 absolute_uri: uri.clone(),
                                 uri: uri.clone().into(),
-                                keyword: json_schema::REF,
+                                keyword: REF,
                             });
                         }
                         {

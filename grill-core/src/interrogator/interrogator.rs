@@ -628,23 +628,23 @@ impl Interrogator {
     // }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-    use std::io::prelude::*;
-    #[tokio::test]
-    async fn test_build() {
-        let interrogator = Build::default()
-            .json_schema_2020_12()
-            .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
-            .unwrap()
-            .finish()
-            .await
-            .unwrap();
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::fs::File;
+//     use std::io::prelude::*;
+//     #[tokio::test]
+//     async fn test_build() {
+//         let interrogator = Build::default()
+//             .json_schema_2020_12()
+//             .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
+//             .unwrap()
+//             .finish()
+//             .await
+//             .unwrap();
 
-        let mut file = File::create("foo.txt").unwrap();
-        file.write_all(format!("{interrogator:#?}").as_bytes())
-            .unwrap();
-    }
-}
+//         let mut file = File::create("foo.txt").unwrap();
+//         file.write_all(format!("{interrogator:#?}").as_bytes())
+//             .unwrap();
+//     }
+// }

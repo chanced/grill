@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde_json::Value;
 
-use crate::{
+use grill_core::{
     error::IdentifyError,
     keyword::{self, Kind, Unimplemented},
     schema::Identifier,
@@ -69,8 +69,8 @@ impl keyword::Keyword for Keyword {
     fn setup<'i>(
         &mut self,
         _compile: &mut keyword::Compile<'i>,
-        _schema: crate::Schema<'i>,
-    ) -> Result<bool, crate::error::CompileError> {
+        _schema: grill_core::Schema<'i>,
+    ) -> Result<bool, grill_core::error::CompileError> {
         Ok(false)
     }
 
@@ -78,7 +78,7 @@ impl keyword::Keyword for Keyword {
         &'i self,
         _ctx: &'i mut keyword::Context,
         _value: &'v Value,
-    ) -> Result<Option<crate::output::Output<'v>>, crate::error::EvaluateError> {
+    ) -> Result<Option<grill_core::output::Output<'v>>, grill_core::error::EvaluateError> {
         Ok(None)
     }
 }

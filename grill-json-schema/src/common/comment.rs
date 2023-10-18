@@ -1,10 +1,10 @@
 use serde_json::Value;
 
-use crate::{
-    error::EvaluateError,
-    json_schema,
-    keyword::{self, Context, Kind},
+use grill_core::{
+    error::{CompileError, EvaluateError},
+    keyword::{self, Compile, Context, Kind},
     output::Output,
+    Schema,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -12,13 +12,13 @@ pub struct Keyword;
 
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
-        Kind::Single(json_schema::COMMENT)
+        Kind::Single(crate::COMMENT)
     }
     fn setup<'i>(
         &mut self,
-        _compile: &mut keyword::Compile<'i>,
-        _schema: crate::Schema<'i>,
-    ) -> Result<bool, crate::error::CompileError> {
+        _compile: &mut Compile<'i>,
+        _schema: Schema<'i>,
+    ) -> Result<bool, CompileError> {
         Ok(false)
     }
     fn evaluate<'i, 'v>(

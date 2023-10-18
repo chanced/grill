@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::{
-    error::IdentifyError,
-    keyword::{self, Kind, Unimplemented},
+use grill_core::{
+    error::{CompileError, EvaluateError, IdentifyError},
+    keyword::{self, Context, Kind, Unimplemented},
     uri::AbsoluteUri,
+    Output, Schema,
 };
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,6 @@ impl Keyword {
         }
     }
 }
-#[async_trait]
 impl keyword::Keyword for Keyword {
     fn kind(&self) -> Kind {
         self.keyword.into()
@@ -61,17 +60,17 @@ impl keyword::Keyword for Keyword {
 
     fn setup<'i>(
         &mut self,
-        _compile: &mut crate::keyword::Compile<'i>,
-        _schema: crate::Schema<'i>,
-    ) -> Result<bool, crate::error::CompileError> {
+        _compile: &mut keyword::Compile<'i>,
+        _schema: Schema<'i>,
+    ) -> Result<bool, CompileError> {
         Ok(false)
     }
 
     fn evaluate<'i, 'v>(
         &'i self,
-        _ctx: &'i mut crate::keyword::Context,
+        _ctx: &'i mut Context,
         _value: &'v Value,
-    ) -> Result<Option<crate::output::Output<'v>>, crate::error::EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         Ok(None)
     }
 }

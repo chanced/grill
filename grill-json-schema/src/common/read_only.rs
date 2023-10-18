@@ -1,11 +1,12 @@
-use crate::{
+use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    json_schema::READ_ONLY,
     keyword::{self, Compile, Kind},
     Output, Schema,
 };
 use serde_json::Value;
 use std::sync::Arc;
+
+use crate::READ_ONLY;
 
 #[derive(Debug, Clone, Default)]
 pub struct Keyword {

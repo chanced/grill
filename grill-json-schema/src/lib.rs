@@ -15,7 +15,7 @@ pub trait Build {
     #[must_use]
     #[allow(unused_must_use)]
     fn json_schema_2020_12() -> grill_core::Build {
-        Build::default().default_dialect(crate::draft_2020_12::dialect())
+        grill_core::Build::default().default_dialect(crate::draft_2020_12::dialect())
     }
 }
 #[macro_export]
