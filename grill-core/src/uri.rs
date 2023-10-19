@@ -64,22 +64,21 @@
 //!   namespace (NID)                       query
 //! ```
 //! ```rust
-//! use grill::uri::{ Uri, AbsoluteUri };
+//! # use grill_core::uri::{ Uri, AbsoluteUri };
 //!
-//! let s = "urn:example:articles:record?category=science#fragment";
-//! let uri = Uri::parse(s).unwrap();
-//! assert_eq!(&uri, s);
-//! assert_eq!(uri.scheme(), "urn");
-//! assert_eq!(uri.user(), None);
-//! assert_eq!(uri.host_or_namespace(), "example");
+//! let input = "urn:example:articles:record";
+//! let uri = Uri::parse(input).unwrap();
+//! assert_eq!(&uri, input);
+//! assert_eq!(uri.scheme(), Some("urn"));
+//! assert_eq!(uri.username(), None);
+//! assert_eq!(uri.authority_or_namespace().as_deref(), Some("example"));
 //! assert_eq!(uri.port(), None);
 //! assert_eq!(uri.path_or_nss(), "articles:record");
-//! assert_eq!(uri.query(), Some("category=science"));
-//! assert_eq!(uri.fragment(), Some("fragment"));
-//! assert_eq!(uri.authority(), None);
-//! assert!(uri.is_urn())
+//! assert!(uri.is_urn());
+//! let abs_uri = AbsoluteUri::parse(input).unwrap();
+//! assert_eq!(uri, abs_uri);
 //!
-//! let abs_uri = AbsoluteUri::parse(s).unwrap();
+//! let abs_uri = AbsoluteUri::parse(input).unwrap();
 //! assert_eq!(uri, abs_uri);
 //! ```
 //!
@@ -102,16 +101,21 @@
 //!                authority                   path                  query         fragment
 //! ```
 //! ```rust
-//!  use grill::uri::{ Uri };
-//! let s = "//john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
-//! let uri = Uri::parse(s).unwrap();
-//! assert_eq!(&uri, s);
+//! # use grill_core::uri::{ Uri };
+//! let input =
+//!     "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top";
+//! let uri = Uri::parse(input).unwrap();
+//! assert_eq!(&uri, input);
 //! assert_eq!(uri.scheme(), None);
-//! assert_eq!(uri.user(), Some("jon.doe"));
-//! assert_eq!(uri.password(), "password");
-//! assert_eq!(uri.path_or_nss(), "/forum/questions/")
-//! assert_eq!(uri.host_or_namespace(), "example.com");
-//! assert_eq!(uri.port(), None);
+//! assert_eq!(uri.username(), Some("john.doe"));
+//! assert_eq!(uri.password(), Some("password"));
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/");
+//! assert_eq!(uri.host().as_deref(), Some("example.com"));
+//! assert_eq!(
+//!     uri.authority_or_namespace().as_deref(),
+//!     Some("john.doe:password@example.com:123")
+//! );
+//! assert_eq!(uri.port(), Some(123));
 //! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
 //! assert_eq!(uri.fragment(), Some("top"));
 //! ```
@@ -132,14 +136,14 @@
 //!         path                   query         fragment
 //! ```
 //! ```rust
-//!  use grill::uri::{ Uri };
-//! let s = "/forum/questions/?tag=networking&order=newest#top";
-//! let uri = Uri::parse(s).unwrap();
-//! assert_eq!(&uri, s);
-//! assert_eq!(uri.path_or_nss(), "/forum/questions/")
+//! # use grill_core::uri::{ Uri };
+//! let input = "/forum/questions/?tag=networking&order=newest#top";
+//! let uri = Uri::parse(input).unwrap();
+//! assert_eq!(&uri, input);
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/");
 //! assert_eq!(uri.scheme(), None);
-//! assert_eq!(uri.user(), None);
-//! assert_eq!(uri.host_or_namespace(), None);
+//! assert_eq!(uri.username(), None);
+//! assert_eq!(uri.authority_or_namespace(), None);
 //! assert_eq!(uri.port(), None);
 //! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
 //! assert_eq!(uri.fragment(), Some("top"));
@@ -613,8 +617,8 @@ impl AbsoluteUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("/path/to/file").unwrap()
-    ///     .as_relative_uri().unwrap();
+    /// let uri = Uri::parse("/path/to/file").unwrap();
+    /// let uri_ref = uri.as_relative_uri().unwrap();
     ///
     /// assert_eq!(uri.base_path(), "/path/to");
     /// ```
@@ -3795,6 +3799,28 @@ mod tests {
             assert_eq!(expected, uri.to_string());
             assert_eq!(expected_path, uri.path_or_nss());
         }
+    }
+    #[test]
+    fn first_doc_test() {
+        let input =
+            "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
+        let uri = Uri::parse(input).unwrap();
+        assert_eq!(&uri, input);
+        assert_eq!(uri.scheme(), Some("https"));
+        assert_eq!(uri.username(), Some("john.doe"));
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
+        assert_eq!(uri.port(), Some(123));
+        assert_eq!(uri.path_or_nss(), "/forum/questions/");
+        assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+        assert_eq!(uri.fragment(), Some("top"));
+        assert_eq!(
+            uri.authority_or_namespace().unwrap(),
+            "john.doe@example.com:123"
+        );
+        assert!(uri.is_url());
+
+        let abs_uri = AbsoluteUri::parse(input).unwrap();
+        assert_eq!(uri, abs_uri);
     }
     #[test]
     fn doc_tests() {
