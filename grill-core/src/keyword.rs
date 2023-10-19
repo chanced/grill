@@ -163,31 +163,12 @@ pub struct Context<'i> {
     pub(crate) evaluated: &'i mut Evaluated,
 }
 
-pub struct EvaluateMany<'c, 'v, I>
-where
-    I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
-{
-    iter: I,
-    keyword: &'v str,
-    ctx: &'c mut Context<'v>,
-}
-
-impl<'c, 'v, I> Iterator for EvaluateMany<'c, 'v, I>
-where
-    I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
-{
-    type Item = Result<Output<'v>, EvaluateError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
-}
-
 impl<'s> Context<'s> {
     pub fn evaluate<'v>(
         &mut self,
         key: Key,
         instance: Option<&str>,
-        keyword: &str,
+        keyword: &Pointer,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut instance_location = self.instance_location.clone();
@@ -195,7 +176,7 @@ impl<'s> Context<'s> {
             instance_location.push_back(instance.into());
         }
         let mut keyword_location = self.keyword_location.clone();
-        keyword_location.push_back(keyword.into());
+        keyword_location.append(keyword);
         self.schemas.evaluate(
             self.structure,
             key,
@@ -206,23 +187,6 @@ impl<'s> Context<'s> {
             self.global_state,
             self.eval_state,
         )
-    }
-
-    pub fn evaluate_many<'c, 'v, I>(
-        &'c mut self,
-        keyword: &'static str,
-        iter: I,
-    ) -> EvaluateMany<'c, 'v, I>
-    where
-        I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
-        'v: 's,
-        's: 'v,
-    {
-        EvaluateMany {
-            iter,
-            keyword,
-            ctx: self,
-        }
     }
 
     /// Mutable reference to the eval local state [`AnyMap`].
@@ -290,7 +254,6 @@ impl<'s> Context<'s> {
                 absolute_keyword_location.set_fragment(Some(&ptr)).unwrap();
             }
         }
-
         Output::new(
             self.structure,
             absolute_keyword_location,
@@ -432,7 +395,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     ///
     /// # Example
     /// ```rust
-    /// use grill::json_schema::draft_2020_12::keywords::Id;
+    /// # use grill_core::json_schema::draft_2020_12::keywords::Id;
     ///
     /// let id = Id.identify(&json!({"$id": "https://example.com/schema.json" }));
     /// assert_eq!(id, Ok(Some("https://example.com/schema.json".parse().unwrap())));
@@ -453,7 +416,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     ///
     /// # Example
     /// ```rust
-    /// use grill::json_schema::draft_2020_12::SchemaKeyword;
+    /// # use grill_core::json_schema::draft_2020_12::SchemaKeyword;
     ///
     /// let draft = "https://json-schema.org/draft/2020-12/schema";
     /// let dialect = SchemaKeyword.dialect(&json!({ "$schema": draft }));

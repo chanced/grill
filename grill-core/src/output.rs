@@ -495,7 +495,7 @@ impl<'v> Output<'v> {
     ///
     /// # Panics
     /// Panics if `output` does not match the variant of `self`.
-    pub fn add(&mut self, output: Output<'v>) {
+    pub fn push(&mut self, output: Output<'v>) {
         let structure = output.structure();
         match self {
             Output::Flag(flag) => flag.add(output.try_into_flag().unwrap_or_else(|_| {
@@ -511,27 +511,6 @@ impl<'v> Output<'v> {
             }
             Output::Verbose(verbose) => {
                 verbose.add(output.try_into_verbose().unwrap_or_else(|_| {
-                    panic!("Output variant mismatch; expected `Verbose`, found {structure}")
-                }));
-            }
-        }
-    }
-    pub(crate) fn push(&mut self, output: Output<'v>) {
-        let structure = output.structure();
-        match self {
-            Output::Flag(flag) => flag.push(output.try_into_flag().unwrap_or_else(|_| {
-                panic!("Output variant mismatch; expected `Flag`, found {structure}")
-            })),
-            Output::Basic(basic) => basic.push(output.try_into_basic().unwrap_or_else(|_| {
-                panic!("Output variant mismatch; expected `Basic`, found {structure}")
-            })),
-            Output::Detailed(detailed) => {
-                detailed.push(output.try_into_detailed().unwrap_or_else(|_| {
-                    panic!("Output variant mismatch; expected `Detailed`, found {structure}")
-                }));
-            }
-            Output::Verbose(verbose) => {
-                verbose.push(output.try_into_verbose().unwrap_or_else(|_| {
                     panic!("Output variant mismatch; expected `Verbose`, found {structure}")
                 }));
             }

@@ -384,7 +384,7 @@ impl Schemas {
         );
         for keyword in &*schema.keywords {
             if let Some(op) = keyword.evaluate(&mut ctx, value)? {
-                output.add(op);
+                output.push(op);
             }
         }
         Ok(output)

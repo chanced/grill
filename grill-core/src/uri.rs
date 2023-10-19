@@ -23,22 +23,26 @@
 //! scheme               authority                   path                  query        fragment
 //! ```
 //! ```rust
-//! use grill::uri::{ Uri, AbsoluteUri };
+//! #use grill_core::uri::{ Uri, AbsoluteUri };
 //!
-//! let input = "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
-//! let uri = Uri::parse(input).unwrap();
-//! assert_eq!(&uri, input);
-//! assert_eq!(uri.scheme(), "https");
-//! assert_eq!(uri.user(), Some("john.doe"));
-//! assert_eq!(uri.host_or_namespace(), "example.com");
-//! assert_eq!(uri.port(), Some(123));
-//! assert_eq!(uri.path_or_nss(), "/forum/questions/");
-//! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
-//! assert_eq!(uri.fragment(), Some("top"));
-//! assert_eq!(uri.authority().unwrap(), "john.doe@www.example.com:123");
-//! assert!(uri.is_url())
+//!  let input =
+//!      "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
+//!  let uri = Uri::parse(input).unwrap();
+//!  assert_eq!(&uri, input);
+//!  assert_eq!(uri.scheme(), Some("https"));
+//!  assert_eq!(uri.username(), Some("john.doe"));
+//!  assert_eq!(uri.host().as_deref(), Some("example.com"));
+//!  assert_eq!(uri.port(), Some(123));
+//!  assert_eq!(uri.path_or_nss(), "/forum/questions/");
+//!  assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+//!  assert_eq!(uri.fragment(), Some("top"));
+//!  assert_eq!(
+//!      uri.authority_or_namespace().unwrap(),
+//!      "john.doe@example.com:123"
+//!  );
+//!  assert!(uri.is_url());
 //!
-//! let abs_uri = AbsoluteUri::parse(s).unwrap();
+//! let abs_uri = AbsoluteUri::parse(input).unwrap();
 //! assert_eq!(uri, abs_uri);
 //! ```
 //! Note that parsing a URL by means of a [`Uri`] or [`AbsoluteUri`] will take
@@ -387,28 +391,24 @@ impl<'a> PathSegment<'a> {
             PathSegment::Normal(val) => percent_decode(val.as_bytes()).decode_utf8_lossy(),
         }
     }
-    fn parse_root(val: &'a str, next: Option<char>) -> Self {
+    fn parse_root(val: &'a str) -> Self {
         match val {
             "" => Self::Root,
-            "." | ".." => Self::remove_dots(val, next),
+            "." | ".." => Self::remove_dots(val),
             _ => Self::Normal(val.into()),
         }
     }
-    fn parse_path_segment(val: &'a str, next: Option<char>) -> Self {
+    fn parse_path_segment(val: &'a str) -> Self {
         match val {
-            "." | ".." => Self::remove_dots(val, next),
+            "." | ".." => Self::remove_dots(val),
             _ => Self::Normal(val.into()),
         }
     }
-    fn remove_dots(val: &'a str, next: Option<char>) -> Self {
-        if next == Some('/') || next.is_none() {
-            if val == "." {
-                Self::Current
-            } else {
-                Self::Parent
-            }
-        } else {
-            Self::Normal(val.into())
+    fn remove_dots(val: &'a str) -> Self {
+        match val {
+            "." => Self::Current,
+            ".." => Self::Parent,
+            _ => Self::Normal(val.into()),
         }
     }
 }
@@ -513,16 +513,16 @@ impl<'a> Iterator for PathSegments<'a> {
         if self.root_sent {
             let base_only = self.base_only;
             let next = self.peek();
-            let next_char = next.and_then(|s| s.chars().next());
+            // let next_char = next.and_then(|s| s.chars().next());
             if base_only && next.is_none() {
                 return None;
             }
-            return Some(PathSegment::parse_path_segment(value, next_char));
+            return Some(PathSegment::parse_path_segment(value));
         }
         self.root_sent = true;
         let next = self.peek();
-        let next_char = next.and_then(|s| s.chars().next());
-        Some(PathSegment::parse_root(value, next_char))
+        // let next_char = next.and_then(|s| s.chars().next());
+        Some(PathSegment::parse_root(value))
     }
 }
 
@@ -566,7 +566,7 @@ impl AbsoluteUri {
     /// Returns a new [`Components`] iterator over all components of the `AbsoluteUri`.
     /// # Example
     /// ```rust
-    /// use grill::uri::{ AbsoluteUri, Component, PathSegment, QueryParameter };
+    /// # use grill_core::uri::{ AbsoluteUri, Component, PathSegment, QueryParameter };
     /// let s = "https://user:password@example.com/path/to/file/?query=str#fragment";
     /// let uri = AbsoluteUri::parse(s).unwrap();
     /// let components = vec![
@@ -592,7 +592,7 @@ impl AbsoluteUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ AbsoluteUri, PathSegment };
+    /// # use grill_core::uri::{ AbsoluteUri, PathSegment };
     /// let uri = AbsoluteUri::parse("https://example.com/path/to/file").unwrap();
     /// let segments = uri.path_segments().collect::<Vec<_>>();
     /// assert_eq!(&segments, &["", "path", "to", "file"]);
@@ -612,7 +612,7 @@ impl AbsoluteUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap()
     ///     .as_relative_uri().unwrap();
     ///
@@ -630,10 +630,10 @@ impl AbsoluteUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file");
     /// let relative_uri = uri.as_relative_uri().unwrap();
-    /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["path", "to"]);
+    /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     #[must_use]
     pub fn base_path_segments(&self) -> PathSegments<'_> {
         let mut segments = self.path_segments();
@@ -710,6 +710,52 @@ impl AbsoluteUri {
         }
     }
 
+    /// Returns the port if the `AbsoluteUri` is [`Url`] or a [`RelativeUri`]
+    /// with a port. Returns `None` otherwise.
+    #[must_use]
+    pub fn port(&self) -> Option<u16> {
+        match self {
+            AbsoluteUri::Url(url) => url.port(),
+            AbsoluteUri::Urn(..) => None,
+        }
+    }
+
+    /// Returns the username if the `AbsoluteUri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    #[must_use]
+    pub fn username(&self) -> Option<&str> {
+        match self {
+            AbsoluteUri::Url(url) => match url.username() {
+                "" => None,
+                s => Some(s),
+            },
+            AbsoluteUri::Urn(..) => None,
+        }
+    }
+    /// Returns the password if the `AbsoluteUri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    #[must_use]
+    pub fn password(&self) -> Option<&str> {
+        match self {
+            AbsoluteUri::Url(url) => url.password(),
+            AbsoluteUri::Urn(..) => None,
+        }
+    }
+
+    /// Returns the host if the `AbsoluteUri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    #[must_use]
+    pub fn host(&self) -> Option<Cow<str>> {
+        match self {
+            AbsoluteUri::Url(url) => url.host().map(|h| match h {
+                url::Host::Domain(s) => Cow::Borrowed(s),
+                url::Host::Ipv4(ip) => Cow::Owned(ip.to_string()),
+                url::Host::Ipv6(ip) => Cow::Owned(ip.to_string()),
+            }),
+            AbsoluteUri::Urn(..) => None,
+        }
+    }
+
     /// Returns `true` if the `AbsoluteUri` is a [`Url`](`url::Url`).
     ///
     /// [`Url`]: AbsoluteUri::Url
@@ -734,6 +780,7 @@ impl AbsoluteUri {
     pub fn is_urn(&self) -> bool {
         matches!(self, Self::Urn(..))
     }
+
     #[must_use]
     pub fn as_urn(&self) -> Option<&Urn> {
         if let Self::Urn(v) = self {
@@ -893,7 +940,7 @@ impl AbsoluteUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::AbsoluteUri;
+    /// # use grill_core::uri::AbsoluteUri;
     /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
     /// assert_eq!(normalized, "/bar");
@@ -910,7 +957,7 @@ impl AbsoluteUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::AbsoluteUri;
+    /// # use grill_core::uri::AbsoluteUri;
     /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");
@@ -1387,7 +1434,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri, Component, PathSegment, QueryParameter };
+    /// # use grill_core::uri::{ AbsoluteUri, Uri, Component, PathSegment, QueryParameter };
     /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
     /// let uri = Uri::parse(s).unwrap();
     /// let uri = AbsoluteUri::parse(s).unwrap();
@@ -1412,10 +1459,10 @@ impl RelativeUri {
     /// `RelativeUri`'s path.
     /// # Example
     /// ```rust
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file");
     /// let uri = uri.as_relative_uri().unwrap();
-    /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["path", "to", "file"]);
+    /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     /// ```
     #[must_use]
     pub fn path_segments(&self) -> PathSegments {
@@ -1483,7 +1530,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let relative_uri = uri.as_relative_uri().unwrap();
     /// let segments = relative_uri.base_path_segments().collect::<Vec<_>>();
@@ -1499,7 +1546,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap()
     ///     .as_relative_uri().unwrap();
     ///
@@ -1523,7 +1570,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri, RelativeUri };
+    /// # use grill_core::uri::{ Uri, RelativeUri };
     /// let uri = Uri::parse("//user:pass@host/path?query#fragment");
     /// let relative_uri = uri.relative_uri().unwrap();
     /// assert_eq!(relative_uri.username(), Some("user"));
@@ -1782,7 +1829,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```
-    /// use grill::Uri;
+    /// # use grill_core::Uri;
     ///
     /// let uri = Uri::parse("//example.com").unwrap()
     ///     .as_relative_uri()
@@ -1842,11 +1889,10 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
-    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap()
-    ///     .as_relative_uri()
-    ///     .unwrap();
-    /// let normalized = uri.path_normalized();
+    /// # use grill_core::uri::Uri;
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// let uri_ref = uri.as_relative_uri().unwrap();
+    /// let normalized = uri_ref.path_normalized();
     /// assert_eq!(normalized, "/bar");
     /// ```
     #[must_use]
@@ -1861,7 +1907,7 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path(), "/bar");
@@ -2036,10 +2082,11 @@ impl<'a> UriRef<'a> {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
-    /// let uri = Uri::parse("/path/to/file").unwrap().as_uri_ref();
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("/path/to/file").unwrap();
+    /// let uri_ref = uri.as_uri_ref();
     ///
-    /// assert_eq!(uri.base_path(), "/path/to");
+    /// assert_eq!(uri_ref.base_path(), "/path/to");
     /// ```
     #[must_use]
     pub fn base_path(&self) -> &str {
@@ -2085,7 +2132,7 @@ impl<'a> UriRef<'a> {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// let uri_ref = uri.as_uri_ref();
     /// let normalized = uri_ref.path_normalized();
@@ -2521,7 +2568,7 @@ impl Uri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::{ Uri, Component, PathSegment, QueryParameter };
+    /// # use grill_core::uri::{ AbsoluteUri, Uri, Component, PathSegment, QueryParameter };
     /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
     /// let uri = Uri::parse(s).unwrap();
     /// let uri = AbsoluteUri::parse(s).unwrap();
@@ -2545,9 +2592,9 @@ impl Uri {
     /// `Uri`'s path.
     /// # Example
     /// ```rust
-    /// use grill::uri::Uri;
-    /// let uri = Uri::parse("https://example.com/path/to/file");
-    /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["path", "to", "file"]);
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("https://example.com/path/to/file").unwrap();
+    /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     /// ```
     #[must_use]
     pub fn path_segments(&self) -> PathSegments {
@@ -2558,7 +2605,7 @@ impl Uri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap();
     ///
     /// assert_eq!(uri.base_path(), "/path/to/");
@@ -2577,9 +2624,9 @@ impl Uri {
     ///
     /// # Example
     /// ```rust
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap();
-    /// assert_eq!(uri.base_path_segments().collect::<Vec<_>>(), vec!["path", "to"]);
+    /// assert_eq!(uri.base_path_segments().collect::<Vec<_>>(), vec!["", "path", "to"]);
     #[must_use]
     pub fn base_path_segments(&self) -> PathSegments<'_> {
         let mut segments = self.path_segments();
@@ -2650,7 +2697,7 @@ impl Uri {
     pub fn query_parameters(&self) -> QueryParameters<'_> {
         QueryParameters::new(self.query()).unwrap()
     }
-    /// Returns the namespace if the absolute uri is [`Urn`], otherwise returns
+    /// Returns the namespace if the `Uri` is [`Urn`], otherwise returns
     /// the authority string for a [`Url`] or [`RelativeUri`].
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {
@@ -2658,6 +2705,56 @@ impl Uri {
             Uri::Url(url) => get::url::authority(url).map(Into::into),
             Uri::Urn(urn) => Some(Cow::Borrowed(urn.nid())),
             Uri::Relative(rel) => rel.authority_str().map(Cow::Borrowed),
+        }
+    }
+
+    /// Returns the port if the `Uri` is [`Url`] or a [`RelativeUri`]
+    /// with a port. Returns `None` otherwise.
+    #[must_use]
+    pub fn port(&self) -> Option<u16> {
+        match self {
+            Uri::Url(url) => url.port(),
+            Uri::Relative(rel) => rel.port(),
+            Uri::Urn(..) => None,
+        }
+    }
+
+    /// Returns the username if the `Uri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    #[must_use]
+    pub fn username(&self) -> Option<&str> {
+        match self {
+            Uri::Url(url) => match url.username() {
+                "" => None,
+                s => Some(s),
+            },
+            Uri::Urn(..) => None,
+            Uri::Relative(rel) => rel.username(),
+        }
+    }
+
+    /// Returns the password if the `Uri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    #[must_use]
+    pub fn password(&self) -> Option<&str> {
+        match self {
+            Uri::Url(url) => url.password(),
+            Uri::Urn(..) => None,
+            Uri::Relative(rel) => rel.password(),
+        }
+    }
+
+    /// Returns the host if the `Uri` is [`Url`] or a [`RelativeUri`]
+    /// with a username. Returns `None` otherwise.
+    pub fn host(&self) -> Option<Cow<str>> {
+        match self {
+            Uri::Url(url) => url.host().map(|h| match h {
+                url::Host::Domain(s) => Cow::Borrowed(s),
+                url::Host::Ipv4(ip) => Cow::Owned(ip.to_string()),
+                url::Host::Ipv6(ip) => Cow::Owned(ip.to_string()),
+            }),
+            Uri::Urn(..) => None,
+            Uri::Relative(rel) => rel.host().map(Cow::Borrowed),
         }
     }
 
@@ -2689,7 +2786,7 @@ impl Uri {
     ///
     /// # Example
     /// ```
-    /// use grill::uri::Uri;
+    /// # use grill_core::uri::Uri;
     /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
     /// assert_eq!(normalized, "/bar");
@@ -3079,6 +3176,7 @@ pub fn normalize(path: &str) -> Cow<'_, str> {
     let mut normalized = false;
     let mut buf = PathBuf::new();
     for segment in PathSegments::new(path) {
+        println!("{segment:?}");
         match segment {
             PathSegment::Parent => {
                 normalized = true;
@@ -3086,7 +3184,7 @@ pub fn normalize(path: &str) -> Cow<'_, str> {
             }
             PathSegment::Current => normalized = true,
             PathSegment::Normal(seg) => buf.push(seg.as_ref()),
-            PathSegment::Root => {}
+            PathSegment::Root => buf.push("/"),
         }
     }
     if normalized {
@@ -3113,7 +3211,7 @@ pub fn normalize(path: &str) -> Cow<'_, str> {
 ///
 /// # Example
 /// ```
-/// use grill::uri::merge;
+/// # use grill_core::uri::merge;
 /// assert_eq!(merge("/path/to", "file"), "/path/to/file");
 /// ```
 #[must_use]
@@ -3137,12 +3235,13 @@ pub fn merge(base: &str, path: &str) -> String {
 /// Normalizes and merges `base` with `path`.
 /// # Example
 /// ```
-/// use grill::uri::resolve;
+/// # use grill_core::uri::resolve;
 /// assert_eq!(resolve("/path/to/other", "../file"), "/path/to/file");
 /// ```
 #[must_use]
 pub fn resolve(base: &str, path: &str) -> String {
     let buf = merge(base, path);
+    println!("buf: {buf}");
     normalize(&buf).into_owned()
 }
 
@@ -3696,5 +3795,67 @@ mod tests {
             assert_eq!(expected, uri.to_string());
             assert_eq!(expected_path, uri.path_or_nss());
         }
+    }
+    #[test]
+    fn doc_tests() {
+        let input =
+            "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
+        let uri = Uri::parse(input).unwrap();
+        assert_eq!(&uri, input);
+        assert_eq!(uri.scheme(), Some("https"));
+        assert_eq!(uri.username(), Some("john.doe"));
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
+        assert_eq!(uri.port(), Some(123));
+        assert_eq!(uri.path_or_nss(), "/forum/questions/");
+        assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+        assert_eq!(uri.fragment(), Some("top"));
+        assert_eq!(
+            uri.authority_or_namespace().unwrap(),
+            "john.doe@example.com:123"
+        );
+        assert!(uri.is_url());
+
+        let abs_uri = AbsoluteUri::parse(input).unwrap();
+        assert_eq!(uri, abs_uri);
+
+        let input = "urn:example:articles:record";
+        let uri = Uri::parse(input).unwrap();
+        assert_eq!(&uri, input);
+        assert_eq!(uri.scheme(), Some("urn"));
+        assert_eq!(uri.username(), None);
+        assert_eq!(uri.authority_or_namespace().as_deref(), Some("example"));
+        assert_eq!(uri.port(), None);
+        assert_eq!(uri.path_or_nss(), "articles:record");
+        assert!(uri.is_urn());
+        let abs_uri = AbsoluteUri::parse(input).unwrap();
+        assert_eq!(uri, abs_uri);
+
+        let input =
+            "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top";
+        let uri = Uri::parse(input).unwrap();
+        assert_eq!(&uri, input);
+        assert_eq!(uri.scheme(), None);
+        assert_eq!(uri.username(), Some("john.doe"));
+        assert_eq!(uri.password(), Some("password"));
+        assert_eq!(uri.path_or_nss(), "/forum/questions/");
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
+        assert_eq!(
+            uri.authority_or_namespace().as_deref(),
+            Some("john.doe:password@example.com:123")
+        );
+        assert_eq!(uri.port(), Some(123));
+        assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+        assert_eq!(uri.fragment(), Some("top"));
+
+        let s = "/forum/questions/?tag=networking&order=newest#top";
+        let uri = Uri::parse(s).unwrap();
+        assert_eq!(&uri, s);
+        assert_eq!(uri.path_or_nss(), "/forum/questions/");
+        assert_eq!(uri.scheme(), None);
+        assert_eq!(uri.username(), None);
+        assert_eq!(uri.authority_or_namespace(), None);
+        assert_eq!(uri.port(), None);
+        assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+        assert_eq!(uri.fragment(), Some("top"));
     }
 }

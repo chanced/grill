@@ -10,7 +10,7 @@ use crate::{
         cache::{Numbers, Values},
         Compile,
     },
-    schema::{self, dialect::Dialects, Schemas},
+    schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator, Key,
@@ -301,11 +301,13 @@ impl<'i> Compiler<'i> {
                 .into(),
             ));
         }
-        // we need to compile the root schema first, so that we can locate the
-        // anchor
-        // re-adding this schema to the queue
+        // need to compile the root schema first in order to locate the anchor
+        //
+        // adding this schema to the front of the queue
         q.push_front(s);
         // putting the root ahead of it
+        //
+        // if the anchor is not found then an error should be raised.
         q.push_front(SchemaToCompile {
             uri: root_uri,
             path: Some(Pointer::default()),

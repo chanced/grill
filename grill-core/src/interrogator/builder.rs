@@ -65,7 +65,7 @@ impl Build {
     ///
     /// # Example
     /// ```rust
-    /// use grill::Builder;
+    /// # use grill_core::Builder;
     /// let source = br#"{"type": "string"}"#;
     /// let interrogator = Builder::default().json_schema_2020_12().build().unwrap()
     /// interrogator.source_slice("https://example.com/schema.json", ).unwrap();

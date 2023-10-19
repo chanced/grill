@@ -237,7 +237,7 @@ impl Interrogator {
     ///
     /// # Example
     /// ```rust
-    /// use grill::{ Interrogator, json_schema::Build };
+    /// # use grill_core::{ Interrogator, json_schema::Build };
     /// #[tokio::main]
     /// async fn main() {
     ///     let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
@@ -383,7 +383,7 @@ impl Interrogator {
     ///
     /// # Example
     /// ```rust
-    /// use grill::Interrogator;
+    /// # use grill_core::Interrogator;
     /// let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
     /// let source = br#"{"type": "string"}"#;
     /// interrogator.source_slice("https://example.com/schema.json", source).unwrap();
@@ -435,7 +435,7 @@ impl Interrogator {
     /// Adds a source schema from a [`Value`]
     /// # Example
     /// ```rust
-    /// use grill::Interrogator;
+    /// # use grill_core::Interrogator;
     /// use serde_json::json;
     ///
     /// let mut interrogator = Interrogator::json_schema().build().unwrap();
@@ -460,7 +460,7 @@ impl Interrogator {
     /// # Example
     /// ```rust
     /// use std::collections::HashMap;
-    /// use grill::Interrogator;
+    /// # use grill_core::Interrogator;
     ///
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
@@ -489,7 +489,7 @@ impl Interrogator {
     /// # Example
     /// ```
     /// use std::collections::HashMap;
-    /// use grill::Interrogator;
+    /// # use grill_core::Interrogator;
     ///
     /// let mut sources = HashMap::new();
     /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
@@ -521,7 +521,7 @@ impl Interrogator {
     ///
     /// # Example
     /// ```
-    /// use grill::Interrogator;
+    /// # use grill_core::Interrogator;
     /// use std::collections::HashMap;
     /// use serde_json::json;
     ///

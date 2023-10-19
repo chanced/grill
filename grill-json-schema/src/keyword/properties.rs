@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::PROPERTIES;
 use ahash::AHashMap;
 use grill_core::{
@@ -69,25 +67,19 @@ impl keyword::Keyword for Properties {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
-
-        ctx.evaluate_many(
-            "properties",
-            obj.iter()
-                .map(|(k, v)| (Key::default(), Cow::Borrowed(k.as_str()), v)),
-        );
-
-        // let mut output = ctx.new_output(value);
-        // let mut ptr = Pointer::new([PROPERTIES]);
-        // for (prop, key) in &self.subschemas {
-        //     if let Some(v) = obj.get(prop) {
-        //         ptr.push_back(prop.into());
-        //         let o = ctx.evaluate(*key, Some(prop), &ptr, v)?;
-        //         output.add(o);
-        //         ptr.pop_back();
-        //     }
-        // }
-        // Ok(Some(output))
-        todo!()
+        let mut ptr = Pointer::new([PROPERTIES]);
+        let mut output = ctx.annotate(PROPERTIES, None);
+        for (prop, key) in &self.subschemas {
+            if let Some(v) = obj.get(prop) {
+                ptr.push_back(prop.into());
+                output.push(ctx.evaluate(*key, Some(prop), &ptr, v)?);
+                ptr.pop_back();
+                if !output.is_valid() && ctx.should_short_circuit() {
+                    break;
+                }
+            }
+        }
+        Ok(Some(output))
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {

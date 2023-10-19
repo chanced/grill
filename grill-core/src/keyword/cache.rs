@@ -140,9 +140,9 @@ impl Numbers {
     // ///
     // /// # Example
     // /// ```
-    // /// use grill::big::BigInt;
+    // /// # use grill_core::big::BigInt;
     // /// use serde_json::Number;
-    // /// use grill::keyword::NumberCache;
+    // /// # use grill_core::keyword::NumberCache;
     // ///
     // /// let mut cache = NumberCache::default();
     // /// let value = Number::from(34);
@@ -164,9 +164,9 @@ impl Numbers {
     // ///
     // /// # Example
     // /// ```
-    // /// use grill::big::{parse_rational, BigRational, num::FromPrimitive};
+    // /// # use grill_core::big::{parse_rational, BigRational, num::FromPrimitive};
     // /// use serde_json::Number;
-    // /// use grill::keyword::NumberCache;
+    // /// # use grill_core::keyword::NumberCache;
     // /// use std::str::FromStr;
     // ///
     // /// let mut cache = NumberCache::default();

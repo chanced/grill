@@ -183,8 +183,12 @@ impl<'a> Parse<'a> {
     }
 
     fn username(&self) -> Option<&str> {
-        self.username_index()
-            .map(|i| &self.input[i..self.password_index().unwrap_or(self.path_index())])
+        self.username_index().map(|i| {
+            &self.input[i..self
+                .password_index()
+                .or(self.host_index())
+                .unwrap_or(self.path_index())]
+        })
     }
 
     fn password(&self) -> Option<&str> {
