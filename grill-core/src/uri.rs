@@ -23,24 +23,26 @@
 //! scheme               authority                   path                  query        fragment
 //! ```
 //! ```rust
-//! #use grill_core::uri::{ Uri, AbsoluteUri };
+//! # use grill_core::uri::{ Uri, AbsoluteUri };
 //!
-//!  let input =
+//! let input =
 //!      "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
-//!  let uri = Uri::parse(input).unwrap();
-//!  assert_eq!(&uri, input);
-//!  assert_eq!(uri.scheme(), Some("https"));
-//!  assert_eq!(uri.username(), Some("john.doe"));
-//!  assert_eq!(uri.host().as_deref(), Some("example.com"));
-//!  assert_eq!(uri.port(), Some(123));
-//!  assert_eq!(uri.path_or_nss(), "/forum/questions/");
-//!  assert_eq!(uri.query(), Some("tag=networking&order=newest"));
-//!  assert_eq!(uri.fragment(), Some("top"));
-//!  assert_eq!(
-//!      uri.authority_or_namespace().unwrap(),
-//!      "john.doe@example.com:123"
-//!  );
-//!  assert!(uri.is_url());
+//! let uri = Uri::parse(input);
+//! eprintln!("uri: {uri:#?}");
+//! let uri = uri.unwrap();
+//! assert_eq!(&uri, input);
+//! assert_eq!(uri.scheme(), Some("https"));
+//! assert_eq!(uri.username(), Some("john.doe"));
+//! assert_eq!(uri.host().as_deref(), Some("example.com"));
+//! assert_eq!(uri.port(), Some(123));
+//! assert_eq!(uri.path_or_nss(), "/forum/questions/");
+//! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
+//! assert_eq!(uri.fragment(), Some("top"));
+//! assert_eq!(
+//!     uri.authority_or_namespace().unwrap(),
+//!     "john.doe@example.com:123"
+//! );
+//! assert!(uri.is_url());
 //!
 //! let abs_uri = AbsoluteUri::parse(input).unwrap();
 //! assert_eq!(uri, abs_uri);
@@ -635,7 +637,7 @@ impl AbsoluteUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("/path/to/file");
+    /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let relative_uri = uri.as_relative_uri().unwrap();
     /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     #[must_use]
@@ -1464,7 +1466,7 @@ impl RelativeUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("/path/to/file");
+    /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let uri = uri.as_relative_uri().unwrap();
     /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     /// ```
@@ -1551,10 +1553,10 @@ impl RelativeUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("/path/to/file").unwrap()
-    ///     .as_relative_uri().unwrap();
+    /// let uri = Uri::parse("/path/to/file").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
     ///
-    /// assert_eq!(uri.base_path(), "/path/to");
+    /// assert_eq!(rel_uri.base_path(), "/path/to");
     /// ```
     #[must_use]
     pub fn base_path(&self) -> &str {
@@ -1575,8 +1577,8 @@ impl RelativeUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::{ Uri, RelativeUri };
-    /// let uri = Uri::parse("//user:pass@host/path?query#fragment");
-    /// let relative_uri = uri.relative_uri().unwrap();
+    /// let uri = Uri::parse("//user:pass@host/path?query#fragment").unwrap();
+    /// let relative_uri = uri.as_relative_uri().unwrap();
     /// assert_eq!(relative_uri.username(), Some("user"));
     #[must_use]
     pub fn username(&self) -> Option<&str> {
@@ -1835,10 +1837,9 @@ impl RelativeUri {
     /// ```
     /// # use grill_core::Uri;
     ///
-    /// let uri = Uri::parse("//example.com").unwrap()
-    ///     .as_relative_uri()
-    ///     .unwrap();
-    /// assert!(uri.has_host());
+    /// let uri = Uri::parse("//example.com").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(uri.host().is_some());
     /// ```
     #[must_use]
     pub fn has_host(&self) -> bool {
@@ -1914,7 +1915,7 @@ impl RelativeUri {
     /// # use grill_core::uri::Uri;
     /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
-    /// assert_eq!(uri.path(), "/bar");
+    /// assert_eq!(uri.path_or_nss(), "/bar");
     /// ```
     pub fn normalize_path(&mut self) {
         let normalized = normalize(self.path()).to_string();
