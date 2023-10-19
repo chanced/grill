@@ -1,6 +1,5 @@
 #![doc = include_str!("../../README.md")]
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
-#![recursion_limit = "256"]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
@@ -18,7 +17,7 @@
     clippy::wildcard_imports,
     clippy::module_inception
 )]
-#![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
+#![cfg_attr(test, allow(clippy::too_many_lines))]
 
 mod interrogator;
 pub use interrogator::{Build, Interrogator};
@@ -35,15 +34,6 @@ pub use uri::{AbsoluteUri, RelativeUri, Uri};
 
 pub mod schema;
 pub use schema::{Key, Schema};
-
-/// A JSON object.
-///
-/// Alias for [`serde_json::Map<String, serde_json::Value>`](`serde_json::Map`).
-pub type Object = serde_json::Map<String, serde_json::Value>;
-/// A JSON array.
-///
-/// Alias for `Vec<serde_json::Value>`.
-pub type Array = Vec<serde_json::Value>;
 
 pub mod source;
 pub(crate) use source::Src;

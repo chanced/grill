@@ -14,7 +14,7 @@
 /// - [JSON Schema Validation 07 # 6.1.2.
 ///   `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
 #[derive(Debug, Clone, Default)]
-pub struct EnumKeyword {
+pub struct Enum {
     _expected: Vec<serde_json::Value>,
 }
 

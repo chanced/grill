@@ -1,5 +1,5 @@
-pub use super::common::id;
-pub use super::common::schema;
+pub use super::keyword::id;
+pub use super::keyword::schema;
 
 use grill_core::schema::Dialect;
 

@@ -1,9 +1,29 @@
 //! JSON Schema dialect implementations 04, 07, 2019-09, 2020-12.
+
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(clippy::all, clippy::pedantic)]
+// TODO: enable this once I get to documenting
+// #![deny(missing_docs)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::result_large_err,
+    clippy::enum_glob_use,
+    clippy::implicit_hasher,
+    clippy::needless_pass_by_value,
+    clippy::similar_names, 
+    clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
+    clippy::missing_errors_doc, // TODO: remove when I get around to documenting
+    clippy::wildcard_imports,
+    clippy::module_inception
+)]
+#![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 mod consts;
 pub use consts::*;
 
-pub mod common;
+pub mod keyword;
 pub mod draft_04;
 pub mod draft_07;
 pub mod draft_2019_09;

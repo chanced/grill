@@ -88,7 +88,7 @@ impl keyword::Keyword for Keyword {
                 .annotate(self.keyword, Some(self.ref_uri_value.clone().into()))
                 .into();
         }
-        ctx.evalute(self.ref_key, None, &self.keyword_ptr, value)?
+        ctx.evaluate(self.ref_key, None, &self.keyword_ptr, value)?
             .into()
     }
 
@@ -107,8 +107,8 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        common::{const_, id, schema},
         draft_2020_12::json_schema_2020_12_uri,
+        keyword::{const_, id, schema},
         ID, REF, SCHEMA,
     };
     use grill_core::{schema::Dialect, Interrogator, Structure};
@@ -116,7 +116,7 @@ mod tests {
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
             .with_keyword(schema::Keyword::new(SCHEMA, false))
-            .with_keyword(const_::Keyword::new(None))
+            .with_keyword(const_::Const::new(None))
             .with_keyword(id::Keyword::new(ID, false))
             .with_keyword(Keyword::new(REF, true))
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))

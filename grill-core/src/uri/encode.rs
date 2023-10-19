@@ -56,14 +56,18 @@ pub(super) fn host(host: Option<&str>) -> Option<Cow<'static, str>> {
 #[inline]
 pub(super) fn path(path: &str) -> String {
     let mut buf = String::with_capacity(path.len());
-    let mut iter = path.split('/').map(path_segment).peekable();
-    while let Some(segment) = iter.next() {
-        buf.push_str(&segment);
-        if iter.peek().is_some() {
-            buf.push('/');
+    let mut iter = path.split('/').map(path_segment);
+    match iter.next() {
+        Some(s) => {
+            buf.push_str(&s);
+            iter.for_each(|s| {
+                buf.push('/');
+                buf.push_str(&s);
+            });
+            buf
         }
+        None => buf,
     }
-    buf
 }
 
 #[inline]

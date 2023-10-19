@@ -17,6 +17,7 @@ use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Token};
 use serde_json::{Number, Value};
 use std::{
+    borrow::Cow,
     fmt::{self, Display},
     sync::Arc,
 };
@@ -155,7 +156,6 @@ pub struct Context<'i> {
     pub(crate) keyword_location: Pointer,
     pub(crate) instance_location: Pointer,
     pub(crate) structure: Structure,
-    /// global state of the interrogator
     pub(crate) global_state: &'i AnyMap,
     pub(crate) eval_state: &'i mut AnyMap,
     pub(crate) schemas: &'i Schemas,
@@ -163,12 +163,31 @@ pub struct Context<'i> {
     pub(crate) evaluated: &'i mut Evaluated,
 }
 
+pub struct EvaluateMany<'c, 'v, I>
+where
+    I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
+{
+    iter: I,
+    keyword: &'v str,
+    ctx: &'c mut Context<'v>,
+}
+
+impl<'c, 'v, I> Iterator for EvaluateMany<'c, 'v, I>
+where
+    I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
+{
+    type Item = Result<Output<'v>, EvaluateError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
 impl<'s> Context<'s> {
-    pub fn evalute<'v>(
+    pub fn evaluate<'v>(
         &mut self,
         key: Key,
         instance: Option<&str>,
-        keyword: &Pointer,
+        keyword: &str,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut instance_location = self.instance_location.clone();
@@ -176,7 +195,7 @@ impl<'s> Context<'s> {
             instance_location.push_back(instance.into());
         }
         let mut keyword_location = self.keyword_location.clone();
-        keyword_location.append(keyword);
+        keyword_location.push_back(keyword.into());
         self.schemas.evaluate(
             self.structure,
             key,
@@ -189,11 +208,34 @@ impl<'s> Context<'s> {
         )
     }
 
+    pub fn evaluate_many<'c, 'v, I>(
+        &'c mut self,
+        keyword: &'static str,
+        iter: I,
+    ) -> EvaluateMany<'c, 'v, I>
+    where
+        I: Iterator<Item = (Key, Cow<'v, str>, &'v Value)>,
+        'v: 's,
+        's: 'v,
+    {
+        EvaluateMany {
+            iter,
+            keyword,
+            ctx: self,
+        }
+    }
+
+    /// Mutable reference to the eval local state [`AnyMap`].
+    ///
+    /// This does not include the [`global_state`].
     #[must_use]
     pub fn global_state(&self) -> &AnyMap {
         self.global_state
     }
 
+    /// Mutable reference to the eval local state [`AnyMap`].
+    ///
+    /// This does not include the [`global_state`].
     pub fn eval_state(&mut self) -> &AnyMap {
         self.eval_state
     }
@@ -213,6 +255,7 @@ impl<'s> Context<'s> {
     {
         self.create_output(Some(keyword), Err(Some(Box::new(error))), false)
     }
+
     pub fn transient<'v>(
         &mut self,
         is_valid: bool,
@@ -222,10 +265,6 @@ impl<'s> Context<'s> {
         let mut output = self.create_output(None, op, true);
         output.append(nodes.into_iter());
         output
-    }
-
-    pub fn new_output<'v>(&mut self, value: &'v Value) -> Output<'v> {
-        self.create_output(None, Ok(None), false)
     }
 
     fn create_output<'v>(
@@ -248,7 +287,6 @@ impl<'s> Context<'s> {
                 .parse::<Pointer>()
             {
                 ptr.push_back(tok);
-                // TODO: this probably needs
                 absolute_keyword_location.set_fragment(Some(&ptr)).unwrap();
             }
         }

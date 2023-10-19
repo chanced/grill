@@ -24,15 +24,15 @@ use crate::CONST;
 /// An instance validates successfully against this keyword if its value is
 /// equal to the value of the keyword.
 #[derive(Clone, Debug)]
-pub struct Keyword {
+pub struct Const {
     pub expected: Arc<Value>,
     pub expected_number: Option<Arc<BigRational>>,
     pub translate: Translate,
 }
 
-impl Keyword {
+impl Const {
     #[must_use]
-    pub fn new(translate: Option<Translate>) -> Keyword {
+    pub fn new(translate: Option<Translate>) -> Const {
         Self {
             expected: Arc::new(Value::Null),
             expected_number: None,
@@ -40,7 +40,7 @@ impl Keyword {
         }
     }
 }
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for Const {
     fn kind(&self) -> Kind {
         CONST.into()
     }
@@ -155,17 +155,17 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        common::{id, schema},
         draft_2020_12::json_schema_2020_12_uri,
+        keyword::{id, schema},
         ID, SCHEMA,
     };
 
-    use super::{Keyword, *};
+    use super::{Const, *};
     async fn create_interrogator(const_value: Value) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
             .with_keyword(schema::Keyword::new(SCHEMA, false))
             .with_keyword(id::Keyword::new(ID, false))
-            .with_keyword(Keyword::new(None))
+            .with_keyword(Const::new(None))
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();

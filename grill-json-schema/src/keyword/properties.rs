@@ -1,22 +1,22 @@
-use ahash::AHashMap;
-use jsonptr::{Pointer, Token};
-use serde_json::Value;
+use std::borrow::Cow;
 
+use crate::PROPERTIES;
+use ahash::AHashMap;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, Compile, Context, Unimplemented},
     output::Output,
     Key, Schema,
 };
-
-use crate::PROPERTIES;
+use jsonptr::{Pointer, Token};
+use serde_json::Value;
 
 #[derive(Debug, Clone)]
-pub struct Keyword {
+pub struct Properties {
     subschemas: AHashMap<String, Key>,
 }
 
-impl Keyword {
+impl Properties {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -25,13 +25,13 @@ impl Keyword {
     }
 }
 
-impl Default for Keyword {
+impl Default for Properties {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for Properties {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(PROPERTIES)
     }
@@ -69,17 +69,25 @@ impl keyword::Keyword for Keyword {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
-        let mut output = ctx.new_output(value);
-        let mut ptr = Pointer::new([PROPERTIES]);
-        for (prop, key) in &self.subschemas {
-            if let Some(v) = obj.get(prop) {
-                ptr.push_back(prop.into());
-                let o = ctx.evalute(*key, Some(prop), &ptr, v)?;
-                output.add(o);
-                ptr.pop_back();
-            }
-        }
-        Ok(Some(output))
+
+        ctx.evaluate_many(
+            "properties",
+            obj.iter()
+                .map(|(k, v)| (Key::default(), Cow::Borrowed(k.as_str()), v)),
+        );
+
+        // let mut output = ctx.new_output(value);
+        // let mut ptr = Pointer::new([PROPERTIES]);
+        // for (prop, key) in &self.subschemas {
+        //     if let Some(v) = obj.get(prop) {
+        //         ptr.push_back(prop.into());
+        //         let o = ctx.evaluate(*key, Some(prop), &ptr, v)?;
+        //         output.add(o);
+        //         ptr.pop_back();
+        //     }
+        // }
+        // Ok(Some(output))
+        todo!()
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {
@@ -109,8 +117,8 @@ mod tests {
     use serde_json::json;
 
     use crate::{
-        common::{const_, id, schema},
         draft_2020_12::json_schema_2020_12_uri,
+        keyword::{const_, id, schema},
         ID, SCHEMA,
     };
     use grill_core::{schema::Dialect, Interrogator, Structure};
@@ -121,8 +129,8 @@ mod tests {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
             .with_keyword(schema::Keyword::new(SCHEMA, false))
             .with_keyword(id::Keyword::new(ID, false))
-            .with_keyword(const_::Keyword::new(None))
-            .with_keyword(super::Keyword::new())
+            .with_keyword(const_::Const::new(None))
+            .with_keyword(super::Properties::new())
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();

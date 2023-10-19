@@ -10,7 +10,7 @@ use crate::{
         cache::{Numbers, Values},
         Compile,
     },
-    schema::{dialect::Dialects, Schemas},
+    schema::{self, dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
     AbsoluteUri, Interrogator, Key,
@@ -20,7 +20,7 @@ use super::{CompiledSchema, Dialect, Ref, Reference};
 
 #[derive(Clone, Debug)]
 struct RefToResolve {
-    dependent_key: Key,
+    referrer_key: Key,
     ref_: Ref,
 }
 
@@ -46,7 +46,7 @@ pub(crate) struct Compiler<'i> {
     numbers: &'i mut Numbers,
     values: &'i mut Values,
 }
-
+#[allow(clippy::too_many_arguments)]
 impl<'i> Compiler<'i> {
     pub(crate) fn new(interrogator: &'i mut Interrogator) -> Self {
         Self {
@@ -133,69 +133,44 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
-        println!("---------------------------------------------------------");
-        println!("COMPILING: {uri}");
+
         let (link, src) = self
             .source(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        println!("LINK:\n{link:#?}");
-        println!("SOURCE:\n{}", serde_json::to_string_pretty(&src).unwrap());
-
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
         if let Some(key) = self.schemas.get_key(&uri) {
-            if let Some(ref_) = ref_ {
-                self.resolve_ref(key, uri.clone(), ref_)
-                    .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-            }
-            if !self.schemas.has_keywords(key) {
-                self.setup_keywords(key, &self.dialects[dialect_idx])
-                    .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-            }
-
-            return Ok(());
+            return self.finalize(key, &uri, dialect_idx, ref_, continue_on_err);
         }
 
         let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
+        let schema_to_compile = || SchemaToCompile {
+            uri: uri.clone(),
+            path: path.clone(),
+            parent,
+            default_dialect_idx,
+            continue_on_err,
+            ref_: ref_.clone(),
+        };
+
         if id.is_some() {
             path = Some(Pointer::default());
             parent = None;
         } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
-            return self.queue_pathed(
-                SchemaToCompile {
-                    uri,
-                    path,
-                    parent,
-                    default_dialect_idx,
-                    continue_on_err,
-                    ref_,
-                },
-                q,
-            );
+            return self.queue_pathed(schema_to_compile(), q);
         } else if is_anchored(&uri) {
-            return self.queue_anchored(
-                SchemaToCompile {
-                    uri,
-                    path,
-                    parent,
-                    default_dialect_idx,
-                    continue_on_err,
-                    ref_,
-                },
-                q,
-            );
+            return self.queue_anchored(schema_to_compile(), q);
         } else if parent.is_none() && path.is_none() {
             // if the uri does not have a pointer fragment, then it should be
             // compiled as document root
             path = Some(Pointer::default());
         }
 
-        // // path should now have a value
+        // path should now have a value
         let path = path.expect("path should be set");
-
         self.add_parent_uris_with_path(&mut uris, &path, parent)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
@@ -204,6 +179,7 @@ impl<'i> Compiler<'i> {
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
         let dialect_uri = self.dialects[dialect_idx].id().clone();
+
         let key = self
             .schemas
             .insert(CompiledSchema::new(
@@ -221,17 +197,25 @@ impl<'i> Compiler<'i> {
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
         let has_refs = self
-            .queue_refs(key, &uri, &path, parent, dialect_idx, &src, ref_.clone(), q)
+            .queue_refs(key, default_dialect_idx, &src, q)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
         if has_subschemas || has_refs {
             // kicking resolve_ref and setup_keywords down the road until all
             // subschemas are compiled and refs are resolved
+            q.push_back(SchemaToCompile {
+                uri,
+                path: Some(path.clone()),
+                parent,
+                default_dialect_idx,
+                continue_on_err: false,
+                ref_: ref_.clone(),
+            });
             return Ok(());
         }
 
         if let Some(ref_) = ref_ {
-            self.resolve_ref(key, uri.clone(), ref_)
+            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)
                 .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
         }
 
@@ -263,6 +247,25 @@ impl<'i> Compiler<'i> {
         }
     }
 
+    fn finalize(
+        &mut self,
+        key: Key,
+        uri: &AbsoluteUri,
+        dialect_idx: usize,
+        ref_: Option<RefToResolve>,
+        continue_on_err: bool,
+    ) -> Result<(), (bool, CompileError)> {
+        if let Some(ref_) = ref_ {
+            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)
+                .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
+        }
+        if !self.schemas.has_keywords(key) {
+            self.setup_keywords(key, &self.dialects[dialect_idx])
+                .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
+        }
+        Ok(())
+    }
+
     fn queue_pathed(
         &mut self,
         s: SchemaToCompile,
@@ -285,6 +288,9 @@ impl<'i> Compiler<'i> {
         let mut root_uri = s.uri.clone();
         root_uri.set_fragment(None).unwrap();
         let anchor = s.uri.fragment().unwrap_or_default();
+
+        // if the root uri is indexed and this schema was not found by now then
+        // the anchor is unknown
         if self.schemas.contains_uri(&root_uri) {
             return Err((
                 false,
@@ -295,7 +301,11 @@ impl<'i> Compiler<'i> {
                 .into(),
             ));
         }
+        // we need to compile the root schema first, so that we can locate the
+        // anchor
+        // re-adding this schema to the queue
         q.push_front(s);
+        // putting the root ahead of it
         q.push_front(SchemaToCompile {
             uri: root_uri,
             path: Some(Pointer::default()),
@@ -332,33 +342,29 @@ impl<'i> Compiler<'i> {
 
     fn resolve_ref(
         &mut self,
-        key: Key,
-        absolute_uri: AbsoluteUri,
-        ref_: RefToResolve,
+        referrer_key: Key,
+        referenced_key: Key,
+        referenced_uri: AbsoluteUri,
+        ref_: Ref,
     ) -> Result<(), CompileError> {
-        let RefToResolve {
-            dependent_key,
-            ref_,
-        } = ref_;
-        // TODO: check if ref is already resolved
-        self.add_reference(key, absolute_uri, dependent_key, ref_)?;
-        self.schemas.add_dependent(key, dependent_key);
+        self.add_reference(referrer_key, referenced_key, referenced_uri, ref_)?;
+        self.schemas.add_dependent(referenced_key, referrer_key);
         Ok(())
     }
 
     fn add_reference(
         &mut self,
-        key: Key,
-        absolute_uri: AbsoluteUri,
-        dependent_key: Key,
+        referrer_key: Key,
+        referenced_key: Key,
+        referenced_uri: AbsoluteUri,
         ref_: Ref,
     ) -> Result<(), CompileError> {
         self.schemas.add_reference(
-            dependent_key,
+            referrer_key,
             Reference {
-                key,
+                key: referenced_key,
                 uri: ref_.uri,
-                absolute_uri,
+                absolute_uri: referenced_uri,
                 keyword: ref_.keyword,
             },
             self.sources,
@@ -370,12 +376,8 @@ impl<'i> Compiler<'i> {
     fn queue_refs(
         &mut self,
         key: Key,
-        absolute_uri: &AbsoluteUri,
-        path: &Pointer,
-        parent: Option<Key>,
         default_dialect_idx: usize,
         src: &Value,
-        ref_: Option<RefToResolve>,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<bool, CompileError> {
         let dialect = &self.dialects[default_dialect_idx];
@@ -386,34 +388,33 @@ impl<'i> Compiler<'i> {
             .unwrap()
             .absolute_uri()
             .clone();
+
         let mut base_uri = dependent_uri.clone();
         base_uri.set_fragment(None).unwrap();
-        let has_keywords = !refs.is_empty();
+
+        let mut has_unresolved_refs = false;
         for ref_ in refs {
-            let absolute_uri = base_uri.resolve(&ref_.uri)?;
-            q.push_front(SchemaToCompile {
-                uri: absolute_uri,
-                path: None,
-                parent: None,
-                default_dialect_idx: self.dialects.default_index(),
-                continue_on_err: false,
-                ref_: Some(RefToResolve {
-                    dependent_key: key,
-                    ref_,
-                }),
-            });
+            let ref_uri = base_uri.resolve(&ref_.uri)?;
+            if self.schemas.contains_uri(&ref_uri) {
+                let ref_key = self.schemas.get_key(&ref_uri).unwrap();
+                self.resolve_ref(key, ref_key, ref_uri, ref_)?;
+            } else {
+                has_unresolved_refs = true;
+                q.push_front(SchemaToCompile {
+                    uri: ref_uri,
+                    path: None,
+                    parent: None,
+                    default_dialect_idx: self.dialects.default_index(),
+                    continue_on_err: false,
+                    ref_: Some(RefToResolve {
+                        referrer_key: key,
+                        ref_,
+                    }),
+                });
+            }
         }
-        if has_keywords {
-            q.push_back(SchemaToCompile {
-                uri: absolute_uri.clone(),
-                path: Some(path.clone()),
-                parent,
-                default_dialect_idx,
-                continue_on_err: false,
-                ref_,
-            });
-        }
-        Ok(has_keywords)
+
+        Ok(has_unresolved_refs)
     }
     fn dialect_idx(&self, src: &Value, default: usize) -> usize {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
@@ -430,7 +431,7 @@ impl<'i> Compiler<'i> {
     ) -> Result<bool, CompileError> {
         let dialect = &self.dialects[dialect_idx];
         let subschemas = dialect.subschemas(path, src);
-        let has_subschemas = !subschemas.is_empty();
+        let mut has_subschemas = false;
         for subschema_path in subschemas {
             let mut uri = uri.clone();
             if subschema_path.is_empty() {
@@ -438,24 +439,17 @@ impl<'i> Compiler<'i> {
             } else {
                 uri.set_fragment(Some(&subschema_path))?;
             }
-            q.push_front(SchemaToCompile {
-                uri,
-                path: Some(subschema_path),
-                parent: Some(key),
-                default_dialect_idx: dialect_idx,
-                continue_on_err: false,
-                ref_: None,
-            });
-        }
-        if has_subschemas {
-            q.push_back(SchemaToCompile {
-                uri: uri.clone(),
-                path: Some(path.clone()),
-                parent: None,
-                default_dialect_idx: dialect_idx,
-                continue_on_err: false,
-                ref_: None,
-            });
+            if !self.schemas.contains_uri(&uri) {
+                has_subschemas = true;
+                q.push_front(SchemaToCompile {
+                    uri,
+                    path: Some(subschema_path),
+                    parent: Some(key),
+                    default_dialect_idx: dialect_idx,
+                    continue_on_err: false,
+                    ref_: None,
+                });
+            }
         }
         Ok(has_subschemas)
     }

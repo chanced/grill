@@ -1,18 +1,20 @@
-use serde_json::Value;
-
 use grill_core::{
     error::{CompileError, EvaluateError},
-    keyword::{self, Compile, Context, Kind},
-    output::Output,
-    Schema,
+    keyword::{self, Compile, Kind},
+    Output, Schema,
 };
+use serde_json::Value;
+use std::sync::Arc;
 
-#[derive(Debug, Default, Clone)]
-pub struct Keyword;
+use crate::WRITE_ONLY;
 
-impl keyword::Keyword for Keyword {
+#[derive(Debug, Clone, Default)]
+pub struct Defs {
+    pub value: Arc<Value>,
+}
+impl keyword::Keyword for Defs {
     fn kind(&self) -> Kind {
-        Kind::Single(crate::COMMENT)
+        Kind::Single(WRITE_ONLY)
     }
     fn setup<'i>(
         &mut self,
@@ -23,7 +25,7 @@ impl keyword::Keyword for Keyword {
     }
     fn evaluate<'i, 'v>(
         &'i self,
-        _ctx: &'i mut Context,
+        _ctx: &'i mut keyword::Context,
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         Ok(None)
