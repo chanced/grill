@@ -17,7 +17,6 @@ use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Token};
 use serde_json::{Number, Value};
 use std::{
-    borrow::Cow,
     fmt::{self, Display},
     sync::Arc,
 };
@@ -395,11 +394,16 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     ///
     /// # Example
     /// ```rust
-    /// # use grill_core::json_schema::draft_2020_12::keywords::Id;
+    /// use serde_json::json;
+    /// use grill::{ uri::AbsoluteUri, keyword::Keyword, json_schema::keyword::id::Id };
     ///
-    /// let id = Id.identify(&json!({"$id": "https://example.com/schema.json" }));
-    /// assert_eq!(id, Ok(Some("https://example.com/schema.json".parse().unwrap())));
+    /// let id_keyword = Id::new("$id", false);
+    /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
+    ///     .unwrap()
+    ///     .unwrap();
+    /// assert_eq!(&id.unwrap(), &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
     /// ```
+    ///
     fn identify(
         &self,
         schema: &Value,
@@ -413,13 +417,17 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// # Convention
     /// Exactly one `Keyword` must implement the `dialect` method for a given
     /// `Dialect`.
-    ///
+    ///()
     /// # Example
-    /// ```rust
-    /// # use grill_core::json_schema::draft_2020_12::SchemaKeyword;
+    /// ```
+    /// use serde_json::json;
+    /// use grill::keyword::Keyword as _;
+    /// use std::borrow::Cow;
     ///
     /// let draft = "https://json-schema.org/draft/2020-12/schema";
-    /// let dialect = SchemaKeyword.dialect(&json!({ "$schema": draft }));
+    /// let schema = json!({ "$schema": draft });
+    /// let schema_keyword = grill::json_schema::keyword::schema::Schema::new("$schema", false);
+    /// let dialect = schema_keyword.dialect(&schema).unwrap().unwrap().unwrap();
     /// assert_eq!(dialect.as_str(), draft);
     /// ```
     fn dialect(

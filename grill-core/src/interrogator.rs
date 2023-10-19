@@ -19,7 +19,9 @@ use crate::{
         },
         Dialect, Dialects, Key, Schema, Schemas,
     },
-    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
+    source::{
+        deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, SourceKey, Sources, Src,
+    },
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
 };
 
@@ -76,11 +78,19 @@ impl Build {
     /// [`build`](`Builder::build`).
     ///
     /// # Example
-    /// ```rust
-    /// # use grill_core::Builder;
-    /// let source = br#"{"type": "string"}"#;
-    /// let interrogator = Builder::default().json_schema_2020_12().build().unwrap()
-    /// interrogator.source_slice("https://example.com/schema.json", ).unwrap();
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let source = br#"{"type": "string"}"#;
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     interrogator.source_slice("https://example.com/schema.json", source).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceError`] if:
@@ -101,11 +111,17 @@ impl Build {
     /// Adds a schema source from a `str`
     /// # Example
     /// ```rust
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -124,14 +140,21 @@ impl Build {
 
     /// Adds a source schema from a [`Value`]
     /// # Example
-    /// ```rust
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// use std::{ borrow::Cow, collections::HashMap };
     /// use serde_json::json;
     ///
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_value("https://example.com/schema.json", json!({"type": "string"})).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let schema = Cow::Owned(json!({"type": "string"}));
+    ///     let interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .source_value("https://example.com/schema.json", schema).unwrap()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -151,15 +174,21 @@ impl Build {
     /// `(TryIntoAbsoluteUri, Deref<Target=str>)`
     ///
     /// # Example
-    /// ```rust
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
     /// use std::collections::HashMap;
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_strs(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut sources = HashMap::new();
+    ///     sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
+    ///     let interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .source_strs(sources).unwrap()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if a URI fails to convert to an
@@ -182,14 +211,21 @@ impl Build {
     ///
     /// # Example
     /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
     /// use std::collections::HashMap;
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_slices(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut sources = HashMap::new();
+    ///     sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
+    ///     
+    ///     let interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .source_slices(sources).unwrap()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -216,23 +252,27 @@ impl Build {
     ///
     /// # Example
     /// ```
-    /// use std::collections::HashMap;
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// use std::{ borrow::Cow, collections::HashMap };
     /// use serde_json::json;
-    ///
-    /// let mut sources = HashMap::new();
-    /// let source = json!({"type": "string"});
-    /// sources.insert("https://example.com/schema.json", source);
-    /// let interrogator = grill::Builder::default()
-    ///     .json_schema_2020_12()
-    ///     .source_values(sources).unwrap()
-    ///     .build()
-    ///     .unwrap();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut sources = HashMap::new();
+    ///     let source = Cow::Owned(json!({"type": "string"}));
+    ///     sources.insert("https://example.com/schema.json", source);
+    ///     let interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .source_values(sources).unwrap()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceError`] if:
     /// - [`TryIntoAbsoluteUri`] fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
-    pub fn source_values<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
+    pub fn source_values<I, K>(mut self, sources: I) -> Result<Self, SourceError>
     where
         K: TryIntoAbsoluteUri,
         I: IntoIterator<Item = (K, Cow<'static, Value>)>,
@@ -340,6 +380,7 @@ impl Build {
     // ///
     // /// # Example
     // /// ```rust
+
     // /// let interrogator = grill::Builder::default()
     // ///    .json_schema_2020_12()
     // ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
@@ -575,17 +616,21 @@ impl Interrogator {
     /// Returns [`CompileError`] if any of the schemas fail to compile.
     ///
     /// # Example
-    /// ```rust
-    /// # use grill_core::{ Interrogator, json_schema::Build };
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
     ///     interrogator.source_str("https://example.com/string.json", r#"{"type": "string"}"#).unwrap();
     ///     interrogator.source_str("https://example.com/number.json", r#"{"type": "number"}"#).unwrap();
     ///     let schemas = interrogator.compile_all(vec![
     ///        "https://example.com/string.json",
     ///        "https://example.com/number.json",
-    ///     ]).unwrap();
+    ///     ]).await.unwrap();
     ///     assert_eq!(schemas.len(), 2);
     /// }
     /// ```
@@ -722,10 +767,18 @@ impl Interrogator {
     ///
     /// # Example
     /// ```rust
-    /// # use grill_core::Interrogator;
-    /// let mut interrogator = Interrogator::json_schema_2020_12().build().unwrap();
-    /// let source = br#"{"type": "string"}"#;
-    /// interrogator.source_slice("https://example.com/schema.json", source).unwrap();
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     let source = br#"{"type": "string"}"#;
+    ///     interrogator.source_slice("https://example.com/schema.json", source).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -744,18 +797,38 @@ impl Interrogator {
         self.source(source)
     }
     fn source(&mut self, src: Src) -> Result<&Value, SourceError> {
-        match src {
+        self.sources.start_txn();
+        let result = match src {
             Src::String(uri, s) => self.sources.insert_string(uri, s, &self.deserializers),
             Src::Value(uri, v) => self.sources.insert_value(uri, v),
+        };
+        match result {
+            Ok((key, _, _)) => {
+                self.sources.commit_txn();
+                Ok(self.sources.get(key))
+            }
+            Err(err) => {
+                self.sources.rollback_txn();
+                Err(err)
+            }
         }
-        .map(|(key, _, _)| self.sources.get(key))
     }
 
     /// Adds a schema source from a `&str`
     /// # Example
     /// ```rust
-    /// let mut interrogator = grill::Interrogator::json_schema_2020_12().build().unwrap();
-    /// interrogator.source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap();
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    ///
+    /// #[tokio::main]
+    /// async fn main(){
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// let schema = r#"{"type": "string"}"#;
+    /// interrogator.source_str("https://example.com/schema.json", schema).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -774,12 +847,20 @@ impl Interrogator {
     /// Adds a source schema from a [`Value`]
     /// # Example
     /// ```rust
-    /// # use grill_core::Interrogator;
+    /// use grill::{ Interrogator, json_schema::Build as _ };
     /// use serde_json::json;
+    /// use std::borrow::Cow;
     ///
-    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
-    /// let source = json!({"type": "string"});
-    /// interrogator.source_value("https://example.com/schema.json", source).unwrap();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     let source = Cow::Owned(json!({"type": "string"}));
+    ///     interrogator.source_value("https://example.com/schema.json", source).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -797,14 +878,21 @@ impl Interrogator {
     /// `(TryIntoAbsoluteUri, Deref<Target=str>)`
     ///
     /// # Example
-    /// ```rust
+    /// ```
+    /// use grill::{Interrogator, json_schema::Build as _};
     /// use std::collections::HashMap;
-    /// # use grill_core::Interrogator;
     ///
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
-    /// interrogator.source_strs(sources).unwrap();
+    /// #[tokio::main]
+    /// async fn main(){
+    ///     let mut sources = HashMap::new();
+    ///     sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     interrogator.source_strs(sources).unwrap();
+    /// }
     /// ```
     ///
     /// # Errors
@@ -828,12 +916,19 @@ impl Interrogator {
     /// # Example
     /// ```
     /// use std::collections::HashMap;
-    /// # use grill_core::Interrogator;
+    /// use grill::{ Interrogator, json_schema::Build };
     ///
-    /// let mut sources = HashMap::new();
-    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
-    /// interrogator.source_slices(sources).unwrap();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut sources = HashMap::new();
+    ///     sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     interrogator.source_slices(sources).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -860,15 +955,22 @@ impl Interrogator {
     ///
     /// # Example
     /// ```
-    /// # use grill_core::Interrogator;
-    /// # use std::collections::HashMap;
-    /// # use serde_json::json;
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// use std::{collections::HashMap, borrow::Cow};
+    /// use serde_json::json;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut sources = HashMap::new();
+    ///     let source = json!({"type": "string"});
+    ///     sources.insert("https://example.com/schema.json", Cow::Owned(source));
     ///
-    /// let mut sources = HashMap::new();
-    /// let source = json!({"type": "string"});
-    /// sources.insert("https://example.com/schema.json", source);
-    /// let mut interrogator = Interrogator::json_schema().build().unwrap();
-    /// interrogator.source_values(sources).unwrap();
+    ///     let mut interrogator = Interrogator::build()
+    ///         .json_schema_2020_12()
+    ///         .finish()
+    ///         .await
+    ///         .unwrap();
+    ///     interrogator.source_values(sources).unwrap();
+    /// }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -889,7 +991,7 @@ impl Interrogator {
     /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn builder() -> Build {
+    pub fn build() -> Build {
         Build::new()
     }
 

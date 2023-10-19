@@ -22,6 +22,7 @@
 //!  └─┬─┘   └───────────────┬───────────────┘└───────┬───────┘ └────────────┬────────────┘ └┬┘
 //! scheme               authority                   path                  query        fragment
 //! ```
+//!
 //! ```rust
 //! # use grill_core::uri::{ Uri, AbsoluteUri };
 //!
@@ -519,15 +520,12 @@ impl<'a> Iterator for PathSegments<'a> {
         if self.root_sent {
             let base_only = self.base_only;
             let next = self.peek();
-            // let next_char = next.and_then(|s| s.chars().next());
             if base_only && next.is_none() {
                 return None;
             }
             return Some(PathSegment::parse_path_segment(value));
         }
         self.root_sent = true;
-        let next = self.peek();
-        // let next_char = next.and_then(|s| s.chars().next());
         Some(PathSegment::parse_root(value))
     }
 }
@@ -639,7 +637,7 @@ impl AbsoluteUri {
     /// # use grill_core::uri::Uri;
     /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let relative_uri = uri.as_relative_uri().unwrap();
-    /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
+    /// assert_eq!(relative_uri.base_path_segments().collect::<Vec<_>>(), vec!["", "path", "to"]);
     #[must_use]
     pub fn base_path_segments(&self) -> PathSegments<'_> {
         let mut segments = self.path_segments();

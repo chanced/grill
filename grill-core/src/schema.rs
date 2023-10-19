@@ -5,7 +5,7 @@ pub mod traverse;
 pub mod dialect;
 use ahash::AHashMap;
 pub use dialect::{Dialect, Dialects};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 pub(crate) mod compiler;
 
@@ -635,6 +635,37 @@ pub enum Identifier {
     Secondary(Uri),
 }
 
+impl PartialEq<Uri> for Identifier {
+    fn eq(&self, other: &Uri) -> bool {
+        match self {
+            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == other,
+        }
+    }
+}
+
+impl PartialEq<Identifier> for Uri {
+    fn eq(&self, other: &Identifier) -> bool {
+        match other {
+            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == self,
+        }
+    }
+}
+impl PartialEq<AbsoluteUri> for Identifier {
+    fn eq(&self, other: &AbsoluteUri) -> bool {
+        match self {
+            Identifier::Primary(uri) | Identifier::Secondary(uri) => other == uri,
+        }
+    }
+}
+
+impl PartialEq<Identifier> for AbsoluteUri {
+    fn eq(&self, other: &Identifier) -> bool {
+        match other {
+            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == other,
+        }
+    }
+}
+
 impl Identifier {
     /// Returns `true` if the identifier is [`Primary`].
     ///
@@ -667,20 +698,6 @@ impl Identifier {
     }
 }
 
-impl PartialEq<Uri> for Identifier {
-    fn eq(&self, other: &Uri) -> bool {
-        match self {
-            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
-        }
-    }
-}
-impl PartialEq<AbsoluteUri> for Identifier {
-    fn eq(&self, other: &AbsoluteUri) -> bool {
-        match self {
-            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
-        }
-    }
-}
 impl PartialEq<str> for Identifier {
     fn eq(&self, other: &str) -> bool {
         match self {

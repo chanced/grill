@@ -4,16 +4,16 @@ use grill_core::{
     error::{CompileError, EvaluateError, IdentifyError},
     keyword::{self, Context, Kind, Unimplemented},
     uri::AbsoluteUri,
-    Output, Schema,
+    Output,
 };
 
 #[derive(Debug, Clone)]
-pub struct Keyword {
+pub struct Schema {
     pub keyword: &'static str,
     pub allow_fragment: bool,
 }
 
-impl Keyword {
+impl Schema {
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
@@ -22,7 +22,8 @@ impl Keyword {
         }
     }
 }
-impl keyword::Keyword for Keyword {
+
+impl keyword::Keyword for Schema {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }
@@ -61,7 +62,7 @@ impl keyword::Keyword for Keyword {
     fn setup<'i>(
         &mut self,
         _compile: &mut keyword::Compile<'i>,
-        _schema: Schema<'i>,
+        _schema: grill_core::Schema<'i>,
     ) -> Result<bool, CompileError> {
         Ok(false)
     }

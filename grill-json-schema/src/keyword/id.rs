@@ -10,12 +10,12 @@ use grill_core::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Keyword {
+pub struct Id {
     pub keyword: &'static str,
     pub allow_fragment: bool,
 }
 
-impl Keyword {
+impl Id {
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
@@ -33,13 +33,13 @@ impl Keyword {
     }
 }
 
-impl Display for Keyword {
+impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} keyword", self.keyword)
     }
 }
 
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for Id {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }

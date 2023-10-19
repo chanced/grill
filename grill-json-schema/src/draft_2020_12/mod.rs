@@ -4,6 +4,8 @@ use serde_json::Value;
 
 use grill_core::schema::Dialect;
 
+use crate::{keyword, ID, SCHEMA};
+
 use super::metaschema;
 
 #[must_use]
@@ -13,6 +15,9 @@ pub fn dialect() -> Dialect {
             json_schema_2020_12_uri().clone(),
             Cow::Borrowed(json_schema_2020_12_value()),
         )
+        .with_keyword(keyword::schema::Schema::new(SCHEMA, false))
+        .with_keyword(keyword::id::Id::new(ID, false))
+        .with_keyword(keyword::comment::Comment)
         .finish()
         .unwrap()
 }

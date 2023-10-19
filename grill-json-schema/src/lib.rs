@@ -29,15 +29,45 @@ pub mod draft_07;
 pub mod draft_2019_09;
 pub mod draft_2020_12;
 
-pub trait Build {
-    /// Returns a new [`Build`] with the JSON Schema Draft 2020-12 [`Dialect`] that is
-    /// set as the default dialect.
+
+
+pub trait Build: Sized {
+    /// Adds the JSON Schema Draft 2020-12 [`Dialect`](grill_core::schema::Dialect).
     #[must_use]
-    #[allow(unused_must_use)]
-    fn json_schema_2020_12() -> grill_core::Build {
-        grill_core::Build::default().default_dialect(crate::draft_2020_12::dialect())
+    fn json_schema_2020_12(self) -> grill_core::Build;
+
+    /// Adds the JSON Schema Draft 2019-09 [`Dialect`](grill_core::schema::Dialect).
+    #[must_use]
+    fn json_schema_2019_09(self) -> grill_core::Build;
+
+    /// Adds the JSON Schema Draft 07 [`Dialect`](grill_core::schema::Dialect).
+    #[must_use]
+    fn json_schema_07(self) -> grill_core::Build;
+
+    /// Adds the JSON Schema Draft 04 [`Dialect`](grill_core::schema::Dialect).
+    #[must_use]
+    fn json_schema_04(self) -> grill_core::Build;
+}
+
+impl Build for grill_core::Build {
+    fn json_schema_2020_12(self) -> grill_core::Build {
+        self.dialect(draft_2020_12::dialect())
+    }
+
+    fn json_schema_2019_09(self) -> grill_core::Build {
+        self.dialect(draft_2019_09::dialect())
+    }
+
+    fn json_schema_07(self) -> grill_core::Build {
+        self.dialect(draft_07::dialect())
+    }
+
+    fn json_schema_04(self) -> grill_core::Build {
+        self.dialect(draft_04::dialect())
     }
 }
+
+
 #[macro_export]
 macro_rules! metaschema {
     (
