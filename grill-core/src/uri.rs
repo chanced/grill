@@ -571,21 +571,25 @@ impl AbsoluteUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::{ AbsoluteUri, Component, PathSegment, QueryParameter };
-    /// let s = "https://user:password@example.com/path/to/file/?query=str#fragment";
-    /// let uri = AbsoluteUri::parse(s).unwrap();
-    /// let components = vec![
-    ///     Component::Scheme("https".into()),
-    ///     Component::Username("user".into()),
-    ///     Component::Password("password".into()),
-    ///     Component::Host("example.com".into()),
-    ///     Component::PathSegment(PathSegment::Root),
-    ///     Component::PathSegment(PathSegment::Normal("path".into())),
-    ///     Component::PathSegment(PathSegment::Normal("to".into())),
-    ///     Component::PathSegment(PathSegment::Normal("file".into())),
-    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
-    ///     Component::Fragment("fragment".into()),
+    /// let input = "https://user:password@example.com/path/to/file/?query=str#fragment";
+    /// let uri = AbsoluteUri::parse(input).unwrap();
+    /// let expected = vec![
+    ///     Component::Scheme("https".into()),                                    // https
+    ///     Component::Username("user".into()),                                   // user
+    ///     Component::Password("password".into()),                               // password
+    ///     Component::Host("example.com".into()),                                // example.com
+    ///     Component::PathSegment(PathSegment::Root),                            // /
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),           // path/
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),             // to/
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),           // file/
+    ///     Component::PathSegment(PathSegment::Normal("".into())),               // /
+    ///                                                                           // ?
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()), // query=str
+    ///                                                                           // #
+    ///     Component::Fragment("fragment".into()),                               // fragment
     /// ];
-    /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
+    /// let res = uri.components().collect::<Vec<_>>();
+    /// assert_eq!(res, expected, "\nexpected: {expected:#?}\nreceived: {res:#?}");
     #[must_use]
     pub fn components(&self) -> Components {
         Components::from_absolute_uri(self)
@@ -620,7 +624,7 @@ impl AbsoluteUri {
     /// let uri = Uri::parse("/path/to/file").unwrap();
     /// let uri_ref = uri.as_relative_uri().unwrap();
     ///
-    /// assert_eq!(uri.base_path(), "/path/to");
+    /// assert_eq!(uri.base_path(), "/path/to/");
     /// ```
     #[must_use]
     pub fn base_path(&self) -> &str {
@@ -1438,22 +1442,24 @@ impl RelativeUri {
     ///
     /// # Example
     /// ```rust
-    /// # use grill_core::uri::{ AbsoluteUri, Uri, Component, PathSegment, QueryParameter };
-    /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
-    /// let uri = Uri::parse(s).unwrap();
-    /// let uri = AbsoluteUri::parse(s).unwrap();
-    /// let components = vec![
-    ///     Component::Username("user".into()),
-    ///     Component::Password("password".into()),
-    ///     Component::Host("example.com".into()),
-    ///     Component::PathSegment(PathSegment::Root),
-    ///     Component::PathSegment(PathSegment::Normal("path".into())),
-    ///     Component::PathSegment(PathSegment::Normal("to".into())),
-    ///     Component::PathSegment(PathSegment::Normal("file".into())),
-    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
-    ///     Component::Fragment("fragment".into()),
+    /// # use grill_core::uri::{ RelativeUri, Uri, Component, PathSegment, QueryParameter };
+    /// let input = "/path/to/file/?query=str#fragment";
+    /// let uri = Uri::parse(input).unwrap();
+    /// let relative_uri = uri.as_relative_uri().unwrap();
+    /// let res = relative_uri.components().collect::<Vec<_>>();
+    ///
+    /// let expected = vec![
+    ///     Component::PathSegment(PathSegment::Root),                            // /
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),           // path/
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),             // to/
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),           // file/
+    ///     Component::PathSegment(PathSegment::Normal("".into())),               // /
+    ///                                                                           // ?
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()), // query=str
+    ///                                                                           // #
+    ///     Component::Fragment("fragment".into()),                               // fragment
     /// ];
-    /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
+    /// assert_eq!(res, expected);
     #[must_use]
     pub fn components(&self) -> Components {
         Components::from_relative_uri(self)
@@ -1893,7 +1899,7 @@ impl RelativeUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
+    /// let mut uri = Uri::parse("/./foo/../bar").unwrap();
     /// let uri_ref = uri.as_relative_uri().unwrap();
     /// let normalized = uri_ref.path_normalized();
     /// assert_eq!(normalized, "/bar");
@@ -2571,22 +2577,26 @@ impl Uri {
     ///
     /// # Example
     /// ```rust
-    /// # use grill_core::uri::{ AbsoluteUri, Uri, Component, PathSegment, QueryParameter };
-    /// let s = "//user:password@example.com/path/to/file/?query=str#fragment";
-    /// let uri = Uri::parse(s).unwrap();
-    /// let uri = AbsoluteUri::parse(s).unwrap();
-    /// let components = vec![
-    ///     Component::Username("user".into()),
-    ///     Component::Password("password".into()),
-    ///     Component::Host("example.com".into()),
-    ///     Component::PathSegment(PathSegment::Root),
-    ///     Component::PathSegment(PathSegment::Normal("path".into())),
-    ///     Component::PathSegment(PathSegment::Normal("to".into())),
-    ///     Component::PathSegment(PathSegment::Normal("file".into())),
-    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()),
-    ///     Component::Fragment("fragment".into()),
+    /// # use grill_core::uri::{  Uri, Component, PathSegment, QueryParameter };
+    /// let input = "https://user:password@example.com/path/to/file/?query=str#fragment";
+    /// let uri = Uri::parse(input).unwrap();
+    /// let expected = vec![
+    ///     Component::Scheme("https".into()),                                    // https
+    ///     Component::Username("user".into()),                                   // user
+    ///     Component::Password("password".into()),                               // password
+    ///     Component::Host("example.com".into()),                                // example.com
+    ///     Component::PathSegment(PathSegment::Root),                            // /
+    ///     Component::PathSegment(PathSegment::Normal("path".into())),           // path/
+    ///     Component::PathSegment(PathSegment::Normal("to".into())),             // to/
+    ///     Component::PathSegment(PathSegment::Normal("file".into())),           // file/
+    ///     Component::PathSegment(PathSegment::Normal("".into())),               // /
+    ///                                                                           // ?
+    ///     Component::QueryParameter(QueryParameter::new("query=str").unwrap()), // query=str
+    ///                                                                           // #
+    ///     Component::Fragment("fragment".into()),                               // fragment
     /// ];
-    /// assert_eq!(uri.components().collect::<Vec<_>>(), components);
+    /// let res = uri.components().collect::<Vec<_>>();
+    /// assert_eq!(res, expected, "\nexpected: {expected:#?}\nreceived: {res:#?}");
     #[must_use]
     pub fn components(&self) -> Components {
         Components::from_uri(self)

@@ -207,6 +207,7 @@ impl Sources {
         deserializers: &Deserializers,
     ) -> Result<Self, SourceError> {
         let mut store = Store::default();
+
         let iter = sources.into_iter();
         for src in iter {
             let uri = src.uri().clone(); // need the uri below for the error context
