@@ -17,6 +17,8 @@ use grill_core::{
 
 use crate::CONST;
 
+define_translate!(ConstInvalid, translate_const_invalid_en);
+
 /// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
 ///
 /// The value of this keyword MAY be of any type, including null.
@@ -36,7 +38,8 @@ impl Const {
         Self {
             expected: Arc::new(Value::Null),
             expected_number: None,
-            translate: translate.unwrap_or(TranslateConstInvalid::Pointer(translate_en)),
+            translate: translate
+                .unwrap_or(TranslateConstInvalid::Pointer(translate_const_invalid_en)),
         }
     }
 }
@@ -100,9 +103,10 @@ impl keyword::Keyword for Const {
     }
 }
 
-define_translate!(ConstInvalid);
-
-pub fn translate_en(f: &mut std::fmt::Formatter<'_>, error: &ConstInvalid<'_>) -> std::fmt::Result {
+pub fn translate_const_invalid_en(
+    f: &mut std::fmt::Formatter<'_>,
+    error: &ConstInvalid<'_>,
+) -> std::fmt::Result {
     write!(f, "expected {}, found {}", error.expected, error.actual)
 }
 
@@ -145,6 +149,12 @@ impl<'v> OutputError<'v> for ConstInvalid<'v> {
             translate.run(f, self)
         } else {
             self.translate.run(f, self)
+        }
+    }
+
+    fn set_translate(&mut self, translator: &grill_core::output::Translator) {
+        if let Some(translate) = translator.get::<TranslateConstInvalid>() {
+            self.translate = translate.clone();
         }
     }
 }

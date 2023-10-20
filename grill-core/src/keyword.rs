@@ -33,7 +33,7 @@ use std::{
 
 #[macro_export]
 macro_rules! define_translate {
-    ($ident:ident) => {
+    ($ident:ident, $default:ident) => {
         paste::paste!{
             #[derive(Clone)]
             pub enum [< Translate $ident >]{
@@ -52,13 +52,17 @@ macro_rules! define_translate {
                     }
                 }
             }
-
             impl ::std::fmt::Debug for [< Translate $ident >] {
-                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                     match self {
                         Self::Closure(_) => f.debug_tuple("Closure").finish(),
                         Self::Pointer(_) => f.debug_tuple("Pointer").finish(),
                     }
+                }
+            }
+            impl std::default::Default for [< Translate $ident >] {
+                fn default() -> Self {
+                    Self::Pointer($default)
                 }
             }
         }

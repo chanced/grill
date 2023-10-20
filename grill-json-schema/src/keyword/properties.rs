@@ -3,9 +3,10 @@ use std::borrow::Cow;
 use crate::PROPERTIES;
 use ahash::AHashMap;
 use grill_core::{
+    define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, Compile, Context, Unimplemented},
-    output::Output,
+    output::{Error, Output},
     Key, Schema,
 };
 use jsonptr::{Pointer, Token};
@@ -14,6 +15,7 @@ use serde_json::Value;
 #[derive(Debug, Clone)]
 pub struct Properties {
     subschemas: AHashMap<String, (Pointer, Key)>,
+    translate: TranslatePropertiesInvalid,
 }
 
 impl Properties {
@@ -21,6 +23,7 @@ impl Properties {
     pub fn new() -> Self {
         Self {
             subschemas: AHashMap::new(),
+            translate: TranslatePropertiesInvalid::default(),
         }
     }
 }
@@ -72,19 +75,21 @@ impl keyword::Keyword for Properties {
         let mut output = ctx.annotate(PROPERTIES, None);
         let mut is_valid = true;
         let mut invalid = Vec::with_capacity(self.subschemas.len());
-        for (prop, (ptr, key)) in &self.subschemas {
-            if let Some(v) = obj.get(prop) {
-                output.push(ctx.evaluate(*key, Some(prop), ptr, v)?);
+        for (prop, value) in obj {
+            if let Some((ptr, key)) = self.subschemas.get(prop) {
+                output.push(ctx.evaluate(*key, Some(prop), ptr, value)?);
                 is_valid &= output.is_valid();
                 if !is_valid && ctx.should_short_circuit() {
                     return Ok(Some(output));
                 }
-                invalid.push(prop);
+                invalid.push(Cow::Borrowed(prop.as_str()));
             }
         }
         if !is_valid {
-            let invalid = invalid.into_iter().map(|s| s.to_string()).collect();
-            output.set_error(Some(Box::new(PropertiesInvalid { invalid })));
+            output.set_error(Some(Box::new(PropertiesInvalid {
+                invalid,
+                translate: self.translate.clone(),
+            })));
         }
         Ok(Some(output))
     }
@@ -97,24 +102,56 @@ impl keyword::Keyword for Properties {
 #[derive(Clone, Debug)]
 pub struct PropertiesInvalid<'v> {
     pub invalid: Vec<Cow<'v, str>>,
+    pub translate: TranslatePropertiesInvalid,
 }
 
-impl<'v> grill_core::output::Error<'v> for PropertiesInvalid<'v> {
-    fn make_owned(self: Box<Self>) -> Box<dyn grill_core::output::Error<'static>> {
+define_translate!(PropertiesInvalid, translate_properties_invalid_default_en);
+
+pub fn translate_properties_invalid_default_en(
+    f: &mut std::fmt::Formatter<'_>,
+    invalid: &PropertiesInvalid<'_>,
+) -> std::fmt::Result {
+    for (i, prop) in invalid.invalid.iter().enumerate() {
+        if i > 0 {
+            write!(f, ", ")?;
+        }
+        write!(f, "\"{prop}\"")?;
+    }
+    write!(f, " failed to validate")?;
+    Ok(())
+}
+
+impl<'v> Error<'v> for PropertiesInvalid<'v> {
+    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         Box::new(PropertiesInvalid {
-            invalid: self.invalid.into_iter().map(Cow::Owned).collect(),
+            invalid: self
+                .invalid
+                .into_iter()
+                .map(|s| Cow::Owned(s.to_string()))
+                .collect(),
+            translate: self.translate,
         })
     }
 
     fn translate(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        lang: &grill_core::output::Translator,
+        translator: &grill_core::output::Translator,
     ) -> std::fmt::Result {
-        todo!()
+        if let Some(translate) = translator.get::<TranslatePropertiesInvalid>() {
+            translate.run(f, self)
+        } else {
+            self.translate.run(f, self)
+        }
+    }
+
+    fn set_translate(&mut self, translator: &grill_core::output::Translator) {
+        if let Some(translate) = translator.get::<TranslatePropertiesInvalid>() {
+            self.translate = translate.clone();
+        }
     }
 }
-
+#[must_use]
 pub fn paths_of_properties(schema: &Value) -> Vec<Pointer> {
     let Some(Value::Object(props)) = schema.get(PROPERTIES) else {
         return Vec::new();

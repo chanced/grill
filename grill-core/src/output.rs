@@ -68,9 +68,20 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 ///
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait Error<'v>: DynClone + std::fmt::Display + std::fmt::Debug + Send + Sync {
+pub trait Error<'v>: DynClone + std::fmt::Debug + Send + Sync {
     fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
     fn translate(&self, f: &mut std::fmt::Formatter<'_>, lang: &Translator) -> std::fmt::Result;
+    fn set_translate(&mut self, translator: &Translator);
+}
+impl<'v> std::fmt::Display for dyn Error<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.translate(f, &Translator::new("en".to_string()))
+    }
+}
+impl<'v> std::fmt::Display for Box<dyn 'v + Send + Sync + Error<'v>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.translate(f, &Translator::new("en".to_string()))
+    }
 }
 
 clone_trait_object!(<'v> Error<'v>);
@@ -101,6 +112,8 @@ impl Error<'_> for String {
     ) -> std::fmt::Result {
         write!(f, "{self}")
     }
+
+    fn set_translate(&mut self, _translator: &Translator) {}
 }
 
 impl<'v> Error<'v> for &'v str {
@@ -115,6 +128,8 @@ impl<'v> Error<'v> for &'v str {
     ) -> std::fmt::Result {
         write!(f, "{self}")
     }
+
+    fn set_translate(&mut self, _translator: &Translator) {}
 }
 
 /*
