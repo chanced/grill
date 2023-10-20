@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::PROPERTIES;
 use ahash::AHashMap;
 use grill_core::{
@@ -11,7 +13,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct Properties {
-    subschemas: AHashMap<String, Key>,
+    subschemas: AHashMap<String, (Pointer, Key)>,
 }
 
 impl Properties {
@@ -51,10 +53,10 @@ impl keyword::Keyword for Properties {
             }
             .into());
         };
-        for subschema in subschemas(&schema) {
+        for subschema in paths_of_properties(&schema) {
             let keyword = subschema.last().unwrap().decoded().to_string();
-            let key = compile.subschema(subschema)?;
-            self.subschemas.insert(keyword, key);
+            let key = compile.subschema(subschema.clone())?;
+            self.subschemas.insert(keyword, (subschema, key));
         }
         Ok(true)
     }
@@ -67,31 +69,57 @@ impl keyword::Keyword for Properties {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
-        let mut ptr = Pointer::new([PROPERTIES]);
         let mut output = ctx.annotate(PROPERTIES, None);
-        for (prop, key) in &self.subschemas {
+        let mut is_valid = true;
+        let mut invalid = Vec::with_capacity(self.subschemas.len());
+        for (prop, (ptr, key)) in &self.subschemas {
             if let Some(v) = obj.get(prop) {
-                ptr.push_back(prop.into());
-                output.push(ctx.evaluate(*key, Some(prop), &ptr, v)?);
-                ptr.pop_back();
-                if !output.is_valid() && ctx.should_short_circuit() {
-                    break;
+                output.push(ctx.evaluate(*key, Some(prop), ptr, v)?);
+                is_valid &= output.is_valid();
+                if !is_valid && ctx.should_short_circuit() {
+                    return Ok(Some(output));
                 }
+                invalid.push(prop);
             }
+        }
+        if !is_valid {
+            let invalid = invalid.into_iter().map(|s| s.to_string()).collect();
+            output.set_error(Some(Box::new(PropertiesInvalid { invalid })));
         }
         Ok(Some(output))
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {
-        Ok(subschemas(schema))
+        Ok(paths_of_properties(schema))
     }
 }
 
-fn subschemas(schema: &Value) -> Vec<Pointer> {
-    let Some(Value::Object(props)) = schema.get("properties") else {
+#[derive(Clone, Debug)]
+pub struct PropertiesInvalid<'v> {
+    pub invalid: Vec<Cow<'v, str>>,
+}
+
+impl<'v> grill_core::output::Error<'v> for PropertiesInvalid<'v> {
+    fn make_owned(self: Box<Self>) -> Box<dyn grill_core::output::Error<'static>> {
+        Box::new(PropertiesInvalid {
+            invalid: self.invalid.into_iter().map(Cow::Owned).collect(),
+        })
+    }
+
+    fn translate(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        lang: &grill_core::output::Translator,
+    ) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+pub fn paths_of_properties(schema: &Value) -> Vec<Pointer> {
+    let Some(Value::Object(props)) = schema.get(PROPERTIES) else {
         return Vec::new();
     };
-    let base = Pointer::new(["properties"]);
+    let base = Pointer::new([PROPERTIES]);
     props
         .keys()
         .map(|k| {

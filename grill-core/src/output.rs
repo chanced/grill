@@ -70,11 +70,7 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
 pub trait Error<'v>: DynClone + std::fmt::Display + std::fmt::Debug + Send + Sync {
     fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
-    fn translate_error(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        lang: &Translator,
-    ) -> std::fmt::Result;
+    fn translate(&self, f: &mut std::fmt::Formatter<'_>, lang: &Translator) -> std::fmt::Result;
 }
 
 clone_trait_object!(<'v> Error<'v>);
@@ -98,7 +94,7 @@ impl Error<'_> for String {
     fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         self
     }
-    fn translate_error(
+    fn translate(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         _translator: &Translator,
@@ -112,7 +108,7 @@ impl<'v> Error<'v> for &'v str {
         Box::new(self.to_string())
     }
 
-    fn translate_error(
+    fn translate(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         _translator: &Translator,
@@ -483,14 +479,19 @@ impl<'v> Output<'v> {
     #[must_use]
     pub fn is_valid(&self) -> bool {
         match self {
-            Output::Flag(flag) => flag.is_valid,
-            Output::Basic(basic) => basic.is_valid,
-            Output::Detailed(detailed) => detailed.is_valid,
-            Output::Verbose(verbose) => verbose.is_valid,
+            Output::Flag(flag) => flag.valid,
+            Output::Basic(basic) => basic.valid,
+            Output::Detailed(detailed) => detailed.valid,
+            Output::Verbose(verbose) => verbose.valid,
         }
     }
 
-    /// Appends a node to the output and updates `is_valid` based on the validity
+    #[must_use]
+    pub fn valid(&self) -> bool {
+        self.is_valid()
+    }
+
+    /// Appends a node to the output and updates `valid` based on the validity
     /// of `output`.
     ///
     /// # Panics
@@ -498,22 +499,40 @@ impl<'v> Output<'v> {
     pub fn push(&mut self, output: Output<'v>) {
         let structure = output.structure();
         match self {
-            Output::Flag(flag) => flag.add(output.try_into_flag().unwrap_or_else(|_| {
-                panic!("Output variant mismatch; expected `Flag`, found {structure}")
+            Output::Flag(flag) => flag.push(output.try_into_flag().unwrap_or_else(|_| {
+                panic!("Output variant mismatch; expected `Flag`, found `{structure}`")
             })),
-            Output::Basic(basic) => basic.add(output.try_into_basic().unwrap_or_else(|_| {
-                panic!("Output variant mismatch; expected `Basic`, found {structure}")
+            Output::Basic(basic) => basic.push(output.try_into_basic().unwrap_or_else(|_| {
+                panic!("Output variant mismatch; expected `Basic`, found `{structure}`")
             })),
             Output::Detailed(detailed) => {
                 detailed.add(output.try_into_detailed().unwrap_or_else(|_| {
-                    panic!("Output variant mismatch; expected `Detailed`, found {structure}")
+                    panic!("Output variant mismatch; expected `Detailed`, found `{structure}`")
                 }));
             }
             Output::Verbose(verbose) => {
                 verbose.add(output.try_into_verbose().unwrap_or_else(|_| {
-                    panic!("Output variant mismatch; expected `Verbose`, found {structure}")
+                    panic!("Output variant mismatch; expected `Verbose`, found `{structure}`")
                 }));
             }
+        }
+    }
+
+    /// Sets the `"error"` field output to `error` and `valid` to false.
+    pub fn set_error(&mut self, error: Option<BoxedError<'v>>) {
+        self.set_annotation_or_error(Err(error));
+    }
+
+    pub fn set_annotation(&mut self, annotation: Option<Annotation<'v>>) {
+        self.set_annotation_or_error(Ok(annotation));
+    }
+
+    pub fn set_annotation_or_error(&mut self, annotation_or_error: AnnotationOrError<'v>) {
+        match self {
+            Output::Flag(flag) => flag.set_annotation_or_error(annotation_or_error),
+            Output::Basic(basic) => basic.set_annotation_or_error(annotation_or_error),
+            Output::Detailed(detailed) => detailed.set_annotation_or_error(annotation_or_error),
+            Output::Verbose(verbose) => verbose.set_annotation_or_error(annotation_or_error),
         }
     }
     #[must_use]
@@ -632,6 +651,18 @@ impl<'v> Output<'v> {
             Err(self)
         }
     }
+
+    /// Sets `valid` to `is_valid`. If this updates `valid`, then the
+    /// `annotation_or_error` will be set to `Ok(None)` or `Err(None)` in
+    /// accordance with `is_valid`.
+    pub fn set_valid(&mut self, is_valid: bool) {
+        match self {
+            Output::Flag(flag) => flag.set_valid(is_valid),
+            Output::Basic(basic) => basic.set_valid(is_valid),
+            Output::Detailed(detailed) => detailed.set_valid(is_valid),
+            Output::Verbose(verbose) => verbose.set_valid(is_valid),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Output<'static> {
@@ -743,8 +774,7 @@ impl<'v, E> From<Output<'v>> for Result<Option<Output<'v>>, E> {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Flag<'v> {
-    #[serde(rename = "valid")]
-    pub is_valid: bool,
+    pub valid: bool,
     #[serde(flatten)]
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
 }
@@ -754,25 +784,33 @@ impl<'v> Flag<'v> {
     pub fn new(err_or_annotation: Result<Option<Annotation>, Option<BoxedError<'v>>>) -> Self {
         match err_or_annotation {
             Ok(_) => Self {
-                is_valid: true,
+                valid: true,
                 additional_props: BTreeMap::new(),
             },
             Err(_) => Self {
-                is_valid: false,
+                valid: false,
                 additional_props: BTreeMap::new(),
             },
         }
     }
 
-    /// Updates `is_valid` based on the validity
-    /// of `node` and merges `additional_props` of `node`.
-    pub fn add(&mut self, node: Flag<'v>) {
-        self.is_valid &= node.is_valid;
-        self.push(node);
-    }
-    /// Appends `node` to the output but does *not* update `is_valid`
+    /// Updates `valid` based on the validity of `node` and merges
+    /// `additional_props` of `node`.
     pub fn push(&mut self, mut node: Flag<'v>) {
+        self.valid &= node.valid;
         self.additional_props.append(&mut node.additional_props);
+    }
+
+    /// sets `valid`
+    pub fn set_valid(&mut self, is_valid: bool) {
+        self.valid = is_valid;
+    }
+
+    fn set_annotation_or_error(
+        &mut self,
+        annotation_or_error: Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>,
+    ) {
+        self.set_valid(annotation_or_error.is_ok());
     }
 }
 
@@ -789,7 +827,7 @@ impl Serialize for Flag<'_> {
 
 impl fmt::Display for Flag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_valid {
+        if self.valid {
             write!(f, "{SUCCESS_MSG}")
         } else {
             write!(f, "{ERROR_MSG}")
@@ -809,7 +847,7 @@ impl fmt::Display for Flag<'_> {
 
 #[derive(Clone, Debug)]
 pub struct BasicNode<'v> {
-    pub is_valid: bool,
+    pub valid: bool,
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub absolute_keyword_location: Uri,
@@ -824,7 +862,7 @@ impl<'v> Serialize for BasicNode<'v> {
     {
         let mut s = serializer.serialize_map(None)?;
         s.serialize_entry(INSTANCE_LOCATION, &self.instance_location)?;
-        s.serialize_entry(VALID, &self.is_valid)?;
+        s.serialize_entry(VALID, &self.valid)?;
         s.serialize_entry(KEYWORD_LOCATION, &self.keyword_location)?;
         s.serialize_entry(ABSOLUTE_KEYWORD_LOCATION, &self.absolute_keyword_location)?;
         serialize_annotation_or_error(&mut s, self.annotation_or_error.as_ref())?;
@@ -846,8 +884,7 @@ impl<'de> Deserialize<'de> for BasicNode<'static> {
             absolute_keyword_location: Uri,
             #[serde(alias = "annotation", alias = "error")]
             annotation_or_error: Option<Value>,
-            #[serde(rename = "valid")]
-            is_valid: bool,
+            valid: bool,
             #[serde(flatten)]
             additional_props: BTreeMap<String, Cow<'v, Value>>,
         }
@@ -856,13 +893,12 @@ impl<'de> Deserialize<'de> for BasicNode<'static> {
             keyword_location,
             absolute_keyword_location,
             annotation_or_error,
-            is_valid,
+            valid,
             additional_props,
         } = Data::deserialize(deserializer)?;
-        let annotation_or_error =
-            deserialize_annotation_or_error::<D>(annotation_or_error, is_valid)?;
+        let annotation_or_error = deserialize_annotation_or_error::<D>(annotation_or_error, valid)?;
         Ok(BasicNode {
-            is_valid,
+            valid,
             instance_location,
             keyword_location,
             absolute_keyword_location,
@@ -884,7 +920,7 @@ impl<'de> Deserialize<'de> for BasicNode<'static> {
 
 #[derive(Clone, Debug)]
 pub struct Basic<'v> {
-    pub is_valid: bool,
+    pub valid: bool,
     pub nodes: Vec<BasicNode<'v>>,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
     pub is_transient: bool,
@@ -899,7 +935,7 @@ impl<'v> Basic<'v> {
         annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
-        let is_valid = annotation_or_error.is_ok();
+        let valid = annotation_or_error.is_ok();
         let absolute_keyword_location = absolute_keyword_location.into();
         let additional_props = BTreeMap::default();
         let nodes = if is_transient {
@@ -910,29 +946,33 @@ impl<'v> Basic<'v> {
                 keyword_location,
                 absolute_keyword_location,
                 annotation_or_error,
-                is_valid,
+                valid,
                 additional_props: BTreeMap::default(),
             }]
         };
 
         Self {
-            is_valid,
+            valid,
             nodes,
             additional_props,
             is_transient,
         }
     }
 
-    /// Appends nodes of `node` to the output and updates `is_valid` based on
+    /// Appends nodes of `node` to the output and updates `valid` based on
     /// the validity.
-    pub fn add(&mut self, node: Basic<'v>) {
-        self.is_valid &= node.is_valid;
-        self.push(node);
+    fn push(&mut self, mut node: Basic<'v>) {
+        self.nodes.append(&mut node.nodes);
+        self.valid &= node.valid;
+        self.nodes.append(&mut node.nodes);
     }
 
-    /// Appends `node` to the output but does *not* update `is_valid`
-    pub(crate) fn push(&mut self, mut other: Basic<'v>) {
-        self.nodes.append(&mut other.nodes);
+    fn set_annotation_or_error(&mut self, annotation_or_error: AnnotationOrError<'v>) {
+        self.valid = annotation_or_error.is_ok();
+    }
+
+    fn set_valid(&mut self, is_valid: bool) {
+        self.valid = is_valid;
     }
 }
 
@@ -944,20 +984,19 @@ impl<'de> Deserialize<'de> for Basic<'static> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct Data<'v> {
-            #[serde(rename = "valid")]
-            is_valid: bool,
+            valid: bool,
             #[serde(alias = "annotations", alias = "errors", default)]
             nodes: Vec<BasicNode<'static>>,
             #[serde(flatten)]
             additional_props: BTreeMap<String, Cow<'v, Value>>,
         }
         let Data {
-            is_valid,
+            valid,
             nodes,
             additional_props,
         } = Data::deserialize(deserializer)?;
         Ok(Basic {
-            is_valid,
+            valid,
             nodes,
             additional_props,
             is_transient: false,
@@ -996,7 +1035,7 @@ pub struct Detailed<'v> {
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub absolute_keyword_location: Option<Uri>,
-    pub is_valid: bool,
+    pub valid: bool,
     annotation_or_error: AnnotationOrError<'v>,
     pub nodes: Vec<Detailed<'v>>,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
@@ -1017,33 +1056,59 @@ impl<'v> Detailed<'v> {
         annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
-        let is_valid = annotation_or_error.is_ok();
+        let valid = annotation_or_error.is_ok();
         let absolute_keyword_location = Some(absolute_keyword_location.into());
         Self {
             instance_location,
             keyword_location,
             absolute_keyword_location,
-            is_valid,
+            valid,
             annotation_or_error,
             nodes: Vec::new(),
             additional_props: BTreeMap::default(),
             is_transient,
         }
     }
-    /// Appends `node` to the output and updates `is_valid` based on the validity
+    /// Appends `node` to the output and updates `valid` based on the validity
     /// of `output`.
     pub fn add(&mut self, node: Detailed<'v>) {
-        self.is_valid &= node.is_valid;
+        self.valid &= node.valid;
         self.push(node);
     }
 
-    /// Appends `node` to the output but does *not* update `is_valid`.
+    /// Appends `node` to the output but does *not* update `valid`.
     pub(crate) fn push(&mut self, node: Detailed<'v>) {
         if node.is_transient {
             self.nodes.extend(node.nodes);
             self.additional_props.extend(node.additional_props);
         } else {
             self.nodes.push(node);
+        }
+    }
+
+    pub fn set_annotation(&mut self, annotation: Option<Annotation<'v>>) {
+        self.set_annotation_or_error(Ok(annotation));
+    }
+    pub fn set_error(&mut self, error: Option<BoxedError<'v>>) {
+        self.set_annotation_or_error(Err(error));
+    }
+
+    pub fn set_annotation_or_error(
+        &mut self,
+        annotation_or_error: Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>,
+    ) {
+        self.valid = annotation_or_error.is_ok();
+        self.annotation_or_error = annotation_or_error;
+    }
+
+    fn set_valid(&mut self, is_valid: bool) {
+        if self.valid != is_valid {
+            if is_valid {
+                self.annotation_or_error = Ok(None);
+            } else {
+                self.annotation_or_error = Err(None);
+            }
+            self.valid = is_valid;
         }
     }
 }
@@ -1076,7 +1141,7 @@ impl<'de> Deserialize<'de> for Detailed<'static> {
             #[serde(alias = "annotations", alias = "errors", default)]
             nodes: Vec<Detailed<'static>>,
             #[serde(rename = "valid")]
-            is_valid: bool,
+            valid: bool,
             #[serde(flatten)]
             additional_props: BTreeMap<String, Cow<'v, Value>>,
         }
@@ -1086,18 +1151,18 @@ impl<'de> Deserialize<'de> for Detailed<'static> {
             absolute_keyword_location,
             annotation_or_error: detail,
             nodes,
-            is_valid,
+            valid,
             additional_props,
         } = Data::deserialize(deserializer)?;
         let annotation_or_error =
-            deserialize_annotation_or_error::<D>(detail, is_valid).map_err(de::Error::custom)?;
+            deserialize_annotation_or_error::<D>(detail, valid).map_err(de::Error::custom)?;
         Ok(Detailed {
             instance_location,
             keyword_location,
             absolute_keyword_location,
             annotation_or_error,
             nodes,
-            is_valid,
+            valid,
             additional_props,
             is_transient: false,
         })
@@ -1127,7 +1192,7 @@ pub struct Verbose<'v> {
     pub absolute_keyword_location: Option<Uri>,
     pub annotation_or_error: AnnotationOrError<'v>,
     pub nodes: Vec<Verbose<'v>>,
-    pub is_valid: bool,
+    pub valid: bool,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
     /// Indicates that this node is not part of the final output and is only
     /// used to store intermediate results.
@@ -1145,13 +1210,13 @@ impl<'v> Verbose<'v> {
         annotation_or_error: AnnotationOrError<'v>,
         is_transient: bool,
     ) -> Self {
-        let is_valid = annotation_or_error.is_ok();
+        let valid = annotation_or_error.is_ok();
         let absolute_keyword_location = Some(absolute_keyword_location.into());
         Self {
             instance_location,
             keyword_location,
             absolute_keyword_location,
-            is_valid,
+            valid,
             annotation_or_error,
             nodes: Vec::new(),
             additional_props: BTreeMap::default(),
@@ -1159,7 +1224,7 @@ impl<'v> Verbose<'v> {
         }
     }
     pub fn add(&mut self, node: Verbose<'v>) {
-        self.is_valid &= node.is_valid;
+        self.valid &= node.valid;
         self.push(node);
     }
     pub(crate) fn push(&mut self, node: Verbose<'v>) {
@@ -1168,6 +1233,31 @@ impl<'v> Verbose<'v> {
             self.additional_props.extend(node.additional_props);
         } else {
             self.nodes.push(node);
+        }
+    }
+
+    pub fn set_annotation(&mut self, annotation: Option<Annotation<'v>>) {
+        self.set_annotation_or_error(Ok(annotation));
+    }
+    pub fn set_error(&mut self, error: Option<BoxedError<'v>>) {
+        self.set_annotation_or_error(Err(error));
+    }
+    pub fn set_annotation_or_error(
+        &mut self,
+        annotation_or_error: Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>,
+    ) {
+        self.valid = annotation_or_error.is_ok();
+        self.annotation_or_error = annotation_or_error;
+    }
+
+    fn set_valid(&mut self, is_valid: bool) {
+        if self.valid != is_valid {
+            if is_valid {
+                self.annotation_or_error = Ok(None);
+            } else {
+                self.annotation_or_error = Err(None);
+            }
+            self.valid = is_valid;
         }
     }
 }
@@ -1196,7 +1286,7 @@ impl<'de> Deserialize<'de> for Verbose<'static> {
             #[serde(alias = "annotations", alias = "errors", default)]
             nodes: Vec<Verbose<'static>>,
             #[serde(rename = "valid")]
-            is_valid: bool,
+            valid: bool,
             #[serde(flatten)]
             additional_props: BTreeMap<String, Cow<'static, Value>>,
         }
@@ -1207,18 +1297,17 @@ impl<'de> Deserialize<'de> for Verbose<'static> {
             absolute_keyword_location,
             annotation_or_error,
             nodes,
-            is_valid,
+            valid,
             additional_props,
         } = Data::deserialize(deserializer)?;
-        let annotation_or_error =
-            deserialize_annotation_or_error::<D>(annotation_or_error, is_valid)?;
+        let annotation_or_error = deserialize_annotation_or_error::<D>(annotation_or_error, valid)?;
         Ok(Verbose {
             instance_location,
             keyword_location,
             absolute_keyword_location,
             annotation_or_error,
             nodes,
-            is_valid,
+            valid,
             additional_props,
             is_transient: false,
         })
@@ -1372,13 +1461,13 @@ fn contains_mixed(obj: &Map<String, Value>) -> bool {
 #[allow(clippy::type_complexity)]
 fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     annotation_or_error: Option<Value>,
-    is_valid: bool,
+    valid: bool,
 ) -> Result<AnnotationOrError<'static>, D::Error> {
-    if is_valid {
+    if valid {
         return Ok(Ok(annotation_or_error.map(Into::into)));
     }
     if annotation_or_error.is_none() {
-        if is_valid {
+        if valid {
             return Ok(Ok(None));
         }
         return Ok(Err(None));
@@ -1386,20 +1475,20 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
     let annotation_or_error = annotation_or_error.unwrap();
     match annotation_or_error {
         Value::String(s) => {
-            if is_valid {
+            if valid {
                 Ok(Ok(Some(Arc::new(Value::String(s)).into())))
             } else {
                 Ok(Err(Some(Box::new(s))))
             }
         }
         Value::Null => {
-            if is_valid {
+            if valid {
                 return Ok(Ok(None));
             }
             Ok(Err(None))
         }
         Value::Bool(b) => {
-            if is_valid {
+            if valid {
                 Ok(Ok(Some(Arc::new(Value::Bool(b)).into())))
             } else {
                 Err(de::Error::invalid_type(
@@ -1409,7 +1498,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
             }
         }
         Value::Number(n) => {
-            if is_valid {
+            if valid {
                 Ok(Ok(Some(Arc::new(Value::Number(n)).into())))
             } else {
                 Err(de::Error::invalid_type(
@@ -1419,7 +1508,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
             }
         }
         Value::Array(arr) => {
-            if is_valid {
+            if valid {
                 Ok(Ok(Some(Arc::new(Value::Array(arr)).into())))
             } else {
                 Err(de::Error::invalid_type(
@@ -1429,7 +1518,7 @@ fn deserialize_annotation_or_error<'de, D: Deserializer<'de>>(
             }
         }
         Value::Object(obj) => {
-            if is_valid {
+            if valid {
                 Ok(Ok(Some(Arc::new(Value::Object(obj)).into())))
             } else {
                 Err(de::Error::invalid_type(
@@ -1454,20 +1543,20 @@ fn serialize_annotation_or_error<'v, S: SerializeMap>(
 }
 
 fn serialize_flag<S: SerializeMap>(s: &mut S, flag: &Flag<'_>) -> Result<(), S::Error> {
-    s.serialize_entry(VALID, &flag.is_valid)?;
+    s.serialize_entry(VALID, &flag.valid)?;
     serialize_additional_props(s, flag.additional_props.iter())?;
     Ok(())
 }
 
 fn serialize_basic<S: SerializeMap>(s: &mut S, basic: &Basic<'_>) -> Result<(), S::Error> {
-    s.serialize_entry(VALID, &basic.is_valid)?;
-    serialize_nodes(s, &basic.nodes, basic.is_valid)?;
+    s.serialize_entry(VALID, &basic.valid)?;
+    serialize_nodes(s, &basic.nodes, basic.valid)?;
     serialize_additional_props(s, basic.additional_props.iter())?;
     Ok(())
 }
 
 fn serialize_detailed<S: SerializeMap>(s: &mut S, detailed: &Detailed<'_>) -> Result<(), S::Error> {
-    s.serialize_entry(VALID, &detailed.is_valid)?;
+    s.serialize_entry(VALID, &detailed.valid)?;
     serialize_annotation_or_error(s, detailed.annotation_or_error.as_ref())?;
     s.serialize_entry(INSTANCE_LOCATION, &detailed.instance_location)?;
     s.serialize_entry(KEYWORD_LOCATION, &detailed.keyword_location)?;
@@ -1476,12 +1565,12 @@ fn serialize_detailed<S: SerializeMap>(s: &mut S, detailed: &Detailed<'_>) -> Re
         ABSOLUTE_KEYWORD_LOCATION,
         detailed.absolute_keyword_location.as_ref(),
     )?;
-    serialize_nodes(s, &detailed.nodes, detailed.is_valid)?;
+    serialize_nodes(s, &detailed.nodes, detailed.valid)?;
     serialize_additional_props(s, detailed.additional_props.iter())?;
     Ok(())
 }
 fn serialize_verbose<S: SerializeMap>(s: &mut S, verbose: &Verbose<'_>) -> Result<(), S::Error> {
-    s.serialize_entry(VALID, &verbose.is_valid)?;
+    s.serialize_entry(VALID, &verbose.valid)?;
     serialize_annotation_or_error(s, verbose.annotation_or_error.as_ref())?;
     s.serialize_entry(INSTANCE_LOCATION, &verbose.instance_location)?;
     s.serialize_entry(KEYWORD_LOCATION, &verbose.keyword_location)?;
@@ -1490,7 +1579,7 @@ fn serialize_verbose<S: SerializeMap>(s: &mut S, verbose: &Verbose<'_>) -> Resul
         ABSOLUTE_KEYWORD_LOCATION,
         verbose.absolute_keyword_location.as_ref(),
     )?;
-    serialize_nodes(s, &verbose.nodes, verbose.is_valid)?;
+    serialize_nodes(s, &verbose.nodes, verbose.valid)?;
     serialize_additional_props(s, verbose.additional_props.iter())?;
     Ok(())
 }

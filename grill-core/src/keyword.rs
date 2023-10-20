@@ -33,30 +33,32 @@ use std::{
 
 #[macro_export]
 macro_rules! define_translate {
-    ($error:ident) => {
-        #[derive(Clone)]
-        pub enum Translate {
-            Closure(
-                ::std::sync::Arc<
-                    dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
-                >,
-            ),
-            Pointer(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
-        }
-        impl Translate {
-            pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
-                match self {
-                    Translate::Closure(c) => c(f, v),
-                    Translate::Pointer(p) => p(f, v),
+    ($ident:ident) => {
+        paste::paste!{
+            #[derive(Clone)]
+            pub enum [< Translate $ident >]{
+                Closure(
+                    ::std::sync::Arc<
+                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$ident) -> ::std::fmt::Result,
+                    >,
+                ),
+                Pointer(fn(&mut ::std::fmt::Formatter, &$ident) -> std::fmt::Result),
+            }
+            impl [< Translate $ident>]{
+                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$ident) -> ::std::fmt::Result {
+                    match self {
+                        Self::Closure(c) => c(f, v),
+                        Self::Pointer(p) => p(f, v),
+                    }
                 }
             }
-        }
 
-        impl ::std::fmt::Debug for Translate {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                match self {
-                    Self::Closure(_) => f.debug_tuple("Closure").finish(),
-                    Self::Pointer(_) => f.debug_tuple("Pointer").finish(),
+            impl ::std::fmt::Debug for [< Translate $ident >] {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    match self {
+                        Self::Closure(_) => f.debug_tuple("Closure").finish(),
+                        Self::Pointer(_) => f.debug_tuple("Pointer").finish(),
+                    }
                 }
             }
         }
@@ -147,7 +149,7 @@ impl<'i> Compile<'i> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// Contains global and evaluation level [`State`], schemas, and location
+/// Contains global state, evaluation level state, schemas, and location
 /// information needed to [`evaluate`](`crate::Interrogator::evaluate`) a
 /// schema.
 pub struct Context<'i> {
@@ -190,7 +192,7 @@ impl<'s> Context<'s> {
 
     /// Mutable reference to the eval local state [`AnyMap`].
     ///
-    /// This does not include the [`global_state`].
+    /// This does not include the [`global_state`](`Context::global_state`).
     #[must_use]
     pub fn global_state(&self) -> &AnyMap {
         self.global_state
@@ -198,7 +200,7 @@ impl<'s> Context<'s> {
 
     /// Mutable reference to the eval local state [`AnyMap`].
     ///
-    /// This does not include the [`global_state`].
+    /// This does not include the [`global_state`](`Context::global_state`).
     pub fn eval_state(&mut self) -> &AnyMap {
         self.eval_state
     }
@@ -227,6 +229,7 @@ impl<'s> Context<'s> {
         let op = if is_valid { Ok(None) } else { Err(None) };
         let mut output = self.create_output(None, op, true);
         output.append(nodes.into_iter());
+        output.set_valid(is_valid);
         output
     }
 
@@ -353,12 +356,15 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// keywords.
     fn kind(&self) -> Kind;
 
-    /// For each `Schema` compiled by the [`Interrogator`], this `Keyword` is
-    /// cloned and [`setup`] is called.
+    /// Each `Schema` compiled by the [`Interrogator`](`crate::Interrogator`)
+    /// that has a [`Dialect`](`crate::schema::Dialect`) containing a fresh copy
+    /// of this `Keyword` will call `setup` with the `Schema` and `Compile`
+    /// context.
     ///
     /// If the keyword is applicable to the given [`Schema`], it must return
-    /// `true`. A return value of `false` indicates that [`evaluate`](`Self::evaluate`) should not
-    /// be called for the given [`Schema`].
+    /// `true`. A return value of `false` indicates that
+    /// [`evaluate`](`Keyword::evaluate`) should not be called for the given
+    /// [`Schema`].
     fn setup<'i>(
         &mut self,
         compile: &mut Compile<'i>,
@@ -386,11 +392,11 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
         Err(Unimplemented)
     }
 
-    /// Attempts to identify the schema based on the
-    /// [`Dialect`](`crate::dialect::Dialect`).
+    /// Attempts to identify the schema based on the [`Dialect`](`crate::schema::Dialect`).
     ///
     /// # Convention
-    /// At least `Keyword` must implement the method `identify` for a given `Dialect`.
+    /// At least `Keyword` must implement the method `identify` for a given
+    /// `Dialect`.
     ///
     /// # Example
     /// ```rust

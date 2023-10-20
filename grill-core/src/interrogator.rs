@@ -19,9 +19,7 @@ use crate::{
         },
         Dialect, Dialects, Key, Schema, Schemas,
     },
-    source::{
-        deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, SourceKey, Sources, Src,
-    },
+    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources, Src},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
 };
 

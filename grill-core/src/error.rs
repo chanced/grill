@@ -186,7 +186,7 @@ pub enum AnchorError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// An error occurred parsing or resolving a JSON [`Pointer`](jsonptr::Pointer).
+/// An error occurred parsing or resolving a JSON [`Pointer`].
 #[derive(Debug, Error)]
 pub enum PointerError {
     #[error(transparent)]
@@ -787,7 +787,7 @@ pub enum CompileError {
     #[error(transparent)]
     DialectNotKnown(#[from] DialectUnknownError),
 
-    /// Failed to parse a [`Uri`](crate::uri::Uri) or
+    /// Failed to parse a [`Uri`] or
     /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
     #[error(transparent)]
     FailedToParseUri(#[from] UriError),
@@ -807,7 +807,7 @@ pub enum CompileError {
 
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
-    /// schema's path as a JSON [`Pointer`](jsonptr::Pointer).
+    /// schema's path as a JSON [`Pointer`].
     #[error(transparent)]
     LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
 
@@ -997,12 +997,11 @@ pub enum UriError {
     NotAbsolute(Uri),
 
     /// An issue occurred while setting the Authority of a
-    /// [`Uri`](crate::uri::Uri) or [`RelativeUri`](crate::uri::RelativeUri).
+    /// [`Uri`] or [`RelativeUri`](crate::uri::RelativeUri).
     #[error(transparent)]
     MalformedAuthority(#[from] AuthorityError),
 
-    /// The scheme of a [`Uri`](crate::uri::Uri) or
-    /// [`AbsoluteUri`](crate::uri::AbsoluteUri) is malformed.
+    /// The scheme of a [`Uri`] or [`AbsoluteUri`] is malformed.
     #[error("invalid scheme: {0}")]
     InvalidScheme(String),
 }
@@ -1105,7 +1104,7 @@ impl UriError {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-/// Returned from `set_authority` on [`Uri`](crate::uri::Uri), [`AbsoluteUri`](crate::uri::AbsoluteUri), and [`RelativeUri`](crate::uri::RelativeUri)
+/// Returned from `set_authority` on [`Uri`], [`AbsoluteUri`], and [`RelativeUri`]
 #[derive(Debug, Clone, Error)]
 #[error("invalid authority: {0}")]
 pub enum AuthorityError {

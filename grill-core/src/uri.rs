@@ -663,7 +663,7 @@ impl AbsoluteUri {
     /// it exists.
     ///
     /// # Errors
-    /// Returns [`UriError::Urn`] if the [`AbsoluteUri`] is a [`Urn`](`urn::Urn`) and
+    /// Returns [`UriError::FailedToParseUrn`] if the [`AbsoluteUri`] is a [`Urn`] and
     /// the fragment is not a valid [`Urn`] fragment.
     pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<Option<String>, UriError> {
         match self {
@@ -681,8 +681,8 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns the path ([`Url`](crate::uri::Url)) or Name Specific String
-    /// ([`Urn`](crate::uri::Urn)
+    /// Returns the path ([`Url`]) or Name Specific String
+    /// ([`Urn`]
     #[must_use]
     pub fn path_or_nss(&self) -> &str {
         match self {
@@ -895,19 +895,19 @@ impl AbsoluteUri {
         }
     }
     /// Sets the scheme of the `AbsoluteUri` and returns the previous scheme. If
-    /// this `AbsoluteUri` is an [`Urn`](`urn::Urn`), then a `scheme` value of
+    /// this `AbsoluteUri` is an [`Urn`], then a `scheme` value of
     /// anything other than `"urn"` will result in the URN being parsed as a
-    /// URL. If the `AbsoluteUri` is a [`Url`](`url::Url`), then a scheme value
+    /// URL. If the `AbsoluteUri` is a [`Url`], then a scheme value
     /// of anything other than `"urn"` will result in the URL being parsed as a
-    /// [`Urn`](crate::uri::Urn).
+    /// [`Urn`].
     ///
     /// # Errors
     /// Returns a [`UriError`] if:
     /// - the scheme is invalid
-    /// - the `AbsoluteUri` is currently an [`Urn`](`urn::Urn`), the value of
+    /// - the `AbsoluteUri` is currently an [`Urn`], the value of
     ///  `scheme` is something other than `"urn"`, and the URN cannot be parsed
     ///  as a URL.
-    /// - the `AbsoluteUri` is currently an [`Url`](`url::Url`), the value of
+    /// - the `AbsoluteUri` is currently an [`Url`], the value of
     ///   `scheme` is `"urn"`, and the URL cannot be parsed as a URN.
     pub fn set_scheme(&mut self, scheme: &str) -> Result<String, UriError> {
         let scheme = scheme.trim_end_matches('/').trim_end_matches(':');
@@ -2136,7 +2136,7 @@ impl<'a> UriRef<'a> {
         QueryParameters::new(self.query()).unwrap()
     }
 
-    /// Returns the path [`normalized`](super::normalize) by removing dot segments, i.e. `'.'`,
+    /// Returns the path [`normalize`]d by removing dot segments, i.e. `'.'`,
     /// `'..'`.
     ///
     /// # Example
@@ -2147,7 +2147,7 @@ impl<'a> UriRef<'a> {
     /// let normalized = uri_ref.path_normalized();
     /// assert_eq!(normalized, "/bar");
     /// ```
-    /// [`normalize`]:super::normalize
+    /// [`normalize`]
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
         normalize(self.path_or_nss())

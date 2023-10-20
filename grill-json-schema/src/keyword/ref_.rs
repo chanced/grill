@@ -92,7 +92,7 @@ impl keyword::Keyword for Keyword {
             .into()
     }
 
-    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
+    /// Returns a list of [`Ref`]s to other
     /// schemas that `schema` depends on.
     fn refs(&self, schema: &Value) -> Result<Result<Vec<Ref>, RefError>, Unimplemented> {
         Ok(self.get_ref(schema))

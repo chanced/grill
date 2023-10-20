@@ -157,7 +157,7 @@ impl Dialect {
     }
 
     /// Attempts to locate nested schemas within `source` by calling
-    /// [`Keyword::subschemas`](`crate::Keyword::subschemas`) for each attached
+    /// [`Keyword::subschemas`] for each attached
     /// `Keyword` of this `Dialect`.
     ///
     #[must_use]
@@ -200,13 +200,6 @@ impl Dialect {
     }
 
     /// Determines if the schema is pertinent to this `Dialect`.
-    ///
-    /// # Convention
-    /// Exactly one `Keyword` must implement `is_pertinent_to` for a given
-    ///
-    /// `Dialect`. It **must** be the **first** (index: `0`) `Keyword` in the
-    /// [`Dialect`](`crate::dialect::Dialect`)'s
-    /// [`Keywords`](`crate::dialect::Keywords`).
     #[must_use]
     pub fn is_pertinent_to(&self, schema: &Value) -> bool {
         for idx in &*self.dialect_indexes {
@@ -341,7 +334,7 @@ impl Dialects {
         })
     }
 
-    /// Returns the [`Dialect`](crate::dialect::Dialect).
+    /// Returns the [`Dialect`].
     #[must_use]
     pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect> {
         self.index_of(id).map(|idx| &self.dialects[idx])
@@ -357,7 +350,7 @@ impl Dialects {
 
     /// Returns the [`Dialect`] that is determined pertinent to the schema based
     /// upon the first [`Keyword`] in each
-    /// [`Dialect`](`crate::dialect::Dialect`) or `None` if a [`Dialect`] cannot
+    /// [`Dialect`] or `None` if a [`Dialect`] cannot
     /// be confidently determined.
     #[must_use]
     pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect> {
@@ -378,7 +371,7 @@ impl Dialects {
     /// Appends a [`Dialect`].
     ///
     /// # Errors
-    /// Returns the [`DialectExists`] if a `Dialect` already exists with the same `id`.
+    /// Returns the [`DialectExistsError`] if a `Dialect` already exists with the same `id`.
     pub fn push(&mut self, dialect: Dialect) -> Result<(), DialectExistsError> {
         if self.contains(&dialect.id) {
             return Err(DialectExistsError {
@@ -407,7 +400,7 @@ impl Dialects {
             .map_or(self.default, |d| self.position(d).unwrap())
     }
 
-    /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`](`crate::dialect::Dialect`).
+    /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`].
     pub fn source_ids(&self) -> impl Iterator<Item = &AbsoluteUri> {
         self.dialects.iter().map(|d| &d.id)
     }
@@ -423,14 +416,14 @@ impl Dialects {
         result
     }
 
-    /// Returns a slice of [`Dialect`](`crate::dialect::Dialect`).
+    /// Returns a slice of [`Dialect`].
     #[must_use]
     pub fn as_slice(&self) -> &[Dialect] {
         &self.dialects
     }
 
     /// Returns the index (`usize`) of the default.
-    /// [`Dialect`](`crate::dialect::Dialect`)
+    /// [`Dialect`]
     #[must_use]
     pub fn default_index(&self) -> usize {
         self.default
@@ -440,7 +433,7 @@ impl Dialects {
         self.dialects.iter()
     }
 
-    /// Returns the primary [`Dialect`](`crate::dialect::Dialect`).
+    /// Returns the primary [`Dialect`].
     #[must_use]
     pub fn primary(&self) -> &Dialect {
         &self.dialects[self.default]
