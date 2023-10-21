@@ -12,6 +12,8 @@ use grill_core::{
 use jsonptr::{Pointer, Token};
 use serde_json::Value;
 
+define_translate!(PropertiesInvalid, translate_properties_invalid_en);
+
 #[derive(Debug, Clone)]
 pub struct Properties {
     subschemas: AHashMap<String, (Pointer, Key)>,
@@ -72,7 +74,7 @@ impl keyword::Keyword for Properties {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
-        let mut output = ctx.annotate(PROPERTIES, None);
+        let mut output = ctx.annotate(Some(PROPERTIES), None);
         let mut is_valid = true;
         let mut invalid = Vec::with_capacity(self.subschemas.len());
         for (prop, value) in obj {
@@ -105,9 +107,7 @@ pub struct PropertiesInvalid<'v> {
     pub translate: TranslatePropertiesInvalid,
 }
 
-define_translate!(PropertiesInvalid, translate_properties_invalid_default_en);
-
-pub fn translate_properties_invalid_default_en(
+pub fn translate_properties_invalid_en(
     f: &mut std::fmt::Formatter<'_>,
     invalid: &PropertiesInvalid<'_>,
 ) -> std::fmt::Result {
@@ -253,6 +253,6 @@ mod tests {
         let output = interrogator
             .evaluate(key, Structure::Verbose, &invalid)
             .unwrap();
-        println!("{output}");
+        assert!(!output.is_valid());
     }
 }

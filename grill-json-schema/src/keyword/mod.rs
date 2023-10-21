@@ -1,3 +1,4 @@
+pub mod boolean;
 pub mod comment;
 pub mod const_;
 pub mod defs;

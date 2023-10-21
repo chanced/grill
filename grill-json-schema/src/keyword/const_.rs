@@ -76,28 +76,28 @@ impl keyword::Keyword for Const {
             if let Some(expected_number) = self.expected_number.as_deref() {
                 let actual_number = parse_rational(n.as_str())?;
                 if &actual_number == expected_number {
-                    return Ok(Some(ctx.annotate(CONST, Some(value.into()))));
+                    return Ok(Some(ctx.annotate(Some(CONST), Some(value.into()))));
                 }
                 return Ok(Some(ctx.error(
-                    CONST,
-                    ConstInvalid {
+                    Some(CONST),
+                    Some(Box::new(ConstInvalid {
                         expected: self.expected.clone(),
                         actual: Cow::Borrowed(value),
                         translate: self.translate.clone(),
-                    },
+                    })),
                 )));
             }
         }
         if self.expected.as_ref() == value {
-            Ok(Some(ctx.annotate(CONST, Some(value.into()))))
+            Ok(Some(ctx.annotate(Some(CONST), Some(value.into()))))
         } else {
             Ok(Some(ctx.error(
-                CONST,
-                ConstInvalid {
+                Some(CONST),
+                Some(Box::new(ConstInvalid {
                     expected: self.expected.clone(),
                     actual: Cow::Borrowed(value),
                     translate: self.translate.clone(),
-                },
+                })),
             )))
         }
     }

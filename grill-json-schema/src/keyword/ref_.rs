@@ -85,7 +85,7 @@ impl keyword::Keyword for Keyword {
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         if !self.must_eval {
             return ctx
-                .annotate(self.keyword, Some(self.ref_uri_value.clone().into()))
+                .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))
                 .into();
         }
         ctx.evaluate(self.ref_key, None, &self.keyword_ptr, value)?

@@ -8,7 +8,7 @@ use self::cache::{Numbers, Values};
 use crate::{
     anymap::AnyMap,
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, NumberError, RefError},
-    output::{self, Annotation, AnnotationOrError, Error, Translator},
+    output::{self, Annotation, AnnotationOrError, BoxedError, Translator},
     schema::{Anchor, Identifier, Ref, Schemas},
     source::Sources,
     AbsoluteUri, Key, Output, Schema, Structure, Uri,
@@ -212,17 +212,18 @@ impl<'s> Context<'s> {
     #[must_use]
     pub fn annotate<'v>(
         &mut self,
-        keyword: &'static str,
+        keyword: Option<&'static str>,
         annotation: Option<Annotation<'v>>,
     ) -> Output<'v> {
-        self.create_output(Some(keyword), Ok(annotation), false)
+        self.create_output(keyword, Ok(annotation), false)
     }
 
-    pub fn error<'v, E>(&mut self, keyword: &'static str, error: E) -> Output<'v>
-    where
-        E: 'v + Error<'v>,
-    {
-        self.create_output(Some(keyword), Err(Some(Box::new(error))), false)
+    pub fn error<'v>(
+        &mut self,
+        keyword: Option<&'static str>,
+        error: Option<BoxedError<'v>>,
+    ) -> Output<'v> {
+        self.create_output(keyword, Err(error), false)
     }
 
     pub fn transient<'v>(
@@ -319,6 +320,9 @@ pub enum Kind {
     /// Depending on the specified `Structure`, the [`Output`] may be expanded
     /// into multiple nodes.
     Composite(&'static [&'static str]),
+
+    /// The [`Keyword`] is responsible for handling `true` or `false` Schemas.
+    BooleanSchema(bool),
 }
 
 impl PartialEq<&str> for Kind {
@@ -409,9 +413,10 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     ///
     /// let id_keyword = Id::new("$id", false);
     /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
-    ///     .unwrap()
-    ///     .unwrap();
-    /// assert_eq!(&id.unwrap(), &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
+    ///     .unwrap()  // unwraps `Result<Result<Option<Identifier>, IdentifyError>, Unimplemented>`
+    ///     .unwrap()  // unwraps `Result<Option<Identifier>, Identifier>`
+    ///     .unwrap(); // unwraps `Option<Identifier>`
+    /// assert_eq!(&id, &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
     /// ```
     ///
     fn identify(

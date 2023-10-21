@@ -40,8 +40,9 @@ impl keyword::Keyword for Keyword {
         ctx: &'i mut keyword::Context,
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
-        Ok(Some(
-            ctx.annotate(READ_ONLY, Some(self.value.clone().into())),
-        ))
+        Ok(Some(ctx.annotate(
+            Some(READ_ONLY),
+            Some(self.value.clone().into()),
+        )))
     }
 }
