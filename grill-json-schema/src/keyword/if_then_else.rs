@@ -1,7 +1,7 @@
 use grill_core::{
     error::{CompileError, EvaluateError},
     keyword::{static_pointer_fn, Compile, Context, Keyword, Kind},
-    output::Output,
+    output::{self, Output},
     Key, Schema,
 };
 use serde_json::Value;
@@ -47,7 +47,40 @@ impl Keyword for IfThenElse {
         ctx: &'i mut Context,
         value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
-        todo!()
+        let if_output = ctx.probe(self.if_key, None, if_pointer(), value)?;
+        let mut outputs = vec![if_output];
+        let mut is_valid = true;
+        if outputs[0].is_valid() && self.then_key.is_some() {
+            let then_key = self.then_key.unwrap();
+            let output = ctx.evaluate(then_key, None, then_pointer(), value)?;
+            is_valid = output.is_valid();
+            outputs.push(output);
+        } else if outputs[0].is_invalid() && self.else_key.is_some() {
+            let else_key = self.else_key.unwrap();
+            let output = ctx.evaluate(else_key, None, else_pointer(), value)?;
+            is_valid = output.is_valid();
+            outputs.push(output);
+        }
+        Ok(Some(ctx.transient(is_valid, outputs)))
+    }
+
+    fn subschemas(
+        &self,
+        schema: &Value,
+    ) -> Result<Vec<jsonptr::Pointer>, grill_core::keyword::Unimplemented> {
+        let mut subschemas = Vec::new();
+        if schema.get(IF).is_some() {
+            subschemas.push(if_pointer().clone());
+        } else {
+            return Ok(Vec::default());
+        }
+        if schema.get(THEN).is_some() {
+            subschemas.push(then_pointer().clone());
+        }
+        if schema.get(ELSE).is_some() {
+            subschemas.push(else_pointer().clone());
+        }
+        Ok(subschemas)
     }
 }
 
@@ -60,19 +93,119 @@ impl IfThenElse {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
+    use crate::Build;
+
     use super::*;
-    use grill_core::schema;
-    use grill_core::test;
-    use grill_core::Interrogator;
+    use grill_core::{Interrogator, Structure};
     use serde_json::json;
 
-    #[test]
-    fn teset_setup() {
-        test::build_dialect();
+    #[tokio::test]
+    async fn teset_if_then_else_setup() {
         let schema = json!({"if": {} });
-        let interrogator = test::build_interrogator(
-            [("https://example.com/schema", schema)],
-            [IfThenElse::default()],
-        );
+        let mut interrogator = Interrogator::build()
+            .json_schema_2020_12()
+            .source_value("https://example.com/schema", Cow::Owned(schema))
+            .unwrap()
+            .finish()
+            .await
+            .unwrap();
+        let key = interrogator
+            .compile("https://example.com/schema")
+            .await
+            .unwrap();
+        assert!(interrogator
+            .schema(key)
+            .unwrap()
+            .keywords
+            .iter()
+            .any(|k| k.kind() == Kind::Composite(&["if", "then", "else"])));
+
+        let schema = json!({"else": {}, "then": {}});
+        let mut interrogator = Interrogator::build()
+            .json_schema_2020_12()
+            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .unwrap()
+            .finish()
+            .await
+            .unwrap();
+        let key = interrogator
+            .compile("https://example.com/schema")
+            .await
+            .unwrap();
+        assert!(!interrogator
+            .schema(key)
+            .unwrap()
+            .keywords
+            .iter()
+            .any(|k| k.kind() == Kind::Composite(&["if", "then", "else"])));
+    }
+
+    #[tokio::test]
+    async fn teset_if_then_else_evaluate() {
+        let schema = json!({
+            "if": true,
+            "then": {
+                "const": 34.34
+            },
+            "else": {
+                "const": 34
+            }
+        });
+        let mut interrogator = Interrogator::build()
+            .json_schema_2020_12()
+            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .unwrap()
+            .finish()
+            .await
+            .unwrap();
+        let key = interrogator
+            .compile("https://example.com/schema")
+            .await
+            .unwrap();
+
+        let value = json!(34);
+        let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
+        println!("{o}");
+        assert!(!o.is_valid());
+        let value = json!(34.34);
+        let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
+        println!("{o}");
+        assert!(o.is_valid());
+
+        let schema = json!({
+            "if": false,
+            "then": {
+                "const": 34.34
+            },
+            "else": {
+                "const": 34
+            }
+        });
+        let mut interrogator = Interrogator::build()
+            .json_schema_2020_12()
+            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .unwrap()
+            .finish()
+            .await
+            .unwrap();
+        let key = interrogator
+            .compile("https://example.com/schema")
+            .await
+            .unwrap();
+
+        let value = json!(34.34);
+        let o = interrogator
+            .evaluate(key, Structure::Verbose, &value)
+            .unwrap();
+        println!("{o}");
+        assert!(!o.is_valid());
+        let value = json!(34);
+        let o = interrogator
+            .evaluate(key, Structure::Verbose, &value)
+            .unwrap();
+        assert!(o.is_valid());
+        println!("{o}");
     }
 }

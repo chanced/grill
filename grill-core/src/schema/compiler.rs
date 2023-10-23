@@ -322,7 +322,6 @@ impl<'i> Compiler<'i> {
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
-            println!("SETUP KEYWORDS: {}", schema.absolute_uri());
             let mut keywords = Vec::new();
             for mut keyword in dialect.keywords().iter().cloned() {
                 let mut compile = Compile {

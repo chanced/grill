@@ -92,7 +92,10 @@ impl Values {
         let number = number.as_str();
         #[allow(clippy::map_unwrap_or)]
         self.numbers
-            .binary_search_by_key(&number, |v| v.as_str().unwrap())
+            .binary_search_by_key(&number, |v| {
+                let number = v.as_number().unwrap();
+                number.as_str()
+            })
             .map(|index| self.numbers[index].clone())
             .unwrap_or_else(|index| {
                 self.numbers.insert(index, Arc::new(value.clone()));

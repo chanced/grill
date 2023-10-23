@@ -7,9 +7,6 @@ use crate::{
     AbsoluteUri,
 };
 
-#[test]
-fn noop() {}
-
 #[must_use]
 pub fn build_dialect() -> dialect::Build {
     let uri = AbsoluteUri::parse("https://json-schema.org/draft/2020-12/schema").unwrap();

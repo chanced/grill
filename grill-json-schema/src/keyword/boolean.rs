@@ -1,6 +1,6 @@
 use grill_core::keyword::{Keyword, Kind};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Boolean {
     bool: bool,
 }
@@ -14,6 +14,9 @@ impl Keyword for Boolean {
         _compile: &mut grill_core::keyword::Compile<'i>,
         schema: grill_core::Schema<'i>,
     ) -> Result<bool, grill_core::error::CompileError> {
+        if let Some(b) = schema.as_bool() {
+            self.bool = b;
+        }
         Ok(schema.is_boolean())
     }
 

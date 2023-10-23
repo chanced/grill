@@ -3189,7 +3189,6 @@ pub fn normalize(path: &str) -> Cow<'_, str> {
     let mut normalized = false;
     let mut buf = PathBuf::new();
     for segment in PathSegments::new(path) {
-        println!("{segment:?}");
         match segment {
             PathSegment::Parent => {
                 normalized = true;
@@ -3254,7 +3253,6 @@ pub fn merge(base: &str, path: &str) -> String {
 #[must_use]
 pub fn resolve(base: &str, path: &str) -> String {
     let buf = merge(base, path);
-    println!("buf: {buf}");
     normalize(&buf).into_owned()
 }
 
@@ -3319,8 +3317,6 @@ mod tests {
             ("g#s/../x", "http://a/b/c/g#s/../x"),
         ];
         for (i, (input, expected)) in tests.into_iter().enumerate() {
-            println!("{i}");
-
             let input = Uri::parse(input);
             if let Err(e) = &input {
                 println!(

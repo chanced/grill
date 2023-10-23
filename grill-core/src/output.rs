@@ -16,8 +16,6 @@ use std::{
     sync::Arc,
 };
 
-const ERROR_MSG: &str = "one or more validation errors occurred";
-const SUCCESS_MSG: &str = "validation passed";
 const EXPECTED_FMT: &str = "a string equal to \"flag\", \"basic\", \"detailed\", or \"verbose\"";
 const INSTANCE_LOCATION: &str = "instanceLocation";
 const ABSOLUTE_KEYWORD_LOCATION: &str = "absoluteKeywordLocation";
@@ -502,6 +500,10 @@ impl<'v> Output<'v> {
     }
 
     #[must_use]
+    pub fn is_invalid(&self) -> bool {
+        !self.is_valid()
+    }
+    #[must_use]
     pub fn valid(&self) -> bool {
         self.is_valid()
     }
@@ -842,11 +844,7 @@ impl Serialize for Flag<'_> {
 
 impl fmt::Display for Flag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.valid {
-            write!(f, "{SUCCESS_MSG}")
-        } else {
-            write!(f, "{ERROR_MSG}")
-        }
+        write_json(f, self)
     }
 }
 
@@ -1279,9 +1277,7 @@ impl<'v> Verbose<'v> {
 
 impl<'v> fmt::Display for Verbose<'v> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        serde_json::to_string_pretty(self)
-            .map_err(|_| fmt::Error)?
-            .fmt(f)
+        write_json(f, self)
     }
 }
 

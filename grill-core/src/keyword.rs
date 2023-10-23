@@ -212,6 +212,37 @@ impl<'s> Context<'s> {
         if let Some(instance) = instance {
             instance_location.push_back(instance.into());
         }
+        self.evaluated.insert(&instance_location);
+        let mut keyword_location = self.keyword_location.clone();
+        keyword_location.append(keyword);
+        self.schemas.evaluate(
+            self.structure,
+            key,
+            value,
+            instance_location,
+            keyword_location,
+            self.sources,
+            self.global_state,
+            self.eval_state,
+        )
+    }
+
+    /// Evaluates `value` against the schema with the given `key` but does not
+    /// mark the instance as evaluated.
+    ///
+    /// This is intended for use with `if` / `then` / `else` but may be used
+    /// in other cases.
+    pub fn probe<'v>(
+        &mut self,
+        key: Key,
+        instance: Option<&str>,
+        keyword: &Pointer,
+        value: &'v Value,
+    ) -> Result<Output<'v>, EvaluateError> {
+        let mut instance_location = self.instance_location.clone();
+        if let Some(instance) = instance {
+            instance_location.push_back(instance.into());
+        }
         let mut keyword_location = self.keyword_location.clone();
         keyword_location.append(keyword);
         self.schemas.evaluate(
@@ -279,8 +310,6 @@ impl<'s> Context<'s> {
         let mut keyword_location = self.keyword_location.clone();
         let mut absolute_keyword_location = self.absolute_keyword_location.clone();
 
-        self.evaluated.insert(&self.instance_location);
-
         if let Some(keyword) = keyword {
             let tok: Token = keyword.into();
             keyword_location.push_back(tok.clone());
@@ -339,7 +368,7 @@ impl Display for Unimplemented {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum Kind {
     /// The [`Keyword`] is singular, evaluating the logic of a specific
     /// JSON Schema Keyword.
@@ -377,7 +406,6 @@ impl From<&'static [&'static str]> for Kind {
         Kind::Composite(s)
     }
 }
-
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗

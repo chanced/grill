@@ -7,12 +7,11 @@ use serde_json::Value;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
-    schema::Ref,
     Key, Output, Schema, Uri,
 };
 
 #[derive(Debug, Clone, Default)]
-pub struct Keyword {
+pub struct Ref {
     pub keyword: &'static str,
     pub keyword_ptr: Pointer,
     /// The key of the referenced schema.
@@ -21,7 +20,7 @@ pub struct Keyword {
     pub must_eval: bool,
 }
 
-impl Keyword {
+impl Ref {
     /// Creates a new [`Keyword`] for handling direct references which may or
     /// may not evaluate, as determined by the `must_eval` parameter.
     #[must_use]
@@ -34,7 +33,7 @@ impl Keyword {
             must_eval,
         }
     }
-    fn get_ref(&self, schema: &Value) -> Result<Vec<Ref>, RefError> {
+    fn get_ref(&self, schema: &Value) -> Result<Vec<grill_core::schema::Ref>, RefError> {
         let Some(v) = schema.get(self.keyword) else {
             return Ok(Vec::default());
         };
@@ -46,14 +45,14 @@ impl Keyword {
             .into());
         };
         let uri = Uri::parse(uri)?;
-        Ok(vec![Ref {
+        Ok(vec![grill_core::schema::Ref {
             uri,
             keyword: self.keyword,
         }])
     }
 }
 
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for Ref {
     fn kind(&self) -> Kind {
         Kind::Single(self.keyword)
     }
@@ -94,7 +93,7 @@ impl keyword::Keyword for Keyword {
 
     /// Returns a list of [`Ref`]s to other
     /// schemas that `schema` depends on.
-    fn refs(&self, schema: &Value) -> Result<Result<Vec<Ref>, RefError>, Unimplemented> {
+    fn refs(&self, schema: &Value) -> Result<Result<Vec<grill_core::schema::Ref>, RefError>, Unimplemented> {
         Ok(self.get_ref(schema))
     }
 }
@@ -118,7 +117,7 @@ mod tests {
             .with_keyword(schema::Schema::new(SCHEMA, false))
             .with_keyword(const_::Const::new(None))
             .with_keyword(id::Id::new(ID, false))
-            .with_keyword(Keyword::new(REF, true))
+            .with_keyword(Ref::new(REF, true))
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();

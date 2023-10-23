@@ -51,10 +51,6 @@ impl keyword::Keyword for Const {
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
-        println!("setup const");
-        println!("{}", schema.absolute_uri());
-        println!("{}", serde_json::to_string_pretty(&schema).unwrap());
-
         let Some(c) = schema.get(CONST) else {
             return Ok(false);
         };
@@ -87,6 +83,7 @@ impl keyword::Keyword for Const {
                 )));
             }
         }
+
         if self.expected.as_ref() == value {
             Ok(Some(ctx.annotate(Some(CONST), Some(value.into()))))
         } else {

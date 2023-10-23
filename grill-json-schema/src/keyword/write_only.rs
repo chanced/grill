@@ -8,10 +8,10 @@ use serde_json::Value;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Default)]
-pub struct Keyword {
+pub struct WriteOnly {
     pub value: Arc<Value>,
 }
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for WriteOnly {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(WRITE_ONLY)
     }

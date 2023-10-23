@@ -9,11 +9,11 @@ use std::sync::Arc;
 use crate::READ_ONLY;
 
 #[derive(Debug, Clone, Default)]
-pub struct Keyword {
+pub struct ReadOnly {
     pub value: Arc<Value>,
 }
 
-impl keyword::Keyword for Keyword {
+impl keyword::Keyword for ReadOnly {
     fn kind(&self) -> Kind {
         Kind::Single(READ_ONLY)
     }

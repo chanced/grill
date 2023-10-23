@@ -46,8 +46,6 @@ impl keyword::Keyword for Properties {
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
-        let j = serde_json::to_string_pretty(&schema).unwrap();
-        println!("{j}");
         let Some(value) = schema.get(PROPERTIES) else {
             return Ok(false);
         };
