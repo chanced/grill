@@ -38,8 +38,7 @@ impl Const {
         Self {
             expected: Arc::new(Value::Null),
             expected_number: None,
-            translate: translate
-                .unwrap_or(TranslateConstInvalid::Pointer(translate_const_invalid_en)),
+            translate: translate.unwrap_or_default(),
         }
     }
 }

@@ -25,8 +25,33 @@ use std::{
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
+║                          static_pointer_fn!                           ║
+║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+#[macro_export]
+macro_rules! static_pointer_fn {
+    ($vis:vis $ident:ident $path:literal) => {
+        paste::paste! {
+            pub fn [< $ident _pointer >]() -> &'static jsonptr::Pointer {
+                use ::once_cell::sync::Lazy;
+                static POINTER: Lazy<jsonptr::Pointer> = Lazy::new(|| jsonptr::Pointer::parse($path).unwrap());
+                &POINTER
+            }
+        }
+    };
+}
+
+pub use static_pointer_fn;
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
 ║                           define_translate!                           ║
-║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
+║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -42,13 +67,13 @@ macro_rules! define_translate {
                         dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$ident) -> ::std::fmt::Result,
                     >,
                 ),
-                Pointer(fn(&mut ::std::fmt::Formatter, &$ident) -> std::fmt::Result),
+                FnPtr(fn(&mut ::std::fmt::Formatter, &$ident) -> std::fmt::Result),
             }
             impl [< Translate $ident>]{
                 pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$ident) -> ::std::fmt::Result {
                     match self {
                         Self::Closure(c) => c(f, v),
-                        Self::Pointer(p) => p(f, v),
+                        Self::FnPtr(p) => p(f, v),
                     }
                 }
             }
@@ -56,13 +81,13 @@ macro_rules! define_translate {
                 fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                     match self {
                         Self::Closure(_) => f.debug_tuple("Closure").finish(),
-                        Self::Pointer(_) => f.debug_tuple("Pointer").finish(),
+                        Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
                     }
                 }
             }
             impl std::default::Default for [< Translate $ident >] {
                 fn default() -> Self {
-                    Self::Pointer($default)
+                    Self::FnPtr($default)
                 }
             }
         }
@@ -134,9 +159,16 @@ impl<'i> Compile<'i> {
             .ok_or(CompileError::SchemaNotFound(uri))
     }
 
-    pub fn subschema(&self, path: Pointer) -> Result<Key, CompileError> {
+    pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
         let mut uri = self.absolute_uri().clone();
-        uri.set_fragment(Some(&path))?;
+
+        if let Some(fragment) = uri.fragment() {
+            let mut ptr = fragment.parse::<Pointer>()?;
+            ptr.append(path);
+            uri.set_fragment(Some(&ptr))?;
+        } else {
+            uri.set_fragment(Some(path))?;
+        }
         self.schemas
             .get_key(&uri)
             .ok_or(CompileError::SchemaNotFound(uri))

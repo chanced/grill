@@ -60,7 +60,7 @@ impl keyword::Keyword for Properties {
         };
         for subschema in paths_of_properties(&schema) {
             let keyword = subschema.last().unwrap().decoded().to_string();
-            let key = compile.subschema(subschema.clone())?;
+            let key = compile.subschema(&subschema)?;
             self.subschemas.insert(keyword, (subschema, key));
         }
         Ok(true)
