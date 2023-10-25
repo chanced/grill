@@ -40,7 +40,7 @@ impl Ref {
         let Value::String(uri) = v else {
             return Err(InvalidTypeError {
                 expected: Expected::String,
-                actual: v.clone(),
+                actual: Box::new(v.clone()),
             }
             .into());
         };
@@ -69,7 +69,7 @@ impl keyword::Keyword for Ref {
         let Value::String(uri) = v else {
             return Err(InvalidTypeError {
                 expected: Expected::String,
-                actual: v.clone(),
+                actual: Box::new(v.clone()),
             }
             .into());
         };

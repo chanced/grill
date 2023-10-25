@@ -59,7 +59,7 @@ impl Keyword for PatternProperties {
         if !matches!(value, Value::Object(_)) {
             return Err(InvalidTypeError {
                 expected: Expected::Object,
-                actual: value.clone(),
+                actual: Box::new(value.clone()),
             }
             .into());
         };

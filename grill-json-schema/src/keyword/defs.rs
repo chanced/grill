@@ -4,17 +4,16 @@ use grill_core::{
     Output, Schema,
 };
 use serde_json::Value;
-use std::sync::Arc;
 
-use super::WRITE_ONLY;
+use super::DEFS;
 
+/// [`Keyword`] for `$defs`
 #[derive(Debug, Clone, Default)]
-pub struct Defs {
-    pub value: Arc<Value>,
-}
+pub struct Defs;
+
 impl keyword::Keyword for Defs {
     fn kind(&self) -> Kind {
-        Kind::Single(WRITE_ONLY)
+        Kind::Single(DEFS)
     }
     fn setup<'i>(
         &mut self,
@@ -29,5 +28,8 @@ impl keyword::Keyword for Defs {
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         Ok(None)
+    }
+    fn subschemas(&self, schema: &Value) -> Result<Vec<jsonptr::Pointer>, keyword::Unimplemented> {
+        Ok(grill_core::keyword::paths_of_object(DEFS, schema))
     }
 }

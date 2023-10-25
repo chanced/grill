@@ -914,7 +914,7 @@ pub struct InvalidTypeError {
     /// The expected type of value.
     pub expected: Expected,
     /// The actual value.
-    pub actual: Value,
+    pub actual: Box<Value>,
 }
 
 /// A [`Value`] was .
@@ -1310,6 +1310,7 @@ impl From<u64> for OverflowError<u64, { usize::MAX as u64 }> {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
+/// An error occurred while parsing a ref
 #[derive(Debug, Error)]
 pub enum RefError {
     /// The ref value was not a string.

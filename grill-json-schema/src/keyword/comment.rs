@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use grill_core::{
-    error::{CompileError, EvaluateError},
+    error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, Compile, Context, Kind},
     output::Output,
     Schema,
@@ -9,8 +9,12 @@ use grill_core::{
 
 use crate::keyword::COMMENT;
 
+/// [`Keyword`] for `$comment`
 #[derive(Debug, Default, Clone)]
-pub struct Comment;
+pub struct Comment {
+    /// the value of the `$comment` keyword
+    pub comment: String,
+}
 
 impl keyword::Keyword for Comment {
     fn kind(&self) -> Kind {
@@ -19,8 +23,20 @@ impl keyword::Keyword for Comment {
     fn setup<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
-        _schema: Schema<'i>,
+        schema: Schema<'i>,
     ) -> Result<bool, CompileError> {
+        if let Some(comment) = schema.get(COMMENT) {
+            if let Value::String(comment) = comment {
+                self.comment = comment.clone();
+            } else {
+                return Err(InvalidTypeError {
+                    expected: Expected::String,
+                    actual: Box::new(comment.clone()),
+                }
+                .into());
+            }
+            return Ok(true);
+        }
         Ok(false)
     }
     fn evaluate<'i, 'v>(

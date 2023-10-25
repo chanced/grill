@@ -282,7 +282,7 @@ impl Types {
             Value::Array(a) => Self::try_from_slice(value, a),
             _ => Err(InvalidTypeError {
                 expected: Expected::AnyOf(&[Expected::String, Expected::Array]),
-                actual: value.clone(),
+                actual: Box::new(value.clone()),
             }
             .into()),
         }
@@ -333,7 +333,7 @@ impl Types {
                 _ => {
                     return Err(InvalidTypeError {
                         expected: Expected::String,
-                        actual: entry.clone(),
+                        actual: Box::new(entry.clone()),
                     }
                     .into())
                 }
