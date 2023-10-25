@@ -3,7 +3,7 @@ pub mod iter;
 pub mod traverse;
 
 pub mod dialect;
-use ahash::AHashMap;
+
 pub use dialect::{Dialect, Dialects};
 use serde::{Serialize, Serializer};
 
@@ -14,7 +14,7 @@ use crate::{
     error::{
         CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
     },
-    keyword::{Context, Evaluated, Keyword},
+    keyword::{cache::Numbers, Context, Evaluated, Keyword},
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
@@ -25,7 +25,7 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{borrow::Cow, hash::Hash, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -209,7 +209,7 @@ impl Serialize for Schema<'_> {
 
 impl<'i> Schema<'i> {
     #[must_use]
-    pub fn make_owned(self) -> Schema<'static> {
+    pub fn to_owned(self) -> Schema<'static> {
         Schema {
             key: self.key,
             parent: self.parent,
@@ -276,7 +276,7 @@ impl<'i> Eq for Schema<'i> {}
 #[derive(Debug, Clone, Default)]
 struct Store {
     table: SlotMap<Key, CompiledSchema>,
-    index: AHashMap<AbsoluteUri, Key>,
+    index: HashMap<AbsoluteUri, Key>,
 }
 
 #[allow(clippy::unnecessary_box_returns)]
@@ -357,11 +357,13 @@ impl Schemas {
         instance_location: Pointer,
         keyword_location: Pointer,
         sources: &Sources,
+        evaluated: &mut Evaluated,
         global_state: &AnyMap,
         eval_state: &mut AnyMap,
+        global_numbers: &Numbers,
+        eval_numbers: &mut Numbers,
     ) -> Result<Output<'v>, EvaluateError> {
         let schema = self.get(key, sources)?;
-        let mut evaluated = Evaluated::new();
         let mut ctx = Context {
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
@@ -371,7 +373,9 @@ impl Schemas {
             sources,
             global_state,
             eval_state,
-            evaluated: &mut evaluated,
+            global_numbers,
+            eval_numbers,
+            evaluated,
         };
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(

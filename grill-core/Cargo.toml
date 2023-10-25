@@ -12,15 +12,13 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-ahash            = { workspace = true }
 anyhow           = { workspace = true }
 async-trait      = { workspace = true }
 derive_more      = { workspace = true }
 dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }
-fancy-regex      = { workspace = true }
-grill-macros     = { path = "../grill-macros" }
+grill-macros     = { workspace = true }
 inherent         = { workspace = true }
 jsonptr          = { workspace = true }
 lazy_static      = { workspace = true }

@@ -1,21 +1,25 @@
 use grill_core::{
     error::{CompileError, EvaluateError},
     keyword::{static_pointer_fn, Compile, Context, Keyword, Kind},
-    output::{self, Output},
+    output::Output,
     Key, Schema,
 };
 use serde_json::Value;
 
-use crate::{ELSE, IF, THEN};
+use super::{ELSE, IF, THEN};
 
 static_pointer_fn!(pub if "/if");
 static_pointer_fn!(pub then "/then");
 static_pointer_fn!(pub else "/else");
 
+/// [`Keyword`] for the `if`, `then`, and `else` keywords.
 #[derive(Debug, Clone, Default)]
 pub struct IfThenElse {
+    /// The key of the subschema for the `if` keyword.
     pub if_key: Key,
+    /// The key of the subschema for the `then` keyword.
     pub then_key: Option<Key>,
+    /// The key of the subschema for the `else` keyword.
     pub else_key: Option<Key>,
 }
 
@@ -84,13 +88,6 @@ impl Keyword for IfThenElse {
     }
 }
 
-impl IfThenElse {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -106,13 +103,13 @@ mod tests {
         let schema = json!({"if": {} });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://example.com/schema", Cow::Owned(schema))
+            .source_value("https://test.com/schema", Cow::Owned(schema))
             .unwrap()
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://example.com/schema")
+            .compile("https://test.com/schema")
             .await
             .unwrap();
         assert!(interrogator
@@ -125,13 +122,13 @@ mod tests {
         let schema = json!({"else": {}, "then": {}});
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
             .unwrap()
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://example.com/schema")
+            .compile("https://test.com/schema")
             .await
             .unwrap();
         assert!(!interrogator
@@ -155,13 +152,13 @@ mod tests {
         });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
             .unwrap()
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://example.com/schema")
+            .compile("https://test.com/schema")
             .await
             .unwrap();
 
@@ -185,13 +182,13 @@ mod tests {
         });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://example.com/schema", Cow::Owned(json!(schema)))
+            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
             .unwrap()
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://example.com/schema")
+            .compile("https://test.com/schema")
             .await
             .unwrap();
 

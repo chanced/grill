@@ -60,17 +60,21 @@ impl Hasher for TypeIdHasher {
         self.0
     }
 }
-
+/// A collection containing zero or one values for any given type and
+/// allowing convenient, type-safe access to those values.
+///
+/// sourced from [`anymap`](https://docs.rs/anymap/1.0.0-beta.2/anymap/index.html)
 #[derive(Clone, Debug, Default)]
 pub struct AnyMap {
     map: Map,
 }
 impl AnyMap {
+    /// Creates a new empty `AnyMap` collection
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
-
+    /// Gets the entry for the given type in the collection for in-place manipulation
     pub fn entry<T>(&mut self) -> Entry<'_, T>
     where
         T: 'static + Clone + Send + Sync,
@@ -78,6 +82,7 @@ impl AnyMap {
         self.map.entry(TypeId::of::<T>()).into()
     }
 
+    /// Returns true if the collection contains a value of type `T`.
     #[must_use]
     pub fn contains<T>(&self) -> bool
     where
@@ -86,6 +91,8 @@ impl AnyMap {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
+    /// Returns a reference to the value stored in the collection for the type
+    /// `T`, if it exists.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
     where
@@ -94,7 +101,8 @@ impl AnyMap {
         let v = self.map.get(&TypeId::of::<T>());
         v.map(|v| unsafe { v.downcast_ref_unchecked::<T>() })
     }
-
+    /// Returns a mutable reference to the value stored in the collection for
+    /// the type `T`, if it exists.
     pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
         T: 'static + Clone + Send + Sync,
@@ -103,7 +111,9 @@ impl AnyMap {
             .get_mut(&TypeId::of::<T>())
             .map(|v| unsafe { v.downcast_mut_unchecked() })
     }
-
+    /// Sets the value stored in the collection for the type `T`. If the
+    /// collection already had a value of type `T`, that value is returned.
+    /// Otherwise, `None` is returned.
     pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: 'static + Clone + std::fmt::Debug + Send + Sync,
@@ -112,18 +122,20 @@ impl AnyMap {
             .insert(TypeId::of::<T>(), Box::new(value))
             .map(|v| *unsafe { v.downcast_unchecked() })
     }
-
+    /// Returns the number of items in the collection.
     #[must_use]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
+    /// Returns true if there are no items in the collection.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 }
 
+/// A view into a single occupied location in an `AnyMap`.
 pub struct OccupiedEntry<'a, T> {
     inner: hash_map::OccupiedEntry<'a, TypeId, Box<dyn Item>>,
     _marker: std::marker::PhantomData<T>,
@@ -167,12 +179,15 @@ impl<'a, T: 'static> OccupiedEntry<'a, T> {
     }
 }
 
+/// A view into a single empty location in an `AnyMap`.
 pub struct VacantEntry<'a, T> {
     inner: hash_map::VacantEntry<'a, TypeId, Box<dyn Item>>,
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<'a, T> VacantEntry<'a, T> {
+    /// Sets the value of the entry with the VacantEntry’s key, and returns a
+    /// mutable reference to it
     pub fn insert(self, value: T) -> &'a mut T
     where
         T: 'static + Clone + std::fmt::Debug + Send + Sync,
@@ -184,8 +199,12 @@ impl<'a, T> VacantEntry<'a, T> {
         }
     }
 }
+/// A view into a single location in an `AnyMap`, which may be vacant or
+/// occupied.
 pub enum Entry<'a, T> {
+    /// A view into a single occupied location in an `AnyMap`.
     Occupied(OccupiedEntry<'a, T>),
+    /// A view into a single empty location in an `AnyMap`.
     Vacant(VacantEntry<'a, T>),
 }
 

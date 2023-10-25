@@ -50,6 +50,8 @@ const KEYS: [&str; 7] = [
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
+
+/// A boxed error.
 pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 
 /*
@@ -67,8 +69,15 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
 pub trait Error<'v>: DynClone + std::fmt::Debug + Send + Sync {
-    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
-    fn translate(&self, f: &mut std::fmt::Formatter<'_>, lang: &Translator) -> std::fmt::Result;
+    /// Makes this error owned.
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
+    /// Translates this error
+    fn translate(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        translator: &Translator,
+    ) -> std::fmt::Result;
+    /// Sets the translator for this error
     fn set_translate(&mut self, translator: &Translator);
 }
 impl<'v> std::fmt::Display for dyn Error<'v> {
@@ -100,7 +109,7 @@ impl<'de> Deserialize<'de> for Box<dyn Error<'static>> {
 }
 
 impl Error<'_> for String {
-    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         self
     }
     fn translate(
@@ -115,7 +124,7 @@ impl Error<'_> for String {
 }
 
 impl<'v> Error<'v> for &'v str {
-    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         Box::new(self.to_string())
     }
 
@@ -278,21 +287,21 @@ pub enum Structure {
     ///     {
     ///       "keywordLocation": "/items/$ref",
     ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
+    ///         "https://test.com/polygon#/$defs/point",
     ///       "instanceLocation": "/1",
     ///       "error": "A subschema had errors."
     ///     },
     ///     {
     ///       "keywordLocation": "/items/$ref/required",
     ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/required",
+    ///         "https://test.com/polygon#/$defs/point/required",
     ///       "instanceLocation": "/1",
     ///       "error": "Required property 'y' not found."
     ///     },
     ///     {
     ///       "keywordLocation": "/items/$ref/additionalProperties",
     ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///         "https://test.com/polygon#/$defs/point/additionalProperties",
     ///       "instanceLocation": "/1/z",
     ///       "error": "Additional property 'z' found but was invalid."
     ///     },
@@ -326,7 +335,7 @@ pub enum Structure {
     /// ## Schema:
     /// ```json
     /// {
-    ///   "$id": "https://example.com/polygon",
+    ///   "$id": "https://test.com/polygon",
     ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
     ///   "$defs": {
     ///     "point": {
@@ -360,14 +369,14 @@ pub enum Structure {
     ///       "valid": false,
     ///       "keywordLocation": "/items/$ref",
     ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
+    ///         "https://test.com/polygon#/$defs/point",
     ///       "instanceLocation": "/1",
     ///       "errors": [
     ///         {
     ///           "valid": false,
     ///           "keywordLocation": "/items/$ref/required",
     ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/required",
+    ///             "https://test.com/polygon#/$defs/point/required",
     ///           "instanceLocation": "/1",
     ///           "error": "Required property 'y' not found."
     ///         },
@@ -375,7 +384,7 @@ pub enum Structure {
     ///           "valid": false,
     ///           "keywordLocation": "/items/$ref/additionalProperties",
     ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
+    ///             "https://test.com/polygon#/$defs/point/additionalProperties",
     ///           "instanceLocation": "/1/z",
     ///           "error": "Additional property 'z' found but was invalid."
     ///         }
@@ -1659,42 +1668,42 @@ mod tests {
                     "valid": true,
                     "keywordLocation": "/items/$ref",
                     "absoluteKeywordLocation":
-                      "https://example.com/polygon#/items/$ref",
+                      "https://test.com/polygon#/items/$ref",
                     "instanceLocation": "/0",
                     "annotations": [
                       {
                         "valid": true,
                         "keywordLocation": "/items/$ref",
                         "absoluteKeywordLocation":
-                          "https://example.com/polygon#/$defs/point",
+                          "https://test.com/polygon#/$defs/point",
                         "instanceLocation": "/0",
                         "annotations": [
                           {
                             "valid": true,
                             "keywordLocation": "/items/$ref/type",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/type",
+                              "https://test.com/polygon#/$defs/point/type",
                             "instanceLocation": "/0"
                           },
                           {
                             "valid": true,
                             "keywordLocation": "/items/$ref/properties",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/properties",
+                              "https://test.com/polygon#/$defs/point/properties",
                             "instanceLocation": "/0"
                           },
                           {
                             "valid": true,
                             "keywordLocation": "/items/$ref/required",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/required",
+                              "https://test.com/polygon#/$defs/point/required",
                             "instanceLocation": "/0"
                           },
                           {
                             "valid": true,
                             "keywordLocation": "/items/$ref/additionalProperties",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/additionalProperties",
+                              "https://test.com/polygon#/$defs/point/additionalProperties",
                             "instanceLocation": "/0"
                           }
                         ]
@@ -1705,14 +1714,14 @@ mod tests {
                     "valid": false,
                     "keywordLocation": "/items/$ref",
                     "absoluteKeywordLocation":
-                      "https://example.com/polygon#/items/$ref",
+                      "https://test.com/polygon#/items/$ref",
                     "instanceLocation": "/1",
                     "errors": [
                       {
                         "valid": false,
                         "keywordLocation": "/items/$ref",
                         "absoluteKeywordLocation":
-                          "https://example.com/polygon#/$defs/point",
+                          "https://test.com/polygon#/$defs/point",
                         "error": "an example error",
                         "instanceLocation": "/1",
                         "errors": [
@@ -1720,14 +1729,14 @@ mod tests {
                             "valid": true,
                             "keywordLocation": "/items/$ref/type",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/type",
+                              "https://test.com/polygon#/$defs/point/type",
                             "instanceLocation": "/1"
                           },
                           {
                             "valid": true,
                             "keywordLocation": "/items/$ref/properties",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/properties",
+                              "https://test.com/polygon#/$defs/point/properties",
                             "annotation": {"v": 1},
                             "instanceLocation": "/1"
                           },
@@ -1735,21 +1744,21 @@ mod tests {
                             "valid": false,
                             "keywordLocation": "/items/$ref/required",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/required",
+                              "https://test.com/polygon#/$defs/point/required",
                             "instanceLocation": "/1"
                           },
                           {
                             "valid": false,
                             "keywordLocation": "/items/$ref/additionalProperties",
                             "absoluteKeywordLocation":
-                              "https://example.com/polygon#/$defs/point/additionalProperties",
+                              "https://test.com/polygon#/$defs/point/additionalProperties",
                             "instanceLocation": "/1",
                             "errors": [
                               {
                                 "valid": false,
                                 "keywordLocation": "/items/$ref/additionalProperties",
                                 "absoluteKeywordLocation":
-                                  "https://example.com/polygon#/$defs/point/additionalProperties",
+                                  "https://test.com/polygon#/$defs/point/additionalProperties",
                                 "instanceLocation": "/1/z"
                               }
                             ]

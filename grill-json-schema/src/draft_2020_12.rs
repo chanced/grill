@@ -4,10 +4,11 @@ use serde_json::Value;
 
 use grill_core::schema::Dialect;
 
-use crate::{keyword, ID, SCHEMA};
+use crate::keyword::{self, ID, SCHEMA};
 
-use super::metaschema;
+use super::{keyword::REF, metaschema};
 
+/// Constructs a new [`Dialect`] for Draft 2020-12
 #[must_use]
 pub fn dialect() -> Dialect {
     Dialect::build(json_schema_2020_12_uri().clone())
@@ -22,13 +23,17 @@ pub fn dialect() -> Dialect {
         .with_keyword(keyword::comment::Comment)
         .with_keyword(keyword::read_only::ReadOnly::default())
         .with_keyword(keyword::write_only::WriteOnly::default())
-        .with_keyword(keyword::ref_::Ref::new(super::REF, true))
+        .with_keyword(keyword::ref_::Ref::new(REF, true))
         .with_keyword(keyword::defs::Defs::default())
         .with_keyword(keyword::if_then_else::IfThenElse::default())
+        .with_keyword(keyword::type_::Type::new(None))
         .finish()
         .unwrap()
 }
 
+/// Returns the static `Value` of the primary schema for Draft 2020-12
+///
+/// This is an alias to [`json_schema_2020_12_value`]
 #[must_use]
 pub fn schema() -> &'static Value {
     json_schema_2020_12_value()

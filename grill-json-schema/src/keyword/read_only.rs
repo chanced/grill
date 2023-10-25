@@ -6,7 +6,7 @@ use grill_core::{
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::READ_ONLY;
+use super::READ_ONLY;
 
 #[derive(Debug, Clone, Default)]
 pub struct ReadOnly {

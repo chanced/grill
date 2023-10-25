@@ -5,10 +5,6 @@ use num::{pow, BigInt, BigRational, One, Zero};
 
 use crate::error::NumberError;
 
-pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
-    Parser::parse(value)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
     Head,
@@ -61,7 +57,7 @@ impl State {
 }
 
 #[derive(Debug)]
-struct Parser<'a> {
+pub(super) struct Parser<'a> {
     value: &'a str,
     state: State,
     is_negative: bool,
@@ -102,7 +98,7 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
-    fn parse(value: &'a str) -> Result<BigRational, NumberError> {
+    pub(super) fn parse(value: &'a str) -> Result<BigRational, NumberError> {
         let value = value.trim();
         let mut parser = Parser {
             value,

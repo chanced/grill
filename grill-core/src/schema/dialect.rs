@@ -2,16 +2,14 @@
 //! schema.
 
 use crate::{
-    error::{
-        AnchorError, DialectError, DialectExistsError, DialectsError, IdentifyError, RefError,
-    },
+    error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError},
     keyword::{Keyword, Unimplemented},
     uri::AbsoluteUri,
     Src,
 };
-use ahash::{AHashMap, AHashSet};
 use jsonptr::Pointer;
 use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
 use std::{borrow::Cow, convert::Into, fmt::Debug, hash::Hash, iter::IntoIterator, ops::Deref};
 
 use super::{Anchor, Ref};
@@ -47,7 +45,7 @@ pub struct Dialect {
     /// `metaschemas` with this `id`.
     id: AbsoluteUri,
     /// Set of meta schemas which make up the dialect.
-    metaschemas: AHashMap<AbsoluteUri, Cow<'static, Value>>,
+    metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>>,
     /// Set of [`Keyword`]s defined by the dialect.
     keywords: Box<[Box<dyn Keyword>]>,
     identify_indexes: Box<[u16]>,
@@ -79,7 +77,7 @@ impl Dialect {
         metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
         keywords: Vec<Box<dyn Keyword>>,
     ) -> Result<Self, DialectError> {
-        let metaschemas: AHashMap<AbsoluteUri, Cow<'static, Value>> =
+        let metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>> =
             metaschemas.into_iter().collect();
         let keywords = keywords.into_boxed_slice();
         let identify_indexes = find_identify_indexes(&id, &keywords)?;
@@ -161,7 +159,7 @@ impl Dialect {
     /// `Keyword` of this `Dialect`.
     ///
     #[must_use]
-    pub fn subschemas(&self, path: &Pointer, src: &Value) -> AHashSet<Pointer> {
+    pub fn subschemas(&self, path: &Pointer, src: &Value) -> HashSet<Pointer> {
         self.subschemas_indexes
             .iter()
             .flat_map(|&idx| self.keywords[idx as usize].subschemas(src).unwrap())
@@ -253,7 +251,7 @@ impl Dialect {
 
     #[must_use]
     /// Returns the metaschemas of this `Dialect`.
-    pub fn metaschemas(&self) -> &AHashMap<AbsoluteUri, Cow<'static, Value>> {
+    pub fn metaschemas(&self) -> &HashMap<AbsoluteUri, Cow<'static, Value>> {
         &self.metaschemas
     }
 
@@ -290,6 +288,7 @@ impl Debug for Dialect {
     }
 }
 
+/// A collection of [`Dialect`]s.
 #[derive(Debug, Clone)]
 pub struct Dialects {
     dialects: Vec<Dialect>,
@@ -305,6 +304,10 @@ impl Deref for Dialects {
 }
 
 impl Dialects {
+    /// Creates a new [`Dialects`] from a [`Vec`] of [`Dialect`]s.
+    ///
+    /// If `default` is `None`, the first [`Dialect`] in the list is used as the
+    /// default.
     pub fn new(
         dialects: Vec<Dialect>,
         default: Option<AbsoluteUri>,
@@ -313,15 +316,13 @@ impl Dialects {
             return Err(DialectsError::Empty);
         }
         let mut collected = Vec::with_capacity(dialects.len());
-        let mut lookup: AHashMap<AbsoluteUri, usize> = AHashMap::with_capacity(dialects.len());
+        let mut lookup: HashMap<AbsoluteUri, usize> = HashMap::with_capacity(dialects.len());
         for (i, dialect) in dialects.into_iter().enumerate() {
             if dialect.id.fragment().is_some() && dialect.id.fragment() != Some("") {
                 return Err(DialectError::FragmentedId(dialect.id.clone()).into());
             }
             if lookup.contains_key(&dialect.id) {
-                return Err(DialectsError::Duplicate(DialectExistsError {
-                    id: dialect.id.clone(),
-                }));
+                return Err(DialectsError::Duplicate(dialect.id.clone()));
             }
             let id = dialect.id.clone();
             collected.push(dialect);
@@ -348,10 +349,6 @@ impl Dialects {
             .map(|(idx, _)| idx)
     }
 
-    /// Returns the [`Dialect`] that is determined pertinent to the schema based
-    /// upon the first [`Keyword`] in each
-    /// [`Dialect`] or `None` if a [`Dialect`] cannot
-    /// be confidently determined.
     #[must_use]
     pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect> {
         self.dialects
@@ -372,11 +369,9 @@ impl Dialects {
     ///
     /// # Errors
     /// Returns the [`DialectExistsError`] if a `Dialect` already exists with the same `id`.
-    pub fn push(&mut self, dialect: Dialect) -> Result<(), DialectExistsError> {
+    pub fn push(&mut self, dialect: Dialect) -> Result<(), AbsoluteUri> {
         if self.contains(&dialect.id) {
-            return Err(DialectExistsError {
-                id: dialect.id.clone(),
-            });
+            return Err(dialect.id.clone());
         }
         self.dialects.push(dialect);
         Ok(())
@@ -473,7 +468,7 @@ impl Dialects {
 
     fn find_primary(
         dialects: &[Dialect],
-        lookup: &AHashMap<AbsoluteUri, usize>,
+        lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<&AbsoluteUri>,
     ) -> Result<usize, DialectError> {
         let uri = default.unwrap_or(&dialects[0].id);

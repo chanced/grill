@@ -1,4 +1,5 @@
-use ahash::AHashMap;
+use std::collections::HashMap;
+
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
@@ -298,6 +299,7 @@ pub struct DeserializationError {
 }
 
 impl DeserializationError {
+    /// Create a new [`DeserializationError`].
     #[must_use]
     pub fn new(uri: AbsoluteUri, error: DeserializeError) -> Self {
         Self { uri, error }
@@ -318,14 +320,15 @@ impl DeserializationError {
 /// [`Dialects`](crate::dialect::Dialects)
 #[derive(Debug, Error)]
 pub enum DialectsError {
+    /// No dialects were provided.
     #[error("no dialects were provided")]
     Empty,
+    /// An error occurred creating a [`Dialect`].
     #[error(transparent)]
     Dialect(#[from] DialectError),
-    /// Multiple [`Dialect`]s with the same
-    /// [`AbsoluteUri`] id were provided.
+    /// Multiple [`Dialect`]s with the same [`AbsoluteUri`] id were provided.
     #[error("duplicate dialect id provided: {0}")]
-    Duplicate(DialectExistsError),
+    Duplicate(AbsoluteUri),
 }
 
 /*
@@ -383,22 +386,29 @@ pub enum DialectError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Failed to associate a schema to a location within a source.
 #[derive(Debug, Error)]
 pub enum LinkError {
+    /// A conflict occurred (i.e. a source was linked from multiple locations).
     #[error(transparent)]
     Conflict(#[from] LinkConflictError),
 
+    /// Failed to resolve a path
     #[error("failed to resolve link path: {0}")]
     PathNotFound(#[from] jsonptr::Error),
 
+    /// Failed to resolve a URI
     #[error("source not found: {0}")]
     NotFound(AbsoluteUri),
 }
 
+/// Source was linked from multiple schemas.
 #[derive(Debug, Error)]
 #[error("source address {:?} @ {:?} already assigned to {:?} @ {:?}", new.0, new.1, existing.0, existing.1)]
 pub struct LinkConflictError {
+    /// The existing schema location.
     pub existing: (AbsoluteUri, Pointer),
+    /// The new schema location.
     pub new: (AbsoluteUri, Pointer),
 }
 
@@ -442,20 +452,31 @@ pub enum BuildError {
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum NumberError {
+    /// Failed to parse exponent of a number.
     #[error("failed to parse exponent of number \"{value}\":\n\t{source}")]
     FailedToParseExponent {
+        /// the value of the string being parsed
         value: String,
+        /// the underlying error
         #[source]
         source: ParseIntError,
     },
+    /// Unexpected character found in a number.
     #[error("failed to parse number \"{value}\":\n\tunexpected character: '{character}' at index {index}")]
     UnexpectedChar {
+        /// the value of the string being parsed
         value: String,
+        /// the character which caused the error
         character: char,
+        /// the index of the character which caused the error
         index: usize,
     },
+    /// The number is not an integer.
     #[error("failed to parse number \"{value}\":\n\tnot an integer")]
-    NotAnInteger { value: String },
+    NotAnInteger {
+        /// value of string being parsed
+        value: String,
+    },
     #[cfg(not(target_pointer_width = "64"))]
     #[error("exponent ({value}) exceeds maximum value for non-64-bit architecture")]
     ExponentTooLarge(OverflowError<u64, { usize::MAX as u64 }>),
@@ -480,7 +501,7 @@ pub enum EvaluateError {
 
     /// Failed to evaluate a regular expression.
     #[error(transparent)]
-    Regex(EvaluateRegexError),
+    Regex(#[from] regex::Error),
 
     /// A [`Key`] was provided that is not known to the `Interrogator`
     #[error(transparent)]
@@ -501,41 +522,6 @@ pub enum EvaluateError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                              RegexError                               ║
-║                              ¯¯¯¯¯¯¯¯¯¯                               ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An error occurred with a regular expression, evaluated with either the `regex`
-/// or `fancy_regex` crate.
-#[derive(Debug, Error)]
-pub enum RegexError {
-    #[error(transparent)]
-    /// An error from the [`regex`] crate.
-    Regex(#[from] regex::Error),
-
-    #[error(transparent)]
-    /// An error from the [`fancy_regex`] crate.
-    FancyRegex(#[from] fancy_regex::Error),
-}
-
-/// A regular expression failed to evaluate against a [`Value`].
-#[derive(Debug, Error)]
-#[error("failed to evaluate regex \"{regex}\" against value \"{value:?}\":\n\t{source}")]
-pub struct EvaluateRegexError {
-    /// the regular expression
-    pub regex: String,
-    /// The value which the regex failed to evaluate against.
-    pub value: Option<Box<Value>>,
-    /// The underlying regex error.
-    pub source: fancy_regex::Error,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
 ║                           DeserializeError                            ║
 ║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -545,7 +531,8 @@ pub struct EvaluateRegexError {
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug, Default)]
 pub struct DeserializeError {
-    pub formats: AHashMap<&'static str, erased_serde::Error>,
+    /// A table of errors keyed by the format which failed to deserialize.
+    pub formats: HashMap<&'static str, erased_serde::Error>,
 }
 
 impl DeserializeError {
@@ -588,6 +575,7 @@ impl StdError for DeserializeError {
 /// resolve.
 #[derive(Debug, Default)]
 pub struct ResolveErrors {
+    /// A list of errors, one per implementation of [`Resolve`].
     pub errors: Vec<ResolveError>,
 }
 impl IntoIterator for ResolveErrors {
@@ -621,6 +609,7 @@ impl From<ResolveError> for ResolveErrors {
 }
 impl ResolveErrors {
     #[must_use]
+    /// Create a new [`ResolveErrors`].
     pub fn new() -> Self {
         Self {
             errors: Vec::default(),
@@ -630,11 +619,13 @@ impl ResolveErrors {
     pub fn push(&mut self, err: ResolveError) {
         self.errors.push(err);
     }
-
+    /// Appends a new [`NotFoundError`] to the list of errors.
     pub fn push_not_found(&mut self, uri: AbsoluteUri) {
         self.errors.push(ResolveError::not_found(uri));
     }
 
+    /// Appends a new [`ResolveError`] from a [`ResolveErrorSource`] to the list
+    /// of errors.
     pub fn push_new(&mut self, err: impl Into<ResolveErrorSource>, uri: AbsoluteUri) {
         self.errors.push(ResolveError {
             source: err.into(),
@@ -695,6 +686,7 @@ pub struct ResolveError {
 }
 
 impl ResolveError {
+    /// Create a new [`ResolveError`].
     pub fn new(err: impl Into<ResolveErrorSource>, uri: AbsoluteUri) -> Self {
         Self {
             source: err.into(),
@@ -702,7 +694,7 @@ impl ResolveError {
             referring_location: None,
         }
     }
-
+    /// Creates a new [`ResolveError`] with a [`ResolveErrorSource::NotFound`]
     #[must_use]
     pub fn not_found(uri: AbsoluteUri) -> Self {
         Self {
@@ -711,7 +703,7 @@ impl ResolveError {
             referring_location: None,
         }
     }
-
+    /// Sets the `referring_location` of the `ResolveError` to `referring_location`.
     pub fn set_referring_location(&mut self, referring_location: AbsoluteUri) {
         self.referring_location = Some(referring_location);
     }
@@ -742,6 +734,7 @@ pub enum ResolveErrorSource {
     #[error(transparent)]
     PointerMalformed(#[from] PointerError),
 
+    /// A source or schema could not be found.
     #[error(transparent)]
     NotFound(#[from] NotFoundError),
 
@@ -808,8 +801,13 @@ pub enum CompileError {
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
     /// schema's path as a JSON [`Pointer`].
-    #[error(transparent)]
-    LocatedUriMalformed(#[from] LocatedSchemaUriPointerError),
+    #[error("expected schema URI to contain path; found {uri}")]
+    LocatedUriMalformed {
+        /// The [`MalformedPointerError`] which occurred.
+        source: MalformedPointerError,
+        /// The [`AbsoluteUri`] which was returned from
+        uri: AbsoluteUri,
+    },
 
     #[error(transparent)]
     /// A [`Schema`] contains a cyclic dependency.
@@ -827,6 +825,7 @@ pub enum CompileError {
     #[error(transparent)]
     FailedToParseAnchor(#[from] AnchorError),
 
+    /// Failed to find a schema with the given uri
     #[error("schema not found: \"{0}\"")]
     SchemaNotFound(AbsoluteUri),
 
@@ -843,10 +842,18 @@ pub enum CompileError {
     #[error(transparent)]
     InvalidType(#[from] InvalidTypeError),
 
+    /// A keyword encountered a value which was not expected
+    #[error(transparent)]
+    UnexpectedValue(#[from] UnexpectedValueError),
+
     /// An error occurred while parsing a ref field (e.g. `"$ref"`,
     /// `"$recursiveRef"`, `"$recursiveAnchor"`)
     #[error(transparent)]
     RefError(#[from] RefError),
+
+    /// A regular expression failed to parse
+    #[error(transparent)]
+    FailedToEvaluateRegex(#[from] regex::Error),
 
     /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]
@@ -873,13 +880,21 @@ impl From<MalformedPointerError> for CompileError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-#[derive(Clone, Copy, Debug, strum::EnumVariantNames, strum::Display)]
+/// The expected type of a [`Value`].
+#[derive(Clone, Debug, Copy, strum::EnumVariantNames, strum::Display)]
 pub enum Expected {
+    /// Expected a boolean
     Bool,
+    /// Expected a number
     Number,
+    /// Expected a string
     String,
+    /// Execpted an array
     Array,
+    /// Expected an object
     Object,
+    /// Expected any of the types in the slice
+    AnyOf(&'static [Expected]),
 }
 
 /*
@@ -892,11 +907,24 @@ pub enum Expected {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A [`Value`] was not of the expected type.
 #[derive(Debug, Error)]
 #[error("expected value with type {expected}, found {actual:?}")]
 pub struct InvalidTypeError {
+    /// The expected type of value.
     pub expected: Expected,
+    /// The actual value.
     pub actual: Value,
+}
+
+/// A [`Value`] was .
+#[derive(Debug, Error)]
+#[error("unexpected value; expected {expected} found {value:?}")]
+pub struct UnexpectedValueError {
+    /// A description of the expected value
+    pub expected: &'static str,
+    /// The actual value.
+    pub value: Box<Value>,
 }
 
 /*
@@ -909,10 +937,13 @@ pub struct InvalidTypeError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A schema referenced an anchor which was not found.
 #[derive(Debug, Error)]
 #[error("unknown anchor: \"{}\" in URI \"{}\"", .anchor, .uri)]
 pub struct UnknownAnchorError {
+    /// The anchor which was not found.
     pub anchor: String,
+    /// The URI of the keyword which referenced the anchor.
     pub uri: AbsoluteUri,
 }
 
@@ -925,10 +956,15 @@ pub struct UnknownAnchorError {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
+
+/// A [`Schema`] contains a cyclic dependency.
 #[derive(Debug, Error)]
 #[error("schema \"{}\" contains a cyclic dependency to \"{}\"", .from, .to)]
 pub struct CyclicDependencyError {
+    /// The [`AbsoluteUri`] of the schema which, through transitive
+    /// dependencies, creates a cycle.
     pub from: AbsoluteUri,
+    /// The [`AbsoluteUri`] of the schema which is the target of the cycle.
     pub to: AbsoluteUri,
 }
 
@@ -962,6 +998,8 @@ pub struct NotFoundError(pub AbsoluteUri);
 #[derive(Debug, Clone, Error)]
 #[error("metaschema dialect not found: {}", .metaschema_id)]
 pub struct DialectUnknownError {
+    /// The id of the [`Dialect`] which is not registered with the
+    /// [`Interrogator`](crate::Interrogator).
     pub metaschema_id: String,
 }
 
@@ -1108,15 +1146,21 @@ impl UriError {
 #[derive(Debug, Clone, Error)]
 #[error("invalid authority: {0}")]
 pub enum AuthorityError {
+    /// The authority contained a path
     ContainsPath(String),
+    /// The authority contained a query
     ContainsQuery(String),
+    /// The authority contained a fragment
     ContainsFragment(String),
+    /// The authority contained a malformed port
     InvalidPort(#[from] InvalidPortError),
+    /// An error occurred while setting the `authority` of a [`Urn`](urn::Urn)
     Urn(UrnError),
     /// The username cannot be set due to the scheme of the Uri (e.g. `file`)
     UsernameNotAllowed(String),
     /// The password cannot be set due to the scheme of the Uri (e.g. `file`)
     PasswordNotAllowed(String),
+    /// The host cannot be set due to the scheme of the Uri (e.g. `file`)
     PortNotAllowed(u16),
 }
 
@@ -1180,7 +1224,9 @@ pub enum IdentifyError {
     /// The value of `$id` was not a string
     #[error("the {keyword} of a schema must be a string in the form of a uri; found {value:?}")]
     NotAString {
+        /// The keyword which was not a string
         keyword: &'static str,
+        /// The value of the keyword
         value: Box<Value>,
     },
 }
@@ -1206,6 +1252,7 @@ pub struct DialectNotFoundError {
 
 impl DialectNotFoundError {
     #[must_use]
+    /// Create a new [`DialectNotFoundError`].
     pub fn new(id: AbsoluteUri) -> Self {
         Self { id }
     }
@@ -1258,39 +1305,6 @@ impl From<u64> for OverflowError<u64, { usize::MAX as u64 }> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                     LocatedSchemaUriPointerError                      ║
-║                     ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                      ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-#[derive(Debug, Error)]
-#[error("expected schema URI to contain path; found {uri}")]
-pub struct LocatedSchemaUriPointerError {
-    #[source]
-    pub source: MalformedPointerError,
-    pub uri: AbsoluteUri,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          DialectExistsError                           ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-#[derive(Debug, Clone, Error)]
-#[error("dialect already exists with id \"{id}\"")]
-pub struct DialectExistsError {
-    pub id: AbsoluteUri,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
 ║                               RefError                                ║
 ║                               ¯¯¯¯¯¯¯¯                                ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -1298,8 +1312,10 @@ pub struct DialectExistsError {
 */
 #[derive(Debug, Error)]
 pub enum RefError {
+    /// The ref value was not a string.
     #[error(transparent)]
     UnexpectedType(#[from] InvalidTypeError),
+    /// The ref value failed to parse as a URI.
     #[error(transparent)]
     UriError(#[from] UriError),
 }

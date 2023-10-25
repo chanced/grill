@@ -8,7 +8,10 @@ use crate::{
         BuildError, CompileError, DeserializeError, EvaluateError, SourceError, UnknownKeyError,
         UriError,
     },
-    keyword::cache::{Numbers, Values},
+    keyword::{
+        cache::{Numbers, Values},
+        Evaluated,
+    },
     output::{Output, Structure},
     schema::{
         compiler::Compiler,
@@ -79,16 +82,16 @@ impl Build {
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let source = br#"{"type": "string"}"#;
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     interrogator.source_slice("https://example.com/schema.json", source).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let source = br#"{"type": "string"}"#;
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_slice("https://test.com/schema.json", source).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceError`] if:
@@ -111,15 +114,15 @@ impl Build {
     /// ```rust
     /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///let interrogator = Interrogator::build()
+    ///    .json_schema_2020_12()
+    ///    .source_str("https://test.com/schema.json", r#"{"type": "string"}"#).unwrap()
+    ///    .finish()
+    ///    .await
+    ///    .unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -140,19 +143,19 @@ impl Build {
     /// # Example
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
-    /// use std::{ borrow::Cow, collections::HashMap };
-    /// use serde_json::json;
+    /// # use std::{ borrow::Cow, collections::HashMap };
+    /// # use serde_json::json;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let schema = Cow::Owned(json!({"type": "string"}));
-    ///     let interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .source_value("https://example.com/schema.json", schema).unwrap()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let schema = Cow::Owned(json!({"type": "string"}));
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_value("https://test.com/schema.json", schema).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -176,17 +179,17 @@ impl Build {
     /// use grill::{ Interrogator, json_schema::Build as _ };
     /// use std::collections::HashMap;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut sources = HashMap::new();
-    ///     sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    ///     let interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .source_strs(sources).unwrap()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://test.com/schema.json", r#"{"type": "string"}"#);
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_strs(sources).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if a URI fails to convert to an
@@ -212,18 +215,18 @@ impl Build {
     /// use grill::{ Interrogator, json_schema::Build as _ };
     /// use std::collections::HashMap;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut sources = HashMap::new();
-    ///     sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    ///     
-    ///     let interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .source_slices(sources).unwrap()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://test.com/schema.json", br#"{"type": "string"}"#);
+    ///
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_slices(sources).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -251,20 +254,20 @@ impl Build {
     /// # Example
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
-    /// use std::{ borrow::Cow, collections::HashMap };
-    /// use serde_json::json;
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut sources = HashMap::new();
-    ///     let source = Cow::Owned(json!({"type": "string"}));
-    ///     sources.insert("https://example.com/schema.json", source);
-    ///     let interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .source_values(sources).unwrap()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    /// }
+    /// # use std::{ borrow::Cow, collections::HashMap };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// let source = Cow::Owned(json!({"type": "string"}));
+    /// sources.insert("https://test.com/schema.json", source);
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_values(sources).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceError`] if:
@@ -381,8 +384,8 @@ impl Build {
 
     // /// let interrogator = grill::Builder::default()
     // ///    .json_schema_2020_12()
-    // ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    // ///    .precompile(["https://example.com/schema.json"]).unwrap()
+    // ///    .source_str("https://test.com/schema.json", r#"{"type": "string"}"#).unwrap()
+    // ///    .precompile(["https://test.com/schema.json"]).unwrap()
     // ///    .build()
     // ///    .unwrap();
     // /// ```
@@ -616,21 +619,22 @@ impl Interrogator {
     /// # Example
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     interrogator.source_str("https://example.com/string.json", r#"{"type": "string"}"#).unwrap();
-    ///     interrogator.source_str("https://example.com/number.json", r#"{"type": "number"}"#).unwrap();
-    ///     let schemas = interrogator.compile_all(vec![
-    ///        "https://example.com/string.json",
-    ///        "https://example.com/number.json",
-    ///     ]).await.unwrap();
-    ///     assert_eq!(schemas.len(), 2);
-    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_str("https://test.com/string.json", r#"{"type": "string"}"#).unwrap();
+    /// interrogator.source_str("https://test.com/number.json", r#"{"type": "number"}"#).unwrap();
+    /// let schemas = interrogator.compile_all(vec![
+    ///    "https://test.com/string.json",
+    ///    "https://test.com/number.json",
+    /// ]).await.unwrap();
+    /// assert_eq!(schemas.len(), 2);
+    /// # }
     /// ```
     ///
     #[allow(clippy::unused_async)]
@@ -731,6 +735,8 @@ impl Interrogator {
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut eval_state = AnyMap::new();
+        let mut evaluated = Evaluated::default();
+        let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(
             structure,
             key,
@@ -738,8 +744,11 @@ impl Interrogator {
             Pointer::default(),
             Pointer::default(),
             &self.sources,
+            &mut evaluated,
             &self.state,
             &mut eval_state,
+            &self.numbers,
+            &mut eval_numbers,
         )
     }
 
@@ -767,16 +776,16 @@ impl Interrogator {
     /// ```rust
     /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     let source = br#"{"type": "string"}"#;
-    ///     interrogator.source_slice("https://example.com/schema.json", source).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// let source = br#"{"type": "string"}"#;
+    /// interrogator.source_slice("https://test.com/schema.json", source).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -817,16 +826,16 @@ impl Interrogator {
     /// ```rust
     /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
-    /// #[tokio::main]
-    /// async fn main(){
+    /// # #[tokio::main]
+    /// # async fn main(){
     /// let mut interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// let schema = r#"{"type": "string"}"#;
-    /// interrogator.source_str("https://example.com/schema.json", schema).unwrap();
-    /// }
+    /// interrogator.source_str("https://test.com/schema.json", schema).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -849,16 +858,16 @@ impl Interrogator {
     /// use serde_json::json;
     /// use std::borrow::Cow;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     let source = Cow::Owned(json!({"type": "string"}));
-    ///     interrogator.source_value("https://example.com/schema.json", source).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// let source = Cow::Owned(json!({"type": "string"}));
+    /// interrogator.source_value("https://test.com/schema.json", source).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`UriError`] if the `uri` fails to convert to an
@@ -880,17 +889,17 @@ impl Interrogator {
     /// use grill::{Interrogator, json_schema::Build as _};
     /// use std::collections::HashMap;
     ///
-    /// #[tokio::main]
-    /// async fn main(){
-    ///     let mut sources = HashMap::new();
-    ///     sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     interrogator.source_strs(sources).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main(){
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://test.com/schema.json", r#"{"type": "string"}"#);
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_strs(sources).unwrap();
+    /// # }
     /// ```
     ///
     /// # Errors
@@ -913,20 +922,20 @@ impl Interrogator {
     ///
     /// # Example
     /// ```
-    /// use std::collections::HashMap;
-    /// use grill::{ Interrogator, json_schema::Build };
+    /// # use std::collections::HashMap;
+    /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut sources = HashMap::new();
-    ///     sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     interrogator.source_slices(sources).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// sources.insert("https://test.com/schema.json", br#"{"type": "string"}"#);
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_slices(sources).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -954,21 +963,21 @@ impl Interrogator {
     /// # Example
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
-    /// use std::{collections::HashMap, borrow::Cow};
-    /// use serde_json::json;
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut sources = HashMap::new();
-    ///     let source = json!({"type": "string"});
-    ///     sources.insert("https://example.com/schema.json", Cow::Owned(source));
+    /// # use std::{collections::HashMap, borrow::Cow};
+    /// # use serde_json::json;
     ///
-    ///     let mut interrogator = Interrogator::build()
-    ///         .json_schema_2020_12()
-    ///         .finish()
-    ///         .await
-    ///         .unwrap();
-    ///     interrogator.source_values(sources).unwrap();
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// let source = json!({"type": "string"});
+    /// sources.insert("https://test.com/schema.json", Cow::Owned(source));
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_values(sources).unwrap();
+    /// # }
     /// ```
     /// # Errors
     /// Returns [`SourceSliceError`] if:
@@ -1076,7 +1085,7 @@ impl Interrogator {
 //     async fn test_build() {
 //         let interrogator = Build::default()
 //             .json_schema_2020_12()
-//             .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
+//             .source_str("https://test.com/schema.json", r#"{"type": "string"}"#)
 //             .unwrap()
 //             .finish()
 //             .await

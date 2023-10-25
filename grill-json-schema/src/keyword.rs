@@ -1,3 +1,19 @@
+//! # Json Schema Keywords
+pub mod boolean;
+pub mod comment;
+pub mod const_;
+pub mod defs;
+pub mod enum_;
+pub mod id;
+pub mod if_then_else;
+pub mod pattern_properties;
+pub mod properties;
+pub mod read_only;
+pub mod ref_;
+pub mod schema;
+pub mod type_;
+pub mod write_only;
+
 /// ## `$id`
 ///
 /// The value of `$id` is a URI-reference without a fragment that resolves

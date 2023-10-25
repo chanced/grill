@@ -1,5 +1,8 @@
+//! Handles schemas which are boolean values.
+
 use grill_core::keyword::{Keyword, Kind};
 
+/// Handles schemas which are boolean values.
 #[derive(Debug, Clone, Default)]
 pub struct Boolean {
     bool: bool,

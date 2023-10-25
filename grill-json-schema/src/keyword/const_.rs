@@ -1,12 +1,12 @@
 use std::{borrow::Cow, sync::Arc};
 
 use grill_core::{
-    big::{parse_rational, BigRational},
+    big::BigRational,
     error::CompileError,
     keyword::{define_translate, Kind},
+    output::Error,
 };
 
-use grill_core::output::Error as OutputError;
 use serde_json::Value;
 
 use grill_core::{
@@ -15,11 +15,9 @@ use grill_core::{
     Output, Schema,
 };
 
-use crate::CONST;
+use crate::keyword::CONST;
 
-define_translate!(ConstInvalid, translate_const_invalid_en);
-
-/// [`Keyword`](`crate::keyword::Keyword`) for the `const` keyword.
+/// [`Keyword`] handler for `"const"`.
 ///
 /// The value of this keyword MAY be of any type, including null.
 ///
@@ -27,12 +25,19 @@ define_translate!(ConstInvalid, translate_const_invalid_en);
 /// equal to the value of the keyword.
 #[derive(Clone, Debug)]
 pub struct Const {
+    /// The value of the keyword.
     pub expected: Arc<Value>,
+    /// The `BigRational` representation of a `Number` value.
     pub expected_number: Option<Arc<BigRational>>,
+    /// The [`TranslateConstInvalid`] instance to use for this keyword.
     pub translate: TranslateConstInvalid,
 }
 
 impl Const {
+    /// Construct a new `Const` keyword.
+    ///
+    /// `translate` allows for overriding of the default [`TranslateConstInvalid`]
+    /// instance.
     #[must_use]
     pub fn new(translate: Option<TranslateConstInvalid>) -> Const {
         Self {
@@ -69,8 +74,8 @@ impl keyword::Keyword for Const {
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         if let Value::Number(n) = value {
             if let Some(expected_number) = self.expected_number.as_deref() {
-                let actual_number = parse_rational(n.as_str())?;
-                if &actual_number == expected_number {
+                let actual_number = ctx.number_ref(n)?;
+                if actual_number == expected_number {
                     return Ok(Some(ctx.annotate(Some(CONST), Some(value.into()))));
                 }
                 return Ok(Some(ctx.error(
@@ -98,7 +103,11 @@ impl keyword::Keyword for Const {
         }
     }
 }
-
+/// The default [`TranslateConstInvalid`] instance.
+///
+/// ```plaintext
+/// "expected {expected}, found {actual}"
+/// ```
 pub fn translate_const_invalid_en(
     f: &mut std::fmt::Formatter<'_>,
     error: &ConstInvalid<'_>,
@@ -106,13 +115,18 @@ pub fn translate_const_invalid_en(
     write!(f, "expected {}, found {}", error.expected, error.actual)
 }
 
-/// [`ValidationError`](`crate::error::ValidationError`) for the `enum` keyword, produced by [`ConstKeyword`].
+/// [`Error`] for the `enum` keyword, produced by [`ConstKeyword`].
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
+    /// The expected value.
     pub expected: Arc<Value>,
+    /// The actual value.
     pub actual: Cow<'v, Value>,
+    /// The [`TranslateConstInvalid`] instance to use for this error.
     pub translate: TranslateConstInvalid,
 }
+
+define_translate!(ConstInvalid, translate_const_invalid_en);
 
 impl<'v> std::fmt::Display for ConstInvalid<'v> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -120,19 +134,19 @@ impl<'v> std::fmt::Display for ConstInvalid<'v> {
     }
 }
 
-impl<'v> OutputError<'v> for ConstInvalid<'v> {
-    fn make_owned(self: Box<Self>) -> Box<dyn OutputError<'static>> {
+impl<'v> Error<'v> for ConstInvalid<'v> {
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         match self.actual {
             Cow::Borrowed(actual) => Box::new(ConstInvalid {
                 translate: self.translate,
                 expected: self.expected,
                 actual: Cow::Owned(actual.clone()),
-            }) as Box<dyn OutputError<'static>>,
+            }) as Box<dyn Error<'static>>,
             Cow::Owned(actual) => Box::new(ConstInvalid {
                 actual: Cow::Owned(actual),
                 expected: self.expected,
                 translate: self.translate,
-            }) as Box<dyn OutputError<'static>>,
+            }) as Box<dyn Error<'static>>,
         }
     }
 
@@ -160,13 +174,11 @@ mod tests {
     use grill_core::{schema::Dialect, Interrogator, Structure};
     use serde_json::json;
 
+    use super::{Const, *};
     use crate::{
         draft_2020_12::json_schema_2020_12_uri,
-        keyword::{id, schema},
-        ID, SCHEMA,
+        keyword::{id, schema, ID, SCHEMA},
     };
-
-    use super::{Const, *};
     async fn create_interrogator(const_value: Value) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
             .with_keyword(schema::Schema::new(SCHEMA, false))
@@ -178,7 +190,7 @@ mod tests {
         Interrogator::build()
             .dialect(dialect)
             .source_value(
-                "https://example.com/with_const",
+                "https://test.com/with_const",
                 Cow::Owned(json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "const": const_value
@@ -186,7 +198,7 @@ mod tests {
             )
             .unwrap()
             .source_value(
-                "https://example.com/without_const",
+                "https://test.com/without_const",
                 Cow::Owned(json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                 })),
@@ -201,7 +213,7 @@ mod tests {
     async fn test_setup() {
         let mut interrogator = create_interrogator(json!(34.34)).await;
         let key = interrogator
-            .compile("https://example.com/with_const")
+            .compile("https://test.com/with_const")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -209,20 +221,20 @@ mod tests {
             .keywords
             .iter()
             .map(|kw| kw.kind())
-            .any(|k| k == crate::CONST));
+            .any(|k| k == CONST));
         let key = interrogator
-            .compile("https://example.com/without_const")
+            .compile("https://test.com/without_const")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
-        assert!(!schema.keywords.iter().any(|k| k.kind() == crate::CONST));
+        assert!(!schema.keywords.iter().any(|k| k.kind() == CONST));
     }
 
     #[tokio::test]
     async fn test_const_evaluate() {
         let mut interrogator = create_interrogator(json!(34.34)).await;
         let key = interrogator
-            .compile("https://example.com/with_const")
+            .compile("https://test.com/with_const")
             .await
             .unwrap();
         let value = json!(34.34);

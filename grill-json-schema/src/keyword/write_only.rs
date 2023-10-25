@@ -1,4 +1,4 @@
-use crate::WRITE_ONLY;
+use super::WRITE_ONLY;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, Compile},

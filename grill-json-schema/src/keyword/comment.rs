@@ -7,12 +7,14 @@ use grill_core::{
     Schema,
 };
 
+use crate::keyword::COMMENT;
+
 #[derive(Debug, Default, Clone)]
 pub struct Comment;
 
 impl keyword::Keyword for Comment {
     fn kind(&self) -> Kind {
-        Kind::Single(crate::COMMENT)
+        Kind::Single(COMMENT)
     }
     fn setup<'i>(
         &mut self,

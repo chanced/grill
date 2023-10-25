@@ -1,38 +1,32 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
-use crate::PROPERTIES;
-use ahash::AHashMap;
+use super::PROPERTIES;
+
 use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    keyword::{self, Compile, Context, Unimplemented},
+    keyword::{self, paths_of_object, Compile, Context, Unimplemented},
     output::{Error, Output},
     Key, Schema,
 };
-use jsonptr::{Pointer, Token};
+use jsonptr::Pointer;
 use serde_json::Value;
 
 define_translate!(PropertiesInvalid, translate_properties_invalid_en);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Properties {
-    subschemas: AHashMap<String, (Pointer, Key)>,
+    subschemas: HashMap<String, (Pointer, Key)>,
     translate: TranslatePropertiesInvalid,
 }
 
 impl Properties {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(translate: Option<TranslatePropertiesInvalid>) -> Self {
         Self {
-            subschemas: AHashMap::new(),
-            translate: TranslatePropertiesInvalid::default(),
+            subschemas: HashMap::new(),
+            translate: translate.unwrap_or_default(),
         }
-    }
-}
-
-impl Default for Properties {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -56,7 +50,7 @@ impl keyword::Keyword for Properties {
             }
             .into());
         };
-        for subschema in paths_of_properties(&schema) {
+        for subschema in paths_of_object(PROPERTIES, &schema) {
             let keyword = subschema.last().unwrap().decoded().to_string();
             let key = compile.subschema(&subschema)?;
             self.subschemas.insert(keyword, (subschema, key));
@@ -95,7 +89,7 @@ impl keyword::Keyword for Properties {
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {
-        Ok(paths_of_properties(schema))
+        Ok(paths_of_object(PROPERTIES, schema))
     }
 }
 
@@ -120,7 +114,7 @@ pub fn translate_properties_invalid_en(
 }
 
 impl<'v> Error<'v> for PropertiesInvalid<'v> {
-    fn make_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         Box::new(PropertiesInvalid {
             invalid: self
                 .invalid
@@ -149,21 +143,6 @@ impl<'v> Error<'v> for PropertiesInvalid<'v> {
         }
     }
 }
-#[must_use]
-pub fn paths_of_properties(schema: &Value) -> Vec<Pointer> {
-    let Some(Value::Object(props)) = schema.get(PROPERTIES) else {
-        return Vec::new();
-    };
-    let base = Pointer::new([PROPERTIES]);
-    props
-        .keys()
-        .map(|k| {
-            let mut ptr = base.clone();
-            ptr.push_back(Token::from(k));
-            ptr
-        })
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {
@@ -173,8 +152,7 @@ mod tests {
 
     use crate::{
         draft_2020_12::json_schema_2020_12_uri,
-        keyword::{const_, id, schema},
-        ID, SCHEMA,
+        keyword::{const_, id, schema, ID, PROPERTIES, SCHEMA},
     };
     use grill_core::{schema::Dialect, Interrogator, Structure};
 
@@ -185,25 +163,25 @@ mod tests {
             .with_keyword(schema::Schema::new(SCHEMA, false))
             .with_keyword(id::Id::new(ID, false))
             .with_keyword(const_::Const::new(None))
-            .with_keyword(super::Properties::new())
+            .with_keyword(super::Properties::default())
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();
         Interrogator::build()
             .dialect(dialect)
             .source_value(
-                "https://example.com/with_properties",
+                "https://test.com/with_properties",
                 Cow::Owned(json!({
-                    "$id": "https://example.com/with_properties",
+                    "$id": "https://test.com/with_properties",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "properties": properties
                 })),
             )
             .unwrap()
             .source_value(
-                "https://example.com/without_properties",
+                "https://test.com/without_properties",
                 Cow::Owned(json!({
-                    "$id": "https://example.com/without_properties",
+                    "$id": "https://test.com/without_properties",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                 })),
             )
@@ -222,15 +200,12 @@ mod tests {
         }))
         .await;
         let key = interrogator
-            .compile("https://example.com/with_properties")
+            .compile("https://test.com/with_properties")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
 
-        assert!(schema
-            .keywords
-            .iter()
-            .any(|k| k.kind() == crate::PROPERTIES));
+        assert!(schema.keywords.iter().any(|k| k.kind() == PROPERTIES));
     }
 
     #[tokio::test]
@@ -242,7 +217,7 @@ mod tests {
         }))
         .await;
         let key = interrogator
-            .compile("https://example.com/with_properties")
+            .compile("https://test.com/with_properties")
             .await
             .unwrap();
         let invalid = json!({

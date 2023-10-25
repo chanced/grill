@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use ahash::AHashMap;
 use lazy_static::lazy_static;
 use num_rational::BigRational;
 use serde_json::{Number, Value};
@@ -122,22 +121,63 @@ fn get_bool(value: bool) -> Arc<Value> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A cache of numbers parsed as `BigRational`.
 #[derive(Debug, Default, Clone)]
 pub struct Numbers {
-    rationals: AHashMap<String, Arc<BigRational>>,
-    // ints: HashMap<String, Arc<BigInt>>,
+    rationals: HashMap<String, Arc<BigRational>>,
 }
 
 impl Numbers {
-    pub fn number(&mut self, value: &Number) -> Result<Arc<BigRational>, NumberError> {
+    /// Either returns an [`Arc`] to a previously parsed [`BigRational`]
+    /// or parses and
+    /// returns a reference to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn get_or_insert_arc(&mut self, number: &Number) -> Result<Arc<BigRational>, NumberError> {
         use std::collections::hash_map::Entry::{Occupied, Vacant};
-        match self.rationals.entry(value.to_string()) {
+        match self.rationals.entry(number.to_string()) {
             Occupied(entry) => Ok(entry.get().clone()),
             Vacant(entry) => Ok(entry
-                .insert(Arc::new(parse_rational(value.as_str())?))
+                .insert(Arc::new(parse_rational(number.as_str())?))
                 .clone()),
         }
     }
+    /// Either returns a reference to a previously parsed [`BigRational`] or parses and
+    /// returns a reference to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn get_or_insert_ref(&mut self, number: &Number) -> Result<&BigRational, NumberError> {
+        if self.rationals.contains_key(number.as_str()) {
+            return Ok(self.rationals.get(number.as_str()).unwrap().as_ref());
+        }
+        let n = parse_rational(number.as_str())?;
+        self.rationals.insert(number.to_string(), Arc::new(n));
+        Ok(self.rationals.get(number.as_str()).unwrap().as_ref())
+    }
+
+    /// Returns an [`Arc`] to the [`BigRational`] associated with `value` if it
+    /// exists.
+    #[must_use]
+    pub fn get_arc(&self, number: &Number) -> Option<Arc<BigRational>> {
+        self.rationals.get(number.as_str()).cloned()
+    }
+
+    /// Returns a reference to the [`BigRational`] associated with `value` if it exists.
+    #[must_use]
+    pub fn get_ref(&self, number: &Number) -> Option<&BigRational> {
+        self.rationals.get(number.as_str()).map(AsRef::as_ref)
+    }
+
+    /// Creates an empty [`Numbers`] with at least the specified capacity.
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Numbers {
+        Self {
+            rationals: HashMap::with_capacity(capacity),
+        }
+    }
+
     // /// Either returns a previously parsed [`Arc<BigInt>`](`num::BigInt`) or
     // /// parses, caches, and returns a new [`Arc<BigInt>`](`num::BigInt`).
     // ///

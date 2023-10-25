@@ -93,7 +93,10 @@ impl keyword::Keyword for Ref {
 
     /// Returns a list of [`Ref`]s to other
     /// schemas that `schema` depends on.
-    fn refs(&self, schema: &Value) -> Result<Result<Vec<grill_core::schema::Ref>, RefError>, Unimplemented> {
+    fn refs(
+        &self,
+        schema: &Value,
+    ) -> Result<Result<Vec<grill_core::schema::Ref>, RefError>, Unimplemented> {
         Ok(self.get_ref(schema))
     }
 }
@@ -107,8 +110,7 @@ mod tests {
 
     use crate::{
         draft_2020_12::json_schema_2020_12_uri,
-        keyword::{const_, id, schema},
-        ID, REF, SCHEMA,
+        keyword::{const_, id, schema, ID, REF, SCHEMA},
     };
     use grill_core::{schema::Dialect, Interrogator, Structure};
 
@@ -124,26 +126,26 @@ mod tests {
         Interrogator::build()
             .dialect(dialect)
             .source_value(
-                "https://example.com/referenced",
+                "https://test.com/referenced",
                 Cow::Owned(json!({
                     "const": "value"
                 })),
             )
             .unwrap()
             .source_value(
-                "https://example.com/with_$ref",
+                "https://test.com/with_$ref",
                 Cow::Owned(json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://example.com/with_$ref",
+                    "$id": "https://test.com/with_$ref",
                     "$ref": Value::String(ref_value.to_string())
                 })),
             )
             .unwrap()
             .source_value(
-                "https://example.com/without_$ref",
+                "https://test.com/without_$ref",
                 Cow::Owned(json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://example.com/without_$ref",
+                    "$id": "https://test.com/without_$ref",
                 })),
             )
             .unwrap()
@@ -154,15 +156,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup() {
-        let mut interrogator = create_interrogator("https://example.com/referenced").await;
+        let mut interrogator = create_interrogator("https://test.com/referenced").await;
         let key = interrogator
-            .compile("https://example.com/with_$ref")
+            .compile("https://test.com/with_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let key = interrogator
-            .compile("https://example.com/without_$ref")
+            .compile("https://test.com/without_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -170,15 +172,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_evaluate() {
-        let mut interrogator = create_interrogator("https://example.com/referenced").await;
+        let mut interrogator = create_interrogator("https://test.com/referenced").await;
         let key = interrogator
-            .compile("https://example.com/with_$ref")
+            .compile("https://test.com/with_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let _ = interrogator
-            .compile("https://example.com/without_$ref")
+            .compile("https://test.com/without_$ref")
             .await
             .unwrap();
         let value = json!(34.34);

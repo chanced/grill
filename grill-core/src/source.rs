@@ -1,20 +1,21 @@
-use super::{Deserializers, Link, Resolvers};
-use crate::error::{
-    DeserializationError, LinkConflictError, LinkError, PointerError, SourceConflictError,
-};
 use crate::{
-    error::{DeserializeError, SourceError},
-    uri::AbsoluteUri,
+    error::{
+        DeserializationError, DeserializeError, LinkConflictError, LinkError, PointerError,
+        ResolveError, ResolveErrors, SourceConflictError, SourceError,
+    },
+    AbsoluteUri,
 };
-
-use ahash::AHashMap;
-use jsonptr::{Pointer, Resolve};
+use async_trait::async_trait;
+use dyn_clone::{clone_trait_object, DynClone};
+use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::borrow::Cow;
-use std::collections::hash_map::Entry;
-use std::convert::AsRef;
-use std::ops::Deref;
+use std::{
+    borrow::Cow,
+    collections::hash_map::{Entry, HashMap},
+    convert::AsRef,
+    ops::Deref,
+};
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 
@@ -92,7 +93,7 @@ impl Deref for Source<'_> {
 #[derive(Clone, Debug, Default)]
 struct Store {
     table: SlotMap<SourceKey, Cow<'static, Value>>,
-    index: AHashMap<AbsoluteUri, Link>,
+    index: HashMap<AbsoluteUri, Link>,
 }
 impl Store {
     fn check_and_get_occupied(
@@ -469,11 +470,233 @@ impl Sources {
     }
 }
 
+/// A trait implemented by functions or types which can deserialize data into a [`Value`].
+///
+///
+/// Three implementations are provided:
+/// - [`deserialize_json`](`deserialize_json`): Deserializes JSON data. Always enabled.
+/// - [`deserialize_yaml`](`deserialize_yaml`): Deserializes YAML data. Enabled with the `"yaml"` feature.
+/// - [`deserialize_toml`](`deserialize_toml`): Deserializes TOML data. Enabled with the `"toml"` feature.
+/// # Example
+/// Implementing a custom deserializer for a format that has serde integration
+/// is straightforward. `Deserializer` is implemented for `Fn(&str) ->
+/// Result<Value, erased_serde::Error>`:
+/// ```rust
+/// pub fn deserialize_yaml(data: &str) -> Result<serde_json::Value, erased_serde::Error> {
+///     use erased_serde::Deserializer;
+///     let yaml = serde_yaml::Deserializer::from_str(data);
+///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
+/// }
+/// ```
+pub trait Deserializer: DynClone + Send + Sync + 'static {
+    fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
+}
+clone_trait_object!(Deserializer);
+impl<F> Deserializer for F
+where
+    F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,
+{
+    fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error> {
+        self(data)
+    }
+}
+
+#[derive(Clone)]
+pub struct Deserializers {
+    deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
+}
+impl std::fmt::Debug for Deserializers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.deserializers.iter().map(|(name, _)| name))
+            .finish()
+    }
+}
+
+impl Deserializers {
+    pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserializer>)>) -> Self {
+        if !deserializers
+            .iter()
+            .any(|(name, _)| name.to_lowercase() == "json")
+        {
+            deserializers.push(("json", Box::new(deserialize_json)));
+        }
+        Self { deserializers }
+    }
+    pub fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
+        let mut errs = HashMap::new();
+        for (name, deserializer) in &self.deserializers {
+            match deserializer.deserialize(data) {
+                Ok(value) => return Ok(value),
+                Err(err) => {
+                    errs.insert(*name, err);
+                }
+            }
+        }
+        Err(DeserializeError { formats: errs })
+    }
+}
+impl Deref for Deserializers {
+    type Target = [(&'static str, Box<dyn Deserializer>)];
+
+    fn deref(&self) -> &Self::Target {
+        &self.deserializers
+    }
+}
+
+pub fn deserialize_json(data: &str) -> Result<Value, erased_serde::Error> {
+    use erased_serde::Deserializer;
+    let mut json = serde_json::Deserializer::from_str(data);
+    erased_serde::deserialize(&mut <dyn Deserializer>::erase(&mut json))
+}
+
+#[cfg(feature = "yaml")]
+pub fn deserialize_yaml(data: &str) -> Result<Value, erased_serde::Error> {
+    use erased_serde::Deserializer;
+    let yaml = serde_yaml::Deserializer::from_str(data);
+    erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
+}
+
+#[cfg(feature = "toml")]
+pub fn deserialize_toml(data: &str) -> Result<Value, erased_serde::Error> {
+    use erased_serde::Deserializer;
+    let toml = toml::Deserializer::new(data);
+    erased_serde::deserialize(&mut <dyn Deserializer>::erase(toml))
+}
+
+/// A file reference
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Link {
+    pub(crate) key: SourceKey,
+    pub(crate) uri: AbsoluteUri,
+    pub(crate) root_uri: AbsoluteUri,
+    pub(crate) path: Pointer,
+}
+
+impl Link {
+    pub(crate) fn new(key: SourceKey, uri: AbsoluteUri, path: Pointer) -> Self {
+        let mut root_uri = uri.clone();
+        root_uri.set_fragment(None).unwrap();
+        Self {
+            key,
+            uri,
+            root_uri,
+            path,
+        }
+    }
+}
+impl From<&Link> for (AbsoluteUri, Pointer) {
+    fn from(value: &Link) -> Self {
+        (value.uri.clone(), value.path.clone())
+    }
+}
+
+#[async_trait]
+pub trait Resolve: DynClone + Send + Sync + 'static {
+    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
+}
+
+clone_trait_object!(Resolve);
+
+///
+#[cfg(feature = "http")]
+#[cfg_attr(docsrs, doc(cfg(feature = "http")))]
+#[derive(Clone, Debug)]
+pub struct HttpResolver {
+    client: reqwest::Client,
+}
+
+#[cfg(feature = "http")]
+/// A [`Resolve`] implementation that uses HTTP(S) to resolve schema sources.
+impl HttpResolver {
+    #[must_use]
+    pub fn new(client: reqwest::Client) -> Self {
+        Self { client }
+    }
+}
+
+#[cfg(feature = "http")]
+#[async_trait]
+impl Resolve for HttpResolver {
+    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError> {
+        let Some(url) = uri.as_url() else {
+            return Ok(None);
+        };
+        let scheme = url.scheme();
+        if scheme != "http" && scheme != "https" {
+            return Ok(None);
+        }
+        match self.client.get(url.clone()).send().await {
+            Ok(resp) => {
+                let text = resp
+                    .text()
+                    .await
+                    .map_err(|err| ResolveError::new(err, uri.clone()))?;
+                Ok(Some(text))
+            }
+            Err(err) if matches!(err.status(), Some(reqwest::StatusCode::NOT_FOUND)) => Ok(None),
+            Err(err) => Err(ResolveError::new(err, uri.clone())),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Resolvers {
+    resolvers: Vec<Box<dyn Resolve>>,
+}
+
+impl Resolvers {
+    #[must_use]
+    pub fn new(resolvers: Vec<Box<dyn Resolve>>) -> Self {
+        Self { resolvers }
+    }
+
+    pub async fn resolve(&self, uri: &AbsoluteUri) -> Result<String, ResolveErrors> {
+        let mut errors = ResolveErrors::default();
+        for resolver in &self.resolvers {
+            match resolver.resolve(uri).await {
+                Ok(Some(data)) => {
+                    return Ok(data);
+                }
+                Err(err) => errors.push(err),
+                _ => continue,
+            }
+        }
+        if errors.is_empty() {
+            errors.push_not_found(uri.clone());
+        }
+        Err(errors)
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Box<dyn Resolve>> {
+        self.resolvers.iter()
+    }
+}
+impl<'a> IntoIterator for &'a Resolvers {
+    type Item = &'a Box<dyn Resolve>;
+    type IntoIter = std::slice::Iter<'a, Box<dyn Resolve>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.resolvers.iter()
+    }
+}
+
+#[cfg(test)]
+mockall::mock! {
+    pub Resolver{}
+
+    #[async_trait]
+    impl Resolve for Resolver {
+        async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
+    }
+    impl Clone for Resolver {
+        fn clone(&self) -> Self;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-
-    use crate::source::resolve::MockResolver;
 
     use super::*;
 
@@ -502,7 +725,7 @@ mod tests {
 
         let resolvers = Resolvers::new(vec![Box::new(resolver)]);
 
-        let uri: AbsoluteUri = "https://example.com/foo".parse().unwrap();
+        let uri: AbsoluteUri = "https://test.com/foo".parse().unwrap();
         let base_uri = uri.clone();
         let deserializers = Deserializers::new(vec![]);
         sources.start_txn();

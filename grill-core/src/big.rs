@@ -7,16 +7,24 @@ pub use num::{BigInt, BigRational};
 use num::FromPrimitive;
 
 mod rational;
-pub use rational::parse_rational;
 
 mod int;
-pub use int::parse_int;
 
 lazy_static::lazy_static! {
     static ref TEN: BigInt = BigInt::from_u8(10).unwrap();
 }
 
-use crate::error::OverflowError;
+/// Parses a string into a [`BigInt`]
+pub fn parse_int(value: &str) -> Result<BigInt, NumberError> {
+    int::Parser::parse(value)
+}
+
+/// Parses a string into a [`BigRational`]
+pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
+    rational::Parser::parse(value)
+}
+
+use crate::error::{NumberError, OverflowError};
 
 /// Attempts to convert a `usize` to `u32`
 ///

@@ -1,5 +1,5 @@
-use ahash::AHashMap;
 use num_rational::BigRational;
+use std::collections::HashMap;
 
 pub mod cache;
 
@@ -31,10 +31,13 @@ use std::{
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Generates a static function which returns a [`Pointer`] to the given path.
+///
 #[macro_export]
 macro_rules! static_pointer_fn {
     ($vis:vis $ident:ident $path:literal) => {
         paste::paste! {
+            #[doc = "Returns a static [`Pointer`] to \"" $path "\""]
             pub fn [< $ident _pointer >]() -> &'static jsonptr::Pointer {
                 use ::once_cell::sync::Lazy;
                 static POINTER: Lazy<jsonptr::Pointer> = Lazy::new(|| jsonptr::Pointer::parse($path).unwrap());
@@ -106,6 +109,7 @@ pub use define_translate;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Context for compilation of the [`Keyword`]
 #[derive(Debug)]
 pub struct Compile<'i> {
     pub(crate) absolute_uri: &'i AbsoluteUri,
@@ -117,6 +121,7 @@ pub struct Compile<'i> {
 
 impl<'i> Compile<'i> {
     #[must_use]
+    /// The [`AbsoluteUri`] of the [`Schema`]
     pub fn absolute_uri(&self) -> &AbsoluteUri {
         self.absolute_uri
     }
@@ -127,7 +132,7 @@ impl<'i> Compile<'i> {
     /// # Errors
     /// Returns `NumberError` if the number fails to parse
     pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
-        self.numbers.number(num)
+        self.numbers.get_or_insert_arc(num)
     }
     /// Caches a [`Value`] and returns an `Arc` to it.
     pub fn value(&mut self, value: &Value) -> Arc<Value> {
@@ -198,6 +203,9 @@ pub struct Context<'i> {
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
     pub(crate) evaluated: &'i mut Evaluated,
+
+    pub(crate) global_numbers: &'i Numbers,
+    pub(crate) eval_numbers: &'i mut Numbers,
 }
 
 impl<'s> Context<'s> {
@@ -222,11 +230,36 @@ impl<'s> Context<'s> {
             instance_location,
             keyword_location,
             self.sources,
+            self.evaluated,
             self.global_state,
             self.eval_state,
+            self.global_numbers,
+            self.eval_numbers,
         )
     }
-
+    /// Either returns a reference to a previously parsed [`BigRational`] or
+    /// parses, stores the [`BigRational`] as an [`Arc`] (per eval) and returns
+    /// a reference to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn number_ref(&mut self, number: &Number) -> Result<&BigRational, NumberError> {
+        if let Some(n) = self.global_numbers.get_ref(number) {
+            return Ok(n);
+        }
+        self.eval_numbers.get_or_insert_ref(number)
+    }
+    /// Either returns a [`Arc`] to a previously parsed [`BigRational`] or
+    /// parses, stores (per eval) and returns an [`Arc`] to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn number_arc(&mut self, number: &Number) -> Result<Arc<BigRational>, NumberError> {
+        if let Some(n) = self.global_numbers.get_arc(number) {
+            return Ok(n);
+        }
+        self.eval_numbers.get_or_insert_arc(number)
+    }
     /// Evaluates `value` against the schema with the given `key` but does not
     /// mark the instance as evaluated.
     ///
@@ -252,8 +285,11 @@ impl<'s> Context<'s> {
             instance_location,
             keyword_location,
             self.sources,
+            self.evaluated,
             self.global_state,
             self.eval_state,
+            self.global_numbers,
+            self.eval_numbers,
         )
     }
 
@@ -337,6 +373,32 @@ impl<'s> Context<'s> {
     pub fn should_short_circuit(&self) -> bool {
         self.structure.is_flag()
     }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                            paths_of_object                            ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+#[must_use]
+pub fn paths_of_object(field: &'static str, schema: &Value) -> Vec<Pointer> {
+    let Some(Value::Object(props)) = schema.get(field) else {
+        return Vec::new();
+    };
+    let base = Pointer::new([field]);
+    props
+        .keys()
+        .map(|k| {
+            let mut ptr = base.clone();
+            ptr.push_back(Token::from(k));
+            ptr
+        })
+        .collect()
 }
 
 /*
@@ -472,11 +534,11 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// use grill::{ uri::AbsoluteUri, keyword::Keyword, json_schema::keyword::id::Id };
     ///
     /// let id_keyword = Id::new("$id", false);
-    /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
+    /// let id = id_keyword.identify(&json!({"$id": "https://test.com/schema.json" }))
     ///     .unwrap()  // unwraps `Result<Result<Option<Identifier>, IdentifyError>, Unimplemented>`
     ///     .unwrap()  // unwraps `Result<Option<Identifier>, Identifier>`
     ///     .unwrap(); // unwraps `Option<Identifier>`
-    /// assert_eq!(&id, &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
+    /// assert_eq!(&id, &AbsoluteUri::parse("https://test.com/schema.json").unwrap());
     /// ```
     ///
     fn identify(
@@ -538,13 +600,13 @@ clone_trait_object!(Keyword);
 /// # use grill::keyword::Evaluated;
 #[derive(Debug, Clone)]
 pub struct Evaluated {
-    children: AHashMap<String, Evaluated>,
+    children: HashMap<String, Evaluated>,
 }
 impl Evaluated {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            children: AHashMap::new(),
+            children: HashMap::new(),
         }
     }
     pub fn insert(&mut self, ptr: &Pointer) {

@@ -4,8 +4,7 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-// TODO: enable this once I get to documenting
-// #![deny(missing_docs)]
+#![warn(missing_docs)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::result_large_err,
@@ -16,12 +15,11 @@
     clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
     clippy::missing_errors_doc, // TODO: remove when I get around to documenting
     clippy::wildcard_imports,
-    clippy::module_inception
+    clippy::module_inception,
+    clippy::unreadable_literal
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
-mod consts;
-pub use consts::*;
 
 pub mod keyword;
 pub mod draft_04;
@@ -30,7 +28,7 @@ pub mod draft_2019_09;
 pub mod draft_2020_12;
 
 
-
+/// A trait for adding JSON Schema dialects to a [`Build`](grill_core::Build).
 pub trait Build: Sized {
     /// Adds the JSON Schema Draft 2020-12 [`Dialect`](grill_core::schema::Dialect).
     #[must_use]
@@ -67,7 +65,36 @@ impl Build for grill_core::Build {
     }
 }
 
-
+/// Generates two `fn`s: one which returns the static
+/// [`AbsoluteUri`](grill::uri::AbsoluteUri) and another that returns the static
+/// `Value`
+/// 
+/// # Example
+/// ```
+/// # use grill_macros::metaschema;
+/// metaschema!(
+///     [JSON Schema 2020_12 Content]("https://json-schema.org/draft/2020-12/meta/content")
+///     {
+///         "$schema": "https://json-schema.org/draft/2020-12/schema",
+///         "$id": "https://json-schema.org/draft/2020-12/meta/content",
+///         "$vocabulary": {
+///             "https://json-schema.org/draft/2020-12/vocab/content": true
+///         },
+///         "$dynamicAnchor": "meta",
+/// 
+///         "title": "Content vocabulary meta-schema",
+/// 
+///         "type": ["object", "boolean"],
+///         "properties": {
+///             "contentEncoding": { "type": "string" },
+///             "contentMediaType": { "type": "string" },
+///             "contentSchema": { "$dynamicRef": "#meta" }
+///         }
+///     }
+/// );
+/// assert_eq!(json_schema_2020_12_content_uri().as_str(), "https://json-schema.org/draft/2020-12/meta/content");
+/// assert_eq!(json_schema_2020_12_content_value().get("$id").unwrap(), &serde_json::Value::String("https://json-schema.org/draft/2020-12/meta/content".to_string()));
+/// ```
 #[macro_export]
 macro_rules! metaschema {
     (

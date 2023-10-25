@@ -3,8 +3,8 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-// TODO: enable this once I get to documenting
-// #![deny(missing_docs)]
+
+#![warn(missing_docs)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::result_large_err,

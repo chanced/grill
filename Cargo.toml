@@ -8,15 +8,14 @@ grill-core        = { version = "0.1.0" }
 grill-json-schema = { workspace = "0.1.0" }
 grill-macros      = { version = "0.1.0" }
 
-ahash            = { version = "0.8.3" }
 anyhow           = { version = "1.0.75" }
 anymap           = { version = "1.0.0-beta.2" }
 async-trait      = { version = "0.1" }
+bitflags         = { version = "2.4.1" }
 derive_more      = { version = "0.99.17" }
 dyn-clone        = { version = "1.0.11" }
 either           = { version = "1.8.1" }
 erased-serde     = { version = "0.3.25" }
-fancy-regex      = { version = "0.11.0" }
 inherent         = { version = "1" }
 jsonptr          = { version = "0.4.4" }
 lazy_static      = { version = "1.4.0" }

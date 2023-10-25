@@ -67,7 +67,7 @@ where
     type Item = Schema<'static>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(Schema::make_owned)
+        self.iter.next().map(Schema::to_owned)
     }
 }
 

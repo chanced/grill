@@ -4,10 +4,6 @@ use num::{pow, BigInt};
 use num_rational::BigRational;
 use std::str::FromStr;
 
-pub fn parse_int(value: &str) -> Result<BigInt, NumberError> {
-    Parser::parse(value)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
     Head,
@@ -51,7 +47,7 @@ impl State {
 }
 
 #[derive(Debug)]
-struct Parser<'a> {
+pub(super) struct Parser<'a> {
     value: &'a str,
     state: State,
     is_negative: bool,
@@ -91,7 +87,7 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
-    fn parse(value: &'a str) -> Result<BigInt, NumberError> {
+    pub(super) fn parse(value: &'a str) -> Result<BigInt, NumberError> {
         let value = value.trim();
         let mut parser = Parser {
             value,
@@ -154,6 +150,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::big::parse_int;
+
     use super::*;
     use State::*;
 
