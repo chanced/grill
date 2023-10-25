@@ -138,6 +138,71 @@ impl Build {
         ));
         Ok(self)
     }
+    /// Adds a source schema from an owned [`Value`]
+    /// # Example
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// # use std::{ collections::HashMap };
+    /// # use serde_json::json;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let schema = json!({"type": "string"});
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_owned_value("https://test.com/schema.json", schema).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    /// # Errors
+    /// Returns [`UriError`] if the `uri` fails to convert to an
+    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
+    ///
+    pub fn source_owned_value(
+        mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: Value,
+    ) -> Result<Self, UriError> {
+        self.sources
+            .push(Src::Value(uri.try_into_absolute_uri()?, Cow::Owned(source)));
+        Ok(self)
+    }
+
+    /// Adds a source schema from a static reference to a [`Value`]
+    /// # Example
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// # use std::{ collections::HashMap };
+    /// # use serde_json::json;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let schema = json!({"type": "string"});
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_owned_value("https://test.com/schema.json", schema).unwrap()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    /// # Errors
+    /// Returns [`UriError`] if the `uri` fails to convert to an
+    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
+    ///
+    pub fn source_static_ref_value(
+        mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: &'static Value,
+    ) -> Result<Self, UriError> {
+        self.sources.push(Src::Value(
+            uri.try_into_absolute_uri()?,
+            Cow::Borrowed(source),
+        ));
+        Ok(self)
+    }
 
     /// Adds a source schema from a [`Value`]
     /// # Example

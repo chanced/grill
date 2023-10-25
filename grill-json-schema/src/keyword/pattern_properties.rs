@@ -63,9 +63,11 @@ impl Keyword for PatternProperties {
             }
             .into());
         };
-        let mut patterns = Vec::with_capacity(self.patterns.len());
+        let paths = paths_of_object(PATTERN_PROPERTIES, &schema);
 
-        for path in paths_of_object(PATTERN_PROPERTIES, &schema) {
+        let mut patterns = Vec::with_capacity(paths.len());
+
+        for path in paths {
             let keyword = path.last().unwrap().decoded().to_string();
             let _ = regex::Regex::new(&keyword)?;
             patterns.push(keyword.clone());
@@ -84,6 +86,7 @@ impl Keyword for PatternProperties {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
+
         let mut output = ctx.annotate(Some(PATTERN_PROPERTIES), None);
         let mut is_valid = true;
         let mut invalid = Vec::with_capacity(self.patterns.len());
@@ -177,7 +180,7 @@ mod tests {
 
     use crate::{
         draft_2020_12::json_schema_2020_12_uri,
-        keyword::{const_, id, schema, ID, SCHEMA},
+        keyword::{id, schema, type_, ID, SCHEMA},
     };
     use grill_core::{schema::Dialect, Interrogator, Structure};
 
@@ -187,7 +190,7 @@ mod tests {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
             .with_keyword(schema::Schema::new(SCHEMA, false))
             .with_keyword(id::Id::new(ID, false))
-            .with_keyword(const_::Const::new(None))
+            .with_keyword(type_::Type::new(None))
             .with_keyword(super::PatternProperties::default())
             .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
@@ -196,11 +199,7 @@ mod tests {
             .dialect(dialect)
             .source_value(
                 "https://test.com/with_pattern_properties",
-                Cow::Owned(json!({
-                    "$id": "https://test.com/with_properties",
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    PATTERN_PROPERTIES: properties
-                })),
+                Cow::Owned(properties),
             )
             .unwrap()
             .source_value(
@@ -267,7 +266,6 @@ mod tests {
             let output = interrogator
                 .evaluate(key, Structure::Verbose, &data)
                 .unwrap();
-
             assert_eq!(
                 output.is_valid(),
                 expected_valid,

@@ -375,6 +375,7 @@ fn determine_bitfield(s: &str) -> Result<Bitfield, ()> {
         "object" => Ok(Bitfield::OBJECT),
         "array" => Ok(Bitfield::ARRAY),
         "number" => Ok(Bitfield::NUMBER),
+        "integer" => Ok(Bitfield::INTEGER),
         "string" => Ok(Bitfield::STRING),
         other => {
             let lower = other.to_lowercase();
@@ -451,8 +452,14 @@ mod tests {
         let with_string_type = json!({
             "type": "string"
         });
-        let with_array_type = json!({
+        let with_array_of_types = json!({
             "type": ["string", "number"]
+        });
+        let with_integer_type = json!({
+            "type": "integer"
+        });
+        let with_number_type = json!({
+            "type": "number"
         });
 
         let without_type = json!({});
@@ -461,10 +468,11 @@ mod tests {
             build_interrogator("https://test.com/with_string_type", with_string_type)
                 .source_value("https://test.com/without_type", Cow::Owned(without_type))
                 .unwrap()
-                .source_value(
-                    "https://test.com/with_array_type",
-                    Cow::Owned(with_array_type),
-                )
+                .source_owned_value("https://test.com/with_array_of_types", with_array_of_types)
+                .unwrap()
+                .source_owned_value("https://test.com/with_number_type", with_number_type)
+                .unwrap()
+                .source_owned_value("https://test.com/with_integer_type", with_integer_type)
                 .unwrap()
                 .finish()
                 .await
@@ -483,6 +491,57 @@ mod tests {
         assert!(output.is_valid());
 
         let invalid_value = json!(["invalid"]);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &invalid_value)
+            .unwrap();
+        assert!(output.is_invalid());
+        let key = interrogator
+            .compile("https://test.com/with_integer_type")
+            .await
+            .unwrap();
+
+        let valid_value = json!(34);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &valid_value)
+            .unwrap();
+        assert!(output.is_valid());
+
+        let invalid_value = json!(34.34);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &invalid_value)
+            .unwrap();
+        assert!(output.is_invalid());
+
+        let key = interrogator
+            .compile("https://test.com/with_array_of_types")
+            .await
+            .unwrap();
+
+        let valid_value = json!(34);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &valid_value)
+            .unwrap();
+        assert!(output.is_valid());
+
+        let valid_value = json!("\"34\"");
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &valid_value)
+            .unwrap();
+        assert!(output.is_valid());
+
+        let invalid_value = json!(true);
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &invalid_value)
+            .unwrap();
+        assert!(output.is_invalid());
+
+        let invalid_value = json!({});
+        let output = interrogator
+            .evaluate(key, Structure::Verbose, &invalid_value)
+            .unwrap();
+        assert!(output.is_invalid());
+
+        let invalid_value = json!([34]);
         let output = interrogator
             .evaluate(key, Structure::Verbose, &invalid_value)
             .unwrap();

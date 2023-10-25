@@ -385,9 +385,10 @@ impl<'s> Context<'s> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Returns a [`Vec`] of [`Pointer`]s to the fields of the object at `field`.
 #[must_use]
-pub fn paths_of_object(field: &'static str, schema: &Value) -> Vec<Pointer> {
-    let Some(Value::Object(props)) = schema.get(field) else {
+pub fn paths_of_object(field: &'static str, object: &Value) -> Vec<Pointer> {
+    let Some(Value::Object(props)) = object.get(field) else {
         return Vec::new();
     };
     let base = Pointer::new([field]);
