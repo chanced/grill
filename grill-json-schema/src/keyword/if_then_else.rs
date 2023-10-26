@@ -1,3 +1,7 @@
+//! # `if`, `then`, `else` keywords.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/validation/const/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.1.3)
 use grill_core::{
     error::{CompileError, EvaluateError},
     keyword::{static_pointer_fn, Compile, Context, Keyword, Kind},

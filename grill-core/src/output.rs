@@ -1,3 +1,5 @@
+//! Output data structures and types.
+//!
 use crate::{anymap::AnyMap, AbsoluteUri, Uri};
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;

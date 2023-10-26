@@ -1,19 +1,29 @@
+//! # `$schema` keyword.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/core/schema/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
+
 use serde_json::Value;
 
 use grill_core::{
     error::{CompileError, EvaluateError, IdentifyError},
-    keyword::{self, Context, Kind, Unimplemented},
+    keyword::{self, Context, Keyword, Kind, Unimplemented},
     uri::AbsoluteUri,
     Output,
 };
 
+/// [`Keyword`] for `$schema`.
 #[derive(Debug, Clone)]
 pub struct Schema {
+    /// the keyword to use (e.g. `$schema`)
     pub keyword: &'static str,
+    /// Whether the [`Dialect`](grill_core::Dialect) allows for fragmented
+    /// metaschema IDs
     pub allow_fragment: bool,
 }
 
 impl Schema {
+    /// Construct a new `Schema` keyword.
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
@@ -23,7 +33,7 @@ impl Schema {
     }
 }
 
-impl keyword::Keyword for Schema {
+impl Keyword for Schema {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }

@@ -24,10 +24,9 @@ grill your data with [JSON Schema](https://json-schema.org/).
 -   Easily translate or customize validation error messages for your users.
 -   Dial in output noise with 3 levels of granularity which conform to the
     current (2020-12) recommendation structures.
--   Utilizes `BigRational` for all numeric comparisons for accuracy and big
-    number support.
--   Built on [`slotmap`](https://docs.rs/slotmap/latest/slotmap/) with caching
-    of schema `Value`s and `BigRational`s to optimize resource utilization.
+-   Confidently compare massive to minuscule numbers - they are all parsed as
+    `BigRational`s.
+-   Conserve bits with `Value`s and `BigRational`s caches.
 
 ## Compatability
 
@@ -95,25 +94,35 @@ async fn main() {
 **Note**: This list may become stale. Check `Cargo.toml` for the most up to date
 account.
 
-|                      Feature Flag                      | Usage                                                                       | Version |     Re-export     | Optional | Dev |
-| :----------------------------------------------------: | --------------------------------------------------------------------------- | :-----: | :---------------: | :------: | --- |
-|           [`anyhow`](https://docs.rs/anyhow)           | User-supplied, opaque errors                                                | 1.0.75  |        ---        |    No    | No  |
-|          [`anymap`](https://docs.rs/anymap)\*          | Storage of state, translations                                              |   ---   |  `grill::anymap`  |    No    | No  |
-|      [`async-trait`](https://docs.rs/async-trait)      | Async trait support for [`Resolver`]                                        |  0.1.0  |        ---        |    No    | No  |
-|         [`bitflags`](https://docs.rs/bitflags)         | Bitfields                                                                   |  2.4.1  |        ---        |    No    | No  |
-|        [`dyn-clone`](https://docs.rs/dyn-clone)        | `Clone` for boxed trait objects                                             | 1.0.11  |        ---        |    No    | No  |
-|           [`either`](https://docs.rs/either)           | General purpose left/right sum enum                                         |  1.8.1  |        ---        |    No    | No  |
-|     [`erased-serde`](https://docs.rs/erased-serde)     | Serde type erasure for `Deserializer`s                                      | 0.3.25  |        ---        |    No    | No  |
-|         [`inherent`](https://docs.rs/inherent)         | Trait methods made callable without the trait in scope                      | 1.0.10  |        ---        |    No    | No  |
-|          [`jsonptr`](https://docs.rs/jsonptr)          | JSON Pointers                                                               |  0.4.4  |        ---        |    No    | No  |
-|              [`num`](https://docs.rs/num)              | Used to support precise comparison and big numbers                          |  0.4.0  | `grill::big::num` |    No    | No  |
-|         [`num-rational`](https://docs.rs/num)          | Big rational numbers                                                        |  0.4.1  |        ---        |    No    | No  |
-|        [`once_cell`](https://docs.rs/once_cell)        | Static values                                                               | 1.10.0  |        ---        |    No    | No  |
-|            [`paste`](https://docs.rs/paste)            | declarative macro utility                                                   | 1.0.14  |        ---        |    No    | No  |
-| [`percent-encoding`](https://docs.rs/percent-encoding) | URI encoding                                                                |  2.3.0  |        ---        |    No    | No  |
-|            [`regex`](https://docs.rs/regex)            | Regular expressions                                                         |  1.5.4  |        ---        |    No    | No  |
-|          [`reqwest`](https://docs.rs/reqwest)          | HTTP client for the optional [`HttpResolver`]                               | 0.11.0  |        ---        |   Yes    | No  |
-|            [`serde`](https://docs.rs/serde)            | Serialization and deserialization. Note: `"derive"` and `"rc"` are enabled. | 1.0.163 |        ---        |    No    | No  |
-|          [`mockall`](https://docs.rs/mockall)          | Mock generator                                                              | 0.11.4  |        ---        |    No    | Yes |
+|                      Feature Flag                      | Usage                                                                       |   Version |     Re-export     | Feature Flag | Dev |
+| :----------------------------------------------------: | --------------------------------------------------------------------------- | --------: | :---------------: | :----------: | --- |
+|           [`anyhow`](https://docs.rs/anyhow)           | User-supplied, opaque errors                                                |  `1.0.75` |        ---        |     ---      | No  |
+|          [`anymap`](https://docs.rs/anymap)\*          | Storage of state, translations                                              |       --- |  `grill::anymap`  |     ---      | No  |
+|      [`async-trait`](https://docs.rs/async-trait)      | Async trait support for [`Resolver`]                                        |   `0.1.0` |        ---        |     ---      | No  |
+|         [`bitflags`](https://docs.rs/bitflags)         | Bitfields                                                                   |   `2.4.1` |        ---        |     ---      | No  |
+|        [`dyn-clone`](https://docs.rs/dyn-clone)        | `Clone` for boxed trait objects                                             |  `1.0.11` |        ---        |     ---      | No  |
+|           [`either`](https://docs.rs/either)           | General purpose left/right sum enum                                         |   `1.8.1` |        ---        |     ---      | No  |
+|     [`erased-serde`](https://docs.rs/erased-serde)     | Serde type erasure for `Deserializer`s                                      |  `0.3.25` |        ---        |     ---      | No  |
+|         [`inherent`](https://docs.rs/inherent)         | Trait methods made callable without the trait in scope                      |  `1.0.10` |        ---        |     ---      | No  |
+|          [`jsonptr`](https://docs.rs/jsonptr)          | JSON Pointers                                                               |   `0.4.4` |        ---        |     ---      | No  |
+|              [`num`](https://docs.rs/num)              | Used to support precise comparison and big numbers                          |   `0.4.0` | `grill::big::num` |     ---      | No  |
+|         [`num-rational`](https://docs.rs/num)          | Big rational numbers                                                        |   `0.4.1` |        ---        |     ---      | No  |
+|        [`once_cell`](https://docs.rs/once_cell)        | Static values                                                               |  `1.10.0` |        ---        |     ---      | No  |
+|            [`paste`](https://docs.rs/paste)            | declarative macro utility                                                   |  `1.0.14` |        ---        |     ---      | No  |
+| [`percent-encoding`](https://docs.rs/percent-encoding) | URI encoding                                                                |   `2.3.0` |        ---        |     ---      | No  |
+|            [`regex`](https://docs.rs/regex)            | Regular expressions                                                         |   `1.5.4` |        ---        |     ---      | No  |
+|          [`reqwest`](https://docs.rs/reqwest)          | HTTP client for the optional [`HttpResolver`]                               |  `0.11.0` |        ---        |   `"http"`   | No  |
+|            [`serde`](https://docs.rs/serde)            | Serialization and deserialization. Note: `"derive"` and `"rc"` are enabled. | `1.0.163` |        ---        |     ---      | No  |
+|       [`serde_json`](https://docs.rs/serde_json)       | JSON support. Note: `"arbitrary_precision"` is enabled.                     | `1.0.107` |        ---        |     ---      | No  |
+|       [`serde_yaml`](https://docs.rs/serde_yaml)       | YAML support                                                                |  `0.9.21` |        ---        |   `"yaml"`   | No  |
+|          [`slotmap`](https://docs.rs/slotmap)          | Primary data store for `Interrogator`                                       |   `1.0.1` |        ---        |     ---      | No  |
+|            [`strum`](https://docs.rs/strum)            | Derive macros for enum stringification                                      |  `0.24.0` |        ---        |     ---      | No  |
+|        [`thiserror`](https://docs.rs/thiserror)        | Error enums                                                                 |  `1.0.25` |        ---        |     ---      | No  |
+|             [`toml`](https://docs.rs/toml)             | TOML support.                                                               |   `0.8.2` |        ---        |   `"toml"`   | No  |
+|              [`url`](https://docs.rs/url)              | URL parsing & representation                                                |   `2.2.2` | `grill::uri::url` |     ---      | No  |
+|              [`urn`](https://docs.rs/urn)              | URN parsing & representation                                                |   `0.7.0` | `grill::uri::urn` |     ---      | No  |
+|          [`similar`](https://docs.rs/similar)          | Test output comparison                                                      |   `2.2.1` |        ---        |     ---      | Yes |
+|            [`tokio`](https://docs.rs/tokio)            | Running `async` tests and examples                                          |  `1.28.0` |        ---        |     ---      | Yes |
+|          [`mockall`](https://docs.rs/mockall)          | Mock generator                                                              |  `0.11.4` |        ---        |     ---      | Yes |
 
 \* `anymap` was copied in for technical reasons.

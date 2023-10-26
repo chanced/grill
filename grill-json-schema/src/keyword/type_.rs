@@ -1,3 +1,8 @@
+//! # `type` keyword.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/validation/type/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation.html#section-6.1.1)
+//!
 use std::{borrow::Cow, sync::Arc};
 
 use bitflags::bitflags;

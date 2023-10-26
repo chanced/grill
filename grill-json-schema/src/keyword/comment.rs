@@ -1,3 +1,7 @@
+//! # `$comment` keyword.
+//!
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core#section-8.3)
+
 use serde_json::Value;
 
 use grill_core::{

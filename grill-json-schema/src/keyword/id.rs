@@ -1,3 +1,6 @@
+//! # `$id` or `id` keyword.
+//!
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.1)
 use std::fmt::Display;
 
 use serde_json::Value;
@@ -9,23 +12,19 @@ use grill_core::{
     Uri,
 };
 
+/// [`Keyword`] for `"$id"` or `"id"`
 #[derive(Debug, Clone)]
 pub struct Id {
+    /// the keyword to use (e.g. `"$id"` or `"id"`)
     pub keyword: &'static str,
+    /// Whether the [`Dialect`](grill_core::Dialect) allows for fragmented IDs
     pub allow_fragment: bool,
 }
 
 impl Id {
+    /// Construct a new `Id` keyword.
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
-        Self {
-            keyword,
-            allow_fragment,
-        }
-    }
-
-    #[must_use]
-    pub fn new_with_translate(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
             keyword,
             allow_fragment,

@@ -1,3 +1,7 @@
+//! # `$ref` keyword.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/core/ref/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.3.1)
 use std::sync::Arc;
 
 use jsonptr::Pointer;

@@ -1,3 +1,8 @@
+//! # `properties` keyword.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/applicator/properties/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.3.2.1)
+
 use std::{borrow::Cow, collections::HashMap};
 
 use super::PROPERTIES;

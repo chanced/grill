@@ -1,3 +1,5 @@
+//! Schema source store, resolvers, and deserializers.
+//!
 use crate::{
     error::{
         DeserializationError, DeserializeError, LinkConflictError, LinkError, PointerError,
@@ -20,6 +22,7 @@ use std::{
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 
 new_key_type! {
+    /// A key for a [`Source`].
     pub struct SourceKey;
 }
 
@@ -53,8 +56,11 @@ impl Src {
 /// A reference to a location within a source
 pub struct Source<'i> {
     pub(crate) key: SourceKey,
+    /// The URI of the source
     pub uri: Cow<'i, AbsoluteUri>,
+    /// The path within the source
     pub path: Cow<'i, Pointer>,
+    /// The value of the source
     pub value: Cow<'i, Value>,
 }
 
@@ -71,8 +77,9 @@ impl<'i> Source<'i> {
             value: Cow::Borrowed(value),
         }
     }
+    /// Returns an owned (`'static`) copy of this `Source`
     #[must_use]
-    pub fn into_owned(&self) -> Source<'static> {
+    pub fn to_owned(&self) -> Source<'static> {
         Source {
             key: self.key,
             uri: Cow::Owned(self.uri.clone().into_owned()),
@@ -489,6 +496,7 @@ impl Sources {
 /// }
 /// ```
 pub trait Deserializer: DynClone + Send + Sync + 'static {
+    /// Deserializes the given data into a [`Value`].
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
 clone_trait_object!(Deserializer);
@@ -501,6 +509,7 @@ where
     }
 }
 
+/// A collection of [`Deserializer`]s.
 #[derive(Clone)]
 pub struct Deserializers {
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
@@ -514,6 +523,8 @@ impl std::fmt::Debug for Deserializers {
 }
 
 impl Deserializers {
+    /// Returns a new [`Deserializers`] instance.
+    #[must_use]
     pub fn new(mut deserializers: Vec<(&'static str, Box<dyn Deserializer>)>) -> Self {
         if !deserializers
             .iter()
@@ -523,6 +534,8 @@ impl Deserializers {
         }
         Self { deserializers }
     }
+    /// Attempts to deserialize the given data into a [`Value`], trying each
+    /// [`Deserializer`] until one is successful.
     pub fn deserialize(&self, data: &str) -> Result<Value, DeserializeError> {
         let mut errs = HashMap::new();
         for (name, deserializer) in &self.deserializers {
@@ -543,20 +556,21 @@ impl Deref for Deserializers {
         &self.deserializers
     }
 }
-
+/// Deserializes JSON data.
 pub fn deserialize_json(data: &str) -> Result<Value, erased_serde::Error> {
     use erased_serde::Deserializer;
     let mut json = serde_json::Deserializer::from_str(data);
     erased_serde::deserialize(&mut <dyn Deserializer>::erase(&mut json))
 }
 
+/// Deserializes YAML data
 #[cfg(feature = "yaml")]
 pub fn deserialize_yaml(data: &str) -> Result<Value, erased_serde::Error> {
     use erased_serde::Deserializer;
     let yaml = serde_yaml::Deserializer::from_str(data);
     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
 }
-
+/// Deserializes TOML data
 #[cfg(feature = "toml")]
 pub fn deserialize_toml(data: &str) -> Result<Value, erased_serde::Error> {
     use erased_serde::Deserializer;
@@ -591,8 +605,10 @@ impl From<&Link> for (AbsoluteUri, Pointer) {
     }
 }
 
+/// A trait which is capable of resolving a [`Source`] at the given [`AbsoluteUri`].
 #[async_trait]
 pub trait Resolve: DynClone + Send + Sync + 'static {
+    /// Attempts to resolve a [`Source`] at the given `uri`
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
 }
 
@@ -609,6 +625,7 @@ pub struct HttpResolver {
 #[cfg(feature = "http")]
 /// A [`Resolve`] implementation that uses HTTP(S) to resolve schema sources.
 impl HttpResolver {
+    /// Returns a new [`HttpResolver`] instance.
     #[must_use]
     pub fn new(client: reqwest::Client) -> Self {
         Self { client }
@@ -640,17 +657,20 @@ impl Resolve for HttpResolver {
     }
 }
 
+/// A collection of [`Resolve`] implementations.
 #[derive(Clone)]
 pub struct Resolvers {
     resolvers: Vec<Box<dyn Resolve>>,
 }
 
 impl Resolvers {
+    /// Returns a new [`Resolvers`] instance.
     #[must_use]
     pub fn new(resolvers: Vec<Box<dyn Resolve>>) -> Self {
         Self { resolvers }
     }
-
+    /// Tries to resolve the given [`AbsoluteUri`] by attempting with each [`Resolve`] until
+    /// one is successful.
     pub async fn resolve(&self, uri: &AbsoluteUri) -> Result<String, ResolveErrors> {
         let mut errors = ResolveErrors::default();
         for resolver in &self.resolvers {
@@ -667,7 +687,8 @@ impl Resolvers {
         }
         Err(errors)
     }
-
+    /// Returns an [`Iterator`] over the [`Resolve`] implementations in this
+    /// [`Resolvers`] instance.
     pub fn iter(&self) -> std::slice::Iter<'_, Box<dyn Resolve>> {
         self.resolvers.iter()
     }

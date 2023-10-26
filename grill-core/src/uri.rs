@@ -152,6 +152,9 @@
 //! assert_eq!(uri.fragment(), Some("top"));
 //! ```
 
+pub use url;
+pub use urn;
+
 use percent_encoding::percent_decode;
 
 mod encode;

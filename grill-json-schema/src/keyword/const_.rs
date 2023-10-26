@@ -1,9 +1,13 @@
+//! # `"const"` keyword.
+//!
+//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/validation/const/)
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.1.3)
 use std::{borrow::Cow, sync::Arc};
 
 use grill_core::{
     big::BigRational,
     error::CompileError,
-    keyword::{define_translate, Kind},
+    keyword::{define_translate, Keyword, Kind},
     output::Error,
 };
 
@@ -11,7 +15,7 @@ use serde_json::Value;
 
 use grill_core::{
     error::EvaluateError,
-    keyword::{self, Compile, Context},
+    keyword::{Compile, Context},
     Output, Schema,
 };
 
@@ -47,7 +51,7 @@ impl Const {
         }
     }
 }
-impl keyword::Keyword for Const {
+impl Keyword for Const {
     fn kind(&self) -> Kind {
         CONST.into()
     }
@@ -115,7 +119,7 @@ pub fn translate_const_invalid_en(
     write!(f, "expected {}, found {}", error.expected, error.actual)
 }
 
-/// [`Error`] for the `enum` keyword, produced by [`ConstKeyword`].
+/// [`Error`] for the `enum` keyword, produced by [`Const`].
 #[derive(Clone, Debug)]
 pub struct ConstInvalid<'v> {
     /// The expected value.

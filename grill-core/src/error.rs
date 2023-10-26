@@ -1,3 +1,6 @@
+//! Logical errors which can occur while interacting this library.
+//!
+//!
 use std::collections::HashMap;
 
 use jsonptr::Pointer;

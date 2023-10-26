@@ -1,3 +1,5 @@
+//! Resources for working with schemas.
+
 pub mod iter;
 
 pub mod traverse;
@@ -22,6 +24,7 @@ use crate::{
     source::{Link, Source, Sources},
     AbsoluteUri, Output, Structure, Uri,
 };
+
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -38,9 +41,11 @@ use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
 */
 
 new_key_type! {
+    /// A unique identifier for a schema.
     pub struct Key;
 }
 
+/// An anchored location within a schema document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Anchor {
     /// Value of the anchor.  
@@ -154,6 +159,7 @@ impl Eq for CompiledSchema {}
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A compiled schema.
 #[derive(Clone, Debug)]
 pub struct Schema<'i> {
     /// Key of the `Schema`
@@ -219,8 +225,9 @@ impl Serialize for Schema<'_> {
 }
 
 impl<'i> Schema<'i> {
+    /// Clones the `Schema`
     #[must_use]
-    pub fn to_owned(self) -> Schema<'static> {
+    pub fn into_owned(self) -> Schema<'static> {
         Schema {
             key: self.key,
             parent: self.parent,
@@ -228,7 +235,7 @@ impl<'i> Schema<'i> {
             path: Cow::Owned(self.path.into_owned()),
             uris: Cow::Owned(self.uris.into_owned()),
             metaschema: Cow::Owned(self.metaschema.into_owned()),
-            source: self.source.into_owned(),
+            source: self.source.to_owned(),
             anchors: Cow::Owned(self.anchors.into_owned()),
             dependents: Cow::Owned(self.dependents.into_owned()),
             references: Cow::Owned(self.references.into_owned()),
@@ -253,6 +260,7 @@ impl std::ops::Index<&str> for Schema<'_> {
 }
 
 impl<'i> Schema<'i> {
+    /// [`Value`] of the schema
     #[must_use]
     pub fn value(&self) -> &Value {
         &self.source
@@ -345,7 +353,7 @@ impl Store {
 */
 
 #[derive(Clone, Debug, Default)]
-pub struct Schemas {
+pub(crate) struct Schemas {
     store: Store,
     sandbox: Option<Store>,
 }
@@ -644,6 +652,7 @@ pub struct Reference {
 
 impl Reference {}
 
+/// An identifier for a schema, returned from [`Keyword::identify`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identifier {
     Primary(Uri),
@@ -698,6 +707,7 @@ impl Identifier {
         matches!(self, Self::Secondary(..))
     }
 
+    /// Returns a reference to the [`Uri`] of the identifier.
     #[must_use]
     pub fn uri(&self) -> &Uri {
         match self {
@@ -705,6 +715,7 @@ impl Identifier {
         }
     }
 
+    /// Takes ownership of the [`Uri`] of the identifier.
     #[must_use]
     pub fn take_uri(self) -> Uri {
         match self {

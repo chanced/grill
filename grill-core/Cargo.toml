@@ -44,7 +44,7 @@ similar = { workspace = true }
 tokio   = { version = "1.28", features = ["full"] }
 
 [features]
-default = ["http", "toml", "yaml"]
+default = []
 http    = ["reqwest"]
 toml    = ["dep:toml"]
 yaml    = ["dep:serde_yaml"]

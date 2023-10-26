@@ -1,3 +1,5 @@
+//! Graph traversal [`Iterator`]s for [`Schema`]s
+
 use super::{Reference, Schemas};
 use crate::{source::Sources, AbsoluteUri, Key, Schema};
 use either::Either;
@@ -67,7 +69,7 @@ where
     type Item = Schema<'static>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(Schema::to_owned)
+        self.iter.next().map(Schema::into_owned)
     }
 }
 

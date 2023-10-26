@@ -1,4 +1,5 @@
-//! # `"enum"` keyword.
+//! # `enum` keyword.
+//!
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.1.2)
 //! - [Draft 2019-09 Specification](https://json-schema.org/draft/2019-09/json-schema-validation#rfc.section.6.1.2)
 
