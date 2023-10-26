@@ -27,6 +27,7 @@ pub fn dialect() -> Dialect {
         .with_keyword(keyword::defs::Defs)
         .with_keyword(keyword::if_then_else::IfThenElse::default())
         .with_keyword(keyword::type_::Type::new(None))
+        .with_keyword(keyword::enum_::Enum::new(None))
         .finish()
         .unwrap()
 }

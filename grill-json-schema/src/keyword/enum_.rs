@@ -1,121 +1,142 @@
-/// [`Keyword`](`crate::keyword::Keyword`) for the `enum` keyword.
-///
-/// An instance validates successfully against this keyword if its value is
-/// equal to one of the elements in this keyword's array value.
-///
-/// The value of this keyword MUST be an array.  This array SHOULD have at least
-/// one element.  Elements in the array SHOULD be unique.
-///
-/// An instance validates successfully against this keyword if its value is
-/// equal to one of the elements in this keyword's array value.
-///
-/// Elements in the array might be of any value, including null.
-///
-/// - [JSON Schema Validation 07 # 6.1.2.
-///   `enum`](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.1.2)
-#[derive(Debug, Clone, Default)]
+//! # `"enum"` keyword.
+//! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.1.2)
+//! - [Draft 2019-09 Specification](https://json-schema.org/draft/2019-09/json-schema-validation#rfc.section.6.1.2)
+
+use grill_core::{
+    define_translate,
+    error::InvalidTypeError,
+    keyword::{Compile, Keyword, Kind},
+    output::Error,
+};
+use serde_json::Value;
+use std::{borrow::Cow, string::ToString, sync::Arc};
+
+use super::ENUM;
+
+/// [`Keyword`] for`enum`.
+#[derive(Debug, Clone)]
 pub struct Enum {
-    _expected: Vec<serde_json::Value>,
+    /// The expected values
+    pub expected: Arc<[Value]>,
+    /// The instance of [`TranslateEnumInvalid`] to use
+    pub translate: TranslateEnumInvalid,
+}
+impl Enum {
+    /// Construct a new `Enum` keyword.
+    ///
+    /// `translate` allows for overriding of the default [`TranslateEnumInvalid`]
+    /// instance.
+    #[must_use]
+    pub fn new(translate: Option<TranslateEnumInvalid>) -> Enum {
+        Self {
+            expected: Arc::new([]),
+            translate: translate.unwrap_or_default(),
+        }
+    }
+}
+impl Keyword for Enum {
+    fn kind(&self) -> Kind {
+        Kind::Single(ENUM)
+    }
+    fn setup<'i>(
+        &mut self,
+        _compile: &mut Compile<'i>,
+        schema: grill_core::Schema<'i>,
+    ) -> Result<bool, grill_core::error::CompileError> {
+        let Some(enum_) = schema.get(ENUM) else {
+            return Ok(false);
+        };
+        let Value::Array(enum_) = enum_ else {
+            return Err(InvalidTypeError {
+                expected: grill_core::error::Expected::Array,
+                actual: Box::new(enum_.clone()),
+            }
+            .into());
+        };
+        if enum_.is_empty() {
+            return Ok(false);
+        }
+        self.expected = Arc::from(enum_.as_slice());
+        Ok(true)
+    }
+
+    fn evaluate<'i, 'v>(
+        &'i self,
+        ctx: &'i mut grill_core::keyword::Context,
+        value: &'v Value,
+    ) -> Result<Option<grill_core::output::Output<'v>>, grill_core::error::EvaluateError> {
+        for expected in &*self.expected {
+            if expected == value {
+                return Ok(Some(ctx.annotate(Some(ENUM), Some(value.into()))));
+            }
+        }
+        Ok(Some(ctx.error(
+            Some(ENUM),
+            Some(Box::new(EnumInvalid {
+                actual: Cow::Borrowed(value),
+                expected: self.expected.clone(),
+                translate: self.translate.clone(),
+            })),
+        )))
+    }
 }
 
-// impl SyncKeyword for EnumKeyword {
-//     fn compile<'s>(
-//         &mut self,
-//         _compiler: &mut crate::Compiler<'s>,
-//         schema: &'s Schema,
-//     ) -> Result<bool, crate::error::SetupError> {
-//         match schema {
-//             Schema::Bool(_) => Ok(false),
-//             Schema::Object(obj) if obj.enumeration.is_empty() => Ok(false),
-//             Schema::Object(obj) => {
-//                 self.expected = obj.enumeration.clone();
-//                 Ok(true)
-//             }
-//         }
-//     }
-
-//     fn evaluate<'v>(
-//         &self,
-//         scope: &mut crate::Scope,
-//         value: &'v serde_json::Value,
-//         _structure: crate::Structure,
-//     ) -> Result<Option<Annotation<'v>>, Box<dyn Error>> {
-//         let mut annotation = scope.annotate("enum", value);
-//         if !self.expected.contains(value) {
-//             annotation.error(EnumInvalid {
-//                 actual: value,
-//                 expected: self.expected.clone(),
-//             });
-//         }
-
-//         Ok(Some(annotation))
-//     }
-// }
-
-/// [`ValidationError`] for the `enum` keyword, produced by [`EnumKeyword`].
+/// [`Error`] for the `enum` keyword, produced by [`EnumKeyword`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
-    _expected: Vec<serde_json::Value>,
-    _actual: &'v serde_json::Value,
+    /// The expected values.
+    pub expected: Arc<[Value]>,
+    /// The value received.
+    pub actual: Cow<'v, Value>,
+    /// The instance of [`TranslateEnumInvalid`] to use
+    pub translate: TranslateEnumInvalid,
 }
 
-// impl<'v> ValidationError<'v> for EnumInvalid<'v> {}
+define_translate!(EnumInvalid, translate_enum_invalid_en);
 
-// impl Display for EnumInvalid<'_> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self.expected.len() {
-//             0 => panic!(
-//                 "EnumInvalid: expected is empty. This is a bug. Please report it to {ISSUES_URL}"
-//             ),
-//             1 => write!(
-//                 f,
-//                 "expected value to be a {}, found {}",
-//                 self.expected[0],
-//                 Types::of_value(self.actual)
-//             ),
-//             _ => write!(
-//                 f,
-//                 "expected value to be one of [{:?}], found {}",
-//                 self.expected.iter().join(", "),
-//                 Types::of_value(self.actual)
-//             ),
-//         }
-//     }
-// }
+impl<'v> Error<'v> for EnumInvalid<'v> {
+    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+        Box::new(EnumInvalid {
+            expected: self.expected,
+            actual: Cow::Owned(self.actual.into_owned()),
+            translate: self.translate,
+        })
+    }
 
-// #[cfg(test)]
-// mod tests {
+    fn translate(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        translator: &grill_core::output::Translator,
+    ) -> std::fmt::Result {
+        if let Some(translate) = translator.get::<TranslateEnumInvalid>() {
+            translate.run(f, self)
+        } else {
+            self.translate.run(f, self)
+        }
+    }
 
-//     use crate::{Scope, State};
+    fn set_translate(&mut self, translator: &grill_core::output::Translator) {
+        if let Some(translate) = translator.get::<TranslateEnumInvalid>() {
+            self.translate = translate.clone();
+        }
+    }
+}
 
-//     use super::*;
+/// Default [`TranslateEnumInvalid`].
+pub fn translate_enum_invalid_en(
+    f: &mut ::std::fmt::Formatter,
+    error: &EnumInvalid,
+) -> std::fmt::Result {
+    let expected = error
+        .expected
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
 
-//     #[test]
-//     fn test_setup_succeeds() {
-//         let mut keyword = EnumKeyword::default();
-//         let mut compiler = crate::Compiler::default();
-//         let schema = serde_json::json!({"enum": [1, 2, 3]});
-//         let schema: Schema = serde_json::from_value(schema).unwrap();
-//         let result = keyword.compile(&mut compiler, &schema);
-//         assert!(result.is_ok());
-//         assert!(result.unwrap());
-//         assert_eq!(keyword.expected, vec![1, 2, 3]);
-//     }
-//     #[test]
-//     fn test_evaluate() {
-//         let mut keyword = EnumKeyword::default();
-//         let mut compiler = crate::Compiler::default();
-//         let schema = serde_json::json!({"enum": [1, 2, 3]});
-//         let schema: Schema = serde_json::from_value(schema).unwrap();
-//         keyword.compile(&mut compiler, &schema).unwrap();
-//         let mut state = State::new();
-//         let mut scope = Scope::new(crate::Location::default(), &mut state);
-//         let one = serde_json::json!(1);
-//         let result = keyword.evaluate(&mut scope, &one, crate::Structure::Complete);
-//         assert!(result.is_ok());
-//         let annotation = result.unwrap();
-//         assert!(annotation.is_some());
-//         let annotation = annotation.unwrap();
-//         assert!(annotation.nested_errors().is_empty());
-//     }
-// }
+    write!(
+        f,
+        "expected one of {}, found {}",
+        expected.join(", "),
+        error.actual
+    )
+}

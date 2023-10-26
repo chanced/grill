@@ -10,7 +10,7 @@
 //! ### Uniform Resource Locator (URL)
 //!
 //! A URL is fully qualified reference to a web resource. For
-//! example`"https://test.com"` or `"mailto:me@test.com"`.
+//! example`"https://example.com"` or `"mailto:me@example.com"`.
 //!
 //! URLs are represented using the [`url`](`url`) crate and can be  in the form
 //! of a [`Url`], [`Uri`], [`AbsoluteUri`], or [`UriRef`].
@@ -18,7 +18,7 @@
 //! ```plaintext
 //!               userinfo         host    port
 //!          ┌───────┴───────┐ ┌────┴────┐ ┌┴┐
-//! "https://john.doe:password@test.com:123/forum/questions/?tag=networking&order=newest#top"
+//! "https://john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top"
 //!  └─┬─┘   └───────────────┬───────────────┘└───────┬───────┘ └────────────┬────────────┘ └┬┘
 //! scheme               authority                   path                  query        fragment
 //! ```
@@ -27,21 +27,21 @@
 //! # use grill_core::uri::{ Uri, AbsoluteUri };
 //!
 //! let input =
-//!      "https://john.doe@test.com:123/forum/questions/?tag=networking&order=newest#top";
+//!      "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
 //! let uri = Uri::parse(input);
 //! eprintln!("uri: {uri:#?}");
 //! let uri = uri.unwrap();
 //! assert_eq!(&uri, input);
 //! assert_eq!(uri.scheme(), Some("https"));
 //! assert_eq!(uri.username(), Some("john.doe"));
-//! assert_eq!(uri.host().as_deref(), Some("test.com"));
+//! assert_eq!(uri.host().as_deref(), Some("example.com"));
 //! assert_eq!(uri.port(), Some(123));
 //! assert_eq!(uri.path_or_nss(), "/forum/questions/");
 //! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
 //! assert_eq!(uri.fragment(), Some("top"));
 //! assert_eq!(
 //!     uri.authority_or_namespace().unwrap(),
-//!     "john.doe@test.com:123"
+//!     "john.doe@example.com:123"
 //! );
 //! assert!(uri.is_url());
 //!
@@ -91,7 +91,7 @@
 //! ### Relative URI with authority
 //! A relative URI with an authority is indicated by the prefixed double slashes
 //! (`"//"`) and may contain user credentials, host, port, path, query, and
-//! fragment. For example: `"//user:password@test.com/path/to/resource`.
+//! fragment. For example: `"//user:password@example.com/path/to/resource`.
 //!
 //! Relative URIs with authority are represented using the [`RelativeUri`] type
 //! and can be in the form of a [`RelativeUri`], [`Uri`] or [`UriRef`].
@@ -99,24 +99,24 @@
 //! ```plaintext
 //!         userinfo        host    port
 //!    ┌───────┴───────┐ ┌────┴────┐ ┌┴┐
-//! "//john.doe:password@test.com:123/forum/questions/?tag=networking&order=newest#top
+//! "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top
 //!    └───────────────┬───────────────┘└───────┬───────┘ └────────────┬────────────┘ └┬┘
 //!                authority                   path                  query         fragment
 //! ```
 //! ```rust
 //! # use grill_core::uri::{ Uri };
 //! let input =
-//!     "//john.doe:password@test.com:123/forum/questions/?tag=networking&order=newest#top";
+//!     "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top";
 //! let uri = Uri::parse(input).unwrap();
 //! assert_eq!(&uri, input);
 //! assert_eq!(uri.scheme(), None);
 //! assert_eq!(uri.username(), Some("john.doe"));
 //! assert_eq!(uri.password(), Some("password"));
 //! assert_eq!(uri.path_or_nss(), "/forum/questions/");
-//! assert_eq!(uri.host().as_deref(), Some("test.com"));
+//! assert_eq!(uri.host().as_deref(), Some("example.com"));
 //! assert_eq!(
 //!     uri.authority_or_namespace().as_deref(),
-//!     Some("john.doe:password@test.com:123")
+//!     Some("john.doe:password@example.com:123")
 //! );
 //! assert_eq!(uri.port(), Some(123));
 //! assert_eq!(uri.query(), Some("tag=networking&order=newest"));
@@ -572,13 +572,13 @@ impl AbsoluteUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::{ AbsoluteUri, Component, PathSegment, QueryParameter };
-    /// let input = "https://user:password@test.com/path/to/file/?query=str#fragment";
+    /// let input = "https://user:password@example.com/path/to/file/?query=str#fragment";
     /// let uri = AbsoluteUri::parse(input).unwrap();
     /// let expected = vec![
     ///     Component::Scheme("https".into()),                                    // https
     ///     Component::Username("user".into()),                                   // user
     ///     Component::Password("password".into()),                               // password
-    ///     Component::Host("test.com".into()),                                // test.com
+    ///     Component::Host("example.com".into()),                                // example.com
     ///     Component::PathSegment(PathSegment::Root),                            // /
     ///     Component::PathSegment(PathSegment::Normal("path".into())),           // path/
     ///     Component::PathSegment(PathSegment::Normal("to".into())),             // to/
@@ -602,7 +602,7 @@ impl AbsoluteUri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::{ AbsoluteUri, PathSegment };
-    /// let uri = AbsoluteUri::parse("https://test.com/path/to/file").unwrap();
+    /// let uri = AbsoluteUri::parse("https://example.com/path/to/file").unwrap();
     /// let segments = uri.path_segments().collect::<Vec<_>>();
     /// assert_eq!(&segments, &["", "path", "to", "file"]);
     /// assert_eq!(&segments, &[
@@ -950,7 +950,7 @@ impl AbsoluteUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::AbsoluteUri;
-    /// let mut uri = AbsoluteUri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
     /// assert_eq!(normalized, "/bar");
     /// ```
@@ -967,7 +967,7 @@ impl AbsoluteUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::AbsoluteUri;
-    /// let mut uri = AbsoluteUri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let mut uri = AbsoluteUri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");
     /// ```
@@ -1844,7 +1844,7 @@ impl RelativeUri {
     /// ```
     /// # use grill_core::Uri;
     ///
-    /// let uri = Uri::parse("//test.com").unwrap();
+    /// let uri = Uri::parse("//example.com").unwrap();
     /// let rel_uri = uri.as_relative_uri().unwrap();
     /// assert!(uri.host().is_some());
     /// ```
@@ -1920,7 +1920,7 @@ impl RelativeUri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let mut uri = Uri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");
     /// ```
@@ -2145,7 +2145,7 @@ impl<'a> UriRef<'a> {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// let uri_ref = uri.as_uri_ref();
     /// let normalized = uri_ref.path_normalized();
     /// assert_eq!(normalized, "/bar");
@@ -2236,25 +2236,25 @@ impl AsUriRef for RelativeUri {
 /// fragment).
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Component<'a> {
-    /// The scheme of the URI, e.g., `"https"` in `"https://test.com"`.
+    /// The scheme of the URI, e.g., `"https"` in `"https://example.com"`.
     Scheme(Cow<'a, str>),
 
     /// The username of the URI, e.g., `"username"` in
-    /// `"https://username:password@test.com"`.
+    /// `"https://username:password@example.com"`.
     ///
     /// # Note:
     /// This is not applicable to URNs
     Username(Cow<'a, str>),
 
     /// The passsword of the URI, e.g., `"password"` in
-    /// `"https://username:password@test.com"`.
+    /// `"https://username:password@example.com"`.
     ///
     /// # Note:
     /// This is not applicable to URNs
     Password(Cow<'a, str>),
 
-    /// The host or namespace of the URI, e.g., `"test.com"` in
-    /// `"https://test.com"`.
+    /// The host or namespace of the URI, e.g., `"example.com"` in
+    /// `"https://example.com"`.
     Host(Cow<'a, str>),
 
     /// The namespace of a URN. This is not applicable to URLs.
@@ -2263,15 +2263,15 @@ pub enum Component<'a> {
     /// The namespace specific string (NSS) for a URN. Not applicable to URLs.
     Nss(Cow<'a, str>),
 
-    /// The segment of the URI's path, e.g., `"/path"` in `"https://test.com/path/to/resource"`.
+    /// The segment of the URI's path, e.g., `"/path"` in `"https://example.com/path/to/resource"`.
     PathSegment(PathSegment<'a>),
 
     /// The a query paramater of the URI, e.g., `"query=str"` in
-    /// `"https://test.com/?query=str"`.
+    /// `"https://example.com/?query=str"`.
     QueryParameter(QueryParameter<'a>),
 
     /// The fragment of the URI, e.g., `"fragment"` in .
-    /// `"https://test.com/#fragment"`
+    /// `"https://example.com/#fragment"`
     Fragment(Cow<'a, str>),
 }
 
@@ -2581,13 +2581,13 @@ impl Uri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::{  Uri, Component, PathSegment, QueryParameter };
-    /// let input = "https://user:password@test.com/path/to/file/?query=str#fragment";
+    /// let input = "https://user:password@example.com/path/to/file/?query=str#fragment";
     /// let uri = Uri::parse(input).unwrap();
     /// let expected = vec![
     ///     Component::Scheme("https".into()),                                    // https
     ///     Component::Username("user".into()),                                   // user
     ///     Component::Password("password".into()),                               // password
-    ///     Component::Host("test.com".into()),                                // test.com
+    ///     Component::Host("example.com".into()),                                // example.com
     ///     Component::PathSegment(PathSegment::Root),                            // /
     ///     Component::PathSegment(PathSegment::Normal("path".into())),           // path/
     ///     Component::PathSegment(PathSegment::Normal("to".into())),             // to/
@@ -2609,7 +2609,7 @@ impl Uri {
     /// # Example
     /// ```rust
     /// # use grill_core::uri::Uri;
-    /// let uri = Uri::parse("https://test.com/path/to/file").unwrap();
+    /// let uri = Uri::parse("https://example.com/path/to/file").unwrap();
     /// assert_eq!(uri.path_segments().collect::<Vec<_>>(), vec!["", "path", "to", "file"]);
     /// ```
     #[must_use]
@@ -2803,7 +2803,7 @@ impl Uri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let mut uri = Uri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// let normalized = uri.path_normalized();
     /// assert_eq!(normalized, "/bar");
     /// ```
@@ -2820,7 +2820,7 @@ impl Uri {
     /// # Example
     /// ```
     /// # use grill_core::uri::Uri;
-    /// let mut uri = Uri::parse("https://test.com/./foo/../bar").unwrap();
+    /// let mut uri = Uri::parse("https://example.com/./foo/../bar").unwrap();
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");
     /// ```
@@ -3406,10 +3406,13 @@ mod tests {
 
     #[test]
     fn test_uri_components() {
-        let uri = Uri::parse("http://test.com/path?query#fragment").unwrap();
+        let uri = Uri::parse("http://example.com/path?query#fragment").unwrap();
         let mut components = uri.components();
         assert_eq!(components.next(), Some(Component::Scheme("http".into())));
-        assert_eq!(components.next(), Some(Component::Host("test.com".into())));
+        assert_eq!(
+            components.next(),
+            Some(Component::Host("example.com".into()))
+        );
     }
 
     #[test]
@@ -3423,8 +3426,8 @@ mod tests {
                 Some("fragment"),
             ),
             (
-                "//test.com/path/path2?query=str#fragment",
-                Some("test.com"),
+                "//example.com/path/path2?query=str#fragment",
+                Some("example.com"),
                 "/path/path2",
                 Some("query=str"),
                 Some("fragment"),
@@ -3467,29 +3470,29 @@ mod tests {
 
     #[test]
     fn test_get_url_authority() {
-        let url = Url::parse("https://user:example@test.com:8080").unwrap();
+        let url = Url::parse("https://user:example@example.com:8080").unwrap();
         let uri: AbsoluteUri = url.into();
         assert_eq!(
             uri.authority_or_namespace().as_deref(),
-            Some("user:example@test.com:8080")
+            Some("user:example@example.com:8080")
         );
     }
 
     #[test]
     fn test_uri_authority_or_namespace() {
         let tests = [
-            ("https://www.test.com", Some("www.test.com")),
+            ("https://www.example.com", Some("www.example.com")),
             ("urn:example:resource", Some("example")),
             (
-                "https://username:password@test.com/path",
-                Some("username:password@test.com"),
+                "https://username:password@example.com/path",
+                Some("username:password@example.com"),
             ),
             ("http://127.0.0.0:3400", Some("127.0.0.0:3400")),
             (
-                "https://username@test.com/somepath",
-                Some("username@test.com"),
+                "https://username@example.com/somepath",
+                Some("username@example.com"),
             ),
-            ("mailto:example@test.com", None),
+            ("mailto:example@example.com", None),
         ];
 
         for (input, expected) in tests {
@@ -3498,18 +3501,18 @@ mod tests {
         }
 
         let tests = [
-            ("https://www.test.com", Some("www.test.com")),
+            ("https://www.example.com", Some("www.example.com")),
             ("urn:example:com", Some("example")),
             (
-                "https://username:password@test.com/path",
-                Some("username:password@test.com"),
+                "https://username:password@example.com/path",
+                Some("username:password@example.com"),
             ),
             ("http://127.0.0.0:3400", Some("127.0.0.0:3400")),
             (
-                "https://username@test.com/somepath",
-                Some("username@test.com"),
+                "https://username@example.com/somepath",
+                Some("username@example.com"),
             ),
-            ("mailto:example@test.com", None),
+            ("mailto:example@example.com", None),
             ("/relative", None),
         ];
 
@@ -3522,18 +3525,18 @@ mod tests {
     #[test]
     fn test_fragment() {
         let tests = [
-            ("https://www.test.com", None),
+            ("https://www.example.com", None),
             ("urn:example:resource", None),
             (
-                "https://username:password@test.com/path#fraggle-rock",
+                "https://username:password@example.com/path#fraggle-rock",
                 Some("fraggle-rock"),
             ),
-            ("https://test.com:3400/path#with-port", Some("with-port")),
+            ("https://example.com:3400/path#with-port", Some("with-port")),
             (
-                "https://username:password@test.com/somepath#with-credentials",
+                "https://username:password@example.com/somepath#with-credentials",
                 Some("with-credentials"),
             ),
-            ("mailto:example@test.com", None),
+            ("mailto:example@example.com", None),
         ];
 
         for (input, expected) in tests {
@@ -3541,18 +3544,18 @@ mod tests {
             assert_eq!(expected, absolute_uri.fragment());
         }
         let tests = [
-            ("https://www.test.com", None),
+            ("https://www.example.com", None),
             ("urn:example:resource", None),
             (
-                "https://username:password@test.com/path#fraggle-rock",
+                "https://username:password@example.com/path#fraggle-rock",
                 Some("fraggle-rock"),
             ),
-            ("https://test.com:3400/path#with-port", Some("with-port")),
+            ("https://example.com:3400/path#with-port", Some("with-port")),
             (
-                "https://username:password@test.com/somepath#with-credentials",
+                "https://username:password@example.com/somepath#with-credentials",
                 Some("with-credentials"),
             ),
-            ("mailto:example@test.com", None),
+            ("mailto:example@example.com", None),
             ("/relative#fragment", Some("fragment")),
             ("#fragment", Some("fragment")),
         ];
@@ -3566,18 +3569,23 @@ mod tests {
     #[test]
     fn test_set_fragment() {
         let tests = [
-            ("https://www.test.com/", None, None, "https://www.test.com/"),
             (
-                "https://username:password@test.com/path#fragment",
-                Some("fragment/nested"),
-                Some("fragment/nested"),
-                "https://username:password@test.com/path#fragment/nested",
+                "https://www.example.com/",
+                None,
+                None,
+                "https://www.example.com/",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://username:password@example.com/path#fragment",
+                Some("fragment/nested"),
+                Some("fragment/nested"),
+                "https://username:password@example.com/path#fragment/nested",
+            ),
+            (
+                "https://example.com/path#with-fragment",
                 None,
                 None,
-                "https://test.com/path",
+                "https://example.com/path",
             ),
             (
                 "urn:example:resource",
@@ -3592,10 +3600,10 @@ mod tests {
                 "urn:example:resource#some%20fragment%20with%20spaces",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://example.com/path#with-fragment",
                 Some("fragment with spaces"),
                 Some("fragment%20with%20spaces"),
-                "https://test.com/path#fragment%20with%20spaces",
+                "https://example.com/path#fragment%20with%20spaces",
             ),
         ];
 
@@ -3607,18 +3615,23 @@ mod tests {
         }
 
         let tests = [
-            ("https://www.test.com/", None, None, "https://www.test.com/"),
             (
-                "https://username:password@test.com/path#fragment",
-                Some("fragment/nested"),
-                Some("fragment/nested"),
-                "https://username:password@test.com/path#fragment/nested",
+                "https://www.example.com/",
+                None,
+                None,
+                "https://www.example.com/",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://username:password@example.com/path#fragment",
+                Some("fragment/nested"),
+                Some("fragment/nested"),
+                "https://username:password@example.com/path#fragment/nested",
+            ),
+            (
+                "https://example.com/path#with-fragment",
                 None,
                 None,
-                "https://test.com/path",
+                "https://example.com/path",
             ),
             (
                 "urn:example:resource",
@@ -3633,10 +3646,10 @@ mod tests {
                 "urn:example:resource#some%20fragment%20with%20spaces",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://example.com/path#with-fragment",
                 Some("fragment with spaces"),
                 Some("fragment%20with%20spaces"),
-                "https://test.com/path#fragment%20with%20spaces",
+                "https://example.com/path#fragment%20with%20spaces",
             ),
             (
                 "/partial/path#existing-fragment",
@@ -3681,22 +3694,22 @@ mod tests {
     fn test_set_path() {
         let tests = [
             (
-                "https://www.test.com",
+                "https://www.example.com",
                 "/new-path",
                 "/new-path",
-                "https://www.test.com/new-path",
+                "https://www.example.com/new-path",
             ),
             (
-                "https://username:password@test.com/path#fraggle-rock",
+                "https://username:password@example.com/path#fraggle-rock",
                 "/new-path",
                 "/new-path",
-                "https://username:password@test.com/new-path#fraggle-rock",
+                "https://username:password@example.com/new-path#fraggle-rock",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://example.com/path#with-fragment",
                 "",
                 "/",
-                "https://test.com/#with-fragment",
+                "https://example.com/#with-fragment",
             ),
             (
                 "urn:example:resource#fragment",
@@ -3711,10 +3724,10 @@ mod tests {
                 "urn:example:new-resource",
             ),
             (
-                "https://test.com/",
+                "https://example.com/",
                 "new path",
                 "/new%20path",
-                "https://test.com/new%20path",
+                "https://example.com/new%20path",
             ),
             (
                 "urn:example:resource#fragment",
@@ -3738,22 +3751,22 @@ mod tests {
 
         let tests = [
             (
-                "https://www.test.com",
+                "https://www.example.com",
                 "/new-path",
                 "/new-path",
-                "https://www.test.com/new-path",
+                "https://www.example.com/new-path",
             ),
             (
-                "https://username:password@test.com/path#fraggle-rock",
+                "https://username:password@example.com/path#fraggle-rock",
                 "/new-path",
                 "/new-path",
-                "https://username:password@test.com/new-path#fraggle-rock",
+                "https://username:password@example.com/new-path#fraggle-rock",
             ),
             (
-                "https://test.com/path#with-fragment",
+                "https://example.com/path#with-fragment",
                 "",
                 "/",
-                "https://test.com/#with-fragment",
+                "https://example.com/#with-fragment",
             ),
             (
                 "urn:example:resource#fragment",
@@ -3776,10 +3789,10 @@ mod tests {
                 "/new-path#fragment",
             ),
             (
-                "https://test.com/",
+                "https://example.com/",
                 "new path",
                 "/new%20path",
-                "https://test.com/new%20path",
+                "https://example.com/new%20path",
             ),
             (
                 "urn:example:resource#fragment",
@@ -3798,19 +3811,19 @@ mod tests {
     #[test]
     fn first_doc_test() {
         let input =
-            "https://john.doe@test.com:123/forum/questions/?tag=networking&order=newest#top";
+            "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
         let uri = Uri::parse(input).unwrap();
         assert_eq!(&uri, input);
         assert_eq!(uri.scheme(), Some("https"));
         assert_eq!(uri.username(), Some("john.doe"));
-        assert_eq!(uri.host().as_deref(), Some("test.com"));
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
         assert_eq!(uri.port(), Some(123));
         assert_eq!(uri.path_or_nss(), "/forum/questions/");
         assert_eq!(uri.query(), Some("tag=networking&order=newest"));
         assert_eq!(uri.fragment(), Some("top"));
         assert_eq!(
             uri.authority_or_namespace().unwrap(),
-            "john.doe@test.com:123"
+            "john.doe@example.com:123"
         );
         assert!(uri.is_url());
 
@@ -3820,19 +3833,19 @@ mod tests {
     #[test]
     fn doc_tests() {
         let input =
-            "https://john.doe@test.com:123/forum/questions/?tag=networking&order=newest#top";
+            "https://john.doe@example.com:123/forum/questions/?tag=networking&order=newest#top";
         let uri = Uri::parse(input).unwrap();
         assert_eq!(&uri, input);
         assert_eq!(uri.scheme(), Some("https"));
         assert_eq!(uri.username(), Some("john.doe"));
-        assert_eq!(uri.host().as_deref(), Some("test.com"));
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
         assert_eq!(uri.port(), Some(123));
         assert_eq!(uri.path_or_nss(), "/forum/questions/");
         assert_eq!(uri.query(), Some("tag=networking&order=newest"));
         assert_eq!(uri.fragment(), Some("top"));
         assert_eq!(
             uri.authority_or_namespace().unwrap(),
-            "john.doe@test.com:123"
+            "john.doe@example.com:123"
         );
         assert!(uri.is_url());
 
@@ -3852,17 +3865,17 @@ mod tests {
         assert_eq!(uri, abs_uri);
 
         let input =
-            "//john.doe:password@test.com:123/forum/questions/?tag=networking&order=newest#top";
+            "//john.doe:password@example.com:123/forum/questions/?tag=networking&order=newest#top";
         let uri = Uri::parse(input).unwrap();
         assert_eq!(&uri, input);
         assert_eq!(uri.scheme(), None);
         assert_eq!(uri.username(), Some("john.doe"));
         assert_eq!(uri.password(), Some("password"));
         assert_eq!(uri.path_or_nss(), "/forum/questions/");
-        assert_eq!(uri.host().as_deref(), Some("test.com"));
+        assert_eq!(uri.host().as_deref(), Some("example.com"));
         assert_eq!(
             uri.authority_or_namespace().as_deref(),
-            Some("john.doe:password@test.com:123")
+            Some("john.doe:password@example.com:123")
         );
         assert_eq!(uri.port(), Some(123));
         assert_eq!(uri.query(), Some("tag=networking&order=newest"));

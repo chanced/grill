@@ -535,11 +535,11 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// use grill::{ uri::AbsoluteUri, keyword::Keyword, json_schema::keyword::id::Id };
     ///
     /// let id_keyword = Id::new("$id", false);
-    /// let id = id_keyword.identify(&json!({"$id": "https://test.com/schema.json" }))
+    /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
     ///     .unwrap()  // unwraps `Result<Result<Option<Identifier>, IdentifyError>, Unimplemented>`
     ///     .unwrap()  // unwraps `Result<Option<Identifier>, Identifier>`
     ///     .unwrap(); // unwraps `Option<Identifier>`
-    /// assert_eq!(&id, &AbsoluteUri::parse("https://test.com/schema.json").unwrap());
+    /// assert_eq!(&id, &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
     /// ```
     ///
     fn identify(

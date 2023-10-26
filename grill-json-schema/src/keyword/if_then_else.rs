@@ -90,7 +90,6 @@ impl Keyword for IfThenElse {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
 
     use crate::Build;
 
@@ -103,13 +102,12 @@ mod tests {
         let schema = json!({"if": {} });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://test.com/schema", Cow::Owned(schema))
-            .unwrap()
+            .source_owned_value("https://example.com/schema", schema)
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://test.com/schema")
+            .compile("https://example.com/schema")
             .await
             .unwrap();
         assert!(interrogator
@@ -122,13 +120,12 @@ mod tests {
         let schema = json!({"else": {}, "then": {}});
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
-            .unwrap()
+            .source_owned_value("https://example.com/schema", schema)
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://test.com/schema")
+            .compile("https://example.com/schema")
             .await
             .unwrap();
         assert!(!interrogator
@@ -152,13 +149,12 @@ mod tests {
         });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
-            .unwrap()
+            .source_owned_value("https://example.com/schema", schema)
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://test.com/schema")
+            .compile("https://example.com/schema")
             .await
             .unwrap();
 
@@ -182,13 +178,12 @@ mod tests {
         });
         let mut interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_value("https://test.com/schema", Cow::Owned(json!(schema)))
-            .unwrap()
+            .source_owned_value("https://example.com/schema", schema)
             .finish()
             .await
             .unwrap();
         let key = interrogator
-            .compile("https://test.com/schema")
+            .compile("https://example.com/schema")
             .await
             .unwrap();
 

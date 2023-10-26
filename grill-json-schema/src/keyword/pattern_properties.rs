@@ -197,19 +197,14 @@ mod tests {
             .unwrap();
         Interrogator::build()
             .dialect(dialect)
-            .source_value(
-                "https://test.com/with_pattern_properties",
-                Cow::Owned(properties),
-            )
-            .unwrap()
-            .source_value(
-                "https://test.com/without_pattern_properties",
-                Cow::Owned(json!({
-                    "$id": "https://test.com/without_properties",
+            .source_owned_value("https://example.com/with_pattern_properties", properties)
+            .source_owned_value(
+                "https://example.com/without_pattern_properties",
+                json!({
+                    "$id": "https://example.com/without_properties",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                })),
+                }),
             )
-            .unwrap()
             .finish()
             .await
             .unwrap()
@@ -228,7 +223,7 @@ mod tests {
         ))
         .await;
         let key = interrogator
-            .compile("https://test.com/with_pattern_properties")
+            .compile("https://example.com/with_pattern_properties")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -252,7 +247,7 @@ mod tests {
         ))
         .await;
         let key = interrogator
-            .compile("https://test.com/with_pattern_properties")
+            .compile("https://example.com/with_pattern_properties")
             .await
             .unwrap();
 

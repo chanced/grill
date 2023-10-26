@@ -125,30 +125,27 @@ mod tests {
             .unwrap();
         Interrogator::build()
             .dialect(dialect)
-            .source_value(
-                "https://test.com/referenced",
-                Cow::Owned(json!({
+            .source_owned_value(
+                "https://example.com/referenced",
+                json!({
                     "const": "value"
-                })),
+                }),
             )
-            .unwrap()
-            .source_value(
-                "https://test.com/with_$ref",
-                Cow::Owned(json!({
+            .source_owned_value(
+                "https://example.com/with_$ref",
+                json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://test.com/with_$ref",
+                    "$id": "https://example.com/with_$ref",
                     "$ref": Value::String(ref_value.to_string())
-                })),
+                }),
             )
-            .unwrap()
-            .source_value(
-                "https://test.com/without_$ref",
-                Cow::Owned(json!({
+            .source_owned_value(
+                "https://example.com/without_$ref",
+                json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://test.com/without_$ref",
-                })),
+                    "$id": "https://example.com/without_$ref",
+                }),
             )
-            .unwrap()
             .finish()
             .await
             .unwrap()
@@ -156,15 +153,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup() {
-        let mut interrogator = create_interrogator("https://test.com/referenced").await;
+        let mut interrogator = create_interrogator("https://example.com/referenced").await;
         let key = interrogator
-            .compile("https://test.com/with_$ref")
+            .compile("https://example.com/with_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let key = interrogator
-            .compile("https://test.com/without_$ref")
+            .compile("https://example.com/without_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -172,15 +169,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_evaluate() {
-        let mut interrogator = create_interrogator("https://test.com/referenced").await;
+        let mut interrogator = create_interrogator("https://example.com/referenced").await;
         let key = interrogator
-            .compile("https://test.com/with_$ref")
+            .compile("https://example.com/with_$ref")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
         let _ = interrogator
-            .compile("https://test.com/without_$ref")
+            .compile("https://example.com/without_$ref")
             .await
             .unwrap();
         let value = json!(34.34);

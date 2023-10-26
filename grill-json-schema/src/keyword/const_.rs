@@ -189,21 +189,17 @@ mod tests {
             .unwrap();
         Interrogator::build()
             .dialect(dialect)
-            .source_value(
-                "https://test.com/with_const",
-                Cow::Owned(json!({
+            .source_owned_value(
+                "https://example.com/with_const",
+                json!({
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "const": const_value
-                })),
+                }),
             )
-            .unwrap()
-            .source_value(
-                "https://test.com/without_const",
-                Cow::Owned(json!({
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                })),
+            .source_owned_value(
+                "https://example.com/without_const",
+                json!({ "$schema": "https://json-schema.org/draft/2020-12/schema" }),
             )
-            .unwrap()
             .finish()
             .await
             .unwrap()
@@ -213,7 +209,7 @@ mod tests {
     async fn test_setup() {
         let mut interrogator = create_interrogator(json!(34.34)).await;
         let key = interrogator
-            .compile("https://test.com/with_const")
+            .compile("https://example.com/with_const")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -223,7 +219,7 @@ mod tests {
             .map(|kw| kw.kind())
             .any(|k| k == CONST));
         let key = interrogator
-            .compile("https://test.com/without_const")
+            .compile("https://example.com/without_const")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -234,7 +230,7 @@ mod tests {
     async fn test_const_evaluate() {
         let mut interrogator = create_interrogator(json!(34.34)).await;
         let key = interrogator
-            .compile("https://test.com/with_const")
+            .compile("https://example.com/with_const")
             .await
             .unwrap();
         let value = json!(34.34);

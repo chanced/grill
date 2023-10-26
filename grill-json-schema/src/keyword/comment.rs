@@ -2,7 +2,7 @@ use serde_json::Value;
 
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    keyword::{self, Compile, Context, Kind},
+    keyword::{Compile, Context, Keyword, Kind},
     output::Output,
     Schema,
 };
@@ -16,7 +16,7 @@ pub struct Comment {
     pub comment: String,
 }
 
-impl keyword::Keyword for Comment {
+impl Keyword for Comment {
     fn kind(&self) -> Kind {
         Kind::Single(COMMENT)
     }

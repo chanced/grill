@@ -402,7 +402,6 @@ mod tests {
         Interrogator::build()
             .json_schema_2020_12()
             .source_value(uri, Cow::Owned(source))
-            .unwrap()
     }
 
     #[tokio::test]
@@ -417,20 +416,15 @@ mod tests {
         let without_type = json!({});
 
         let mut interrogator =
-            build_interrogator("https://test.com/with_string_type", with_string_type)
-                .source_value("https://test.com/without_type", Cow::Owned(without_type))
-                .unwrap()
-                .source_value(
-                    "https://test.com/with_array_type",
-                    Cow::Owned(with_array_type),
-                )
-                .unwrap()
+            build_interrogator("https://example.com/with_string_type", with_string_type)
+                .source_owned_value("https://example.com/without_type", without_type)
+                .source_owned_value("https://example.com/with_array_type", with_array_type)
                 .finish()
                 .await
                 .unwrap();
 
         let with_type_key = interrogator
-            .compile("https://test.com/with_string_type")
+            .compile("https://example.com/with_string_type")
             .await
             .unwrap();
 
@@ -438,7 +432,7 @@ mod tests {
         assert!(schema.keywords.iter().any(|kw| kw.kind() == TYPE));
 
         let without_type_key = interrogator
-            .compile("https://test.com/without_type")
+            .compile("https://example.com/without_type")
             .await
             .unwrap();
 
@@ -465,21 +459,20 @@ mod tests {
         let without_type = json!({});
 
         let mut interrogator =
-            build_interrogator("https://test.com/with_string_type", with_string_type)
-                .source_value("https://test.com/without_type", Cow::Owned(without_type))
-                .unwrap()
-                .source_owned_value("https://test.com/with_array_of_types", with_array_of_types)
-                .unwrap()
-                .source_owned_value("https://test.com/with_number_type", with_number_type)
-                .unwrap()
-                .source_owned_value("https://test.com/with_integer_type", with_integer_type)
-                .unwrap()
+            build_interrogator("https://example.com/with_string_type", with_string_type)
+                .source_owned_value("https://example.com/without_type", without_type)
+                .source_owned_value(
+                    "https://example.com/with_array_of_types",
+                    with_array_of_types,
+                )
+                .source_owned_value("https://example.com/with_number_type", with_number_type)
+                .source_owned_value("https://example.com/with_integer_type", with_integer_type)
                 .finish()
                 .await
                 .unwrap();
 
         let key = interrogator
-            .compile("https://test.com/with_string_type")
+            .compile("https://example.com/with_string_type")
             .await
             .unwrap();
 
@@ -496,7 +489,7 @@ mod tests {
             .unwrap();
         assert!(output.is_invalid());
         let key = interrogator
-            .compile("https://test.com/with_integer_type")
+            .compile("https://example.com/with_integer_type")
             .await
             .unwrap();
 
@@ -513,7 +506,7 @@ mod tests {
         assert!(output.is_invalid());
 
         let key = interrogator
-            .compile("https://test.com/with_array_of_types")
+            .compile("https://example.com/with_array_of_types")
             .await
             .unwrap();
 

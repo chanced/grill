@@ -31,11 +31,29 @@ use crate::anymap::AnyMap;
 /// Constructs an [`Interrogator`].
 pub struct Build {
     dialects: Vec<Dialect>,
-    sources: Vec<Src>,
+    precompile: Vec<Result<AbsoluteUri, UriError>>,
+    pending_srcs: Vec<PendingSrc>,
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     state: AnyMap,
+}
+
+enum PendingSrc {
+    Bytes(Result<AbsoluteUri, UriError>, Vec<u8>),
+    String(Result<AbsoluteUri, UriError>, String),
+    Value(Result<AbsoluteUri, UriError>, Cow<'static, Value>),
+}
+impl TryFrom<PendingSrc> for Src {
+    type Error = SourceError;
+
+    fn try_from(src: PendingSrc) -> Result<Self, Self::Error> {
+        Ok(match src {
+            PendingSrc::Bytes(uri, bytes) => Src::String(uri?, String::from_utf8(bytes)?),
+            PendingSrc::String(uri, string) => Src::String(uri?, string),
+            PendingSrc::Value(uri, value) => Src::Value(uri?, value),
+        })
+    }
 }
 
 impl Default for Build {
@@ -44,19 +62,14 @@ impl Default for Build {
     }
 }
 impl Build {
+    /// Constructs a new `Build`
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            dialects: Vec::new(),
-            sources: Vec::new(),
-            resolvers: Vec::new(),
-            deserializers: Vec::new(),
-            state: AnyMap::new(),
-            default_dialect_idx: None,
-        }
+        Self::default()
     }
 }
 impl Build {
+    /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
     pub fn dialect(mut self, dialect: Dialect) -> Self {
         let idx = self.dialects.len();
@@ -66,6 +79,9 @@ impl Build {
         }
         self
     }
+
+    /// Sets the default [`Dialect`] for the [`Interrogator`] constructed by
+    /// [`Build`].
     #[must_use]
     pub fn default_dialect(mut self, dialect: Dialect) -> Self {
         let idx = self.dialects.len();
@@ -87,26 +103,19 @@ impl Build {
     /// let source = br#"{"type": "string"}"#;
     /// let mut interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
+    ///     .source_bytes("https://example.com/schema.json", source)
     ///     .finish()
     ///     .await
     ///     .unwrap();
-    /// interrogator.source_slice("https://test.com/schema.json", source).unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`SourceError`] if:
-    /// - the `uri` fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    pub fn source_slice(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: &[u8],
-    ) -> Result<Self, SourceError> {
-        self.sources.push(Src::String(
-            uri.try_into_absolute_uri()?,
-            String::from_utf8(source.to_vec())?,
+    #[must_use]
+    pub fn source_bytes(mut self, uri: impl TryIntoAbsoluteUri, source: &[u8]) -> Self {
+        self.pending_srcs.push(PendingSrc::Bytes(
+            uri.try_into_absolute_uri(),
+            source.to_vec(),
         ));
-        Ok(self)
+        self
     }
 
     /// Adds a schema source from a `str`
@@ -118,25 +127,19 @@ impl Build {
     /// # async fn main() {
     ///let interrogator = Interrogator::build()
     ///    .json_schema_2020_12()
-    ///    .source_str("https://test.com/schema.json", r#"{"type": "string"}"#).unwrap()
+    ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
     ///    .finish()
     ///    .await
     ///    .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    pub fn source_str(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: &str,
-    ) -> Result<Self, UriError> {
-        self.sources.push(Src::String(
-            uri.try_into_absolute_uri()?,
+    #[must_use]
+    pub fn source_str(mut self, uri: impl TryIntoAbsoluteUri, source: &str) -> Self {
+        self.pending_srcs.push(PendingSrc::String(
+            uri.try_into_absolute_uri(),
             source.to_string(),
         ));
-        Ok(self)
+        self
     }
     /// Adds a source schema from an owned [`Value`]
     /// # Example
@@ -150,24 +153,19 @@ impl Build {
     /// let schema = json!({"type": "string"});
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
-    ///     .source_owned_value("https://test.com/schema.json", schema).unwrap()
+    ///     .source_owned_value("https://example.com/schema.json", schema)
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    ///
-    pub fn source_owned_value(
-        mut self,
-        uri: impl TryIntoAbsoluteUri,
-        source: Value,
-    ) -> Result<Self, UriError> {
-        self.sources
-            .push(Src::Value(uri.try_into_absolute_uri()?, Cow::Owned(source)));
-        Ok(self)
+    #[must_use]
+    pub fn source_owned_value(mut self, uri: impl TryIntoAbsoluteUri, source: Value) -> Self {
+        self.pending_srcs.push(PendingSrc::Value(
+            uri.try_into_absolute_uri(),
+            Cow::Owned(source),
+        ));
+        self
     }
 
     /// Adds a source schema from a static reference to a [`Value`]
@@ -182,26 +180,23 @@ impl Build {
     /// let schema = json!({"type": "string"});
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
-    ///     .source_owned_value("https://test.com/schema.json", schema).unwrap()
+    ///     .source_owned_value("https://example.com/schema.json", schema)
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    ///
+    #[must_use]
     pub fn source_static_ref_value(
         mut self,
         uri: impl TryIntoAbsoluteUri,
         source: &'static Value,
-    ) -> Result<Self, UriError> {
-        self.sources.push(Src::Value(
-            uri.try_into_absolute_uri()?,
+    ) -> Self {
+        self.pending_srcs.push(PendingSrc::Value(
+            uri.try_into_absolute_uri(),
             Cow::Borrowed(source),
         ));
-        Ok(self)
+        self
     }
 
     /// Adds a source schema from a [`Value`]
@@ -216,24 +211,21 @@ impl Build {
     /// let schema = Cow::Owned(json!({"type": "string"}));
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
-    ///     .source_value("https://test.com/schema.json", schema).unwrap()
+    ///     .source_value("https://example.com/schema.json", schema)
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`UriError`] if the `uri` fails to convert to an
-    /// [`AbsoluteUri`](`crate::AbsoluteUri`).
-    ///
+    #[must_use]
     pub fn source_value(
         mut self,
         uri: impl TryIntoAbsoluteUri,
         source: Cow<'static, Value>,
-    ) -> Result<Self, UriError> {
-        self.sources
-            .push(Src::Value(uri.try_into_absolute_uri()?, source));
-        Ok(self)
+    ) -> Self {
+        self.pending_srcs
+            .push(PendingSrc::Value(uri.try_into_absolute_uri(), source));
+        self
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
@@ -247,29 +239,27 @@ impl Build {
     /// # #[tokio::main]
     /// # async fn main() {
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://test.com/schema.json", r#"{"type": "string"}"#);
+    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
-    ///     .source_strs(sources).unwrap()
+    ///     .source_strs(sources)
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`UriError`] if a URI fails to convert to an
-    /// [`AbsoluteUri`]
-    pub fn source_strs<I, K, V>(mut self, sources: I) -> Result<Self, UriError>
+    #[must_use]
+    pub fn source_strs<I, K, V>(mut self, sources: I) -> Self
     where
         K: TryIntoAbsoluteUri,
         V: std::ops::Deref<Target = str>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.sources
-                .push(Src::String(k.try_into_absolute_uri()?, v.to_string()));
+            self.pending_srcs
+                .push(PendingSrc::String(k.try_into_absolute_uri(), v.to_string()));
         }
-        Ok(self)
+        self
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
@@ -283,7 +273,7 @@ impl Build {
     /// # #[tokio::main]
     /// # async fn main() {
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://test.com/schema.json", br#"{"type": "string"}"#);
+    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
     ///
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
@@ -293,24 +283,20 @@ impl Build {
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`SourceSliceError`] if:
-    /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    ///
-    pub fn source_slices<I, K, V>(mut self, sources: I) -> Result<Self, SourceError>
+    #[must_use]
+    pub fn source_slices<I, K, V>(mut self, sources: I) -> Self
     where
         K: TryIntoAbsoluteUri,
         V: AsRef<[u8]>,
         I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
-            self.sources.push(Src::String(
-                k.try_into_absolute_uri()?,
-                String::from_utf8(v.as_ref().to_vec())?,
+            self.pending_srcs.push(PendingSrc::Bytes(
+                k.try_into_absolute_uri(),
+                v.as_ref().to_vec(),
             ));
         }
-        Ok(self)
+        self
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
@@ -325,28 +311,26 @@ impl Build {
     /// # async fn main() {
     /// let mut sources = HashMap::new();
     /// let source = Cow::Owned(json!({"type": "string"}));
-    /// sources.insert("https://test.com/schema.json", source);
+    /// sources.insert("https://example.com/schema.json", source);
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
-    ///     .source_values(sources).unwrap()
+    ///     .source_values(sources)
     ///     .finish()
     ///     .await
     ///     .unwrap();
     /// # }
     /// ```
-    /// # Errors
-    /// Returns [`SourceError`] if:
-    /// - [`TryIntoAbsoluteUri`] fails to convert to an [`AbsoluteUri`]
-    /// - a source is not valid UTF-8
-    pub fn source_values<I, K>(mut self, sources: I) -> Result<Self, SourceError>
+    #[must_use]
+    pub fn source_values<I, K>(mut self, sources: I) -> Self
     where
         K: TryIntoAbsoluteUri,
         I: IntoIterator<Item = (K, Cow<'static, Value>)>,
     {
         for (k, v) in sources {
-            self.sources.push(Src::Value(k.try_into_absolute_uri()?, v));
+            self.pending_srcs
+                .push(PendingSrc::Value(k.try_into_absolute_uri(), v));
         }
-        Ok(self)
+        self
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -404,25 +388,30 @@ impl Build {
         self
     }
 
+    /// Finalizes the build of an [`Interrogator`]
     pub async fn finish(self) -> Result<Interrogator, BuildError> {
         let Self {
             dialects,
-            mut sources,
+            pending_srcs,
             resolvers,
             deserializers,
             default_dialect_idx,
             state,
+            precompile,
         } = self;
         let default_dialect_id = default_dialect_idx
             .as_ref()
             .map(|idx| dialects[*idx].id().clone());
         let dialects = Dialects::new(dialects, default_dialect_id)?;
-        sources.append(&mut dialects.sources());
+
         let deserializers = Deserializers::new(deserializers);
-        let sources = Sources::new(sources, &deserializers)?;
+        let sources = Sources::new(srcs(dialects.sources(), pending_srcs)?, &deserializers)?;
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
-        let precompile = dialects.source_ids().cloned().collect::<Vec<AbsoluteUri>>();
+
+        let precompile: Result<Vec<AbsoluteUri>, UriError> = precompile.into_iter().collect();
+        let mut precompile = precompile.map_err(SourceError::UriFailedToParse)?;
+        precompile.extend(dialects.source_ids().cloned());
 
         let mut interrogator = Interrogator {
             dialects,
@@ -442,31 +431,47 @@ impl Build {
         Ok(interrogator)
     }
 
-    // /// Precompiles schemas at the given URIs.
-    // ///
-    // /// # Example
-    // /// ```rust
+    /// Precompiles schemas at the given URIs.
+    ///
+    /// # Example
+    /// ```rust
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let interrogator = Interrogator::build()
+    ///    .json_schema_2020_12()
+    ///    .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
+    ///    .precompile(["https://example.com/schema.json"])
+    ///    .finish()
+    ///    .await
+    ///    .unwrap();
+    /// let uri = AbsoluteUri::parse("https://example.com/schema.json").unwrap();
+    /// let schema = interrogator.schema_by_uri(&uri).unwrap();
+    /// assert_eq!(&schema, &json!({"type": "string"}));
+    /// ```
+    /// # Errors
+    /// Returns [`UriError`] if the URI fails to convert
+    /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
+    #[must_use]
+    pub fn precompile<I, V>(mut self, schemas: I) -> Self
+    where
+        I: IntoIterator<Item = V>,
+        V: TryIntoAbsoluteUri,
+    {
+        for schema in schemas {
+            self.precompile.push(schema.try_into_absolute_uri());
+        }
+        self
+    }
+}
 
-    // /// let interrogator = grill::Builder::default()
-    // ///    .json_schema_2020_12()
-    // ///    .source_str("https://test.com/schema.json", r#"{"type": "string"}"#).unwrap()
-    // ///    .precompile(["https://test.com/schema.json"]).unwrap()
-    // ///    .build()
-    // ///    .unwrap();
-    // /// ```
-    // /// # Errors
-    // /// Returns [`UriError`] if the URI fails to convert
-    // /// into an [`AbsoluteUri`](`crate::AbsoluteUri`).
-    // pub fn precompile<I, V>(mut self, schemas: I) -> Result<Self, UriError>
-    // where
-    //     I: IntoIterator<Item = V>,
-    //     V: TryIntoAbsoluteUri,
-    // {
-    //     for schema in schemas {
-    //         self.precompile.insert(schema.try_into_absolute_uri()?);
-    //     }
-    //     Ok(self)
-    // }
+fn srcs(mut srcs: Vec<Src>, pending_srcs: Vec<PendingSrc>) -> Result<Vec<Src>, SourceError> {
+    srcs.reserve(pending_srcs.len());
+    for pending in pending_srcs {
+        srcs.push(pending.try_into()?);
+    }
+    Ok(srcs)
 }
 
 /// Compiles and evaluates JSON Schemas.
@@ -513,7 +518,7 @@ impl Interrogator {
 
     /// Returns the [`Schema`] with the given `id` if it exists.
     #[must_use]
-    pub fn schema_by_id(&self, id: &AbsoluteUri) -> Option<Schema<'_>> {
+    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_>> {
         self.schemas.get_by_uri(id, &self.sources)
     }
 
@@ -692,11 +697,11 @@ impl Interrogator {
     ///     .finish()
     ///     .await
     ///     .unwrap();
-    /// interrogator.source_str("https://test.com/string.json", r#"{"type": "string"}"#).unwrap();
-    /// interrogator.source_str("https://test.com/number.json", r#"{"type": "number"}"#).unwrap();
+    /// interrogator.source_str("https://example.com/string.json", r#"{"type": "string"}"#).unwrap();
+    /// interrogator.source_str("https://example.com/number.json", r#"{"type": "number"}"#).unwrap();
     /// let schemas = interrogator.compile_all(vec![
-    ///    "https://test.com/string.json",
-    ///    "https://test.com/number.json",
+    ///    "https://example.com/string.json",
+    ///    "https://example.com/number.json",
     /// ]).await.unwrap();
     /// assert_eq!(schemas.len(), 2);
     /// # }
@@ -747,12 +752,25 @@ impl Interrogator {
             }
         }
     }
-
+    /// Returns an [`Iter`] of `Result<Schema, UnknownKeyError>`s for the given [`Key`]s.
+    ///
+    /// Each item in the iterator is a [`Result`] because it is possible a [`Key`] may not
+    /// belong to this `Interrogator`.
+    ///
+    /// If you know that all of the keys belong to this `Interrogator`, you can use
+    /// [`iter_unchecked`](`Interrogator::iter_unchecked`) instead.
     #[must_use]
     pub fn iter<'i>(&'i self, keys: &'i [Key]) -> Iter<'i> {
         Iter::new(keys, &self.schemas, &self.sources)
     }
 
+    /// Returns an [`IterUnchecked`](`IterUnchecked`) of [`Schema`]s for the
+    /// given [`Key`]s.
+    ///
+    /// # Panics
+    /// Panics if a [`Key`] does not belong to this [`Interrogator`]. If you
+    /// have multiple `Interrogator` instances where mixing up keys could occur,
+    /// use [`iter`](`Interrogator::iter`) instead.
     #[must_use]
     pub fn iter_unchecked<'i>(&'i self, keys: &'i [Key]) -> IterUnchecked<'i> {
         self.iter(keys).unchecked()
@@ -762,6 +780,7 @@ impl Interrogator {
         Compiler::new(self).compile(uri).await
     }
 
+    /// Returns the [`Dialects`] for this `Interrogator`
     #[must_use]
     pub fn dialects(&self) -> &Dialects {
         &self.dialects
@@ -773,26 +792,9 @@ impl Interrogator {
         self.dialects.primary()
     }
 
-    // /// Returns the [`Dialect`] for the given schema, if any.
-    // pub fn determine_dialect(
-    //     &self,
-    //     schema: &Value,
-    // ) -> Result<Option<&Dialect>, DialectUnknownError> {
-    //     if let Some(schema) = self.dialects.pertinent_to(schema) {
-    //         return Ok(Some(schema));
-    //     }
-    //     // TODO: this is the only place outside of a Keyword that a specific
-    //     // json schema keyword is used. This should be refactored.
-    //     match schema
-    //         .get(json_schema::SCHEMA)
-    //         .and_then(Value::as_str)
-    //         .map(ToString::to_string)
-    //     {
-    //         Some(metaschema_id) => Err(DialectUnknownError { metaschema_id }),
-    //         None => Ok(None),
-    //     }
-    // }
-
+    /// Evaluates a `Schema` with the given `key` against the given `value`,
+    /// returning the result of the evaluation as an [`Output`] with the specified
+    /// [`Structure`].
     pub fn evaluate<'v>(
         &self,
         key: Key,
@@ -849,7 +851,7 @@ impl Interrogator {
     ///     .await
     ///     .unwrap();
     /// let source = br#"{"type": "string"}"#;
-    /// interrogator.source_slice("https://test.com/schema.json", source).unwrap();
+    /// interrogator.source_slice("https://example.com/schema.json", source).unwrap();
     /// # }
     /// ```
     /// # Errors
@@ -899,7 +901,7 @@ impl Interrogator {
     ///     .await
     ///     .unwrap();
     /// let schema = r#"{"type": "string"}"#;
-    /// interrogator.source_str("https://test.com/schema.json", schema).unwrap();
+    /// interrogator.source_str("https://example.com/schema.json", schema).unwrap();
     /// # }
     /// ```
     /// # Errors
@@ -931,7 +933,7 @@ impl Interrogator {
     ///     .await
     ///     .unwrap();
     /// let source = Cow::Owned(json!({"type": "string"}));
-    /// interrogator.source_value("https://test.com/schema.json", source).unwrap();
+    /// interrogator.source_value("https://example.com/schema.json", source).unwrap();
     /// # }
     /// ```
     /// # Errors
@@ -957,7 +959,7 @@ impl Interrogator {
     /// # #[tokio::main]
     /// # async fn main(){
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://test.com/schema.json", r#"{"type": "string"}"#);
+    /// sources.insert("https://example.com/schema.json", r#"{"type": "string"}"#);
     /// let mut interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
     ///     .finish()
@@ -993,7 +995,7 @@ impl Interrogator {
     /// # #[tokio::main]
     /// # async fn main() {
     /// let mut sources = HashMap::new();
-    /// sources.insert("https://test.com/schema.json", br#"{"type": "string"}"#);
+    /// sources.insert("https://example.com/schema.json", br#"{"type": "string"}"#);
     /// let mut interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
     ///     .finish()
@@ -1035,7 +1037,7 @@ impl Interrogator {
     /// # async fn main() {
     /// let mut sources = HashMap::new();
     /// let source = json!({"type": "string"});
-    /// sources.insert("https://test.com/schema.json", Cow::Owned(source));
+    /// sources.insert("https://example.com/schema.json", Cow::Owned(source));
     /// let mut interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
     ///     .finish()
@@ -1150,7 +1152,7 @@ impl Interrogator {
 //     async fn test_build() {
 //         let interrogator = Build::default()
 //             .json_schema_2020_12()
-//             .source_str("https://test.com/schema.json", r#"{"type": "string"}"#)
+//             .source_str("https://example.com/schema.json", r#"{"type": "string"}"#)
 //             .unwrap()
 //             .finish()
 //             .await

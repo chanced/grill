@@ -655,7 +655,7 @@ mod tests {
             if uri.starts_with('/') {
                 uri = uri.strip_prefix('/').unwrap().to_string();
             }
-            uri = format!("https://test.com/{uri}");
+            uri = format!("https://example.com/{uri}");
         }
         AbsoluteUri::parse(&uri).unwrap()
     }

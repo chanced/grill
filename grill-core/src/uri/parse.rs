@@ -531,17 +531,17 @@ mod tests {
                 ..Default::default()
             },
             Test {
-                input: "//www.test.com",
+                input: "//www.example.com",
                 kind: Expect::RelativeUri,
                 path: "",
-                host: Some("www.test.com"),
+                host: Some("www.example.com"),
                 ..Default::default()
             },
             Test {
-                input: "http://www.test.com",
+                input: "http://www.example.com",
                 kind: Expect::Url,
                 path: "",
-                host: Some("www.test.com"),
+                host: Some("www.example.com"),
                 ..Default::default()
             },
             Test {

@@ -725,7 +725,7 @@ mod tests {
 
         let resolvers = Resolvers::new(vec![Box::new(resolver)]);
 
-        let uri: AbsoluteUri = "https://test.com/foo".parse().unwrap();
+        let uri: AbsoluteUri = "https://example.com/foo".parse().unwrap();
         let base_uri = uri.clone();
         let deserializers = Deserializers::new(vec![]);
         sources.start_txn();

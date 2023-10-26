@@ -5,7 +5,7 @@ use super::PROPERTIES;
 use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    keyword::{self, paths_of_object, Compile, Context, Unimplemented},
+    keyword::{self, paths_of_object, Compile, Context, Keyword, Unimplemented},
     output::{Error, Output},
     Key, Schema,
 };
@@ -14,6 +14,7 @@ use serde_json::Value;
 
 define_translate!(PropertiesInvalid, translate_properties_invalid_en);
 
+/// [`Keyword`] implementation for `"properties"`.
 #[derive(Debug, Default, Clone)]
 pub struct Properties {
     subschemas: HashMap<String, (Pointer, Key)>,
@@ -21,6 +22,7 @@ pub struct Properties {
 }
 
 impl Properties {
+    /// Returns a new `Properties` [`Keyword`].
     #[must_use]
     pub fn new(translate: Option<TranslatePropertiesInvalid>) -> Self {
         Self {
@@ -30,7 +32,7 @@ impl Properties {
     }
 }
 
-impl keyword::Keyword for Properties {
+impl Keyword for Properties {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(PROPERTIES)
     }
@@ -93,12 +95,16 @@ impl keyword::Keyword for Properties {
     }
 }
 
+/// [`Error`] for `"properties"` keyword
 #[derive(Clone, Debug)]
 pub struct PropertiesInvalid<'v> {
+    /// the list of properties that failed to validate
     pub invalid: Vec<Cow<'v, str>>,
+    /// the default [`TranslatePropertiesInvalid`] to use for translation
     pub translate: TranslatePropertiesInvalid,
 }
 
+/// default [`TranslatePropertiesInvalid`] instance
 pub fn translate_properties_invalid_en(
     f: &mut std::fmt::Formatter<'_>,
     invalid: &PropertiesInvalid<'_>,
@@ -169,23 +175,21 @@ mod tests {
             .unwrap();
         Interrogator::build()
             .dialect(dialect)
-            .source_value(
-                "https://test.com/with_properties",
-                Cow::Owned(json!({
-                    "$id": "https://test.com/with_properties",
+            .source_owned_value(
+                "https://example.com/with_properties",
+                json!({
+                    "$id": "https://example.com/with_properties",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "properties": properties
-                })),
+                }),
             )
-            .unwrap()
-            .source_value(
-                "https://test.com/without_properties",
-                Cow::Owned(json!({
-                    "$id": "https://test.com/without_properties",
+            .source_owned_value(
+                "https://example.com/without_properties",
+                json!({
+                    "$id": "https://example.com/without_properties",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                })),
+                }),
             )
-            .unwrap()
             .finish()
             .await
             .unwrap()
@@ -200,7 +204,7 @@ mod tests {
         }))
         .await;
         let key = interrogator
-            .compile("https://test.com/with_properties")
+            .compile("https://example.com/with_properties")
             .await
             .unwrap();
         let schema = interrogator.schema(key).unwrap();
@@ -217,7 +221,7 @@ mod tests {
         }))
         .await;
         let key = interrogator
-            .compile("https://test.com/with_properties")
+            .compile("https://example.com/with_properties")
             .await
             .unwrap();
         let invalid = json!({

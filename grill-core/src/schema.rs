@@ -201,6 +201,17 @@ pub struct Schema<'i> {
     pub source: Source<'i>,
 }
 
+impl PartialEq<Schema<'_>> for Value {
+    fn eq(&self, other: &Schema<'_>) -> bool {
+        self == other.value()
+    }
+}
+impl PartialEq<Value> for Schema<'_> {
+    fn eq(&self, other: &Value) -> bool {
+        self.value() == other
+    }
+}
+
 impl Serialize for Schema<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.source.serialize(serializer)

@@ -21,7 +21,6 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
-use serde_json::Value;
 
 pub mod keyword;
 pub mod draft_04;
