@@ -17,10 +17,9 @@ grill-json-schema = { version = "0.1.0" }
 grill-macros      = { version = "0.1.0" }
 
 [dev-dependencies]
-mockall  = { workspace = true }
-proptest = { workspace = true }
-similar  = { workspace = true }
-tokio    = { version = "1.28", features = ["full"] }
+mockall = { workspace = true }
+similar = { workspace = true }
+tokio   = { version = "1.28", features = ["full"] }
 
 [features]
 default = ["http", "toml", "yaml"]

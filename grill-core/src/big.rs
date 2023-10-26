@@ -5,13 +5,17 @@ pub use num;
 pub use num::{BigInt, BigRational};
 
 use num::FromPrimitive;
+use once_cell::sync::Lazy;
 
 mod rational;
 
 mod int;
 
-lazy_static::lazy_static! {
-    static ref TEN: BigInt = BigInt::from_u8(10).unwrap();
+/// The number ten (10) as a [`BigInt`]
+#[must_use]
+pub fn ten() -> &'static BigInt {
+    static TEN: Lazy<BigInt> = Lazy::new(|| BigInt::from_u8(10).unwrap());
+    &TEN
 }
 
 /// Parses a string into a [`BigInt`]
@@ -44,8 +48,4 @@ pub(crate) fn usize_to_u32(v: usize) -> Result<u32, OverflowError<usize, { u32::
 #[inline]
 pub(crate) fn u64_to_usize(v: u64) -> Result<usize, OverflowError<u64, { usize::MAX as u64 }>> {
     v.try_into().map_err(|_| OverflowError(v))
-}
-
-fn ten() -> BigInt {
-    TEN.clone()
 }

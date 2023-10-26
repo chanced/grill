@@ -1,4 +1,4 @@
-use super::{u64_to_usize, TEN};
+use super::{ten, u64_to_usize};
 use std::str::FromStr;
 
 use num::{pow, BigInt, BigRational, One, Zero};
@@ -118,7 +118,7 @@ impl<'a> Parser<'a> {
 
         let denom = parser
             .fraction()
-            .map_or(BigInt::one(), |f| pow(TEN.clone(), f.len()));
+            .map_or(BigInt::one(), |f| pow(ten().clone(), f.len()));
 
         let fraction = BigRational::new(fraction, denom);
         let mut result = fraction + integer;
@@ -140,9 +140,9 @@ impl<'a> Parser<'a> {
             // safety: usize is the same width as u64 on 64-bit systems
             let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
             if is_positive {
-                result *= pow(TEN.clone(), exp);
+                result *= pow(ten().clone(), exp);
             } else {
-                result /= pow(TEN.clone(), exp);
+                result /= pow(ten().clone(), exp);
             }
         }
         Ok(result)

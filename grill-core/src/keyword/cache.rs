@@ -4,16 +4,25 @@ use std::{
     sync::Arc,
 };
 
-use lazy_static::lazy_static;
 use num_rational::BigRational;
+use once_cell::sync::Lazy;
 use serde_json::{Number, Value};
 
 use crate::{big::parse_rational, error::NumberError};
 
-lazy_static! {
-    static ref TRUE: Arc<Value> = Arc::new(Value::Bool(true));
-    static ref FALSE: Arc<Value> = Arc::new(Value::Bool(false));
-    static ref NULL: Arc<Value> = Arc::new(Value::Null);
+fn boolean(value: bool) -> Arc<Value> {
+    static TRUE: Lazy<Arc<Value>> = Lazy::new(|| Arc::new(Value::Bool(true)));
+    static FALSE: Lazy<Arc<Value>> = Lazy::new(|| Arc::new(Value::Bool(false)));
+    if value {
+        TRUE.clone()
+    } else {
+        FALSE.clone()
+    }
+}
+
+fn null() -> Arc<Value> {
+    static NULL: Lazy<Arc<Value>> = Lazy::new(|| Arc::new(Value::Null));
+    NULL.clone()
 }
 
 type Map<K, V> = HashMap<K, V, BuildHasherDefault<LenHasher>>;
@@ -46,8 +55,8 @@ impl Values {
             Value::String(_) => self.resolve_string(value),
             Value::Array(_) => self.resolve_array(value),
             Value::Object(_) => self.resolve_object(value),
-            Value::Bool(value) => get_bool(*value),
-            Value::Null => NULL.clone(),
+            Value::Bool(value) => boolean(*value),
+            Value::Null => null(),
         }
     }
 
@@ -100,14 +109,6 @@ impl Values {
                 self.numbers.insert(index, Arc::new(value.clone()));
                 self.numbers[index].clone()
             })
-    }
-}
-
-fn get_bool(value: bool) -> Arc<Value> {
-    if value {
-        TRUE.clone()
-    } else {
-        FALSE.clone()
     }
 }
 

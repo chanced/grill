@@ -18,8 +18,7 @@ serde_json   = { workspace = true }
 thiserror    = { workspace = true }
 
 [dev-dependencies]
-grill    = { workspace = true }
-mockall  = { workspace = true }
-proptest = { workspace = true }
-similar  = { workspace = true }
-tokio    = { version = "1.28", features = ["full"] }
+grill   = { workspace = true }
+mockall = { workspace = true }
+similar = { workspace = true }
+tokio   = { version = "1.28", features = ["full"] }

@@ -14,14 +14,12 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 anyhow           = { workspace = true }
 async-trait      = { workspace = true }
-derive_more      = { workspace = true }
 dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }
 grill-macros     = { workspace = true }
 inherent         = { workspace = true }
 jsonptr          = { workspace = true }
-lazy_static      = { workspace = true }
 num              = { workspace = true }
 num-rational     = { workspace = true }
 once_cell        = { workspace = true }
@@ -34,18 +32,16 @@ serde_json       = { version = "1.0.106", features = ["arbitrary_precision"] }
 serde_yaml       = { workspace = true, optional = true }
 slotmap          = { workspace = true }
 strum            = { workspace = true }
-tap              = { workspace = true }
 thiserror        = { workspace = true }
 toml             = { workspace = true, optional = true }
 url              = { workspace = true }
 urn              = { workspace = true }
 
 [dev-dependencies]
-grill    = { workspace = true }
-mockall  = { workspace = true }
-proptest = { workspace = true }
-similar  = { workspace = true }
-tokio    = { version = "1.28", features = ["full"] }
+grill   = { workspace = true }
+mockall = { workspace = true }
+similar = { workspace = true }
+tokio   = { version = "1.28", features = ["full"] }
 
 [features]
 default = ["http", "toml", "yaml"]

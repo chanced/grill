@@ -9,23 +9,19 @@ grill-json-schema = { workspace = "0.1.0" }
 grill-macros      = { version = "0.1.0" }
 
 anyhow           = { version = "1.0.75" }
-anymap           = { version = "1.0.0-beta.2" }
 async-trait      = { version = "0.1" }
 bitflags         = { version = "2.4.1" }
-derive_more      = { version = "0.99.17" }
 dyn-clone        = { version = "1.0.11" }
 either           = { version = "1.8.1" }
 erased-serde     = { version = "0.3.25" }
-inherent         = { version = "1" }
+inherent         = { version = "1.0.10" }
 jsonptr          = { version = "0.4.4" }
-lazy_static      = { version = "1.4.0" }
 mockall          = { version = "0.11.4" }
 num              = { version = "0.4", features = ["serde"] }
 num-rational     = { version = "0.4.1" }
 once_cell        = { version = "1.10" }
 paste            = { version = "1.0.14" }
 percent-encoding = { version = "2.3" }
-proptest         = { version = "1.2.0" }
 regex            = { version = "1.5.4" }
 reqwest          = { version = "0.11" }
 serde            = { version = "1.0.163", features = ["derive", "rc"] }
@@ -35,7 +31,6 @@ similar          = { version = "2.2.1" }
 slotmap          = { version = "1.0.6" }
 strum            = { version = "0.24", features = ["derive"] }
 strum_macros     = { version = "0.24" }
-tap              = { version = "1.0.1" }
 thiserror        = { version = "1.0.25" }
 toml             = { version = "0.8.2" }
 url              = { version = "2.2.2" }

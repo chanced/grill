@@ -117,9 +117,9 @@ impl<'a> Parser<'a> {
             #[cfg(target_pointer_width = "64")]
             let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
             if is_positive {
-                result *= pow(ten(), exp);
+                result *= pow(ten().clone(), exp);
             } else {
-                result /= pow(ten(), exp);
+                result /= pow(ten().clone(), exp);
                 if !result.is_integer() {
                     return Err(NumberError::NotAnInteger {
                         value: value.to_string(),

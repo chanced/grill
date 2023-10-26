@@ -821,7 +821,7 @@ impl Interrogator {
 
     /// Returns the schema's `Key` if it exists
     #[must_use]
-    pub fn schema_key_by_id(&self, id: &AbsoluteUri) -> Option<Key> {
+    pub fn schema_key_by_uri(&self, id: &AbsoluteUri) -> Option<Key> {
         self.schemas.get_by_uri(id, &self.sources)?.key.into()
     }
     /// Returns the attached `Deserializers`.
