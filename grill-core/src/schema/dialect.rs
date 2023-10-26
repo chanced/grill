@@ -1,10 +1,10 @@
-//! Keywords and semantics that can be used to evaluate a value against a
-//! schema.
+//! A container of [`Keyword`]s and semantics which determine how to evaluate a
+//! [`Value`] against a [`Schema`](crate::Schema).
 
 use crate::{
-    error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError},
+    error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError, UriError},
     keyword::{Keyword, Unimplemented},
-    uri::AbsoluteUri,
+    uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Src,
 };
 use jsonptr::Pointer;
@@ -14,26 +14,44 @@ use std::{borrow::Cow, convert::Into, fmt::Debug, hash::Hash, iter::IntoIterator
 
 use super::{Anchor, Ref};
 
+/// Builds a [`Dialect`].
 pub struct Build {
     id: AbsoluteUri,
-    metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
+    metaschemas: Vec<(Result<AbsoluteUri, UriError>, Cow<'static, Value>)>,
     keywords: Vec<Box<dyn Keyword>>,
 }
 
 impl Build {
+    /// Adds a metaschema to the [`Dialect`]. These are used to validate the
+    /// schemas of the [`Dialect`], as determined by [`Dialect::is_pertinent_to`].
     #[must_use]
-    pub fn with_metaschema(mut self, id: AbsoluteUri, schema: Cow<'static, Value>) -> Self {
-        self.metaschemas.push((id, schema));
+    pub fn add_metaschema(
+        mut self,
+        id: impl TryIntoAbsoluteUri,
+        schema: Cow<'static, Value>,
+    ) -> Self {
+        self.metaschemas.push((id.try_into_absolute_uri(), schema));
         self
     }
 
+    /// Adds a [`Keyword`] to the [`Dialect`].
     #[must_use]
-    pub fn with_keyword(mut self, keyword: impl 'static + Keyword) -> Self {
+    pub fn add_keyword(mut self, keyword: impl 'static + Keyword) -> Self {
         self.keywords.push(Box::new(keyword));
         self
     }
+
+    /// Finalizes the [`Dialect`].
     pub fn finish(self) -> Result<Dialect, DialectError> {
-        Dialect::new(self.id, self.metaschemas, self.keywords)
+        let metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)> = self
+            .metaschemas
+            .into_iter()
+            .map(|(id, schema)| {
+                let id = id?;
+                Ok((id.clone(), schema))
+            })
+            .collect::<Result<_, UriError>>()?;
+        Dialect::new(self.id, metaschemas, self.keywords)
     }
 }
 
@@ -100,16 +118,10 @@ impl Dialect {
         })
     }
 
-    /// Attempts to identify a `schema` based on the [`Keyword`]s associated with
-    /// this `Dialect`, returning the primary (if any) and all [`AbsoluteUri`]s
-    /// the [`Schema`](`crate::schema::Schema`) can be referenced by.
-    ///
-    /// # Convention
-    /// The second (index: `1`) `Keyword` must implement `identify` and, if
-    /// able, return the primary identifier.
-    ///
-    /// Secondary identifiers are determined by
-    /// [`Keyword`]s index `2` and greater.
+    /// Attempts to identify a `schema` based on the [`Keyword`]s associated
+    /// with this `Dialect`. It returns the primary id (if any) and all
+    /// additional, secondary [`AbsoluteUri`]s the
+    /// [`Schema`](`crate::schema::Schema`) can be referenced by.
     pub fn identify(
         &self,
         mut base_uri: AbsoluteUri,
@@ -149,6 +161,7 @@ impl Dialect {
         Ok((primary, uris))
     }
 
+    /// Returns the [`AbsoluteUri`] of the primary metaschema.
     #[must_use]
     pub fn primary_metaschema_id(&self) -> &AbsoluteUri {
         &self.id
@@ -171,6 +184,12 @@ impl Dialect {
             .collect()
     }
 
+    /// Attempts to locate [`Ref`]s of a schema, composed of results from associated [`Keyword`]'s
+    /// [`Keyword::refs`] method.
+    ///
+    /// # Errors
+    /// Returns [`RefError`] if any [`Keyword`] fails to parse the [`Ref`]s. This could include
+    /// invalid JSON types or malformed URIs.
     pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, RefError> {
         let mut refs = Vec::new();
         for res in self
@@ -184,6 +203,12 @@ impl Dialect {
         Ok(refs)
     }
 
+    /// Attempts to locate [`Anchor`]s of a schema, composed of results from associated [`Keyword`]'s
+    /// [`Keyword::anchors`] method.
+    ///
+    /// # Errors
+    /// Returns [`AnchorError`] if any [`Keyword`] fails to parse the [`Anchor`]s. This could include
+    /// invalid JSON types or malformed anchors.
     pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
         let mut anchors = Vec::new();
         for res in self
@@ -349,6 +374,15 @@ impl Dialects {
             .map(|(idx, _)| idx)
     }
 
+    /// Attempts to determine if the `schema` [`Value`] is pertinent to a
+    /// [`Dialect`] based upon the [`Keyword`]s of this [`Dialect`].
+    ///
+    /// ## Special handling for Dialect IDs that are URLs
+    /// Logic is in place to handle cases where the URI `$id` of the
+    /// schema is in the form of a URL which matches on both the `"http"` and
+    /// `"https"` schemes as well as with an empty or non-existent fragment. For
+    /// example, a `Dialect` with the `$id` `"https://example.com"` would consider
+    /// a schema with a `$schema` of `"http://example.com#"` to be pertinent.
     #[must_use]
     pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect> {
         self.dialects
@@ -356,6 +390,7 @@ impl Dialects {
             .find(|&dialect| dialect.is_pertinent_to(schema))
     }
 
+    /// Returns the index of the [`Dialect`] that is pertinent to the schema.
     #[must_use]
     pub fn pertinent_to_idx(&self, schema: &Value) -> Option<usize> {
         self.dialects
@@ -377,6 +412,8 @@ impl Dialects {
         Ok(())
     }
 
+    /// Returns `true` if the [`Dialects`] contains a [`Dialect`] with the given
+    /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`) as an ID.
     #[must_use]
     pub fn contains(&self, id: &AbsoluteUri) -> bool {
         self.dialects.iter().any(|d| &d.id == id)
@@ -389,6 +426,9 @@ impl Dialects {
         self.pertinent_to(schema).unwrap_or(self.primary())
     }
 
+    /// Returns the index of the [`Dialect`] that is pertinent to the schema or
+    /// the index of the default [`Dialect`] if the [`Dialect`] can not be
+    /// determined from schema.
     #[must_use]
     pub fn pertinent_to_or_default_idx(&self, schema: &Value) -> usize {
         self.pertinent_to(schema)
@@ -447,23 +487,10 @@ impl Dialects {
         self.dialects.iter().position(|d| d == dialect)
     }
 
+    /// Returns the [`Dialect`] at the given index.
     #[must_use]
     pub fn get_by_index(&self, idx: usize) -> Option<&Dialect> {
         self.dialects.get(idx)
-    }
-
-    #[must_use]
-    pub fn dialect_index_for(&self, schema: &Value) -> usize {
-        let default = self.primary();
-        if default.is_pertinent_to(schema) {
-            return self.default;
-        }
-        for (idx, dialect) in self.dialects.iter().enumerate() {
-            if dialect.id != default.id && dialect.is_pertinent_to(schema) {
-                return idx;
-            }
-        }
-        self.default
     }
 
     fn find_primary(
@@ -553,9 +580,9 @@ mod tests {
         ];
         let id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
         let dialect = Dialect::build(id.clone())
-            .with_metaschema(id.clone(), Cow::Owned(json!({})))
-            .with_keyword(test::keyword::schema::Keyword::new("$schema", true))
-            .with_keyword(test::keyword::id::Keyword::new("$id", true))
+            .add_metaschema(id.clone(), Cow::Owned(json!({})))
+            .add_keyword(test::keyword::schema::Keyword::new("$schema", true))
+            .add_keyword(test::keyword::id::Keyword::new("$id", true))
             .finish()
             .unwrap();
 

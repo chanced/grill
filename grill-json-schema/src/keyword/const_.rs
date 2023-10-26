@@ -181,10 +181,10 @@ mod tests {
     };
     async fn create_interrogator(const_value: Value) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
-            .with_keyword(schema::Schema::new(SCHEMA, false))
-            .with_keyword(id::Id::new(ID, false))
-            .with_keyword(Const::new(None))
-            .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+            .add_keyword(schema::Schema::new(SCHEMA, false))
+            .add_keyword(id::Id::new(ID, false))
+            .add_keyword(Const::new(None))
+            .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();
         Interrogator::build()

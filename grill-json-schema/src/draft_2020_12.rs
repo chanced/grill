@@ -12,22 +12,22 @@ use super::{keyword::REF, metaschema};
 #[must_use]
 pub fn dialect() -> Dialect {
     Dialect::build(json_schema_2020_12_uri().clone())
-        .with_metaschema(
+        .add_metaschema(
             json_schema_2020_12_uri().clone(),
             Cow::Borrowed(json_schema_2020_12_value()),
         )
-        .with_keyword(keyword::schema::Schema::new(SCHEMA, false))
-        .with_keyword(keyword::id::Id::new(ID, false))
-        .with_keyword(keyword::boolean::Boolean::default())
-        .with_keyword(keyword::const_::Const::new(None))
-        .with_keyword(keyword::comment::Comment::default())
-        .with_keyword(keyword::read_only::ReadOnly::default())
-        .with_keyword(keyword::write_only::WriteOnly::default())
-        .with_keyword(keyword::ref_::Ref::new(REF, true))
-        .with_keyword(keyword::defs::Defs)
-        .with_keyword(keyword::if_then_else::IfThenElse::default())
-        .with_keyword(keyword::type_::Type::new(None))
-        .with_keyword(keyword::enum_::Enum::new(None))
+        .add_keyword(keyword::schema::Schema::new(SCHEMA, false))
+        .add_keyword(keyword::id::Id::new(ID, false))
+        .add_keyword(keyword::boolean::Boolean::default())
+        .add_keyword(keyword::const_::Const::new(None))
+        .add_keyword(keyword::comment::Comment::default())
+        .add_keyword(keyword::read_only::ReadOnly::default())
+        .add_keyword(keyword::write_only::WriteOnly::default())
+        .add_keyword(keyword::ref_::Ref::new(REF, true))
+        .add_keyword(keyword::defs::Defs)
+        .add_keyword(keyword::if_then_else::IfThenElse::default())
+        .add_keyword(keyword::type_::Type::new(None))
+        .add_keyword(keyword::enum_::Enum::new(None))
         .finish()
         .unwrap()
 }

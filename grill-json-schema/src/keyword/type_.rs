@@ -95,7 +95,7 @@ impl Type {
         if self.bitfield.contains(bitfield) {
             return Ok(Some(ctx.annotate(
                 Some(TYPE),
-                Some(Annotation::Cow(Cow::Borrowed(bitfield_to_value(bitfield)))),
+                Some(Annotation::Ref(bitfield_to_value(bitfield))),
             )));
         }
         Ok(Some(ctx.error(
@@ -116,19 +116,13 @@ impl Type {
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         let mut bitfield = Bitfield::NUMBER;
         if self.bitfield.contains(Bitfield::NUMBER) {
-            return Ok(Some(ctx.annotate(
-                Some(TYPE),
-                Some(Annotation::Cow(Cow::Borrowed(value))),
-            )));
+            return Ok(Some(ctx.annotate(Some(TYPE), Some(Annotation::Ref(value)))));
         }
         let number = ctx.number_ref(number)?;
         if self.bitfield.contains(Bitfield::INTEGER) {
             bitfield = Bitfield::NUMBER;
             if number.is_integer() {
-                return Ok(Some(ctx.annotate(
-                    Some(TYPE),
-                    Some(Annotation::Cow(Cow::Borrowed(value))),
-                )));
+                return Ok(Some(ctx.annotate(Some(TYPE), Some(Annotation::Ref(value)))));
             }
         }
         Ok(Some(ctx.error(

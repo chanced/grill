@@ -11,15 +11,15 @@ use crate::{
 pub fn build_dialect() -> dialect::Build {
     let uri = AbsoluteUri::parse("https://json-schema.org/draft/2020-12/schema").unwrap();
     Dialect::build(uri.clone())
-        .with_metaschema(
+        .add_metaschema(
             uri.clone(),
             Cow::Owned(json!({
                 "$id": uri,
                 "$schema": uri.clone()
             })),
         )
-        .with_keyword(keyword::id::Keyword::new("$id", false))
-        .with_keyword(keyword::schema::Keyword::new("$schema", false))
+        .add_keyword(keyword::id::Keyword::new("$id", false))
+        .add_keyword(keyword::schema::Keyword::new("$schema", false))
 }
 pub mod keyword {
 

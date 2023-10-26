@@ -374,6 +374,10 @@ pub enum DialectError {
     /// implement [`identify`](`crate::keyword::Keyword::identify`) but none were provided.
     #[error("at least one `Keyword` must implement the `identify` method; none were found")]
     IdentifyNotImplemented(AbsoluteUri),
+
+    /// An [`AbsoluteUri`] failed to parse.
+    #[error(transparent)]
+    UriPFailedToParse(#[from] UriError),
 }
 
 /*

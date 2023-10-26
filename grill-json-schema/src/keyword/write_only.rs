@@ -1,9 +1,7 @@
-use std::borrow::Cow;
-
-use super::{FALSE, TRUE, WRITE_ONLY};
+use super::WRITE_ONLY;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
-    keyword::{self, Compile},
+    keyword::{self, get_bool_value, Compile},
     output::Annotation,
     Output, Schema,
 };
@@ -44,11 +42,7 @@ impl keyword::Keyword for WriteOnly {
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         Ok(Some(ctx.annotate(
             Some(WRITE_ONLY),
-            Some(Annotation::Cow(Cow::Borrowed(if self.value {
-                TRUE
-            } else {
-                FALSE
-            }))),
+            Some(Annotation::StaticRef(get_bool_value(self.value))),
         )))
     }
 }

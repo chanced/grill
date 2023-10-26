@@ -161,11 +161,34 @@ pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedErro
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// The value of an `"anntation"` field in the form of a [`Value`].
+///
+/// Each [`Keyword`](crate::Keyword) may have an annotation. The annotation is
+/// dynamic and will be keyword-specific.
 #[derive(Debug, Clone, Serialize, strum::Display)]
 #[serde(untagged)]
 pub enum Annotation<'v> {
-    Cow(Cow<'v, Value>),
+    /// A [`Value`] in a [`Cow`]. This is the most common variant for all
+    /// supplied [`Keyword`](`crate::Keyword`)s, as the `Value` is referenced
+    /// from the original value.
+    ///
+    /// Use `into_owned` to convert this variant into an [`Arc`].
+    Ref(&'v Value),
+    /// `&'static Value`
+    StaticRef(&'static Value),
+    /// The value
     Arc(Arc<Value>),
+}
+
+impl<'v> Annotation<'v> {
+    #[must_use]
+    pub fn into_owned(self) -> Annotation<'static> {
+        match self {
+            Self::Ref(value) => Annotation::Arc(Arc::from(value.clone())),
+            Self::Arc(value) => Annotation::Arc(value),
+            Self::StaticRef(value) => Annotation::StaticRef(value),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Annotation<'de> {
@@ -179,12 +202,12 @@ impl<'de> Deserialize<'de> for Annotation<'de> {
 }
 impl<'v> From<&'v Value> for Annotation<'v> {
     fn from(value: &'v Value) -> Self {
-        Self::Cow(Cow::Borrowed(value))
+        Self::Ref(value)
     }
 }
 impl From<Value> for Annotation<'static> {
     fn from(value: Value) -> Self {
-        Self::Cow(Cow::Owned(value))
+        Self::Arc(Arc::new(value))
     }
 }
 impl From<Arc<Value>> for Annotation<'_> {
@@ -202,7 +225,7 @@ impl Deref for Annotation<'_> {
     type Target = Value;
     fn deref(&self) -> &Self::Target {
         match self {
-            Self::Cow(value) => value,
+            Self::Ref(value) | Self::StaticRef(value) => value,
             Self::Arc(value) => value,
         }
     }
@@ -662,6 +685,8 @@ impl<'v> Output<'v> {
         matches!(self, Self::Verbose(..))
     }
 
+    /// Returns a refernece to the [`Verbose`] output if
+    /// able. Returns `None` otherwise.
     #[must_use]
     pub fn as_verbose(&self) -> Option<&Verbose<'v>> {
         if let Self::Verbose(v) = self {
@@ -670,6 +695,10 @@ impl<'v> Output<'v> {
             None
         }
     }
+    /// Attempts to convert this output into a [`Verbose`] output.
+    ///
+    /// # Errors
+    /// Returns `Err(Self)` if this output is not [`Verbose`].
     pub fn try_into_verbose(self) -> Result<Verbose<'v>, Self> {
         if let Self::Verbose(v) = self {
             Ok(v)

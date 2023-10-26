@@ -1,7 +1,8 @@
+/// # Cache collections for [`Value`](`serde_json::Value`)s and [`BigRational`]s.
+pub mod cache;
+
 use num_rational::BigRational;
 use std::collections::HashMap;
-
-pub mod cache;
 
 use self::cache::{Numbers, Values};
 
@@ -634,6 +635,20 @@ impl Evaluated {
 impl Default for Evaluated {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// A static reference to [`Value::Bool`] with the value `true`
+pub const TRUE: &Value = &Value::Bool(true);
+/// A static reference to [`Value::Bool`] with the value `false`
+pub const FALSE: &Value = &Value::Bool(false);
+/// Returns a static reference to [`Value::Bool`] with the given value.
+#[must_use]
+pub const fn get_bool_value(value: bool) -> &'static Value {
+    if value {
+        TRUE
+    } else {
+        FALSE
     }
 }
 

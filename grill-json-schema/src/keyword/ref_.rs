@@ -10,13 +10,20 @@ use grill_core::{
     Key, Output, Schema, Uri,
 };
 
+/// A reference to another schema.
 #[derive(Debug, Clone, Default)]
 pub struct Ref {
+    /// The name of the keyword.
     pub keyword: &'static str,
+    /// The pointer to the keyword in the schema.
     pub keyword_ptr: Pointer,
     /// The key of the referenced schema.
     pub ref_key: Key,
+    /// the value of the keyword as a [`Value`] in an `Arc`
     pub ref_uri_value: Arc<Value>,
+    /// Determines whether this `Ref` must evaluate or merely annotate.
+    ///
+    /// Note: JSON Schema 07 and earlier do not evaluate refs.
     pub must_eval: bool,
 }
 
@@ -116,11 +123,11 @@ mod tests {
 
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
-            .with_keyword(schema::Schema::new(SCHEMA, false))
-            .with_keyword(const_::Const::new(None))
-            .with_keyword(id::Id::new(ID, false))
-            .with_keyword(Ref::new(REF, true))
-            .with_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+            .add_keyword(schema::Schema::new(SCHEMA, false))
+            .add_keyword(const_::Const::new(None))
+            .add_keyword(id::Id::new(ID, false))
+            .add_keyword(Ref::new(REF, true))
+            .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
             .finish()
             .unwrap();
         Interrogator::build()

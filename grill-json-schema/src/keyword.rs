@@ -1,6 +1,5 @@
 //! # Json Schema Keywords
 
-use serde_json::Value;
 pub mod boolean;
 pub mod comment;
 pub mod const_;
@@ -15,9 +14,6 @@ pub mod ref_;
 pub mod schema;
 pub mod type_;
 pub mod write_only;
-
-const TRUE: &Value = &Value::Bool(true);
-pub const FALSE: &Value = &Value::Bool(false);
 
 /// ## `$id`
 ///
