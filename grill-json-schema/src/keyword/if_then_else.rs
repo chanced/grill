@@ -91,7 +91,7 @@ impl Keyword for IfThenElse {
 #[cfg(test)]
 mod tests {
 
-    use crate::Build;
+    use crate::JsonSchema;
 
     use super::*;
     use grill_core::{Interrogator, Structure};

@@ -60,28 +60,34 @@ pub use static_pointer_fn;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Generates an enum containing either a `fn(&mut std::fmt::Formater, &T) ->
+/// std::fmt::Result` or an `Arc` containing a `Fn` of the same signature.
 #[macro_export]
 macro_rules! define_translate {
-    ($ident:ident, $default:ident) => {
+    ($error:ident, $default:ident) => {
         paste::paste!{
+            /// A function which can translate [`$error`].
             #[derive(Clone)]
-            pub enum [< Translate $ident >]{
+            pub enum [< Translate $error >]{
+                #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
                 Closure(
                     ::std::sync::Arc<
-                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$ident) -> ::std::fmt::Result,
+                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
                     >,
                 ),
-                FnPtr(fn(&mut ::std::fmt::Formatter, &$ident) -> std::fmt::Result),
+                #[doc = "A `fn` which can translate [`" $error "`]"]
+                FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
             }
-            impl [< Translate $ident>]{
-                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$ident) -> ::std::fmt::Result {
+            impl [< Translate $error>]{
+                /// Runs the translation
+                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
                     match self {
                         Self::Closure(c) => c(f, v),
                         Self::FnPtr(p) => p(f, v),
                     }
                 }
             }
-            impl ::std::fmt::Debug for [< Translate $ident >] {
+            impl ::std::fmt::Debug for [< Translate $error >] {
                 fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                     match self {
                         Self::Closure(_) => f.debug_tuple("Closure").finish(),
@@ -89,7 +95,7 @@ macro_rules! define_translate {
                     }
                 }
             }
-            impl std::default::Default for [< Translate $ident >] {
+            impl std::default::Default for [< Translate $error >] {
                 fn default() -> Self {
                     Self::FnPtr($default)
                 }
@@ -165,6 +171,11 @@ impl<'i> Compile<'i> {
             .ok_or(CompileError::SchemaNotFound(uri))
     }
 
+    /// Returns the [`Key`] of a schema at the specified `path` relative to
+    /// the current schema.
+    ///
+    /// # Errors
+    /// Returns a [`CompileError`] if the schema cannot be found.
     pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
         let mut uri = self.absolute_uri().clone();
 

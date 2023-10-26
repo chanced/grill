@@ -23,15 +23,19 @@
 
 
 pub mod keyword;
+/// [Draft 04](https://json-schema.org/specification-links#draft-4) implementation.
 pub mod draft_04;
+/// [Draft 07](https://json-schema.org/specification-links#draft-7) implementation.
 pub mod draft_07;
+/// [Draft 2019-09](<https://json-schema.org/specification-links#draft-2019-09-(formerly-known-as-draft-8)>) implementation.
 pub mod draft_2019_09;
+/// [Draft 2020-12](https://json-schema.org/specification-links#2020-12) implementation.
 pub mod draft_2020_12;
 
 
 
-/// A trait for adding JSON Schema dialects to a [`Build`](grill_core::Build).
-pub trait Build: Sized {
+/// A trait for adding JSON Schema dialect methods to a [`Build`](grill_core::Build).
+pub trait JsonSchema: Sized {
     /// Adds the JSON Schema Draft 2020-12 [`Dialect`](grill_core::schema::Dialect).
     #[must_use]
     fn json_schema_2020_12(self) -> grill_core::Build;
@@ -49,7 +53,7 @@ pub trait Build: Sized {
     fn json_schema_04(self) -> grill_core::Build;
 }
 
-impl Build for grill_core::Build {
+impl JsonSchema for grill_core::Build {
     fn json_schema_2020_12(self) -> grill_core::Build {
         self.dialect(draft_2020_12::dialect())
     }

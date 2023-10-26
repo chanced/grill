@@ -386,7 +386,7 @@ fn determine_bitfield(s: &str) -> Result<Bitfield, ()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Build as _;
+    use crate::JsonSchema as _;
     use grill_core::{Build, Interrogator, Structure};
     use serde_json::json;
 

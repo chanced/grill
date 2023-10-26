@@ -1,3 +1,5 @@
+pub mod readme;
+
 use serde::Deserialize;
 use serde_json::Value;
 
