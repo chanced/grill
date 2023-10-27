@@ -223,6 +223,8 @@ pub struct Context<'i> {
 }
 
 impl<'s> Context<'s> {
+    /// Evaluates `value` against the schema with the given `key` for the
+    /// `keyword` and produces an [`Output`]
     pub fn evaluate<'v>(
         &mut self,
         key: Key,
@@ -322,6 +324,7 @@ impl<'s> Context<'s> {
         self.eval_state
     }
 
+    /// creates a valid [`Output`] with the given `keyword` and `annotation`
     #[must_use]
     pub fn annotate<'v>(
         &mut self,
@@ -331,6 +334,7 @@ impl<'s> Context<'s> {
         self.create_output(keyword, Ok(annotation), false)
     }
 
+    /// Creates an invalid [`Output`] with the given `keyword` and `error`
     pub fn error<'v>(
         &mut self,
         keyword: Option<&'static str>,
@@ -339,6 +343,18 @@ impl<'s> Context<'s> {
         self.create_output(keyword, Err(error), false)
     }
 
+    /// Creates a transient [`Output`] with the given `keyword` and `nodes`
+    ///
+    /// A transient `Output` is one which is not included in the final output
+    /// but accumulates errors and annotations, which are then flattened into a
+    /// series of `Output`s which are included in the final output without
+    /// having their conjunction considered.
+    ///
+    /// Essentially, a transient `Output` is a pseudo node which has its state
+    /// determined by the `Keyword` rather than the result of it's children.
+    ///
+    /// The transient `Output` is removed from the final output, promoting the
+    /// `nodes` to the same level as the transient `Output`.
     pub fn transient<'v>(
         &mut self,
         is_valid: bool,
@@ -426,6 +442,10 @@ pub fn paths_of_object(field: &'static str, object: &Value) -> Vec<Pointer> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Indicates that the specific method of [`Keyword`] is not implemented.
+///
+/// This enables the `Dialect` to reduce the list of `Keyword`s to call
+/// for any given method down to those which are pertinent.
 #[derive(Debug)]
 pub struct Unimplemented;
 
@@ -445,6 +465,7 @@ impl Display for Unimplemented {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// Indicates the type of [`Keyword`] and the keyword(s) which it handles.
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum Kind {
     /// The [`Keyword`] is singular, evaluating the logic of a specific
@@ -527,7 +548,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     fn set_translate(&mut self, translator: &Translator) -> Result<(), Unimplemented> {
         Err(Unimplemented)
     }
-
+    /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
         Err(Unimplemented)
     }
@@ -610,20 +631,19 @@ clone_trait_object!(Keyword);
 
 /// A collection of evaluated paths in the form of a trie of JSON pointers.
 ///
-/// # Example
-/// ```
-/// # use grill::keyword::Evaluated;
 #[derive(Debug, Clone)]
 pub struct Evaluated {
     children: HashMap<String, Evaluated>,
 }
 impl Evaluated {
+    /// Creates a new empty `Evaluated`
     #[must_use]
     pub fn new() -> Self {
         Self {
             children: HashMap::new(),
         }
     }
+    /// Inserts a [`Pointer`] into the trie
     pub fn insert(&mut self, ptr: &Pointer) {
         let mut props = self;
         for tok in ptr.split('/') {
@@ -631,6 +651,7 @@ impl Evaluated {
         }
     }
 
+    /// Returns `true` if the trie contains the given [`Pointer`]
     #[must_use]
     pub fn contains(&self, ptr: &Pointer) -> bool {
         let mut node = self;

@@ -379,11 +379,15 @@ impl<'a> PathSegment<'a> {
 }
 
 impl<'a> PathSegment<'a> {
+    /// Returns a new [`PathSegment::Normal`] from a `&str`.
     #[must_use]
     pub fn normal(val: &'a str) -> Self {
         Self::Normal(Cow::Borrowed(val))
     }
-
+    /// Attempts to decode the path segment as a `&str`.
+    ///
+    /// # Errors
+    /// Returns a [`std::str::Utf8Error`] if the path segment is not valid UTF-8.
     pub fn decode(&'a self) -> Result<Cow<'a, str>, std::str::Utf8Error> {
         match self {
             PathSegment::Root => Ok(Cow::Borrowed("")),
@@ -393,6 +397,8 @@ impl<'a> PathSegment<'a> {
         }
     }
 
+    /// Decodes the path segment as a `&str` and replaces invalid UTF-8 with
+    /// the Unicode replacement character � (U+FFFD).
     #[must_use]
     pub fn decode_lossy(&'a self) -> Cow<'a, str> {
         match self {
@@ -492,6 +498,7 @@ pub struct PathSegments<'a> {
 }
 
 impl<'a> PathSegments<'a> {
+    /// Returns a new [`PathSegments`] iterator over the given path.
     #[must_use]
     pub fn new(path: &'a str) -> Self {
         Self {
@@ -548,7 +555,9 @@ impl<'a> Iterator for PathSegments<'a> {
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum AbsoluteUri {
+    /// A fully qualified [`Url`].
     Url(Url),
+    /// A fully qualified [`Urn`].
     Urn(Urn),
 }
 impl std::fmt::Debug for AbsoluteUri {
@@ -776,6 +785,8 @@ impl AbsoluteUri {
         matches!(self, Self::Url(..))
     }
 
+    /// Returns the [`Url`] if this `AbsoluteUri` is a [`Url`] or
+    /// `None` otherwise.
     #[must_use]
     pub fn as_url(&self) -> Option<&Url> {
         if let Self::Url(v) = self {
@@ -785,14 +796,14 @@ impl AbsoluteUri {
         }
     }
 
-    /// Returns `true` if the `AbsoluteUri` is a [`Urn`](`urn::Urn`).
-    ///
-    /// [`Urn`]: AbsoluteUri::Urn
+    /// Returns `true` if the `AbsoluteUri` is a [`Urn`].
     #[must_use]
     pub fn is_urn(&self) -> bool {
         matches!(self, Self::Urn(..))
     }
 
+    /// Returns the [`Urn`] if this `AbsoluteUri` is a [`Urn`] or
+    /// `None` otherwise.
     #[must_use]
     pub fn as_urn(&self) -> Option<&Urn> {
         if let Self::Urn(v) = self {

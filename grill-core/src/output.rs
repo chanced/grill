@@ -831,7 +831,20 @@ impl<'v, E> From<Output<'v>> for Result<Option<Output<'v>>, E> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 */
-
+/// A concise [`Output`] [`Structure`] which only contains a single
+/// `"valid"` `bool` field.
+///
+/// This `Structure` may have a positive impact on
+/// performance as [`Keyword`]s are expected to short circuit and return errors as
+/// soon as possible.
+///
+/// # Example
+/// ```json
+/// { "valid": false }
+/// ```
+///
+/// - [JSON Schema Core 2020-12 # 12.4.1
+///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Flag<'v> {
@@ -1242,6 +1255,7 @@ impl fmt::Display for Detailed<'_> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+///
 #[derive(Debug, Clone)]
 pub struct Verbose<'v> {
     pub instance_location: Pointer,
@@ -1259,6 +1273,7 @@ pub struct Verbose<'v> {
     pub is_transient: bool,
 }
 impl<'v> Verbose<'v> {
+    /// Creates a new `Verbose` output.
     #[must_use]
     pub fn new(
         absolute_keyword_location: AbsoluteUri,
