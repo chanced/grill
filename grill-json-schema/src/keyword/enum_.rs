@@ -39,7 +39,7 @@ impl Keyword for Enum {
     fn kind(&self) -> Kind {
         Kind::Single(ENUM)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
         schema: grill_core::Schema<'i>,

@@ -65,7 +65,7 @@ impl keyword::Keyword for Id {
         })
     }
 
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut keyword::Compile<'i>,
         _schema: grill_core::Schema<'i>,

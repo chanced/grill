@@ -18,7 +18,7 @@ impl keyword::Keyword for Defs {
     fn kind(&self) -> Kind {
         Kind::Single(DEFS)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
         _schema: Schema<'i>,

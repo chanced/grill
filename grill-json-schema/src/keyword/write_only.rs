@@ -23,7 +23,7 @@ impl keyword::Keyword for WriteOnly {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(WRITE_ONLY)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
         schema: Schema<'i>,

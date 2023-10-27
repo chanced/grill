@@ -47,7 +47,7 @@ pub mod test;
 use std::{any, borrow::Cow, fmt::Debug, ops::Deref};
 
 use jsonptr::Pointer;
-use serde_json::Value;
+use serde_json::{Value, Number};
 
 use crate::{
     error::{
@@ -124,6 +124,7 @@ pub struct Build {
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     state: AnyMap,
+    number_seed: Vec<Number>
 }
 
 enum PendingSrc {
@@ -485,6 +486,7 @@ impl Build {
             default_dialect_idx,
             state,
             precompile,
+            number_seed
         } = self;
         let default_dialect_id = default_dialect_idx
             .as_ref()

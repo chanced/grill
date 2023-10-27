@@ -22,7 +22,7 @@ impl keyword::Keyword for ReadOnly {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(READ_ONLY)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
         schema: Schema<'i>,

@@ -395,6 +395,7 @@ impl Schemas {
             global_numbers,
             eval_numbers,
             evaluated,
+            should_short_circuit: None,
         };
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(

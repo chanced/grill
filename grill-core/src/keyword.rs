@@ -217,7 +217,7 @@ pub struct Context<'i> {
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
     pub(crate) evaluated: &'i mut Evaluated,
-
+    pub(crate) should_short_circuit: Option<bool>,
     pub(crate) global_numbers: &'i Numbers,
     pub(crate) eval_numbers: &'i mut Numbers,
 }
@@ -397,8 +397,9 @@ impl<'s> Context<'s> {
             is_transient,
         )
     }
-    /// Returns `true` if the evaluation should short-circuit, i.e. if the
-    /// [`Structure`] is [`Flag`](`crate::Structure::Flag`).
+
+    /// Returns `true` if the evaluation should short-circuit, as determined
+    /// by the [`ShortCircuit`](grill_json_schema::keyword::short_circuit::ShortCircuit) keyword handler
     #[must_use]
     pub fn should_short_circuit(&self) -> bool {
         self.structure.is_flag()
@@ -482,6 +483,14 @@ pub enum Kind {
 
     /// The [`Keyword`] is responsible for handling `true` or `false` Schemas.
     BooleanSchema(bool),
+
+    /// A logical keyword which modifies the state of the evaluation without
+    /// producing an [`Output`](`crate::Output`).
+    ///
+    /// For example, the
+    /// [`ShortCircuit`](grill::json_schema::keyword::ShortCircuit) determines
+    /// whether or not the evaluation can short-circuit
+    Logic,
 }
 
 impl PartialEq<&str> for Kind {
@@ -531,7 +540,7 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
     /// `true`. A return value of `false` indicates that
     /// [`evaluate`](`Keyword::evaluate`) should not be called for the given
     /// [`Schema`].
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,
@@ -633,21 +642,21 @@ clone_trait_object!(Keyword);
 ///
 #[derive(Debug, Clone)]
 pub struct Evaluated {
-    children: HashMap<String, Evaluated>,
+    nodes: HashMap<String, Evaluated>,
 }
 impl Evaluated {
     /// Creates a new empty `Evaluated`
     #[must_use]
     pub fn new() -> Self {
         Self {
-            children: HashMap::new(),
+            nodes: HashMap::new(),
         }
     }
     /// Inserts a [`Pointer`] into the trie
     pub fn insert(&mut self, ptr: &Pointer) {
         let mut props = self;
         for tok in ptr.split('/') {
-            props = props.children.entry(tok.to_string()).or_default();
+            props = props.nodes.entry(tok.to_string()).or_default();
         }
     }
 
@@ -656,8 +665,8 @@ impl Evaluated {
     pub fn contains(&self, ptr: &Pointer) -> bool {
         let mut node = self;
         for tok in ptr.split('/') {
-            if node.children.contains_key(tok) {
-                node = node.children.get(tok).unwrap();
+            if node.nodes.contains_key(tok) {
+                node = node.nodes.get(tok).unwrap();
                 continue;
             }
             return false;

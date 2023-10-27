@@ -286,6 +286,7 @@ impl Translator {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, strum::Display,
 )]
 #[serde(rename_all = "lowercase")]
+#[repr(u8)]
 pub enum Structure {
     /// A concise [`Output`] [`Structure`] which only contains a single
     /// `"valid"` `bool` field.
@@ -301,7 +302,7 @@ pub enum Structure {
     ///
     /// - [JSON Schema Core 2020-12 # 12.4.1
     ///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
-    Flag,
+    Flag = 1,
     /// The `Basic` structure is a flat list of output units.
     /// # Example
     /// ```json
@@ -342,7 +343,7 @@ pub enum Structure {
     ///   ]
     /// }
     /// ```
-    Basic,
+    Basic = 2,
     /// The `Detailed` structure is based on the schema and can be more readable
     /// for both humans and machines. Having the structure organized this way
     /// makes associations between the errors more apparent. For example, the
@@ -428,8 +429,8 @@ pub enum Structure {
     ///   ]
     /// }
     ///
-    Detailed,
-    Verbose,
+    Detailed = 4,
+    Verbose = 8,
 }
 
 impl Structure {

@@ -7,11 +7,13 @@ pub mod defs;
 pub mod enum_;
 pub mod id;
 pub mod if_then_else;
+pub mod not;
 pub mod pattern_properties;
 pub mod properties;
 pub mod read_only;
 pub mod ref_;
 pub mod schema;
+pub mod short_circuit;
 pub mod type_;
 pub mod write_only;
 

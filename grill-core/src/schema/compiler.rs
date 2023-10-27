@@ -331,7 +331,7 @@ impl<'i> Compiler<'i> {
                     value_cache: self.values,
                     state: self.global_state,
                 };
-                if keyword.setup(&mut compile, schema.clone())? {
+                if keyword.compile(&mut compile, schema.clone())? {
                     keywords.push(keyword);
                 }
             }

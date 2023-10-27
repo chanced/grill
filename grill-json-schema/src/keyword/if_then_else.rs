@@ -32,7 +32,7 @@ impl Keyword for IfThenElse {
         Kind::Composite(&[IF, THEN, ELSE])
     }
 
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

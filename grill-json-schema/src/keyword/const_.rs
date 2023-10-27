@@ -1,4 +1,4 @@
-//! # `"const"` keyword.
+//! # `const` keyword.
 //!
 //! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/validation/const/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.1.3)
@@ -55,7 +55,7 @@ impl Keyword for Const {
     fn kind(&self) -> Kind {
         CONST.into()
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

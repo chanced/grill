@@ -52,7 +52,7 @@ impl Keyword for PatternProperties {
     fn kind(&self) -> keyword::Kind {
         keyword::Kind::Single(PATTERN_PROPERTIES)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

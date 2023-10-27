@@ -68,7 +68,7 @@ impl keyword::Keyword for Ref {
         Kind::Single(self.keyword)
     }
 
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         compile: &mut Compile<'i>,
         schema: Schema<'i>,

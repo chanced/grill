@@ -12,7 +12,7 @@ impl Keyword for Boolean {
         Kind::BooleanSchema(self.bool)
     }
 
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut grill_core::keyword::Compile<'i>,
         schema: grill_core::Schema<'i>,

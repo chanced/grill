@@ -24,7 +24,7 @@ impl Keyword for Comment {
     fn kind(&self) -> Kind {
         Kind::Single(COMMENT)
     }
-    fn setup<'i>(
+    fn compile<'i>(
         &mut self,
         _compile: &mut Compile<'i>,
         schema: Schema<'i>,
