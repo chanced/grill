@@ -3,10 +3,10 @@ members  = ["grill", "grill-core", "grill-macros", "grill-json-schema", "tests"]
 resolver = "2"
 
 [workspace.dependencies]
-grill             = { version = "0.1.0" }
-grill-core        = { version = "0.1.0" }
-grill-json-schema = { workspace = "0.1.0" }
-grill-macros      = { version = "0.1.0" }
+grill             = { version = "0.1.0", path = "grill" }
+grill-core        = { version = "0.1.0", path = "grill-core" }
+grill-json-schema = { workspace = "0.1.0", path = "grill-json-schema" }
+grill-macros      = { version = "=0.1.0", path = "grill-macros" }
 
 anyhow           = { version = "1.0.75" }
 async-trait      = { version = "0.1" }
@@ -35,9 +35,3 @@ thiserror        = { version = "1.0.25" }
 toml             = { version = "0.8.2" }
 url              = { version = "2.2.2" }
 urn              = { version = "0.7.0" }
-
-[patch.crates-io]
-grill             = { path = "grill" }
-grill-core        = { path = "grill-core" }
-grill-json-schema = { path = "grill-json-schema" }
-grill-macros      = { path = "grill-macros" }

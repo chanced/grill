@@ -398,11 +398,32 @@ impl<'s> Context<'s> {
         )
     }
 
+    /// Returns `true` if enabling short-circuiting was successful or if it
+    /// was previously set to `true`.
+    pub fn enable_short_circuiting(&mut self) -> bool {
+        if let Some(should_short_circuit) = self.should_short_circuit {
+            should_short_circuit
+        } else {
+            self.should_short_circuit = Some(true);
+            true
+        }
+    }
+    /// Disables short-circuiting
+    pub fn disable_short_circuiting(&mut self) {
+        self.should_short_circuit = Some(false);
+    }
+
     /// Returns `true` if the evaluation should short-circuit, as determined
     /// by the [`ShortCircuit`](grill_json_schema::keyword::short_circuit::ShortCircuit) keyword handler
     #[must_use]
     pub fn should_short_circuit(&self) -> bool {
-        self.structure.is_flag()
+        self.should_short_circuit.unwrap_or(false)
+    }
+
+    /// Returns the desired [`Structure`] of the evaluation
+    #[must_use]
+    pub fn structure(&self) -> Structure {
+        self.structure
     }
 }
 

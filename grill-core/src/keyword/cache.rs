@@ -130,6 +130,18 @@ pub struct Numbers {
 }
 
 impl Numbers {
+    /// Creates a new [`Numbers`] cache, seeded with `seed`
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if any of the numbers fail to parse
+    pub fn new<'n>(seed: impl IntoIterator<Item = &'n Number>) -> Result<Self, NumberError> {
+        let mut numbers = Self::default();
+        for number in seed {
+            numbers.get_or_insert_arc(number)?;
+        }
+        Ok(numbers)
+    }
+
     /// Either returns an [`Arc`] to a previously parsed [`BigRational`]
     /// or parses and
     /// returns a reference to the [`BigRational`].

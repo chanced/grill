@@ -12,14 +12,12 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-grill-core        = { version = "0.1.0" }
-grill-json-schema = { version = "0.1.0" }
-grill-macros      = { version = "0.1.0" }
+grill-core        = { workspace = true }
+grill-json-schema = { workspace = true }
+grill-macros      = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-similar = { workspace = true }
-tokio   = { version = "1.28", features = ["full"] }
+tokio = { version = "1.28", features = ["full"] }
 
 [features]
 default = ["http", "toml", "yaml"]

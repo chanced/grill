@@ -124,7 +124,7 @@ pub struct Build {
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     state: AnyMap,
-    number_seed: Vec<Number>
+    numbers: Vec<Number>
 }
 
 enum PendingSrc {
@@ -486,7 +486,7 @@ impl Build {
             default_dialect_idx,
             state,
             precompile,
-            number_seed
+            numbers
         } = self;
         let default_dialect_id = default_dialect_idx
             .as_ref()
@@ -502,6 +502,10 @@ impl Build {
         let mut precompile = precompile.map_err(SourceError::UriFailedToParse)?;
         precompile.extend(dialects.source_ids().cloned());
 
+
+
+        
+
         let mut interrogator = Interrogator {
             dialects,
             sources,
@@ -509,7 +513,7 @@ impl Build {
             schemas,
             deserializers,
             state,
-            numbers: Numbers::default(),
+            numbers: Numbers::new(numbers.iter())?,
             values: Values::default(),
         };
 

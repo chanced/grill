@@ -1,6 +1,7 @@
 //! Output data structures and types.
 //!
 use crate::{anymap::AnyMap, AbsoluteUri, Uri};
+use bitflags::bitflags;
 use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde::{
@@ -84,12 +85,12 @@ pub trait Error<'v>: DynClone + std::fmt::Debug + Send + Sync {
 }
 impl<'v> std::fmt::Display for dyn Error<'v> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.translate(f, &Translator::new("en".to_string()))
+        self.translate(f, &Translator::new())
     }
 }
 impl<'v> std::fmt::Display for Box<dyn 'v + Send + Sync + Error<'v>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.translate(f, &Translator::new("en".to_string()))
+        self.translate(f, &Translator::new())
     }
 }
 
@@ -237,24 +238,16 @@ impl Deref for Annotation<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
+/// A collection of translation functions used to translate an [`Error`].
+#[derive(Debug, Clone, Default)]
 pub struct Translator {
-    lang: String,
     map: AnyMap,
 }
 
 impl Translator {
     #[must_use]
-    pub fn new(lang: String) -> Self {
-        Self {
-            lang,
-            map: AnyMap::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn lang(&self) -> &str {
-        &self.lang
+    pub fn new() -> Self {
+        Self { map: AnyMap::new() }
     }
 
     pub fn insert<T>(&mut self, translate: T)
@@ -433,6 +426,12 @@ pub enum Structure {
     Verbose = 8,
 }
 
+impl From<Structure> for u8 {
+    fn from(structure: Structure) -> Self {
+        structure as u8
+    }
+}
+
 impl Structure {
     /// Returns `true` if the structure is [`Flag`].
     ///
@@ -464,6 +463,52 @@ impl Structure {
     #[must_use]
     pub fn is_verbose(&self) -> bool {
         matches!(self, Self::Verbose)
+    }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                              Structures                               ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+bitflags! {
+    /// Represents a set of `Structure`s.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Structures: u8 {
+        /// [`Structure::Flag`]
+        const FLAG = Structure::Flag as u8;
+        /// [`Structure::Basic`]
+        const BASIC = Structure::Basic as u8;
+        /// [`Structure::Detailed`]
+        const DETAILED = Structure::Detailed as u8;
+        /// [`Structure::Verbose`]
+        const VERBOSE = Structure::Verbose as u8;
+    }
+}
+
+impl From<Structure> for Structures {
+    fn from(structure: Structure) -> Self {
+        match structure {
+            Structure::Flag => Structures::FLAG,
+            Structure::Basic => Structures::BASIC,
+            Structure::Detailed => Structures::DETAILED,
+            Structure::Verbose => Structures::VERBOSE,
+        }
+    }
+}
+
+impl<T: IntoIterator<Item = Structure>> From<T> for Structures {
+    fn from(structures: T) -> Structures {
+        let mut result = Structures::empty();
+        for structure in structures {
+            result |= structure.into();
+        }
+        result
     }
 }
 

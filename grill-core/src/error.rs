@@ -434,16 +434,20 @@ pub struct LinkConflictError {
 pub enum BuildError {
     #[error(transparent)]
     /// A [`Schema`](crate::schema::Schema) failed to compile.
-    Compile(#[from] CompileError),
+    FailedToCompile(#[from] CompileError),
 
     #[error(transparent)]
     /// An issue with [`Dialect`]s occurred.
-    Dialect(#[from] DialectsError),
+    FailedToCreateDialects(#[from] DialectsError),
 
     #[error(transparent)]
     /// An error occurred while adding, resolving, or deserializing a
     /// [`Source`](crate::source::Source).
-    Source(#[from] SourceError),
+    FailedToSource(#[from] SourceError),
+
+    /// Failed to parse a number
+    #[error(transparent)]
+    FailedToParseNumber(#[from] NumberError),
 }
 
 /*
@@ -888,7 +892,7 @@ impl From<MalformedPointerError> for CompileError {
 */
 
 /// The expected type of a [`Value`].
-#[derive(Clone, Debug, Copy, strum::EnumVariantNames, strum::Display)]
+#[derive(Clone, Debug, Copy)]
 pub enum Expected {
     /// Expected a boolean
     Bool,
@@ -904,6 +908,27 @@ pub enum Expected {
     AnyOf(&'static [Expected]),
 }
 
+impl Display for Expected {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expected::Bool => write!(f, "Bool"),
+            Expected::Number => write!(f, "Number"),
+            Expected::String => write!(f, "String"),
+            Expected::Array => write!(f, "Array"),
+            Expected::Object => write!(f, "Object"),
+            Expected::AnyOf(anyof) => {
+                write!(f, "[")?;
+                for (i, expected) in anyof.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{expected}")?;
+                }
+                write!(f, "]")
+            }
+        }
+    }
+}
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
