@@ -631,9 +631,12 @@ impl Schemas {
     }
 }
 
+/// A reference to a schema.
 #[derive(Debug, Clone)]
 pub struct Ref {
+    /// the parsed [`Uri`] value.
     pub uri: Uri,
+    /// the keyword of the reference (i.e. $ref)
     pub keyword: &'static str,
 }
 
@@ -655,7 +658,9 @@ impl Reference {}
 /// An identifier for a schema, returned from [`Keyword::identify`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identifier {
+    /// The primary id (e.g. `$id`, `id`)
     Primary(Uri),
+    /// Secondary id (e.g. `$anchor`, `$dynamicAnchor`)
     Secondary(Uri),
 }
 

@@ -37,6 +37,7 @@ type Map<K, V> = HashMap<K, V, BuildHasherDefault<LenHasher>>;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A cache store of [`Value`]s.
 #[derive(Clone, Debug, Default)]
 pub struct Values {
     strings: Vec<Arc<Value>>,

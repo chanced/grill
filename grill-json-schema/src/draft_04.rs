@@ -4,6 +4,8 @@ pub use super::keyword::schema;
 use grill_core::schema::Dialect;
 
 use super::metaschema;
+
+/// Returns the [`Dialect`] for JSON Schema 04.
 #[must_use]
 pub fn dialect() -> Dialect {
     todo!()

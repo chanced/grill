@@ -5,6 +5,7 @@ use super::metaschema;
 use grill_core::schema::Dialect;
 use serde_json::Value;
 
+/// Returns the [`Dialect`] for JSON Schema 07.
 #[must_use]
 pub fn dialect() -> Dialect {
     todo!()

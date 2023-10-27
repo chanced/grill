@@ -2,11 +2,14 @@ use crate::metaschema;
 use grill_core::schema::Dialect;
 use serde_json::Value;
 
+/// Returns the [`Dialect`] for JSON Schema 2019-09
 #[must_use]
 pub fn dialect() -> Dialect {
     todo!()
 }
 
+/// Returns the primary schema for JSON Schema 2019-09 - alias to
+/// [`json_schema_2019_09_value`]
 #[must_use]
 pub fn schema() -> &'static Value {
     json_schema_2019_09_value()

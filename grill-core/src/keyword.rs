@@ -60,8 +60,10 @@ pub use static_pointer_fn;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// Generates an enum containing either a `fn(&mut std::fmt::Formater, &T) ->
-/// std::fmt::Result` or an `Arc` containing a `Fn` of the same signature.
+/// Generates an `enum` which contains a translate function for a given
+/// [`Error`](`crate::output::Error`).
+///
+/// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
 #[macro_export]
 macro_rules! define_translate {
     ($error:ident, $default:ident) => {

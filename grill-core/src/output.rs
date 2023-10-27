@@ -151,6 +151,9 @@ impl<'v> Error<'v> for &'v str {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// An an optional [`Annotation`] or an optional [`BoxedError`] as a
+/// `Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>` which is used as
+/// the value of `"annotation"` or `"error"` in [`Output`](`crate::Output`).
 pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>;
 
 /*
@@ -183,6 +186,7 @@ pub enum Annotation<'v> {
 }
 
 impl<'v> Annotation<'v> {
+    /// Consumes this annotation and produces a new [`Annotation<'static>`].
     #[must_use]
     pub fn into_owned(self) -> Annotation<'static> {
         match self {
