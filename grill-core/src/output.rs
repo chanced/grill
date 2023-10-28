@@ -14,7 +14,7 @@ use std::{
     any::Any,
     borrow::Cow,
     collections::{BTreeMap, VecDeque},
-    fmt::{self},
+    fmt,
     ops::Deref,
     sync::Arc,
 };
@@ -71,25 +71,21 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 ///
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait Error<'v>: DynClone + std::fmt::Debug + Send + Sync {
+pub trait Error<'v>: DynClone + fmt::Debug + Send + Sync {
     /// Makes this error owned.
     fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
     /// Translates this error
-    fn translate(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        translator: &Translator,
-    ) -> std::fmt::Result;
+    fn translate(&self, f: &mut fmt::Formatter<'_>, translator: &Translator) -> fmt::Result;
     /// Sets the translator for this error
     fn set_translate(&mut self, translator: &Translator);
 }
-impl<'v> std::fmt::Display for dyn Error<'v> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'v> fmt::Display for dyn Error<'v> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.translate(f, &Translator::new())
     }
 }
-impl<'v> std::fmt::Display for Box<dyn 'v + Send + Sync + Error<'v>> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'v> fmt::Display for Box<dyn 'v + Send + Sync + Error<'v>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.translate(f, &Translator::new())
     }
 }
@@ -115,11 +111,7 @@ impl Error<'_> for String {
     fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
         self
     }
-    fn translate(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        _translator: &Translator,
-    ) -> std::fmt::Result {
+    fn translate(&self, f: &mut fmt::Formatter<'_>, _translator: &Translator) -> fmt::Result {
         write!(f, "{self}")
     }
 
@@ -131,11 +123,7 @@ impl<'v> Error<'v> for &'v str {
         Box::new(self.to_string())
     }
 
-    fn translate(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        _translator: &Translator,
-    ) -> std::fmt::Result {
+    fn translate(&self, f: &mut fmt::Formatter<'_>, _translator: &Translator) -> fmt::Result {
         write!(f, "{self}")
     }
 
@@ -238,6 +226,12 @@ impl Deref for Annotation<'_> {
     }
 }
 
+/// Translates an [`Error`] `E`
+pub trait Translate<E>: Any + Clone + Send + Sync + fmt::Debug {
+    /// Executes the translation
+    fn run(&self, f: &mut fmt::Formatter, v: &E) -> fmt::Result;
+}
+
 /// A collection of translation functions used to translate an [`Error`].
 #[derive(Debug, Clone, Default)]
 pub struct Translator {
@@ -245,21 +239,24 @@ pub struct Translator {
 }
 
 impl Translator {
+    /// Constructs a new `Translator`.
     #[must_use]
     pub fn new() -> Self {
         Self { map: AnyMap::new() }
     }
-
-    pub fn insert<T>(&mut self, translate: T)
+    /// Inserts a [`Translate`] fn.
+    pub fn insert<T, E>(&mut self, translate: T)
     where
-        T: 'static + Clone + std::fmt::Debug + Send + Sync,
+        T: 'static + Translate<E> + fmt::Debug,
     {
         self.map.insert(translate);
     }
+
+    /// Returns a reference to the specified [`Translate`] if it exists.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
     where
-        T: Any + std::fmt::Debug + Clone + Send + Sync,
+        T: Any + fmt::Debug + Clone + Send + Sync,
     {
         self.map.get()
     }

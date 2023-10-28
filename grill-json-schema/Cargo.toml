@@ -10,6 +10,7 @@ bitflags     = { workspace = true }
 either       = { workspace = true }
 grill-core   = { workspace = true }
 grill-macros = { workspace = true }
+inherent     = { workspace = true }
 jsonptr      = { workspace = true }
 once_cell    = { workspace = true }
 paste        = { workspace = true }

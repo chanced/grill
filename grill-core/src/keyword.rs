@@ -60,10 +60,12 @@ pub use static_pointer_fn;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// Generates an `enum` which contains a translate function for a given
+/// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
 /// [`Error`](`crate::output::Error`).
 ///
 /// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
+///
+/// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
 #[macro_export]
 macro_rules! define_translate {
     ($error:ident, $default:ident) => {
@@ -80,7 +82,9 @@ macro_rules! define_translate {
                 #[doc = "A `fn` which can translate [`" $error "`]"]
                 FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
             }
-            impl [< Translate $error>]{
+
+            #[::inherent::inherent]
+            impl grill_core::output::Translate<$error<'_>> for [< Translate $error>]{
                 /// Runs the translation
                 pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
                     match self {
