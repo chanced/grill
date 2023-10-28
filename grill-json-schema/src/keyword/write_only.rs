@@ -21,7 +21,7 @@ pub struct WriteOnly {
 
 impl keyword::Keyword for WriteOnly {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(WRITE_ONLY)
+        keyword::Kind::Keyword(WRITE_ONLY)
     }
     fn compile<'i>(
         &mut self,

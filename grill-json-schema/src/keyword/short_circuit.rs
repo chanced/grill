@@ -23,7 +23,7 @@ pub struct ShortCircuit {
 
 impl Keyword for ShortCircuit {
     fn kind(&self) -> Kind {
-        Kind::Logic
+        Kind::Middleware("short-circuit")
     }
 
     fn compile<'i>(

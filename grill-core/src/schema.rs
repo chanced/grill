@@ -421,6 +421,7 @@ impl Schemas {
         sources: &Sources,
     ) -> Result<(), CompileError> {
         for reference in references {
+            println!("checking reference: {reference:?}");
             if key == reference.key
                 || self
                     .transitive_dependencies(reference.key, sources)

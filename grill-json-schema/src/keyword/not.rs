@@ -22,7 +22,7 @@ pub struct Not {
 
 impl Keyword for Not {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(NOT)
+        keyword::Kind::Keyword(NOT)
     }
     fn compile<'i>(
         &mut self,
@@ -42,7 +42,7 @@ impl Keyword for Not {
         value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         let mut output = ctx.evaluate(self.key, None, not_path(), value)?;
-        output.set_valid(output.is_invalid());
+        output.set_valid(output.is_error());
         Ok(Some(output))
     }
 

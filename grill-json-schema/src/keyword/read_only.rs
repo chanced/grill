@@ -20,7 +20,7 @@ pub struct ReadOnly {
 
 impl keyword::Keyword for ReadOnly {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(READ_ONLY)
+        keyword::Kind::Keyword(READ_ONLY)
     }
     fn compile<'i>(
         &mut self,

@@ -50,7 +50,7 @@ impl PatternProperties {
 
 impl Keyword for PatternProperties {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(PATTERN_PROPERTIES)
+        keyword::Kind::Keyword(PATTERN_PROPERTIES)
     }
     fn compile<'i>(
         &mut self,
@@ -98,11 +98,11 @@ impl Keyword for PatternProperties {
             for matched in self.regexes.matches(prop) {
                 let (_, ptr, key) = &self.patterns[matched];
                 output.push(ctx.evaluate(*key, Some(prop), ptr, value)?);
-                is_valid &= output.is_valid();
+                is_valid &= output.is_annotation();
                 if !is_valid && ctx.should_short_circuit() {
                     return Ok(Some(output));
                 }
-                if !output.is_valid() {
+                if !output.is_annotation() {
                     invalid.push(Cow::Borrowed(prop.as_str()));
                 }
             }
@@ -266,7 +266,7 @@ mod tests {
                 .evaluate(key, Structure::Verbose, &data)
                 .unwrap();
             assert_eq!(
-                output.is_valid(),
+                output.is_annotation(),
                 expected_valid,
                 "expected {data} to be {expected_valid}"
             );

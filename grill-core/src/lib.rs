@@ -115,6 +115,7 @@ macro_rules! json_pretty_str {
 
 
 
+#[derive(Default)]
 /// Constructs an [`Interrogator`].
 pub struct Build {
     dialects: Vec<Dialect>,
@@ -144,11 +145,6 @@ impl TryFrom<PendingSrc> for Src {
     }
 }
 
-impl Default for Build {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl Build {
     /// Constructs a new `Build`
     #[must_use]
@@ -501,10 +497,6 @@ impl Build {
         let precompile: Result<Vec<AbsoluteUri>, UriError> = precompile.into_iter().collect();
         let mut precompile = precompile.map_err(SourceError::UriFailedToParse)?;
         precompile.extend(dialects.source_ids().cloned());
-
-
-
-        
 
         let mut interrogator = Interrogator {
             dialects,

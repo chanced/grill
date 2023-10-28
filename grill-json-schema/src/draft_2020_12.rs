@@ -16,6 +16,66 @@ pub fn dialect() -> Dialect {
             json_schema_2020_12_uri().clone(),
             Cow::Borrowed(json_schema_2020_12_value()),
         )
+        .add_metaschema(
+            json_schema_2020_12_core_uri(),
+            Cow::Borrowed(json_schema_2020_12_core_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_content_uri(),
+            Cow::Borrowed(json_schema_2020_12_content_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_assertion_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_annotation_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_metadata_uri(),
+            Cow::Borrowed(json_schema_2020_12_metadata_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_output_uri(),
+            Cow::Borrowed(json_schema_2020_12_output_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_validation_uri(),
+            Cow::Borrowed(json_schema_2020_12_validation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_applicator_uri(),
+            Cow::Borrowed(json_schema_2020_12_applicator_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_content_uri(),
+            Cow::Borrowed(json_schema_2020_12_content_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_assertion_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_annotation_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_metadata_uri(),
+            Cow::Borrowed(json_schema_2020_12_metadata_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_output_uri(),
+            Cow::Borrowed(json_schema_2020_12_output_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_validation_uri(),
+            Cow::Borrowed(json_schema_2020_12_validation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_unevaluated_uri(),
+            Cow::Borrowed(json_schema_2020_12_unevaluated_value()),
+        )
         .add_keyword(keyword::schema::Schema::new(SCHEMA, false))
         .add_keyword(keyword::id::Id::new(ID, false))
         .add_keyword(keyword::boolean::Boolean::default())
@@ -23,9 +83,9 @@ pub fn dialect() -> Dialect {
             [Structure::Flag],
             [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS],
         ))
+        .add_keyword(keyword::defs::Defs)
         .add_keyword(keyword::comment::Comment::default())
         .add_keyword(keyword::const_::Const::new(None))
-        .add_keyword(keyword::defs::Defs)
         .add_keyword(keyword::enum_::Enum::new(None))
         .add_keyword(keyword::if_then_else::IfThenElse::default())
         .add_keyword(keyword::not::Not::default())
@@ -35,6 +95,9 @@ pub fn dialect() -> Dialect {
         .add_keyword(keyword::write_only::WriteOnly::default())
         .add_keyword(keyword::ref_::Ref::new(REF, true))
         .add_keyword(keyword::type_::Type::new(None))
+        .add_keyword(keyword::all_of::AllOf::default())
+        .add_keyword(keyword::any_of::AnyOf::default())
+        .add_keyword(keyword::one_of::OneOf::default())
         .finish()
         .unwrap()
 }

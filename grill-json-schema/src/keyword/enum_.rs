@@ -37,7 +37,7 @@ impl Enum {
 }
 impl Keyword for Enum {
     fn kind(&self) -> Kind {
-        Kind::Single(ENUM)
+        Kind::Keyword(ENUM)
     }
     fn compile<'i>(
         &mut self,

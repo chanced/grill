@@ -65,7 +65,7 @@ impl Ref {
 
 impl keyword::Keyword for Ref {
     fn kind(&self) -> Kind {
-        Kind::Single(self.keyword)
+        Kind::Keyword(self.keyword)
     }
 
     fn compile<'i>(

@@ -241,12 +241,12 @@ mod tests {
         let output = interrogator
             .evaluate(key, Structure::Verbose, &value)
             .unwrap();
-        assert!(output.is_valid());
+        assert!(output.is_annotation());
         let value = json!(34.3434);
         let output = interrogator
             .evaluate(key, Structure::Verbose, &value)
             .unwrap();
-        assert!(!output.is_valid());
+        assert!(!output.is_annotation());
     }
     #[test]
     fn test_const_obj() {}

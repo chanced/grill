@@ -22,7 +22,7 @@ pub struct Comment {
 
 impl Keyword for Comment {
     fn kind(&self) -> Kind {
-        Kind::Single(COMMENT)
+        Kind::Keyword(COMMENT)
     }
     fn compile<'i>(
         &mut self,

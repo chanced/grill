@@ -6,7 +6,7 @@ own schema language.
 ## Table of contents
 
 -   [High level features & attractions](#high-level-features--attractions)
--   [Compatibility](#compatibility)
+-   [Compatibility(#compatibility)
 -   [Installation](#installation)
 -   [Feature flags](#feature-flags)
 -   [Example](#example)

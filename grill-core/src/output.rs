@@ -528,6 +528,7 @@ pub enum Output<'v> {
 }
 
 impl<'v> Output<'v> {
+    /// Constructs a new `Output`
     #[must_use]
     pub fn new(
         structure: Structure,
@@ -570,8 +571,9 @@ impl<'v> Output<'v> {
             self.push(node);
         }
     }
+    /// Returns `true` if this `Output` is an annotation, (i.e. valid).
     #[must_use]
-    pub fn is_valid(&self) -> bool {
+    pub fn is_annotation(&self) -> bool {
         match self {
             Output::Flag(flag) => flag.valid,
             Output::Basic(basic) => basic.valid,
@@ -580,10 +582,24 @@ impl<'v> Output<'v> {
         }
     }
 
+    /// Returns `true` if this `Output` is valid.
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.is_annotation()
+    }
+    /// Returns `true` if this `Output` is not valid.
     #[must_use]
     pub fn is_invalid(&self) -> bool {
-        !self.is_valid()
+        !self.valid()
     }
+
+    /// Returns `true` if this `Output` is an error, (i.e. invalid).
+    #[must_use]
+    pub fn is_error(&self) -> bool {
+        !self.valid()
+    }
+
+    /// Returns `true` if this `Output` is valid.
     #[must_use]
     pub fn valid(&self) -> bool {
         self.is_valid()

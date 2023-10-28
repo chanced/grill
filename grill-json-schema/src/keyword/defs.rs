@@ -3,7 +3,7 @@
 //! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/core/defs/)
 use grill_core::{
     error::{CompileError, EvaluateError},
-    keyword::{self, Compile, Kind},
+    keyword::{self, paths_of_object, Compile, Kind},
     Output, Schema,
 };
 use serde_json::Value;
@@ -16,7 +16,7 @@ pub struct Defs;
 
 impl keyword::Keyword for Defs {
     fn kind(&self) -> Kind {
-        Kind::Single(DEFS)
+        Kind::Keyword(DEFS)
     }
     fn compile<'i>(
         &mut self,
@@ -33,6 +33,8 @@ impl keyword::Keyword for Defs {
         Ok(None)
     }
     fn subschemas(&self, schema: &Value) -> Result<Vec<jsonptr::Pointer>, keyword::Unimplemented> {
-        Ok(grill_core::keyword::paths_of_object(DEFS, schema))
+        let subschemas = paths_of_object(DEFS, schema);
+        println!("subschemas: {subschemas:?}");
+        Ok(subschemas)
     }
 }

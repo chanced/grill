@@ -39,7 +39,7 @@ impl Properties {
 
 impl Keyword for Properties {
     fn kind(&self) -> keyword::Kind {
-        keyword::Kind::Single(PROPERTIES)
+        keyword::Kind::Keyword(PROPERTIES)
     }
 
     fn compile<'i>(
@@ -79,7 +79,7 @@ impl Keyword for Properties {
         for (prop, value) in obj {
             if let Some((ptr, key)) = self.subschemas.get(prop) {
                 output.push(ctx.evaluate(*key, Some(prop), ptr, value)?);
-                is_valid &= output.is_valid();
+                is_valid &= output.is_annotation();
                 if !is_valid && ctx.should_short_circuit() {
                     return Ok(Some(output));
                 }
@@ -96,7 +96,9 @@ impl Keyword for Properties {
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {
-        Ok(paths_of_object(PROPERTIES, schema))
+        let subschemas = paths_of_object(PROPERTIES, schema);
+        println!("properties subschemas: {subschemas:?}");
+        Ok(subschemas)
     }
 }
 
@@ -235,6 +237,6 @@ mod tests {
         let output = interrogator
             .evaluate(key, Structure::Verbose, &invalid)
             .unwrap();
-        assert!(!output.is_valid());
+        assert!(!output.is_annotation());
     }
 }

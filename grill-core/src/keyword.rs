@@ -496,7 +496,7 @@ impl Display for Unimplemented {
 pub enum Kind {
     /// The [`Keyword`] is singular, evaluating the logic of a specific
     /// JSON Schema Keyword.
-    Single(&'static str),
+    Keyword(&'static str),
     /// The [`Keyword`] is a composite of multiple keywords with additional
     /// logic which handles co-dependencies between the embedded keywords.
     ///
@@ -515,12 +515,12 @@ pub enum Kind {
     /// For example, the
     /// [`ShortCircuit`](grill::json_schema::keyword::ShortCircuit) determines
     /// whether or not the evaluation can short-circuit
-    Logic,
+    Middleware(&'static str),
 }
 
 impl PartialEq<&str> for Kind {
     fn eq(&self, other: &&str) -> bool {
-        if let Kind::Single(s) = self {
+        if let Kind::Keyword(s) = self {
             s == other
         } else {
             false
@@ -530,7 +530,7 @@ impl PartialEq<&str> for Kind {
 
 impl From<&'static str> for Kind {
     fn from(s: &'static str) -> Self {
-        Kind::Single(s)
+        Kind::Keyword(s)
     }
 }
 impl From<&'static [&'static str]> for Kind {

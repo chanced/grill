@@ -58,15 +58,15 @@ impl Keyword for IfThenElse {
         let if_output = ctx.probe(self.if_key, None, if_pointer(), value)?;
         let mut outputs = vec![if_output];
         let mut is_valid = true;
-        if outputs[0].is_valid() && self.then_key.is_some() {
+        if outputs[0].is_annotation() && self.then_key.is_some() {
             let then_key = self.then_key.unwrap();
             let output = ctx.evaluate(then_key, None, then_pointer(), value)?;
-            is_valid = output.is_valid();
+            is_valid = output.is_annotation();
             outputs.push(output);
-        } else if outputs[0].is_invalid() && self.else_key.is_some() {
+        } else if outputs[0].is_error() && self.else_key.is_some() {
             let else_key = self.else_key.unwrap();
             let output = ctx.evaluate(else_key, None, else_pointer(), value)?;
-            is_valid = output.is_valid();
+            is_valid = output.is_annotation();
             outputs.push(output);
         }
         Ok(Some(ctx.transient(is_valid, outputs)))
@@ -165,11 +165,11 @@ mod tests {
         let value = json!(34);
         let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
         println!("{o}");
-        assert!(!o.is_valid());
+        assert!(!o.is_annotation());
         let value = json!(34.34);
         let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
         println!("{o}");
-        assert!(o.is_valid());
+        assert!(o.is_annotation());
 
         let schema = json!({
             "if": false,
@@ -196,12 +196,12 @@ mod tests {
             .evaluate(key, Structure::Verbose, &value)
             .unwrap();
         println!("{o}");
-        assert!(!o.is_valid());
+        assert!(!o.is_annotation());
         let value = json!(34);
         let o = interrogator
             .evaluate(key, Structure::Verbose, &value)
             .unwrap();
-        assert!(o.is_valid());
+        assert!(o.is_annotation());
         println!("{o}");
     }
 }

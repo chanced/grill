@@ -119,7 +119,7 @@ impl<'i> Compiler<'i> {
         }
         Ok(())
     }
-
+    #[allow(clippy::too_many_lines)]
     async fn compile_schema(
         &mut self,
         schema_to_compile: SchemaToCompile,
@@ -141,11 +141,42 @@ impl<'i> Compiler<'i> {
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
         if let Some(key) = self.schemas.get_key(&uri) {
+            println!("schema already exists, finalizing");
+            let path = self
+                .schemas
+                .get(key, self.sources)
+                .unwrap()
+                .path
+                .clone()
+                .into_owned();
+            let has_subschemas = self
+                .queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+            let has_refs = self
+                .queue_refs(key, default_dialect_idx, &src, q)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+            if has_subschemas || has_refs {
+                // kicking resolve_ref and setup_keywords down the road until all
+                // subschemas are compiled and refs are resolved
+                q.push_back(SchemaToCompile {
+                    uri,
+                    path: Some(path.clone()),
+                    parent,
+                    default_dialect_idx,
+                    continue_on_err: false,
+                    ref_: ref_.clone(),
+                });
+                return Ok(());
+            }
+
             return self.finalize(key, &uri, dialect_idx, ref_, continue_on_err);
         }
 
         let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        println!("after link");
 
         let schema_to_compile = || SchemaToCompile {
             uri: uri.clone(),
@@ -155,24 +186,32 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_: ref_.clone(),
         };
-
+        println!("before if statements");
         if id.is_some() {
+            println!("id is some");
             path = Some(Pointer::default());
             parent = None;
         } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
+            println!("parent is none and path is none and has ptr fragment");
             return self.queue_pathed(schema_to_compile(), q);
         } else if is_anchored(&uri) {
+            println!("is anchored");
             return self.queue_anchored(schema_to_compile(), q);
         } else if parent.is_none() && path.is_none() {
+            println!("parent is none and path is none");
             // if the uri does not have a pointer fragment, then it should be
             // compiled as document root
             path = Some(Pointer::default());
         }
+        println!("after if statements");
 
+        println!("adding parent uris");
         // path should now have a value
         let path = path.expect("path should be set");
         self.add_parent_uris_with_path(&mut uris, &path, parent)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        println!("after add_parent_uris_with_path");
 
         self.sources
             .link_all(id.as_ref(), &uris, &link)
@@ -322,6 +361,7 @@ impl<'i> Compiler<'i> {
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
+            println!("compiling keywords of {}", schema.absolute_uri());
             let mut keywords = Vec::new();
             for mut keyword in dialect.keywords().iter().cloned() {
                 let mut compile = Compile {
@@ -460,10 +500,17 @@ impl<'i> Compiler<'i> {
         target_uri: &AbsoluteUri,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), CompileError> {
-        let path = Pointer::parse(target_uri.fragment().unwrap())
+        let mut path = Pointer::parse(target_uri.fragment().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
-        while !path.is_empty() {
-            let mut path = path.clone();
+        q.push_front(SchemaToCompile {
+            uri: target_uri.clone(),
+            path: Some(path.clone()),
+            parent: None,
+            default_dialect_idx: self.dialects.default_index(),
+            continue_on_err: true,
+            ref_: None,
+        });
+        while !path.is_root() {
             path.pop_back();
             let mut uri = target_uri.clone();
             if path.is_empty() {
@@ -471,18 +518,37 @@ impl<'i> Compiler<'i> {
             } else {
                 uri.set_fragment(Some(&path))?;
             }
-            if self.schemas.contains_uri(&uri) {
-                return Err(CompileError::SchemaNotFound(target_uri.clone()));
+            if let Some(schema) = self.schemas.get_by_uri(&uri, self.sources) {
+                if schema.keywords.len() > 0 {
+                    return Err(CompileError::SchemaNotFound(target_uri.clone()));
+                }
+                continue;
             }
+
             q.push_front(SchemaToCompile {
                 uri,
-                path: Some(path),
+                path: Some(path.clone()),
                 parent: None,
                 default_dialect_idx: self.dialects.default_index(),
                 continue_on_err: true,
                 ref_: None,
             });
         }
+        let mut uri = target_uri.clone();
+        uri.set_fragment(None).unwrap();
+        if let Some(schema) = self.schemas.get_by_uri(&uri, self.sources) {
+            if schema.keywords.len() > 0 {
+                return Err(CompileError::SchemaNotFound(target_uri.clone()));
+            }
+        }
+        q.push_front(SchemaToCompile {
+            uri,
+            path: None,
+            parent: None,
+            default_dialect_idx: self.dialects.default_index(),
+            continue_on_err: true,
+            ref_: None,
+        });
         Ok(())
     }
     async fn source(&mut self, uri: &AbsoluteUri) -> Result<(Link, Value), CompileError> {

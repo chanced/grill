@@ -437,7 +437,7 @@ impl Dialects {
 
     /// Returns an [`Iterator`] of [`&AbsoluteUri`](`crate::uri::AbsoluteUri`) for each metaschema in each [`Dialect`].
     pub fn source_ids(&self) -> impl Iterator<Item = &AbsoluteUri> {
-        self.dialects.iter().map(|d| &d.id)
+        self.dialects.iter().flat_map(|d| d.metaschemas.keys())
     }
 
     #[must_use]
