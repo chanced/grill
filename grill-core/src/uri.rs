@@ -841,6 +841,7 @@ impl AbsoluteUri {
         Ok(prev)
     }
 
+    /// Returns `true` if the fragment is either `None` or an empty string
     #[must_use]
     pub fn is_fragment_empty_or_none(&self) -> bool {
         self.fragment().map_or(true, |f| f.trim().is_empty())
@@ -902,6 +903,12 @@ impl AbsoluteUri {
         Ok(uri)
     }
 
+    /// Returns the scheme of the `AbsoluteUri`
+    /// # Example
+    /// ```rust
+    /// # use grill::AbsoluteUri;
+    /// let uri = AbsoluteUri::parse("https://example.com").unwrap();
+    /// assert_eq!(uri.scheme(), "https");
     #[must_use]
     pub fn scheme(&self) -> &str {
         match self {
@@ -1330,6 +1337,11 @@ pub struct QueryParameter<'a> {
     eq_index: Option<u32>,
 }
 impl<'a> QueryParameter<'a> {
+    /// Creates a new `QueryParameter` from the given `full` query parameter
+    /// string.
+    ///
+    /// # Errors
+    /// Returns `OverflowError` if the length of `full` is greater than `u32::MAX`
     pub fn new(full: &'a str) -> Result<Self, OverflowError<usize, { u32::MAX as u64 }>> {
         usize_to_u32(full.len())?;
         let eq_index = full.find('=').map(|i| i.try_into().unwrap());
@@ -1386,11 +1398,14 @@ impl<'a> TryFrom<&'a str> for QueryParameter<'a> {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
+
+/// An iterator over [`QueryParameter`]s.
 #[derive(Debug, Default)]
 pub struct QueryParameters<'a> {
     query: Option<Split<'a, char>>,
 }
 impl<'a> QueryParameters<'a> {
+    /// Creates a new `QueryParameters` iterator from the given query string.
     pub fn new(
         query: Option<&'a str>,
     ) -> Result<Self, OverflowError<usize, { usize::MAX as u64 }>> {
@@ -1607,6 +1622,14 @@ impl RelativeUri {
         let end = self.username_end_index()?;
         Some(&self.value[start..end])
     }
+    /// Returns the password portion of the `RelativeUri` if it exists.
+    /// # Example
+    /// ```rust
+    /// # use grill_core::uri::{ Uri, RelativeUri };
+    /// let uri = Uri::parse("//user:pass@host/path?query#fragment").unwrap();
+    /// let relative_uri = uri.as_relative_uri().unwrap();
+    /// assert_eq!(relative_uri.password(), Some("pass"));
+    /// ```
     #[must_use]
     pub fn password(&self) -> Option<&str> {
         let start = self.password_index()? + 1;
@@ -1837,16 +1860,45 @@ impl RelativeUri {
         Ok(existing_authority)
     }
 
+    /// Returns `true` if the `RelativeUri` has an authority.
+    /// # Example
+    /// ```
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("//example.com").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(rel_uri.has_authority());
     #[must_use]
     pub fn has_authority(&self) -> bool {
         self.path_index() > 2
     }
 
+    /// Returns `true` if the `RelativeUri` has a username.
+    /// # Example
+    /// ```
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("//user@host").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(rel_uri.has_username());
+    /// let uri = Uri::parse("//host").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(!rel_uri.has_username());
+    /// ```
     #[must_use]
     pub fn has_username(&self) -> bool {
         self.username_index.is_some()
     }
 
+    /// Returns `true` if the `RelativeUri` has a password.
+    /// # Example
+    /// ```
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("//user:pass@host").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(rel_uri.has_password());
+    /// let uri = Uri::parse("//user@host").unwrap();
+    /// let rel_uri = uri.as_relative_uri().unwrap();
+    /// assert!(!rel_uri.has_password());
+    /// ```
     #[must_use]
     pub fn has_password(&self) -> bool {
         self.password_index.is_some()
@@ -2664,6 +2716,14 @@ impl Uri {
         segments
     }
 
+    /// Returns the fragment component of the [`Url`] or [`Urn`] if it exists.
+    ///
+    /// # Example
+    /// ```
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("https://example.com/path/to/file#fragment").unwrap();
+    /// assert_eq!(uri.fragment(), Some("fragment"));
+    /// ```
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
         match self {
@@ -2691,7 +2751,8 @@ impl Uri {
             Uri::Relative(rel) => Ok(rel.set_fragment(fragment)?),
         }
     }
-
+    /// Returns `true` if the fragment component of the `Uri` is empty or
+    /// `None`.
     #[must_use]
     pub fn is_fragment_empty_or_none(&self) -> bool {
         self.fragment().map_or(true, |f| f.trim().is_empty())
@@ -2787,7 +2848,8 @@ impl Uri {
             Uri::Relative(rel) => rel.host().map(Cow::Borrowed),
         }
     }
-
+    /// Sets the authority (if a `Url` or `RelativeUri`) or namespace (if a
+    /// `Urn`) to `authority_or_namespace`.
     pub fn set_authority_or_namespace(
         &mut self,
         authority_or_namespace: &str,
@@ -2853,7 +2915,7 @@ impl Uri {
             Self::Relative(rel) => Ok(rel.set_path(path_or_nss)?),
         }
     }
-
+    /// Returns the `Uri` as a `&str`
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -2864,12 +2926,13 @@ impl Uri {
     }
 
     /// Returns `true` if the uri is [`Url`].
-    ///
-    /// [`Url`]: Uri::Url
     #[must_use]
     pub fn is_url(&self) -> bool {
         matches!(self, Self::Url(..))
     }
+
+    /// Returns a reference to a [`Url`] if the `Uri` is a `Url` or `None`
+    /// otherwise.
     #[must_use]
     pub fn as_url(&self) -> Option<&Url> {
         if let Self::Url(v) = self {
@@ -2880,12 +2943,12 @@ impl Uri {
     }
 
     /// Returns `true` if the uri is [`Urn`].
-    ///
-    /// [`Urn`]: Uri::Urn
     #[must_use]
     pub fn is_urn(&self) -> bool {
         matches!(self, Self::Urn(..))
     }
+
+    /// Returns a reference to a [`Urn`] if the `Uri` is a `Urn` or `None`
     #[must_use]
     pub fn as_urn(&self) -> Option<&Urn> {
         if let Self::Urn(v) = self {
@@ -2902,6 +2965,8 @@ impl Uri {
     pub fn is_relative(&self) -> bool {
         matches!(self, Self::Relative(..))
     }
+    /// Returns this `Uri` as a reference to a  [`RelativeUri`] if it is a
+    /// relative URI or `None` otherwise.
     #[must_use]
     pub fn as_relative_uri(&self) -> Option<&RelativeUri> {
         if let Self::Relative(v) = self {
@@ -2910,7 +2975,7 @@ impl Uri {
             None
         }
     }
-
+    /// Attempts to convert this `Uri` into a [`RelativeUri`].
     pub fn try_into_relative(self) -> Result<RelativeUri, Self> {
         if let Self::Relative(v) = self {
             Ok(v)
@@ -2918,7 +2983,8 @@ impl Uri {
             Err(self)
         }
     }
-
+    /// Consumes and returns this `Uri` as a [`Urn`] if it is a `Urn` or
+    /// returns `Err(self)` otherwise.
     pub fn try_into_urn(self) -> Result<Urn, Self> {
         if let Self::Urn(v) = self {
             Ok(v)
@@ -2927,6 +2993,8 @@ impl Uri {
         }
     }
 
+    /// Consumes and returns this `Uri` as a [`Url`] if it is a `Url` or
+    /// returns `Err(self)` otherwise.
     pub fn try_into_url(self) -> Result<Url, Self> {
         if let Self::Url(v) = self {
             Ok(v)
@@ -2934,6 +3002,14 @@ impl Uri {
             Err(self)
         }
     }
+
+    /// Returns the scheme of the `Uri` if it exists.
+    /// # Example
+    /// ```
+    /// # use grill_core::uri::Uri;
+    /// let uri = Uri::parse("https://example.com/path/to/file").unwrap();
+    /// assert_eq!(uri.scheme(), Some("https"));
+    /// ```
     #[must_use]
     pub fn scheme(&self) -> Option<&str> {
         match self {
