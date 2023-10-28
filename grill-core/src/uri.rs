@@ -61,10 +61,11 @@
 //! of a [`Urn`], [`Uri`], [`AbsoluteUri`] or [`UriRef`].
 //!
 //! ```plaintext
-//! "urn:example:articles:record?category=science#fragment"
-//!  └┬┘ └─┬───┘ └──────┬──────┘ └────────────┬─┘ └──┬───┘
-//! scheme │  namespace specific string (NSS) │   fragment
-//!   namespace (NID)                       query
+//!
+//! "urn:example:catalog:articles:record?+r-component:ex=idk?=category=science#fragment"
+//!  └┬┘ └───┬┘ └──────────────┬───────┘ └─────────┬───────┘ └───────┬────────┘ └───┬──┘
+//! scheme  nid               nss             r-component        q-component    fragment
+//!     namespace   namespace specific string                       query                                   
 //! ```
 //! ```rust
 //! # use grill_core::uri::{ Uri, AbsoluteUri };
