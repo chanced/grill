@@ -14,7 +14,7 @@ use std::{borrow::Cow, string::ToString, sync::Arc};
 
 use super::ENUM;
 
-/// [`Keyword`] for`enum`.
+/// [`Keyword`] implementation for `enum`.
 #[derive(Debug, Clone)]
 pub struct Enum {
     /// The expected values
@@ -82,7 +82,7 @@ impl Keyword for Enum {
     }
 }
 
-/// [`Error`] for the `enum` keyword, produced by [`EnumKeyword`].
+/// [`Error`] for the `enum` keyword, produced by [`Enum`].
 #[derive(Debug, Clone)]
 pub struct EnumInvalid<'v> {
     /// The expected values.

@@ -10,7 +10,7 @@
 //! - [ ] $anchor
 //! - [x] allOf
 //! - [x] anyOf
-//! - [ ] oneOf
+//! - [x] oneOf
 //! - [x] then
 //! - [x] if
 //! - [x] else
@@ -69,6 +69,7 @@ pub mod id;
 pub mod if_then_else;
 pub mod not;
 pub mod one_of;
+pub mod pattern;
 pub mod pattern_properties;
 pub mod properties;
 pub mod read_only;

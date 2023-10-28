@@ -6,7 +6,7 @@ own schema language.
 ## Table of contents
 
 -   [High level features & attractions](#high-level-features--attractions)
--   [Compatibility(#compatibility)
+-   [Compatibility](#compatibility)
 -   [Installation](#installation)
 -   [Feature flags](#feature-flags)
 -   [Example](#example)
@@ -30,7 +30,7 @@ own schema language.
     `BigRational`s.
 -   Conserve bits with `Value`s and `BigRational`s caches.
 
-## Compatability
+## Compatibility
 
 grill requires `std` and an `async` runtime to support `Resolver`s.
 
