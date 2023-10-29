@@ -1,6 +1,6 @@
 //! # `$defs` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/core/defs/)
+//! - [Learn JSON Schema - $defs](https://www.learnjsonschema.com/2020-12/core/defs/)
 use grill_core::{
     error::{CompileError, EvaluateError},
     keyword::{self, paths_of_object, Compile, Kind},

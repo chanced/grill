@@ -7,7 +7,7 @@ use grill_core::{
     define_translate,
     error::InvalidTypeError,
     keyword::{Compile, Keyword, Kind},
-    output::Error,
+    output::{BoxedError, Error},
 };
 use serde_json::Value;
 use std::{borrow::Cow, string::ToString, sync::Arc};
@@ -96,7 +96,7 @@ pub struct EnumInvalid<'v> {
 define_translate!(EnumInvalid, translate_enum_invalid_en);
 
 impl<'v> Error<'v> for EnumInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         Box::new(EnumInvalid {
             expected: self.expected,
             actual: Cow::Owned(self.actual.into_owned()),

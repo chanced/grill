@@ -10,7 +10,7 @@ use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, paths_of_object, Compile, Context, Keyword, Unimplemented},
-    output::{Error, Output},
+    output::{Error, Output, BoxedError},
     Key, Schema,
 };
 use jsonptr::Pointer;
@@ -146,7 +146,7 @@ pub fn translate_pattern_properties_invalid_en(
 }
 
 impl<'v> Error<'v> for PatternPropertiesInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         Box::new(PatternPropertiesInvalid {
             invalid: self
                 .invalid

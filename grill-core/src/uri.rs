@@ -164,7 +164,7 @@ mod parse;
 mod set;
 mod write;
 
-use crate::error::UrnError;
+use crate::{error::UrnError, output::Annotation};
 #[doc(no_inline)]
 pub use url::Url;
 #[doc(no_inline)]
@@ -275,9 +275,9 @@ impl<'a> Authority<'a> {
         self.port_index().map(|idx| &self.value[idx + 1..])
     }
 
-    /// Returns the
+    /// Returns the `Authority` as owned.
     #[must_use]
-    pub fn into_owned(&self) -> Authority<'static> {
+    pub fn into_owned(self) -> Authority<'static> {
         Authority {
             value: Cow::Owned(self.value.to_string()),
             username_index: self.username_index,
@@ -1825,7 +1825,7 @@ impl RelativeUri {
         &'a mut self,
         authority: Option<&str>,
     ) -> Result<Option<Authority<'a>>, UriError> {
-        let existing_authority = self.authority().map(|a| a.into_owned());
+        let existing_authority = self.authority().map(Authority::into_owned);
         let new = authority
             .map(parse::authority)
             .transpose()?

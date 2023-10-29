@@ -1,69 +1,16 @@
 //! # Json Schema Keywords
-//! - [x] $schema
-//! - [x] $id
-//! - [x] $ref
-//! - [x] $defs
-//! - [x] $comment
-//! - [ ] $vocabulary
-//! - [ ] $dynamicRef
-//! - [ ] $dynamicAnchor
-//! - [ ] $anchor
-//! - [x] allOf
-//! - [x] anyOf
-//! - [x] oneOf
-//! - [x] then
-//! - [x] if
-//! - [x] else
-//! - [x] not
-//! - [x] properties
-//! - [ ] additionalProperties
-//! - [x] patternProperties
-//! - [ ] dependentSchemas
-//! - [ ] propertyNames
-//! - [ ] items
-//! - [ ] prefixItems
-//! - [ ] contains
-//! - [x] type
-//! - [x] enum
-//! - [x] const
-//! - [ ] pattern
-//! - [ ] minLength
-//! - [ ] maxLength
-//! - [ ] exclusiveMaximum
-//! - [ ] multipleOf
-//! - [ ] exclusiveMinimum
-//! - [ ] maximum
-//! - [ ] minimum
-//! - [ ] dependentRequired
-//! - [ ] maxProperties
-//! - [ ] minProperties
-//! - [ ] required
-//! - [ ] maxItems
-//! - [ ] minItems
-//! - [ ] maxContains
-//! - [ ] minContains
-//! - [ ] uniqueItems
-//! - [ ] title
-//! - [ ] description
-//! - [ ] default
-//! - [x] writeOnly
-//! - [x] readOnly
-//! - [ ] examples
-//! - [ ] deprecated
-//! - [ ] format
-//! - [ ] unevaluatedProperties
-//! - [ ] unevaluatedItems
-//! - [ ] contentSchema
-//! - [ ] contentMediaType
-//! - [ ] contentEncoding
-//! - [ ] format
+
+use grill_core::error::{AnchorError, AnchorInvalidLeadCharError};
 
 pub mod all_of;
+pub mod anchor;
 pub mod any_of;
 pub mod boolean;
 pub mod comment;
 pub mod const_;
 pub mod defs;
+pub mod dynamic_anchor;
+pub mod dynamic_ref;
 pub mod enum_;
 pub mod id;
 pub mod if_then_else;
@@ -78,6 +25,36 @@ pub mod schema;
 pub mod short_circuit;
 pub mod type_;
 pub mod write_only;
+
+/// Validates the value of `anchor` by ensuring that it start with a letter
+/// ([A-Za-z]) or underscore ("_"), followed by any number of letters, digits
+/// ([0-9]), hyphens ("-"), underscores ("_"), and periods (".")
+pub fn validate_anchor(keyword: &'static str, anchor: &str) -> Result<(), AnchorError> {
+    if anchor.is_empty() {
+        return Err(AnchorError::Empty(keyword));
+    }
+    let mut chars = anchor.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return Err(AnchorInvalidLeadCharError {
+            char: first,
+            value: anchor.to_string(),
+            keyword,
+        }
+        .into());
+    }
+    for c in chars {
+        if !c.is_ascii_alphanumeric() && c != '-' && c != '_' && c != '.' {
+            return Err(AnchorInvalidLeadCharError {
+                char: c,
+                value: anchor.to_string(),
+                keyword,
+            }
+            .into());
+        }
+    }
+    Ok(())
+}
 
 /// ## `$id`
 ///

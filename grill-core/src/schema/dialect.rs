@@ -5,7 +5,7 @@ use crate::{
     error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError, UriError},
     keyword::{Keyword, Unimplemented},
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
-    Src,
+    Key, Src,
 };
 use jsonptr::Pointer;
 use serde_json::{json, Value};
@@ -71,6 +71,7 @@ pub struct Dialect {
     subschemas_indexes: Box<[u16]>,
     anchors_indexes: Box<[u16]>,
     references_indexes: Box<[u16]>,
+    pub(crate) schema_key: Key,
 }
 impl std::fmt::Display for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -115,6 +116,7 @@ impl Dialect {
             subschemas_indexes,
             anchors_indexes,
             references_indexes,
+            schema_key: Key::default(),
         })
     }
 
@@ -503,6 +505,16 @@ impl Dialects {
             .get(uri)
             .copied()
             .ok_or(DialectError::DefaultNotFound(uri.clone()))
+    }
+
+    pub(crate) fn set_keys(&mut self, keys: Vec<(AbsoluteUri, Key)>) {
+        for (uri, key) in keys {
+            self.dialects
+                .iter_mut()
+                .find(|d| d.id == uri)
+                .unwrap()
+                .schema_key = key;
+        }
     }
 }
 

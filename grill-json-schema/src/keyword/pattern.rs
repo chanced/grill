@@ -4,7 +4,7 @@ use grill_core::{
     define_translate,
     error::Expected,
     keyword::{Compile, Keyword, Kind},
-    output::{Annotation, Error},
+    output::{Annotation, BoxedError, Error},
 };
 use regex::Regex;
 use serde_json::Value;
@@ -16,7 +16,7 @@ use super::PATTERN;
 pub struct Pattern {
     value: Arc<Value>,
     regex: Option<regex::Regex>,
-    pattern: Option<Arc<str>>,
+    pattern: Option<String>,
     translate: TranslatePatternInvalid,
 }
 
@@ -40,7 +40,7 @@ impl Keyword for Pattern {
             }
             .into());
         };
-        self.pattern = Some(regex.clone().into());
+        self.pattern = Some(regex.clone());
         let regex = Regex::new(regex)?;
         self.regex = Some(regex);
         self.value = Arc::new(value.clone());
@@ -78,7 +78,7 @@ impl Keyword for Pattern {
 #[derive(Debug, Clone)]
 pub struct PatternInvalid<'v> {
     /// The expected values.
-    pub pattern: Arc<str>,
+    pub pattern: String,
     /// The value received.
     pub actual: Cow<'v, Value>,
     /// The instance of [`TranslateEnumInvalid`] to use
@@ -88,8 +88,12 @@ pub struct PatternInvalid<'v> {
 define_translate!(PatternInvalid, translate_pattern_invalid_en);
 
 impl<'v> Error<'v> for PatternInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
-        todo!()
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
+        Box::new(PatternInvalid {
+            pattern: self.pattern,
+            actual: Cow::Owned(self.actual.into_owned()),
+            translate: self.translate,
+        })
     }
 
     fn translate(

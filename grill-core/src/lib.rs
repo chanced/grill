@@ -489,14 +489,16 @@ impl Build {
             .map(|idx| dialects[*idx].id().clone());
         let dialects = Dialects::new(dialects, default_dialect_id)?;
 
+
         let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(srcs(dialects.sources(), pending_srcs)?, &deserializers)?;
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
 
         let precompile: Result<Vec<AbsoluteUri>, UriError> = precompile.into_iter().collect();
-        let mut precompile = precompile.map_err(SourceError::UriFailedToParse)?;
-        precompile.extend(dialects.source_ids().cloned());
+        let precompile = precompile.map_err(SourceError::UriFailedToParse)?;
+
+        let dialect_ids:Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
 
         let mut interrogator = Interrogator {
             dialects,
@@ -508,9 +510,10 @@ impl Build {
             numbers: Numbers::new(numbers.iter())?,
             values: Values::default(),
         };
+        interrogator.compile_dialects_schemas(dialect_ids).await?;
 
-        for id in precompile {
-            interrogator.compile(id).await?;
+        for uri in precompile {
+            interrogator.compile(uri).await?;
         }
 
         Ok(interrogator)
@@ -800,7 +803,7 @@ impl Interrogator {
     {
         let uris = uris.into_iter();
         self.start_txn();
-        match Compiler::new(self).compile_all(uris).await {
+        match Compiler::new(self, true).compile_all(uris).await {
             Ok(key) => {
                 self.commit_txn();
                 Ok(key)
@@ -826,7 +829,7 @@ impl Interrogator {
         // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
         let uri = uri.try_into_absolute_uri()?;
         self.start_txn();
-        match self.compile_schema(uri).await {
+        match self.compile_schema(uri, true).await {
             Ok(key) => {
                 self.commit_txn();
                 Ok(key)
@@ -837,6 +840,23 @@ impl Interrogator {
             }
         }
     }
+
+    async fn compile_dialects_schemas(&mut self, uris: Vec<AbsoluteUri>) -> Result<(), CompileError>  {
+        let uris = uris.into_iter();
+        self.start_txn();
+        match Compiler::new(self, true).compile_all(uris).await {
+            Ok(results) => {
+                self.commit_txn();
+                self.dialects.set_keys(results);
+                Ok(())
+            }
+            Err(err) => {
+                self.rollback_txn();
+                Err(err)
+            }
+        }
+    }
+
     /// Returns an [`Iter`] of `Result<Schema, UnknownKeyError>`s for the given [`Key`]s.
     ///
     /// Each item in the iterator is a [`Result`] because it is possible a [`Key`] may not
@@ -861,8 +881,8 @@ impl Interrogator {
         self.iter(keys).unchecked()
     }
 
-    async fn compile_schema(&mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
-        Compiler::new(self).compile(uri).await
+    async fn compile_schema(&mut self, uri: AbsoluteUri, validate: bool) -> Result<Key, CompileError> {
+        Compiler::new(self, validate).compile(uri).await
     }
 
     /// Returns the [`Dialects`] for this `Interrogator`
@@ -1207,6 +1227,8 @@ impl Interrogator {
         self.schemas.rollback_txn();
         self.sources.rollback_txn();
     }
+
+
 
     // /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
     // fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>

@@ -33,6 +33,11 @@ use std::{
 */
 
 /// Generates a static function which returns a [`Pointer`] to the given path.
+/// # Example
+/// ```no_run
+/// static_pointer_fn!(pub if "/if");
+/// assert_eq!(if_pointer(), &Pointer::new(["if"]));
+/// ```
 ///
 #[macro_export]
 macro_rules! static_pointer_fn {
@@ -324,7 +329,7 @@ impl<'s> Context<'s> {
     /// Mutable reference to the eval local state [`AnyMap`].
     ///
     /// This does not include the [`global_state`](`Context::global_state`).
-    pub fn eval_state(&mut self) -> &AnyMap {
+    pub fn eval_state(&mut self) -> &mut AnyMap {
         self.eval_state
     }
 

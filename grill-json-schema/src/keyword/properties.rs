@@ -11,7 +11,7 @@ use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, paths_of_object, Compile, Context, Keyword, Unimplemented},
-    output::{Error, Output},
+    output::{BoxedError, Error, Output},
     Key, Schema,
 };
 use jsonptr::Pointer;
@@ -127,7 +127,7 @@ pub fn translate_properties_invalid_en(
 }
 
 impl<'v> Error<'v> for PropertiesInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         Box::new(PropertiesInvalid {
             invalid: self
                 .invalid

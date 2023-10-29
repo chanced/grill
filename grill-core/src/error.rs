@@ -35,34 +35,10 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[error("error locating subschemas")]
 pub enum LocateSchemasError {
-    /// An error occurred locating subschemas due to an invalid character in an
-    /// anchor.
+    /// An error occurred locating subschemas due to a malformed anchor.
     MalformedAnchor(#[from] AnchorError),
     /// An error occurred locating subschemas due to an error identifying a schema.
     FailedToIdentifySchema(#[from] IdentifyError),
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                           AnchorEmptyError                            ║
-║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An anchor keyword which does not allow for empty values (e.g. `$anchor`,
-/// `$dynamicAnchor`) was found with an empty string.
-#[derive(Debug, Clone, Error)]
-#[error("{keyword} at {location} must not be an empty string")]
-pub struct AnchorEmptyError {
-    /// The location of the anchor in the form of an [`AbsoluteUri`].
-    ///
-    /// The keyword's path can be found as a JSON pointer in the fragment.
-    pub location: AbsoluteUri,
-    /// The [`Keyword`] of the anchor.
-    pub keyword: &'static str,
 }
 
 /*
@@ -78,13 +54,8 @@ pub struct AnchorEmptyError {
 /// An anchor keyword which does not allow for non-empty values (e.g.
 /// `$recursiveAnchor`) was found with a value.
 #[derive(Debug, Clone, Error)]
-#[error("{keyword} at {location} must be an empty string; found {value}")]
+#[error("{keyword} must be an empty string; found {value}")]
 pub struct AnchorNotEmptyError {
-    /// The location of the anchor in the form of an [`AbsoluteUri`].
-    ///
-    /// The keyword's path can be found as a JSON pointer in the fragment.
-    pub location: AbsoluteUri,
-
     /// The [`Keyword`] of the anchor.
     pub keyword: &'static str,
 
@@ -106,18 +77,14 @@ pub struct AnchorNotEmptyError {
 /// letter (`([A-Za-z])`) or an underscore (`_`) (e.g. `$anchor` and
 /// `$dynamicAnchor`) was found with an invalid leading character.
 #[derive(Debug, Clone, Error)]
-#[error("{keyword} must start with either a letter (([A-Za-z])) or an underscore (_); found {value} for {character} at {location}")]
+#[error("{keyword} must start with either a letter (([A-Za-z])) or an underscore (_); found {value} for {char}")]
 pub struct AnchorInvalidLeadCharError {
-    /// The location of the anchor in the form of an [`AbsoluteUri`].
-    ///
-    /// The keyword's path can be found as a JSON pointer in the fragment.
-    pub location: AbsoluteUri,
     /// The value of the anchor.
     pub value: String,
     /// The [`Keyword`] of the anchor.
     pub keyword: &'static str,
     /// The character which caused the error.
-    pub character: char,
+    pub char: char,
 }
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -131,18 +98,14 @@ pub struct AnchorInvalidLeadCharError {
 
 /// An anchor keyword contained an invalid character.
 #[derive(Debug, Clone, Error)]
-#[error("{keyword} may only contain letters (([A-Za-z])), digits ([0-9]), hyphens ('-'), underscores ('_'), and periods ('.'); found {value} for {character} at {location}")]
+#[error("{keyword} may only contain letters (([A-Za-z])), digits ([0-9]), hyphens ('-'), underscores ('_'), and periods ('.'); found {value} for {char}")]
 pub struct AnchorInvalidCharError {
-    /// The location of the anchor in the form of an [`AbsoluteUri`].
-    ///
-    /// The keyword's path can be found as a JSON pointer in the fragment.
-    pub location: AbsoluteUri,
     /// The value of the anchor.
     pub value: String,
     /// The [`Keyword`] of the anchor.
     pub keyword: &'static str,
     /// The character which caused the error.
-    pub character: char,
+    pub char: char,
 }
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -156,12 +119,12 @@ pub struct AnchorInvalidCharError {
 
 /// An issue with an anchor keyword (e.g. `$anchor`, `$dynamicAnchor`,
 /// `$recursiveAnchor`) occurred
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error)]
 pub enum AnchorError {
     /// An anchor keyword which does not allow for empty values (e.g. `$anchor`,
     /// `$dynamicAnchor`) was found with an empty string.
-    #[error(transparent)]
-    EmptyNotAllowed(#[from] AnchorEmptyError),
+    #[error("{0} must be a non-empty string")]
+    Empty(&'static str),
 
     /// An anchor keyword which does not allow for non-empty values (e.g.
     /// `$recursiveAnchor`) was found with a value.
@@ -177,7 +140,11 @@ pub enum AnchorError {
     /// digits (`[0-9]`), hyphens (`'-'`), underscores (`'_'`), and periods
     /// (`'.'`).
     #[error(transparent)]
-    InvalidCharacter(#[from] AnchorInvalidCharError),
+    InvalidChar(#[from] AnchorInvalidCharError),
+
+    /// The anchor value was not of the expected type.
+    #[error(transparent)]
+    InvalidType(#[from] InvalidTypeError),
 }
 
 /*
@@ -804,6 +771,9 @@ pub enum CompileError {
     /// Failed to resolve or deserialize a source
     #[error(transparent)]
     FailedToSource(#[from] SourceError),
+
+    #[error(transparent)]
+    FailedToEvaluateSchema(#[from] EvaluateError),
 
     /// Failed to locate subschemas within a schema.
     #[error(transparent)]

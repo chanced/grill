@@ -1,0 +1,57 @@
+-   [x] $schema
+-   [x] $id
+-   [x] $ref
+-   [x] $defs
+-   [x] $comment
+-   [ ] $dynamicRef
+-   [ ] $dynamicAnchor
+-   [ ] $anchor
+-   [x] allOf
+-   [x] anyOf
+-   [x] oneOf
+-   [x] then
+-   [x] if
+-   [x] else
+-   [x] not
+-   [x] properties
+-   [ ] additionalProperties
+-   [x] patternProperties
+-   [ ] dependentSchemas
+-   [ ] propertyNames
+-   [ ] items
+-   [ ] prefixItems
+-   [ ] contains
+-   [x] type
+-   [x] enum
+-   [x] const
+-   [x] pattern
+-   [ ] minLength
+-   [ ] maxLength
+-   [ ] exclusiveMaximum
+-   [ ] multipleOf
+-   [ ] exclusiveMinimum
+-   [ ] maximum
+-   [ ] minimum
+-   [ ] dependentRequired
+-   [ ] maxProperties
+-   [ ] minProperties
+-   [ ] required
+-   [ ] maxItems
+-   [ ] minItems
+-   [ ] maxContains
+-   [ ] minContains
+-   [ ] uniqueItems
+-   [ ] title
+-   [ ] description
+-   [ ] default
+-   [x] writeOnly
+-   [x] readOnly
+-   [ ] examples
+-   [ ] deprecated
+-   [ ] unevaluatedProperties
+-   [ ] unevaluatedItems
+-   [ ] contentSchema
+-   [ ] contentMediaType
+-   [ ] contentEncoding
+-   [ ] format
+<!-- -   [ ] $vocabulary -->

@@ -1,12 +1,8 @@
-use std::borrow::Cow;
-
-use serde_json::Value;
-
-use grill_core::{schema::Dialect, Structure};
-
-use crate::keyword::{self, ID, SCHEMA, UNEVALUATED_ITEMS, UNEVALUATED_PROPERTIES};
-
 use super::{keyword::REF, metaschema};
+use crate::keyword::{self, ID, SCHEMA, UNEVALUATED_ITEMS, UNEVALUATED_PROPERTIES};
+use grill_core::{schema::Dialect, Structure};
+use serde_json::Value;
+use std::borrow::Cow;
 
 /// Constructs a new [`Dialect`] for Draft 2020-12
 #[must_use]

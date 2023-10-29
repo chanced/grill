@@ -8,12 +8,12 @@ use crate::{
     error::{CompileError, UnknownAnchorError},
     keyword::{
         cache::{Numbers, Values},
-        Compile,
+        Compile, Evaluated,
     },
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key,
+    AbsoluteUri, Interrogator, Key, Structure,
 };
 
 use super::{CompiledSchema, Dialect, Ref, Reference};
@@ -45,10 +45,11 @@ pub(crate) struct Compiler<'i> {
     resolvers: &'i Resolvers,
     numbers: &'i mut Numbers,
     values: &'i mut Values,
+    validate: bool,
 }
 #[allow(clippy::too_many_arguments)]
 impl<'i> Compiler<'i> {
-    pub(crate) fn new(interrogator: &'i mut Interrogator) -> Self {
+    pub(crate) fn new(interrogator: &'i mut Interrogator, validate: bool) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -58,6 +59,7 @@ impl<'i> Compiler<'i> {
             resolvers: &interrogator.resolvers,
             numbers: &mut interrogator.numbers,
             values: &mut interrogator.values,
+            validate,
         }
     }
     pub(crate) async fn compile(mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
@@ -141,7 +143,6 @@ impl<'i> Compiler<'i> {
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
         if let Some(key) = self.schemas.get_key(&uri) {
-            println!("schema already exists, finalizing");
             let path = self
                 .schemas
                 .get(key, self.sources)
@@ -174,9 +175,11 @@ impl<'i> Compiler<'i> {
             return self.finalize(key, &uri, dialect_idx, ref_, continue_on_err);
         }
 
+        self.validate(dialect_idx, &src)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
         let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        println!("after link");
 
         let schema_to_compile = || SchemaToCompile {
             uri: uri.clone(),
@@ -186,32 +189,22 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_: ref_.clone(),
         };
-        println!("before if statements");
         if id.is_some() {
-            println!("id is some");
             path = Some(Pointer::default());
             parent = None;
         } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
-            println!("parent is none and path is none and has ptr fragment");
             return self.queue_pathed(schema_to_compile(), q);
         } else if is_anchored(&uri) {
-            println!("is anchored");
             return self.queue_anchored(schema_to_compile(), q);
         } else if parent.is_none() && path.is_none() {
-            println!("parent is none and path is none");
             // if the uri does not have a pointer fragment, then it should be
             // compiled as document root
             path = Some(Pointer::default());
         }
-        println!("after if statements");
-
-        println!("adding parent uris");
         // path should now have a value
         let path = path.expect("path should be set");
         self.add_parent_uris_with_path(&mut uris, &path, parent)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        println!("after add_parent_uris_with_path");
 
         self.sources
             .link_all(id.as_ref(), &uris, &link)
@@ -361,7 +354,6 @@ impl<'i> Compiler<'i> {
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
-            println!("compiling keywords of {}", schema.absolute_uri());
             let mut keywords = Vec::new();
             for mut keyword in dialect.keywords().iter().cloned() {
                 let mut compile = Compile {
@@ -588,6 +580,31 @@ impl<'i> Compiler<'i> {
                     uris.push(uri);
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn validate(&mut self, dialect_idx: usize, src: &Value) -> Result<(), CompileError> {
+        let mut eval_state = AnyMap::new();
+        let mut evaluated = Evaluated::default();
+        let mut eval_numbers = Numbers::with_capacity(7);
+        let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
+
+        let output = self.schemas.evaluate(
+            Structure::Verbose,
+            key,
+            src,
+            Pointer::default(),
+            Pointer::default(),
+            self.sources,
+            &mut evaluated,
+            self.global_state,
+            &mut eval_state,
+            self.numbers,
+            &mut eval_numbers,
+        )?;
+        if output.is_invalid() {
+            return Err(CompileError::SchemaInvalid(output.into_owned()));
         }
         Ok(())
     }

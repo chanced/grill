@@ -73,7 +73,7 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
 pub trait Error<'v>: DynClone + fmt::Debug + Send + Sync {
     /// Makes this error owned.
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>>;
+    fn into_owned(self: Box<Self>) -> BoxedError<'static>;
     /// Translates this error
     fn translate(&self, f: &mut fmt::Formatter<'_>, translator: &Translator) -> fmt::Result;
     /// Sets the translator for this error
@@ -108,7 +108,7 @@ impl<'de> Deserialize<'de> for Box<dyn Error<'static>> {
 }
 
 impl Error<'_> for String {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         self
     }
     fn translate(&self, f: &mut fmt::Formatter<'_>, _translator: &Translator) -> fmt::Result {
@@ -119,7 +119,7 @@ impl Error<'_> for String {
 }
 
 impl<'v> Error<'v> for &'v str {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         Box::new(self.to_string())
     }
 
@@ -783,6 +783,16 @@ impl<'v> Output<'v> {
             Output::Verbose(verbose) => verbose.set_valid(is_valid),
         }
     }
+    /// Converts this `Output` into an owned output.
+    #[must_use]
+    pub fn into_owned(self) -> Output<'static> {
+        match self {
+            Output::Flag(flag) => Output::Flag(flag.into_owned()),
+            Output::Basic(basic) => Output::Basic(basic.into_owned()),
+            Output::Detailed(detailed) => Output::Detailed(detailed.into_owned()),
+            Output::Verbose(verbose) => Output::Verbose(verbose.into_owned()),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Output<'static> {
@@ -945,6 +955,15 @@ impl<'v> Flag<'v> {
     ) {
         self.set_valid(annotation_or_error.is_ok());
     }
+
+    /// Consumes this `Flag` output, returning an owned `Flag`.
+    #[must_use]
+    pub fn into_owned(self) -> Flag<'static> {
+        Flag {
+            valid: self.valid,
+            additional_props: additional_props_into_owned(self.additional_props),
+        }
+    }
 }
 
 impl Serialize for Flag<'_> {
@@ -968,8 +987,8 @@ impl fmt::Display for Flag<'_> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                                 Basic                                 ║
-║                                 ¯¯¯¯¯                                 ║
+║                               BasicNode                               ║
+║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -983,7 +1002,24 @@ pub struct BasicNode<'v> {
     pub annotation_or_error: AnnotationOrError<'v>,
     pub additional_props: BTreeMap<String, Cow<'v, Value>>,
 }
-
+impl<'v> BasicNode<'v> {
+    #[must_use]
+    /// Consumes this `BasicNode`, returning an owned copy.
+    pub fn into_owned(self) -> BasicNode<'static> {
+        let annotation_or_error = match self.annotation_or_error {
+            Ok(annotation) => Ok(annotation.map(Annotation::into_owned)),
+            Err(err) => Err(err.map(Error::into_owned)),
+        };
+        BasicNode {
+            valid: self.valid,
+            instance_location: self.instance_location,
+            keyword_location: self.keyword_location,
+            absolute_keyword_location: self.absolute_keyword_location,
+            annotation_or_error,
+            additional_props: additional_props_into_owned(self.additional_props),
+        }
+    }
+}
 impl<'v> Serialize for BasicNode<'v> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1102,6 +1138,16 @@ impl<'v> Basic<'v> {
 
     fn set_valid(&mut self, is_valid: bool) {
         self.valid = is_valid;
+    }
+
+    #[must_use]
+    pub fn into_owned(self) -> Basic<'static> {
+        Basic {
+            valid: self.valid,
+            nodes: self.nodes.into_iter().map(BasicNode::into_owned).collect(),
+            additional_props: additional_props_into_owned(self.additional_props),
+            is_transient: self.is_transient,
+        }
     }
 }
 
@@ -1238,6 +1284,19 @@ impl<'v> Detailed<'v> {
                 self.annotation_or_error = Err(None);
             }
             self.valid = is_valid;
+        }
+    }
+
+    fn into_owned(self) -> Detailed<'static> {
+        Detailed {
+            instance_location: self.instance_location,
+            keyword_location: self.keyword_location,
+            absolute_keyword_location: self.absolute_keyword_location,
+            valid: self.valid,
+            annotation_or_error: annotation_or_error_into_owned(self.annotation_or_error),
+            nodes: self.nodes.into_iter().map(Detailed::into_owned).collect(),
+            additional_props: additional_props_into_owned(self.additional_props),
+            is_transient: self.is_transient,
         }
     }
 }
@@ -1389,6 +1448,20 @@ impl<'v> Verbose<'v> {
                 self.annotation_or_error = Err(None);
             }
             self.valid = is_valid;
+        }
+    }
+
+    #[must_use]
+    pub fn into_owned(self) -> Verbose<'static> {
+        Verbose {
+            instance_location: self.instance_location,
+            keyword_location: self.keyword_location,
+            absolute_keyword_location: self.absolute_keyword_location,
+            annotation_or_error: annotation_or_error_into_owned(self.annotation_or_error),
+            nodes: self.nodes.into_iter().map(Verbose::into_owned).collect(),
+            valid: self.valid,
+            additional_props: additional_props_into_owned(self.additional_props),
+            is_transient: self.is_transient,
         }
     }
 }
@@ -1733,6 +1806,21 @@ fn fmt_err<T>(_err: T) -> fmt::Error {
 
 fn write_json<V: Serialize>(f: &mut fmt::Formatter<'_>, v: &V) -> fmt::Result {
     write!(f, "{}", serde_json::to_string_pretty(v).map_err(fmt_err)?)
+}
+
+fn annotation_or_error_into_owned(value: AnnotationOrError<'_>) -> AnnotationOrError<'static> {
+    match value {
+        Ok(annotation) => Ok(annotation.map(Annotation::into_owned)),
+        Err(err) => Err(err.map(Error::into_owned)),
+    }
+}
+fn additional_props_into_owned(
+    additional_props: BTreeMap<String, Cow<'_, Value>>,
+) -> BTreeMap<String, Cow<'static, Value>> {
+    additional_props
+        .into_iter()
+        .map(|(k, v)| (k, Cow::Owned(v.into_owned())))
+        .collect()
 }
 
 /*

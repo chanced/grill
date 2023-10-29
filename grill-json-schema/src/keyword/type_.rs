@@ -10,7 +10,7 @@ use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, UnexpectedValueError},
     keyword::{self, Compile, Context, Keyword},
-    output::{Annotation, Error, Output},
+    output::{Annotation, BoxedError, Error, Output},
     Schema,
 };
 use once_cell::sync::Lazy;
@@ -197,7 +197,7 @@ pub struct TypeInvalid<'v> {
 define_translate!(TypeInvalid, translate_type_invalid_en);
 
 impl<'v> Error<'v> for TypeInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         Box::new(TypeInvalid {
             value: Cow::Owned(self.value.into_owned()),
             value_type: self.value_type,

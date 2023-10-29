@@ -8,7 +8,7 @@ use grill_core::{
     big::BigRational,
     error::CompileError,
     keyword::{define_translate, Keyword, Kind},
-    output::Error,
+    output::{BoxedError, Error},
 };
 
 use serde_json::Value;
@@ -139,18 +139,18 @@ impl<'v> std::fmt::Display for ConstInvalid<'v> {
 }
 
 impl<'v> Error<'v> for ConstInvalid<'v> {
-    fn into_owned(self: Box<Self>) -> Box<dyn Error<'static>> {
+    fn into_owned(self: Box<Self>) -> BoxedError<'static> {
         match self.actual {
             Cow::Borrowed(actual) => Box::new(ConstInvalid {
                 translate: self.translate,
                 expected: self.expected,
                 actual: Cow::Owned(actual.clone()),
-            }) as Box<dyn Error<'static>>,
+            }),
             Cow::Owned(actual) => Box::new(ConstInvalid {
                 actual: Cow::Owned(actual),
                 expected: self.expected,
                 translate: self.translate,
-            }) as Box<dyn Error<'static>>,
+            }),
         }
     }
 
