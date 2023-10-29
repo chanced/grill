@@ -16,7 +16,7 @@ use crate::{
     AbsoluteUri, Interrogator, Key, Structure,
 };
 
-use super::{CompiledSchema, Dialect, Ref, Reference};
+use super::{dialect, Anchor, CompiledSchema, Dialect, Ref, Reference};
 
 #[derive(Clone, Debug)]
 struct RefToResolve {
@@ -121,6 +121,7 @@ impl<'i> Compiler<'i> {
         }
         Ok(())
     }
+
     #[allow(clippy::too_many_lines)]
     async fn compile_schema(
         &mut self,
@@ -150,15 +151,11 @@ impl<'i> Compiler<'i> {
                 .path
                 .clone()
                 .into_owned();
-            let has_subschemas = self
-                .queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
+            let ready = self
+                .queue_refs_and_subschemas(key, &uri, &path, default_dialect_idx, &src, q)
                 .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-            let has_refs = self
-                .queue_refs(key, default_dialect_idx, &src, q)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-            if has_subschemas || has_refs {
+            if !ready {
                 // kicking resolve_ref and setup_keywords down the road until all
                 // subschemas are compiled and refs are resolved
                 q.push_back(SchemaToCompile {
@@ -206,6 +203,13 @@ impl<'i> Compiler<'i> {
         self.add_parent_uris_with_path(&mut uris, &path, parent)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
+        let anchors = self
+            .find_anchors(dialect_idx, &src)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        add_uris_from_anchors(&uri, &mut uris, &anchors)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
         self.sources
             .link_all(id.as_ref(), &uris, &link)
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
@@ -219,29 +223,24 @@ impl<'i> Compiler<'i> {
                 path.clone(),
                 uris,
                 link,
+                anchors,
                 parent,
                 dialect_uri,
             ))
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
-        let has_subschemas = self
-            .queue_subschemas(key, &uri, &path, dialect_idx, &src, q)
+        let ready = self
+            .queue_refs_and_subschemas(key, &uri, &path, default_dialect_idx, &src, q)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-        let has_refs = self
-            .queue_refs(key, default_dialect_idx, &src, q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        if has_subschemas || has_refs {
-            // kicking resolve_ref and setup_keywords down the road until all
-            // subschemas are compiled and refs are resolved
+        if !ready {
             q.push_back(SchemaToCompile {
-                uri,
+                uri: uri.clone(),
                 path: Some(path.clone()),
                 parent,
                 default_dialect_idx,
                 continue_on_err: false,
-                ref_: ref_.clone(),
+                ref_,
             });
             return Ok(());
         }
@@ -296,6 +295,26 @@ impl<'i> Compiler<'i> {
                 .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
         }
         Ok(())
+    }
+
+    /// returns `true` if this schema is ready for finalization
+    fn queue_refs_and_subschemas(
+        &mut self,
+        key: Key,
+        uri: &AbsoluteUri,
+        path: &Pointer,
+        default_dialect_idx: usize,
+        src: &Value,
+        q: &mut VecDeque<SchemaToCompile>,
+    ) -> Result<bool, CompileError> {
+        let has_subschemas = self.queue_subschemas(key, uri, path, default_dialect_idx, src, q)?;
+        let has_refs = self.queue_refs(key, default_dialect_idx, src, q)?;
+        if has_subschemas || has_refs {
+            // kicking resolve_ref and setup_keywords down the road until all
+            // subschemas are compiled and refs are resolved
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     fn queue_pathed(
@@ -556,6 +575,18 @@ impl<'i> Compiler<'i> {
         Ok((link, source))
     }
 
+    fn find_anchors(
+        &mut self,
+        dialect_idx: usize,
+        src: &Value,
+    ) -> Result<Vec<Anchor>, CompileError> {
+        Ok(self
+            .dialects
+            .get_by_index(dialect_idx)
+            .unwrap()
+            .anchors(src)?)
+    }
+
     #[allow(clippy::unnecessary_wraps)]
     fn add_parent_uris_with_path(
         &mut self,
@@ -585,6 +616,12 @@ impl<'i> Compiler<'i> {
     }
 
     fn validate(&mut self, dialect_idx: usize, src: &Value) -> Result<(), CompileError> {
+        if !self.validate {
+            return Ok(());
+        }
+
+        let src_str = serde_json::to_string_pretty(src).unwrap();
+        println!("{src_str}");
         let mut eval_state = AnyMap::new();
         let mut evaluated = Evaluated::default();
         let mut eval_numbers = Numbers::with_capacity(7);
@@ -608,6 +645,21 @@ impl<'i> Compiler<'i> {
         }
         Ok(())
     }
+}
+
+fn add_uris_from_anchors(
+    base_uri: &AbsoluteUri,
+    uris: &mut Vec<AbsoluteUri>,
+    anchors: &[Anchor],
+) -> Result<(), CompileError> {
+    for anchor in anchors {
+        let mut base_uri = base_uri.clone();
+        base_uri.set_fragment(Some(&anchor.name))?;
+        if !uris.contains(&base_uri) {
+            uris.push(base_uri);
+        }
+    }
+    Ok(())
 }
 
 fn is_anchored(uri: &AbsoluteUri) -> bool {

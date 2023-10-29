@@ -104,6 +104,8 @@ pub(crate) struct CompiledSchema {
 
     /// Absolute URI of the source and path to this schema.
     pub(crate) link: Link,
+
+    pub(crate) compiled: bool,
 }
 
 impl CompiledSchema {
@@ -112,6 +114,7 @@ impl CompiledSchema {
         path: Pointer,
         uris: Vec<AbsoluteUri>,
         link: Link,
+        anchors: Vec<Anchor>,
         parent: Option<Key>,
         metaschema: AbsoluteUri,
     ) -> Self {
@@ -127,6 +130,7 @@ impl CompiledSchema {
             references: Vec::default(),
             anchors: Vec::default(),
             keywords: Box::default(),
+            compiled: false,
         }
     }
 }
@@ -411,6 +415,11 @@ impl Schemas {
         }
         Ok(output)
     }
+
+    pub(crate) fn set_compiled(&mut self, key: Key) {
+        self.sandbox().table.get_mut(key).unwrap().compiled = true;
+    }
+
     pub(crate) fn ensure_not_cyclic(
         &mut self,
         key: Key,

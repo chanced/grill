@@ -844,7 +844,7 @@ impl Interrogator {
     async fn compile_dialects_schemas(&mut self, uris: Vec<AbsoluteUri>) -> Result<(), CompileError>  {
         let uris = uris.into_iter();
         self.start_txn();
-        match Compiler::new(self, true).compile_all(uris).await {
+        match Compiler::new(self, false).compile_all(uris).await {
             Ok(results) => {
                 self.commit_txn();
                 self.dialects.set_keys(results);

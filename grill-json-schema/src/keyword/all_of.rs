@@ -60,8 +60,6 @@ impl Keyword for AllOf {
         value: &'v serde_json::Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         let mut output = ctx.annotate(Some(ALL_OF), None);
-        output.set_valid(false);
-
         for (path, key) in &self.keys {
             let o = ctx.evaluate(*key, None, path, value)?;
             output.push(o);

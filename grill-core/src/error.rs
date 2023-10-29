@@ -800,7 +800,7 @@ pub enum CompileError {
 
     /// Could not locate an anchor referenced in a schema
     #[error(transparent)]
-    AnchorNotFound(#[from] UnknownAnchorError),
+    UnknownAnchor(#[from] UnknownAnchorError),
 
     /// Failed to parse an anchor field
     #[error(transparent)]

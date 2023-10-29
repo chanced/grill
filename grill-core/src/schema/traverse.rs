@@ -684,6 +684,7 @@ mod tests {
             link,
             path: Pointer::default(),
             metaschema,
+            compiled: false,
         }
     }
 }

@@ -125,10 +125,14 @@ mod tests {
     #[tokio::test]
     async fn test_setup() {
         let mut interrogator = create_interrogator().await;
-        let key = interrogator
-            .compile("https://example.com/with_oneOf")
-            .await
-            .unwrap();
+        let result = interrogator.compile("https://example.com/with_oneOf").await;
+        let key = match result {
+            Ok(key) => key,
+            Err(err) => {
+                println!("{err}");
+                panic!("Failed to compile schema")
+            }
+        };
         let with_one_of = interrogator.schema(key).unwrap();
         assert!(with_one_of
             .keywords
