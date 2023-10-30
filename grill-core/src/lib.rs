@@ -44,7 +44,7 @@ pub mod anymap;
 #[cfg(test)]
 pub mod test;
 
-use std::{any, borrow::Cow, fmt::Debug, ops::Deref};
+use std::{any, borrow::Cow, fmt::Debug, ops::Deref, collections::HashSet};
 
 use jsonptr::Pointer;
 use serde_json::{Value, Number};
@@ -56,7 +56,6 @@ use crate::{
     },
     keyword::{
         cache::{Numbers, Values},
-        Evaluated,
     },
     schema::{
         compiler::Compiler,
@@ -907,7 +906,7 @@ impl Interrogator {
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut eval_state = AnyMap::new();
-        let mut evaluated = Evaluated::default();
+        let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(
             structure,

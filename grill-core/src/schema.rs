@@ -16,7 +16,7 @@ use crate::{
     error::{
         CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
     },
-    keyword::{cache::Numbers, Context, Evaluated, Keyword},
+    keyword::{cache::Numbers, Context, Keyword},
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
@@ -28,7 +28,12 @@ use crate::{
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    ops::Deref,
+};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -378,7 +383,7 @@ impl Schemas {
         instance_location: Pointer,
         keyword_location: Pointer,
         sources: &Sources,
-        evaluated: &mut Evaluated,
+        evaluated: &mut HashSet<String>,
         global_state: &AnyMap,
         eval_state: &mut AnyMap,
         global_numbers: &Numbers,

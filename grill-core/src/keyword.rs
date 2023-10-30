@@ -2,7 +2,6 @@
 pub mod cache;
 
 use num_rational::BigRational;
-use std::collections::HashMap;
 
 use self::cache::{Numbers, Values};
 
@@ -18,9 +17,15 @@ use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Token};
 use serde_json::{Number, Value};
 use std::{
+    collections::HashSet,
     fmt::{self, Display},
     sync::Arc,
 };
+
+/// A static reference to [`Value::Bool`] with the value `true`
+pub const TRUE: &Value = &Value::Bool(true);
+/// A static reference to [`Value::Bool`] with the value `false`
+pub const FALSE: &Value = &Value::Bool(false);
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -225,7 +230,7 @@ pub struct Context<'i> {
     pub(crate) eval_state: &'i mut AnyMap,
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
-    pub(crate) evaluated: &'i mut Evaluated,
+    pub(crate) evaluated: &'i mut HashSet<String>,
     pub(crate) should_short_circuit: Option<bool>,
     pub(crate) global_numbers: &'i Numbers,
     pub(crate) eval_numbers: &'i mut Numbers,
@@ -245,7 +250,7 @@ impl<'s> Context<'s> {
         if let Some(instance) = instance {
             instance_location.push_back(instance.into());
         }
-        self.evaluated.insert(&instance_location);
+        self.evaluated.insert(instance_location.to_string());
         let mut keyword_location = self.keyword_location.clone();
         keyword_location.append(keyword);
         self.schemas.evaluate(
@@ -657,64 +662,6 @@ pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
 }
 
 clone_trait_object!(Keyword);
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                               Evaluated                               ║
-║                               ¯¯¯¯¯¯¯¯¯                               ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// A collection of evaluated paths in the form of a trie of JSON pointers.
-///
-#[derive(Debug, Clone)]
-pub struct Evaluated {
-    nodes: HashMap<String, Evaluated>,
-}
-impl Evaluated {
-    /// Creates a new empty `Evaluated`
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            nodes: HashMap::new(),
-        }
-    }
-    /// Inserts a [`Pointer`] into the trie
-    pub fn insert(&mut self, ptr: &Pointer) {
-        let mut props = self;
-        for tok in ptr.split('/') {
-            props = props.nodes.entry(tok.to_string()).or_default();
-        }
-    }
-
-    /// Returns `true` if the trie contains the given [`Pointer`]
-    #[must_use]
-    pub fn contains(&self, ptr: &Pointer) -> bool {
-        let mut node = self;
-        for tok in ptr.split('/') {
-            if node.nodes.contains_key(tok) {
-                node = node.nodes.get(tok).unwrap();
-                continue;
-            }
-            return false;
-        }
-        true
-    }
-}
-
-impl Default for Evaluated {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// A static reference to [`Value::Bool`] with the value `true`
-pub const TRUE: &Value = &Value::Bool(true);
-/// A static reference to [`Value::Bool`] with the value `false`
-pub const FALSE: &Value = &Value::Bool(false);
 /// Returns a static reference to [`Value::Bool`] with the given value.
 #[must_use]
 pub const fn get_bool_value(value: bool) -> &'static Value {
@@ -734,16 +681,3 @@ pub const fn get_bool_value(value: bool) -> &'static Value {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_evaluated_insert() {
-        let ptr = Pointer::new(["a", "b", "c"]);
-        let mut props = Evaluated::default();
-        props.insert(&ptr);
-        assert!(props.contains(&ptr));
-        assert!(!props.contains(&Pointer::new(["a", "b", "d"])));
-    }
-}

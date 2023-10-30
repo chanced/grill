@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
@@ -8,7 +8,7 @@ use crate::{
     error::{CompileError, UnknownAnchorError},
     keyword::{
         cache::{Numbers, Values},
-        Compile, Evaluated,
+        Compile,
     },
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
@@ -16,7 +16,7 @@ use crate::{
     AbsoluteUri, Interrogator, Key, Structure,
 };
 
-use super::{dialect, Anchor, CompiledSchema, Dialect, Ref, Reference};
+use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
 
 #[derive(Clone, Debug)]
 struct RefToResolve {
@@ -623,7 +623,7 @@ impl<'i> Compiler<'i> {
         let src_str = serde_json::to_string_pretty(src).unwrap();
         println!("{src_str}");
         let mut eval_state = AnyMap::new();
-        let mut evaluated = Evaluated::default();
+        let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
 
