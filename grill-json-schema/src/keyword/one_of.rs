@@ -129,8 +129,7 @@ mod tests {
         let key = match result {
             Ok(key) => key,
             Err(err) => {
-                println!("{err}");
-                panic!("Failed to compile schema")
+                panic!("Failed to compile schema\n{err}")
             }
         };
         let with_one_of = interrogator.schema(key).unwrap();

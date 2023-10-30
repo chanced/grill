@@ -34,7 +34,6 @@ impl keyword::Keyword for Defs {
     }
     fn subschemas(&self, schema: &Value) -> Result<Vec<jsonptr::Pointer>, keyword::Unimplemented> {
         let subschemas = paths_of_object(DEFS, schema);
-        println!("subschemas: {subschemas:?}");
         Ok(subschemas)
     }
 }

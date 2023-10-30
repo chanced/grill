@@ -294,6 +294,7 @@ impl<'i> Compiler<'i> {
             self.setup_keywords(key, &self.dialects[dialect_idx])
                 .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
         }
+        self.schemas.set_compiled(key);
         Ok(())
     }
 
@@ -529,13 +530,12 @@ impl<'i> Compiler<'i> {
             } else {
                 uri.set_fragment(Some(&path))?;
             }
-            if let Some(schema) = self.schemas.get_by_uri(&uri, self.sources) {
-                if schema.keywords.len() > 0 {
+            if let Some(key) = self.schemas.get_key(&uri) {
+                if self.schemas.is_compiled(key) {
                     return Err(CompileError::SchemaNotFound(target_uri.clone()));
                 }
                 continue;
             }
-
             q.push_front(SchemaToCompile {
                 uri,
                 path: Some(path.clone()),
@@ -547,11 +547,11 @@ impl<'i> Compiler<'i> {
         }
         let mut uri = target_uri.clone();
         uri.set_fragment(None).unwrap();
-        if let Some(schema) = self.schemas.get_by_uri(&uri, self.sources) {
-            if schema.keywords.len() > 0 {
-                return Err(CompileError::SchemaNotFound(target_uri.clone()));
-            }
+
+        if self.schemas.is_compiled_by_uri(&uri) {
+            return Err(CompileError::SchemaNotFound(target_uri.clone()));
         }
+
         q.push_front(SchemaToCompile {
             uri,
             path: None,
@@ -619,9 +619,6 @@ impl<'i> Compiler<'i> {
         if !self.validate {
             return Ok(());
         }
-
-        let src_str = serde_json::to_string_pretty(src).unwrap();
-        println!("{src_str}");
         let mut eval_state = AnyMap::new();
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);

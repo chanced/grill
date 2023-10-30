@@ -96,9 +96,7 @@ impl Keyword for Properties {
     }
 
     fn subschemas(&self, schema: &serde_json::Value) -> Result<Vec<Pointer>, Unimplemented> {
-        let subschemas = paths_of_object(PROPERTIES, schema);
-        println!("properties subschemas: {subschemas:?}");
-        Ok(subschemas)
+        Ok(paths_of_object(PROPERTIES, schema))
     }
 }
 

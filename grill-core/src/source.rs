@@ -111,12 +111,6 @@ impl Store {
         let key = self.index.get(&uri).unwrap().key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
-            println!("src: {}", serde_json::to_string_pretty(&src).unwrap());
-            println!(
-                "existing_src: {}",
-                serde_json::to_string_pretty(&existing_src).unwrap()
-            );
-
             return Err(SourceConflictError { uri: uri.clone() }.into());
         }
         let link = self.index.get(&uri).unwrap().clone();

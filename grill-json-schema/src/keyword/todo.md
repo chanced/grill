@@ -4,7 +4,7 @@
 -   [x] $defs
 -   [x] $comment
 -   [ ] $dynamicRef
--   [ ] $dynamicAnchor
+-   [x] $dynamicAnchor
 -   [ ] $anchor
 -   [x] allOf
 -   [x] anyOf

@@ -65,6 +65,7 @@ impl Keyword for DynamicAnchor {
             Some(Annotation::Arc(self.dynamic_anchor_value.clone())),
         )))
     }
+
     fn anchors(&self, schema: &Value) -> Result<Result<Vec<Anchor>, AnchorError>, Unimplemented> {
         let Some(dynamic_anchor) = schema.get(DYNAMIC_ANCHOR) else {
             return Ok(Ok(Vec::new()));

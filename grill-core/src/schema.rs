@@ -420,7 +420,18 @@ impl Schemas {
         }
         Ok(output)
     }
-
+    pub(crate) fn is_compiled_by_uri(&self, uri: &AbsoluteUri) -> bool {
+        let Some(key) = self.store().get_index(uri) else {
+            return false;
+        };
+        self.is_compiled(key)
+    }
+    pub(crate) fn is_compiled(&self, key: Key) -> bool {
+        let Some(s) = self.store().get(key) else {
+            return false;
+        };
+        s.compiled
+    }
     pub(crate) fn set_compiled(&mut self, key: Key) {
         self.sandbox().table.get_mut(key).unwrap().compiled = true;
     }
@@ -433,7 +444,6 @@ impl Schemas {
         sources: &Sources,
     ) -> Result<(), CompileError> {
         for reference in references {
-            println!("checking reference: {reference:?}");
             if key == reference.key
                 || self
                     .transitive_dependencies(reference.key, sources)

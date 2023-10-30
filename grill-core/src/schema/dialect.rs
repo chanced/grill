@@ -130,10 +130,6 @@ impl Dialect {
         path: &Pointer,
         schema: &Value,
     ) -> Result<(Option<AbsoluteUri>, Vec<AbsoluteUri>), IdentifyError> {
-        // println!(
-        //     "IDENTIFY\nBASE_URI:{base_uri}\nPATH:{path}\nSCHEMA:\n{}",
-        //     serde_json::to_string_pretty(schema).unwrap()
-        // );
         let mut uris = Vec::new();
         if path.is_empty() {
             base_uri.set_fragment(None)?;
