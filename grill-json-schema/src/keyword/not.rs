@@ -1,6 +1,6 @@
 //! # `not` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/applicator/not/)
+//! - [Learn JSON Schema - `not`](https://www.learnjsonschema.com/2020-12/applicator/not/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.2.1.4)
 //!
 use super::NOT;

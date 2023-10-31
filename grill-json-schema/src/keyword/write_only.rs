@@ -1,6 +1,6 @@
 //! # `writeOnly` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/meta-data/writeonly/)
+//! - [Learn JSON Schema - `writeOnly`](https://www.learnjsonschema.com/2020-12/meta-data/writeonly/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-9.4)
 //!
 use super::WRITE_ONLY;

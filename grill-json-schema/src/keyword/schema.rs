@@ -1,6 +1,6 @@
 //! # `$schema` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/core/schema/)
+//! - [Learn JSON Schema - `$schema`](https://www.learnjsonschema.com/2020-12/core/schema/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
 
 use serde_json::Value;

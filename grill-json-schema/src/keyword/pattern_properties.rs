@@ -1,6 +1,6 @@
 //! # `patternProperties` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/applicator/patternproperties/)
+//! - [Learn JSON Schema - `patternProperties`](https://www.learnjsonschema.com/2020-12/applicator/patternproperties/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.3.2.2)
 use std::borrow::Cow;
 
@@ -10,7 +10,7 @@ use grill_core::{
     define_translate,
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, paths_of_object, Compile, Context, Keyword, Unimplemented},
-    output::{Error, Output, BoxedError},
+    output::{BoxedError, Error, Output},
     Key, Schema,
 };
 use jsonptr::Pointer;

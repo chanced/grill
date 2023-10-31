@@ -1,6 +1,6 @@
 //! # `readOnly` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/meta-data/readonly/)
+//! - [Learn JSON Schema - `readOnly`](https://www.learnjsonschema.com/2020-12/meta-data/readonly/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-9.4)
 use super::READ_ONLY;
 use grill_core::{

@@ -1,6 +1,6 @@
 //! # `properties` keyword.
 //!
-//! - [Learn JSON Schema - const](https://www.learnjsonschema.com/2020-12/applicator/properties/)
+//! - [Learn JSON Schema - `properties`](https://www.learnjsonschema.com/2020-12/applicator/properties/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.3.2.1)
 
 use std::{borrow::Cow, collections::HashMap};
@@ -79,7 +79,7 @@ impl Keyword for Properties {
         for (prop, value) in obj {
             if let Some((ptr, key)) = self.subschemas.get(prop) {
                 output.push(ctx.evaluate(*key, Some(prop), ptr, value)?);
-                is_valid &= output.is_annotation();
+                is_valid &= output.is_valid();
                 if !is_valid && ctx.should_short_circuit() {
                     return Ok(Some(output));
                 }
@@ -100,7 +100,7 @@ impl Keyword for Properties {
     }
 }
 
-/// [`Error`] for `"properties"` keyword
+/// [`Error`] for `"properties"` [`Keyword`]
 #[derive(Clone, Debug)]
 pub struct PropertiesInvalid<'v> {
     /// the list of properties that failed to validate
@@ -120,8 +120,7 @@ pub fn translate_properties_invalid_en(
         }
         write!(f, "\"{prop}\"")?;
     }
-    write!(f, " failed to validate")?;
-    Ok(())
+    write!(f, " failed to validate")
 }
 
 impl<'v> Error<'v> for PropertiesInvalid<'v> {

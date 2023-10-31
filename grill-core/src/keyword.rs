@@ -17,6 +17,7 @@ use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Token};
 use serde_json::{Number, Value};
 use std::{
+    any::Any,
     collections::HashSet,
     fmt::{self, Display},
     sync::Arc,
@@ -59,6 +60,26 @@ macro_rules! static_pointer_fn {
 }
 
 pub use static_pointer_fn;
+
+/// Generates an `as_<Keyword>` and `is_<Keyword>` fn for the given `Keyword` type.
+#[macro_export]
+macro_rules! keyword_fns {
+    ($keyword:ident) => {
+        paste::paste! {
+            #[doc= "Attempts to downcast `keyword` as `" $keyword "`"]
+            pub fn [< as_ $keyword:snake >](keyword: &dyn ::std::any::Any) -> Option<&$keyword> {
+                keyword.downcast_ref::<$keyword>()
+            }
+            #[doc= "Returns `true` if `keyword` is an instance of `" $keyword "`"]
+            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::keyword::Keyword) -> bool {
+                ::std::any::TypeId::of::<$keyword>() == keyword.type_id()
+            }
+
+        }
+    };
+}
+
+pub use keyword_fns;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -293,7 +314,7 @@ impl<'s> Context<'s> {
     /// Evaluates `value` against the schema with the given `key` but does not
     /// mark the instance as evaluated.
     ///
-    /// This is intended for use with `if` / `then` / `else` but may be used
+    /// This is intended for use with `if` but may be used
     /// in other cases.
     pub fn probe<'v>(
         &mut self,
@@ -410,6 +431,26 @@ impl<'s> Context<'s> {
             annotation_or_error,
             is_transient,
         )
+    }
+
+    /// Returns a mutable reference to the [`HashSet`] of evaluated instances.
+    #[must_use]
+    pub fn evaluated_mut(&mut self) -> &mut HashSet<String> {
+        self.evaluated
+    }
+
+    /// Returns an immutable reference to the [`HashSet`] of evaluated instances
+    #[must_use]
+    pub fn evaluated(&self) -> &HashSet<String> {
+        self.evaluated
+    }
+
+    /// Returns `true` if the instance location has been evaluated.
+    #[must_use]
+    pub fn has_evaluated(&self, instance: &str) -> bool {
+        let mut instance_location = self.instance_location.clone();
+        instance_location.push_back(instance.into());
+        self.evaluated.contains(&self.instance_location.to_string())
     }
 
     /// Returns `true` if enabling short-circuiting was successful or if it
@@ -560,7 +601,7 @@ impl From<&'static [&'static str]> for Kind {
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-pub trait Keyword: Send + Sync + DynClone + fmt::Debug {
+pub trait Keyword: Any + Send + Sync + DynClone + fmt::Debug {
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
     /// be the name of the keyword or `Composite`, which will be a list of
     /// keywords.

@@ -3,9 +3,9 @@
 -   [x] $ref
 -   [x] $defs
 -   [x] $comment
--   [ ] $dynamicRef
+-   [x] $dynamicRef
 -   [x] $dynamicAnchor
--   [ ] $anchor
+-   [x] $anchor
 -   [x] allOf
 -   [x] anyOf
 -   [x] oneOf
@@ -14,17 +14,19 @@
 -   [x] else
 -   [x] not
 -   [x] properties
--   [ ] additionalProperties
+-   [x] type
+-   [x] enum
+-   [x] const
+-   [x] pattern
 -   [x] patternProperties
+-   [x] writeOnly
+-   [x] readOnly
+-   [ ] additionalProperties
 -   [ ] dependentSchemas
 -   [ ] propertyNames
 -   [ ] items
 -   [ ] prefixItems
 -   [ ] contains
--   [x] type
--   [x] enum
--   [x] const
--   [x] pattern
 -   [ ] minLength
 -   [ ] maxLength
 -   [ ] exclusiveMaximum
@@ -44,8 +46,6 @@
 -   [ ] title
 -   [ ] description
 -   [ ] default
--   [x] writeOnly
--   [x] readOnly
 -   [ ] examples
 -   [ ] deprecated
 -   [ ] unevaluatedProperties

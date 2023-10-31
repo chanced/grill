@@ -23,6 +23,7 @@
 pub mod error;
 
 pub mod output;
+pub mod visitor;
 pub use output::{Output, Structure};
 
 /// Keywords

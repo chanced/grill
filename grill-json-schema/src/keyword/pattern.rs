@@ -14,10 +14,30 @@ use super::PATTERN;
 /// [`Keyword`] implementation for `pattern`.
 #[derive(Clone, Default, Debug)]
 pub struct Pattern {
-    value: Arc<Value>,
-    regex: Option<regex::Regex>,
-    pattern: Option<String>,
-    translate: TranslatePatternInvalid,
+    /// Value of the `pattern` keyword.
+    pub value: Arc<Value>,
+    /// Compiled `Regex`
+    ///
+    /// If this `Pattern` is attached to a schema, this will be set.
+    pub regex: Option<regex::Regex>,
+    /// Pattern as a string
+    /// If this `Pattern` is attached to a schema, this will be set.
+    pub pattern: Option<String>,
+    /// The default `TranslatePatternInvalid` to use
+    pub translate: TranslatePatternInvalid,
+}
+
+impl Pattern {
+    #[must_use]
+    /// Returns a new `Pattern` [`Keyword`].
+    pub fn new(translate: Option<TranslatePatternInvalid>) -> Self {
+        Self {
+            value: Arc::new(Value::Null),
+            regex: None,
+            pattern: None,
+            translate: translate.unwrap_or_default(),
+        }
+    }
 }
 
 impl Keyword for Pattern {

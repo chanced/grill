@@ -79,7 +79,7 @@ pub fn dialect() -> Dialect {
             [Structure::Flag],
             [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS],
         ))
-        .add_keyword(keyword::defs::Defs)
+        .add_keyword(keyword::defs::Defs::default())
         .add_keyword(keyword::comment::Comment::default())
         .add_keyword(keyword::const_::Const::new(None))
         .add_keyword(keyword::enum_::Enum::new(None))
@@ -89,11 +89,16 @@ pub fn dialect() -> Dialect {
         .add_keyword(keyword::properties::Properties::default())
         .add_keyword(keyword::read_only::ReadOnly::default())
         .add_keyword(keyword::write_only::WriteOnly::default())
+        .add_keyword(keyword::anchor::Anchor::default())
         .add_keyword(keyword::ref_::Ref::new(REF, true))
         .add_keyword(keyword::type_::Type::new(None))
         .add_keyword(keyword::all_of::AllOf::default())
         .add_keyword(keyword::any_of::AnyOf::default())
         .add_keyword(keyword::one_of::OneOf::default())
+        .add_keyword(keyword::pattern::Pattern::default())
+        .add_keyword(keyword::dynamic_anchor::DynamicAnchor::default())
+        .add_keyword(keyword::dynamic_ref::DynamicRef::default())
+        .add_keyword(keyword::additional_properties::AdditionalProperties::default())
         .finish()
         .unwrap()
 }

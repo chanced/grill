@@ -5,7 +5,7 @@ use grill_core::{
     keyword::{Context, Keyword, Kind, Unimplemented},
     output::{Annotation, Output},
     schema::Anchor,
-    static_pointer_fn, Key,
+    static_pointer_fn, AbsoluteUri, Key, Uri,
 };
 use serde_json::Value;
 
@@ -14,10 +14,12 @@ use super::DYNAMIC_ANCHOR;
 /// [`Keyword`] implementation for `$dynamicAnchor`.
 #[derive(Debug, Clone, Default)]
 pub struct DynamicAnchor {
-    /// The value of `$dynamicAnchor`.
-    pub dynamic_anchor: String,
+    /// [`AbsoluteUri`] of the `$dynamicAnchor` value.
+    ///
+    /// If this `DynamicAnchor` is attached to a schema, this will be set.
+    pub absolute_uri: Option<AbsoluteUri>,
     /// The value of `$dynamicAnchor` as a [`Value`] wrapped in an `Arc`.
-    pub dynamic_anchor_value: Arc<Value>,
+    pub value: Arc<Value>,
     /// the default [`Key`] for the schema.
     pub key: Key,
 }
@@ -48,8 +50,10 @@ impl Keyword for DynamicAnchor {
             .into());
         };
         self.key = schema.key;
-        self.dynamic_anchor_value = Arc::new(value.clone());
-        self.dynamic_anchor = dynamic_anchor.clone();
+        self.value = Arc::new(value.clone());
+        let uri = Uri::parse(dynamic_anchor)?;
+        let uri = schema.absolute_uri().resolve(&uri)?;
+        self.absolute_uri = Some(uri);
         Ok(true)
     }
 
@@ -59,10 +63,10 @@ impl Keyword for DynamicAnchor {
         _value: &'v Value,
     ) -> Result<Option<Output<'v>>, EvaluateError> {
         let dynamic_anchors = ctx.eval_state().entry::<DynamicAnchors>().or_default();
-        dynamic_anchors.set(&self.dynamic_anchor, self.key);
+        dynamic_anchors.set(self.absolute_uri.as_ref().unwrap(), self.key);
         Ok(Some(ctx.annotate(
             Some(DYNAMIC_ANCHOR),
-            Some(Annotation::Arc(self.dynamic_anchor_value.clone())),
+            Some(Annotation::Arc(self.value.clone())),
         )))
     }
 
@@ -93,7 +97,7 @@ static_pointer_fn!(pub dynamic_anchor "/$dynamicAnchor");
 /// A map of `$dynamicAnchor` values to [`Key`]s.
 #[derive(Default, Clone, Debug)]
 pub struct DynamicAnchors {
-    map: HashMap<String, Key>,
+    map: HashMap<AbsoluteUri, Key>,
 }
 
 impl DynamicAnchors {
@@ -105,16 +109,16 @@ impl DynamicAnchors {
 
     /// Returns the [`Key`] for the given anchor, if it exists.
     #[must_use]
-    pub fn get(&self, anchor: &str) -> Option<Key> {
+    pub fn get(&self, anchor: &AbsoluteUri) -> Option<Key> {
         self.map.get(anchor).copied()
     }
 
     /// Sets the [`Key`] for the given anchor if it does not exist.
-    pub fn set(&mut self, anchor: &str, key: Key) -> bool {
+    pub fn set(&mut self, anchor: &AbsoluteUri, key: Key) -> bool {
         if self.map.contains_key(anchor) {
             return false;
         }
-        self.map.insert(anchor.to_string(), key);
+        self.map.insert(anchor.clone(), key);
         true
     }
 }

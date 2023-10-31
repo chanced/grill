@@ -2,6 +2,7 @@
 
 use grill_core::error::{AnchorError, AnchorInvalidLeadCharError};
 
+pub mod additional_properties;
 pub mod all_of;
 pub mod anchor;
 pub mod any_of;
@@ -27,8 +28,8 @@ pub mod type_;
 pub mod write_only;
 
 /// Validates the value of `anchor` by ensuring that it start with a letter
-/// ([A-Za-z]) or underscore ("_"), followed by any number of letters, digits
-/// ([0-9]), hyphens ("-"), underscores ("_"), and periods (".")
+/// (`[A-Za-z]`) or underscore (`'_'`), followed by any number of letters, digits
+/// (`[0-9]`), hyphens (`"-"`), underscores (`'_'`), and periods (`'.'`)
 pub fn validate_anchor(keyword: &'static str, anchor: &str) -> Result<(), AnchorError> {
     if anchor.is_empty() {
         return Err(AnchorError::Empty(keyword));
