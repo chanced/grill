@@ -11,7 +11,6 @@ use crate::{
     output::{self, Annotation, AnnotationOrError, BoxedError, Translator},
     schema::{Anchor, Identifier, Ref, Schemas},
     source::Sources,
-    uri::{decode, decode_lossy},
     AbsoluteUri, Key, Output, Schema, Structure, Uri,
 };
 use dyn_clone::{clone_trait_object, DynClone};

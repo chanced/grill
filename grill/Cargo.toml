@@ -28,6 +28,3 @@ yaml    = ["grill-core/yaml"]
 [[bench]]
 harness = false
 name    = "benchmark"
-
-[replace]
-"serde_json:1.0.107" = { git = "https://github.com/serde-rs/json" }

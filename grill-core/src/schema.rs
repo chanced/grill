@@ -130,10 +130,10 @@ impl CompiledSchema {
             metaschema,
             parent,
             link,
+            anchors,
             subschemas: Vec::default(),
             dependents: Vec::default(),
             references: Vec::default(),
-            anchors: Vec::default(),
             keywords: Box::default(),
             compiled: false,
         }

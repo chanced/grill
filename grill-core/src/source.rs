@@ -260,10 +260,17 @@ impl Sources {
         to: AbsoluteUri,
         path: Pointer,
     ) -> Result<&Link, LinkError> {
+        if !from.starts_with("https://json") {
+            println!("LINKING from {from} TO {to}");
+        }
         let key = self
             .store_mut()
             .get_link(&to)
-            .ok_or_else(|| LinkError::NotFound(to.clone()))?
+            .ok_or_else(|| LinkError::NotFound(to.clone()))
+            .map_err(|err| {
+                println!("ERRRORRORORORROROROROROORRO");
+                err
+            })?
             .key;
         let link = Link::new(key, to, path.clone());
 
@@ -409,12 +416,11 @@ impl Sources {
         let src = self.store().get(link.key).clone();
 
         if uri.host().as_deref() != Some("json-schema.org") {
-            println!("---------------------------------------------------------------------");
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             println!(
                 "RESOLVING \n\tfragment: {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
-                
             );
-            println!("---------------------------------------------------------------------");
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
 
         // println!("{:#?}", self.sandbox.as_ref().unwrap().index);
@@ -436,7 +442,7 @@ impl Sources {
         let link = self.store().get_link(uri).unwrap();
         if uri.starts_with("!https://json-schema.org/draft/2020-12") {
             println!("CREATED\t{link:?}");
-            println!("---------------------------------------------------------------------");
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             println!(
                 "{:#?}",
                 self.sandbox
@@ -447,7 +453,7 @@ impl Sources {
                     .filter(|(_, v)| v.uri.host().as_deref() != Some("json-schema.org"))
                     .collect::<HashMap<_, _>>()
             );
-            println!("---------------------------------------------------------------------");
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
         Ok((link, src))
     }

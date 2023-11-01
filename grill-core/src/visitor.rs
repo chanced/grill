@@ -1,5 +1,3 @@
-use std::ops::ControlFlow;
-
 use crate::schema::Reference;
 use crate::Schema;
 /// This trait is used to walk a [`Schema`](grill_core::schema::Schema), its
@@ -34,13 +32,13 @@ struct X;
 impl<'i> Visitor<'i> for X {
     type Error = anyhow::Error;
 
-    fn visit_schema(&mut self, schema: Schema<'i>) -> Result<Option<&mut Self>, Self::Error> {
+    fn visit_schema(&mut self, _schema: Schema<'i>) -> Result<Option<&mut Self>, Self::Error> {
         anyhow::bail!("schema")
     }
 
     fn visit_reference(
         &mut self,
-        reference: &'i Reference,
+        _reference: &'i Reference,
     ) -> Result<Option<&mut Self>, Self::Error> {
         Ok(Some(self))
     }

@@ -1,6 +1,6 @@
 use std::fs;
 
-use grill::{AbsoluteUri, Interrogator, Key};
+use grill::{Interrogator, Key};
 
 use serde::Deserialize;
 use serde_json::Value;

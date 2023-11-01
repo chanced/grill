@@ -29,7 +29,7 @@ percent-encoding = { workspace = true }
 regex            = { workspace = true }
 reqwest          = { workspace = true, optional = true }
 serde            = { workspace = true }
-serde_json       = { version = "1.0.106", features = ["arbitrary_precision"] }
+serde_json       = { workspace = true, features = ["arbitrary_precision"] }
 serde_yaml       = { workspace = true, optional = true }
 slotmap          = { workspace = true }
 strum            = { workspace = true }
@@ -49,6 +49,3 @@ default = []
 http    = ["reqwest"]
 toml    = ["dep:toml"]
 yaml    = ["dep:serde_yaml"]
-
-[replace]
-"serde_json:1.0.106" = { git = "https://github.com/serde-rs/json" }

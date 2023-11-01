@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    hash::{BuildHasherDefault, Hasher},
+    hash::{BuildHasher, BuildHasherDefault, Hasher},
     sync::Arc,
 };
 
@@ -25,7 +25,7 @@ fn null() -> Arc<Value> {
     NULL.clone()
 }
 
-type Map<K, V> = HashMap<K, V, BuildHasherDefault<LenHasher>>;
+type Map<K, V> = HashMap<K, V, LenHasher>;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -255,11 +255,16 @@ impl Numbers {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct LenHasher(u64);
 impl Hasher for LenHasher {
-    fn write(&mut self, _: &[u8]) {
+    fn write(&mut self, bytes: &[u8]) {
+        println!("bytes: {bytes:?}");
         unreachable!();
+    }
+
+    fn write_usize(&mut self, i: usize) {
+        self.0 = i as u64;
     }
 
     #[inline]
@@ -272,9 +277,9 @@ impl Hasher for LenHasher {
         self.0
     }
 }
-// impl BuildHasher for LenHasher {
-//     type Hasher = Self;
-//     fn build_hasher(&self) -> Self::Hasher {
-//         self.clone()
-//     }
-// }
+impl BuildHasher for LenHasher {
+    type Hasher = Self;
+    fn build_hasher(&self) -> Self::Hasher {
+        Self(self.0)
+    }
+}

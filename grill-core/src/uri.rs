@@ -156,7 +156,7 @@
 pub use url;
 pub use urn;
 
-use percent_encoding::{percent_decode, AsciiSet, CONTROLS};
+use percent_encoding::percent_decode;
 
 mod encode;
 mod get;
