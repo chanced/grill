@@ -156,7 +156,7 @@
 pub use url;
 pub use urn;
 
-use percent_encoding::percent_decode;
+use percent_encoding::{percent_decode, AsciiSet, CONTROLS};
 
 mod encode;
 mod get;
@@ -164,7 +164,7 @@ mod parse;
 mod set;
 mod write;
 
-use crate::{error::UrnError, output::Annotation};
+use crate::error::UrnError;
 #[doc(no_inline)]
 pub use url::Url;
 #[doc(no_inline)]
@@ -670,6 +670,11 @@ impl AbsoluteUri {
             Self::Url(url) => url.fragment(),
             Self::Urn(urn) => urn.f_component(),
         }
+    }
+
+    #[must_use]
+    pub fn fragment_decoded_lossy(&self) -> Option<String> {
+        self.fragment().map(decode_lossy)
     }
 
     /// Percent encodes and sets the fragment component of the [`Url`] or
@@ -1540,16 +1545,8 @@ impl RelativeUri {
 
         if reference.path().is_empty() {
             let mut uri: Uri = self.clone().into();
-            if let Some(fragment) = reference.fragment() {
-                if !fragment.is_empty() {
-                    uri.set_fragment(Some(fragment))?;
-                }
-            }
-            if let Some(query) = reference.query() {
-                if !query.is_empty() {
-                    uri.set_query(Some(query))?;
-                }
-            }
+            uri.set_fragment(reference.fragment())?;
+            uri.set_query(reference.query())?;
             return Ok(uri);
         }
 
@@ -3350,6 +3347,21 @@ pub fn resolve(base: &str, path: &str) -> String {
     normalize(&buf).into_owned()
 }
 
+/// Percent decodes `value`
+pub fn decode(value: &str) -> Result<String, std::str::Utf8Error> {
+    Ok(percent_encoding::percent_decode_str(value)
+        .decode_utf8()?
+        .to_string())
+}
+
+/// Percent decodes `value` lossily
+#[must_use]
+pub fn decode_lossy(fragment: &str) -> String {
+    percent_encoding::percent_decode_str(fragment)
+        .decode_utf8_lossy()
+        .to_string()
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -3982,5 +3994,11 @@ mod tests {
         assert_eq!(uri.port(), None);
         assert_eq!(uri.query(), Some("tag=networking&order=newest"));
         assert_eq!(uri.fragment(), Some("top"));
+    }
+    #[test]
+    fn test_fragment_decoded_lossy() {
+        let uri = AbsoluteUri::parse("https://example.com/#/patternProperties/^%C3%A1").unwrap();
+        println!("{uri}");
+        println!("{:?}", uri.fragment_decoded_lossy());
     }
 }

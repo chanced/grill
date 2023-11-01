@@ -93,3 +93,42 @@ impl Keyword for Anchor {
 }
 
 static_pointer_fn!(pub anchor "/$anchor");
+
+#[cfg(test)]
+mod tests {
+    use grill_core::Interrogator;
+    use serde_json::json;
+
+    use crate::JsonSchema;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_setup() {
+        let interrogator = Interrogator::build()
+            .json_schema_2020_12()
+            .source_owned_value(
+                "https://example.com/schema",
+                json!({
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "http://localhost:1234/draft2020-12/root",
+                    "$ref": "http://localhost:1234/draft2020-12/nested.json#foo",
+                    "$defs": {
+                        "A": {
+                            "$id": "nested.json",
+                            "$defs": {
+                                "B": {
+                                    "$anchor": "foo",
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                }),
+            )
+            .precompile(["https://example.com/schema"])
+            .finish()
+            .await
+            .unwrap();
+    }
+}

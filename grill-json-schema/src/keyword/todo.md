@@ -21,7 +21,7 @@
 -   [x] patternProperties
 -   [x] writeOnly
 -   [x] readOnly
--   [ ] additionalProperties
+-   [x] additionalProperties
 -   [ ] dependentSchemas
 -   [ ] propertyNames
 -   [ ] items

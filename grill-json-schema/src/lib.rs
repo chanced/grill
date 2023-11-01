@@ -21,8 +21,6 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
-
-pub mod keyword;
 /// [Draft 04](https://json-schema.org/specification-links#draft-4) implementation.
 pub mod draft_04;
 /// [Draft 07](https://json-schema.org/specification-links#draft-7) implementation.
@@ -31,8 +29,7 @@ pub mod draft_07;
 pub mod draft_2019_09;
 /// [Draft 2020-12](https://json-schema.org/specification-links#2020-12) implementation.
 pub mod draft_2020_12;
-
-
+pub mod keyword;
 
 /// A trait for adding JSON Schema dialect methods to a [`Build`](grill_core::Build).
 pub trait JsonSchema: Sized {
@@ -74,7 +71,7 @@ impl JsonSchema for grill_core::Build {
 /// Generates two `fn`s: one which returns the static
 /// [`AbsoluteUri`](grill::uri::AbsoluteUri) and another that returns the static
 /// `Value`
-/// 
+///
 /// # Example
 /// ```
 /// # use grill_macros::metaschema;
@@ -87,9 +84,9 @@ impl JsonSchema for grill_core::Build {
 ///             "https://json-schema.org/draft/2020-12/vocab/content": true
 ///         },
 ///         "$dynamicAnchor": "meta",
-/// 
+///
 ///         "title": "Content vocabulary meta-schema",
-/// 
+///
 ///         "type": ["object", "boolean"],
 ///         "properties": {
 ///             "contentEncoding": { "type": "string" },

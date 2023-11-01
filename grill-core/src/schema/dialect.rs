@@ -156,6 +156,9 @@ impl Dialect {
         for uri in secondary_uris {
             uris.push(base_uri.resolve(&uri)?);
         }
+        if let Some(primary) = primary.clone() {
+            uris.push(primary);
+        }
         Ok((primary, uris))
     }
 

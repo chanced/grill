@@ -3,7 +3,6 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-
 #![warn(missing_docs)]
 #![allow(
     clippy::module_name_repetitions,
@@ -18,7 +17,6 @@
     clippy::module_inception
 )]
 #![cfg_attr(test, allow(clippy::too_many_lines))]
-
 
 pub mod error;
 
@@ -45,19 +43,17 @@ pub mod anymap;
 #[cfg(test)]
 pub mod test;
 
-use std::{any, borrow::Cow, fmt::Debug, ops::Deref, collections::HashSet};
+use std::{any, borrow::Cow, collections::HashSet, fmt::Debug, ops::Deref};
 
 use jsonptr::Pointer;
-use serde_json::{Value, Number};
+use serde_json::{Number, Value};
 
 use crate::{
     error::{
         BuildError, CompileError, DeserializeError, EvaluateError, SourceError, UnknownKeyError,
         UriError,
     },
-    keyword::{
-        cache::{Numbers, Values},
-    },
+    keyword::cache::{Numbers, Values},
     schema::{
         compiler::Compiler,
         iter::{Iter, IterUnchecked},
@@ -65,7 +61,7 @@ use crate::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
         },
-        Dialect, Dialects,  Schemas,
+        Dialect, Dialects, Schemas,
     },
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
@@ -113,8 +109,6 @@ macro_rules! json_pretty_str {
     };
 }
 
-
-
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
 pub struct Build {
@@ -125,7 +119,7 @@ pub struct Build {
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     state: AnyMap,
-    numbers: Vec<Number>
+    numbers: Vec<Number>,
 }
 
 enum PendingSrc {
@@ -482,13 +476,12 @@ impl Build {
             default_dialect_idx,
             state,
             precompile,
-            numbers
+            numbers,
         } = self;
         let default_dialect_id = default_dialect_idx
             .as_ref()
             .map(|idx| dialects[*idx].id().clone());
         let dialects = Dialects::new(dialects, default_dialect_id)?;
-
 
         let deserializers = Deserializers::new(deserializers);
         let sources = Sources::new(srcs(dialects.sources(), pending_srcs)?, &deserializers)?;
@@ -498,7 +491,7 @@ impl Build {
         let precompile: Result<Vec<AbsoluteUri>, UriError> = precompile.into_iter().collect();
         let precompile = precompile.map_err(SourceError::UriFailedToParse)?;
 
-        let dialect_ids:Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
+        let dialect_ids: Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
 
         let mut interrogator = Interrogator {
             dialects,
@@ -841,7 +834,10 @@ impl Interrogator {
         }
     }
 
-    async fn compile_dialects_schemas(&mut self, uris: Vec<AbsoluteUri>) -> Result<(), CompileError>  {
+    async fn compile_dialects_schemas(
+        &mut self,
+        uris: Vec<AbsoluteUri>,
+    ) -> Result<(), CompileError> {
         let uris = uris.into_iter();
         self.start_txn();
         match Compiler::new(self, false).compile_all(uris).await {
@@ -881,7 +877,11 @@ impl Interrogator {
         self.iter(keys).unchecked()
     }
 
-    async fn compile_schema(&mut self, uri: AbsoluteUri, validate: bool) -> Result<Key, CompileError> {
+    async fn compile_schema(
+        &mut self,
+        uri: AbsoluteUri,
+        validate: bool,
+    ) -> Result<Key, CompileError> {
         Compiler::new(self, validate).compile(uri).await
     }
 
@@ -1051,6 +1051,22 @@ impl Interrogator {
         source: Cow<'static, Value>,
     ) -> Result<&Value, SourceError> {
         self.source(Src::Value(uri.try_into_absolute_uri()?, source))
+    }
+
+    pub fn source_owned_value(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: Value,
+    ) -> Result<&Value, SourceError> {
+        self.source_value(uri, Cow::Owned(source))
+    }
+
+    pub fn source_static_value(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+        source: &'static Value,
+    ) -> Result<&Value, SourceError> {
+        self.source_value(uri, Cow::Borrowed(source))
     }
 
     /// Adds a set of source schemas from an [`Iterator`] of
@@ -1227,8 +1243,6 @@ impl Interrogator {
         self.schemas.rollback_txn();
         self.sources.rollback_txn();
     }
-
-
 
     // /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
     // fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>

@@ -5,6 +5,7 @@ use crate::{
         DeserializationError, DeserializeError, LinkConflictError, LinkError, PointerError,
         ResolveError, ResolveErrors, SourceConflictError, SourceError,
     },
+    uri::decode_lossy,
     AbsoluteUri,
 };
 use async_trait::async_trait;
@@ -123,6 +124,7 @@ impl Store {
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+        let fragment = decode_lossy(&fragment);
         let key = self.table.insert(src);
         let src = self.table.get(key).unwrap().clone();
         self.index.insert(
@@ -130,13 +132,22 @@ impl Store {
             Link::new(key, base_uri.clone(), Pointer::default()),
         );
         let link = self.index.get(&base_uri).unwrap().clone();
-        if fragment.trim().is_empty() {
+        if fragment.is_empty() {
             return Ok((key, link, src));
         }
         if fragment.starts_with('/') {
             let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
             self.index
                 .insert(uri.clone(), Link::new(key, uri.clone(), ptr.clone()));
+
+            if uri == "http://localhost:1234/draft2020-12/nested.json#/$defs/A/$defs/B" {
+                println!(
+                    "INSERTING {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
+                    
+                );
+                println!("{:#?}", self.index);
+            }
+
             let key = self.index.get(&uri).unwrap().key;
             let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
             return Ok((key, link, Cow::Owned(src)));
@@ -149,10 +160,12 @@ impl Store {
         uri: AbsoluteUri,
         src: Cow<'static, Value>,
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
-        let fragment = uri.fragment().unwrap_or_default();
-        if !fragment.trim().is_empty() {
+        let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
+
+        if !fragment.is_empty() {
             return Err(SourceError::UnexpectedUriFragment(uri.clone()));
         }
+
         match self.index.entry(uri.clone()) {
             Entry::Occupied(_) => self.check_and_get_occupied(uri, src),
             Entry::Vacant(_) => self.insert_vacant(uri, src),
@@ -309,7 +322,7 @@ impl Sources {
     }
 
     pub(crate) fn get(&self, key: SourceKey) -> &Value {
-        self.store.get(key)
+        self.store().get(key)
     }
 
     // #[must_use]
@@ -362,11 +375,8 @@ impl Sources {
         }
     }
 
-    fn sandbox(&mut self) -> &mut Store {
-        self.sandbox.as_mut().expect(SANDBOX_ERR)
-    }
     fn store_mut(&mut self) -> &mut Store {
-        self.sandbox()
+        self.sandbox.as_mut().expect(SANDBOX_ERR)
     }
     fn store(&self) -> &Store {
         if let Some(sandbox) = self.sandbox.as_ref() {
@@ -383,25 +393,62 @@ impl Sources {
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
         let link = if let Some(link) = self.store().get_link(base_uri) {
+            if uri.starts_with("!https://json-schema.org/draft/2020-12"){
+            println!(
+                    "resolving internal link for:\n\turi: {uri}\n\tbase_uri:{base_uri}\n\tfragment:{fragment}\n\n",
+            );
+        }
             link
-        } else {
+        }                else {
             let (link, _) = self
                 .resolve_external(uri, base_uri, fragment, resolvers, deserializers)
                 .await?;
             link
         }
         .clone();
-
         let src = self.store().get(link.key).clone();
-        let ptr = Pointer::parse(fragment)?;
-        ptr.resolve(&src).map_err(PointerError::from)?;
-        self.create_link(uri.clone(), Link::new(link.key, uri.clone(), ptr.clone()))?;
+
+        if uri.host().as_deref() != Some("json-schema.org") {
+            println!("---------------------------------------------------------------------");
+            println!(
+                "RESOLVING \n\tfragment: {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
+                
+            );
+            println!("---------------------------------------------------------------------");
+        }
+
+        // println!("{:#?}", self.sandbox.as_ref().unwrap().index);
+        let fragment = Pointer::parse(fragment)?;
+        let mut path = link.path.clone();
+        path.append(&fragment);
+
+        let src = path.resolve(&src).map_err(PointerError::from)?;
+        if uri.starts_with("!https://json-schema.org/draft/2020-12") {
+            println!("CREATING LINK FOR {uri}\n\turi:\t\t{uri}\n\tbase_uri:\t{base_uri}\n\tfragment:\t{fragment}\n\tsrc:\t\t{src}\n\n",);
+        }
+
+        self.create_link(uri.clone(), Link::new(link.key, uri.clone(), path.clone()))?;
         let src = self
             .store()
             .get(link.key)
-            .resolve(&ptr)
+            .resolve(&path)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(uri).unwrap();
+        if uri.starts_with("!https://json-schema.org/draft/2020-12") {
+            println!("CREATED\t{link:?}");
+            println!("---------------------------------------------------------------------");
+            println!(
+                "{:#?}",
+                self.sandbox
+                    .as_ref()
+                    .unwrap()
+                    .index
+                    .iter()
+                    .filter(|(_, v)| v.uri.host().as_deref() != Some("json-schema.org"))
+                    .collect::<HashMap<_, _>>()
+            );
+            println!("---------------------------------------------------------------------");
+        }
         Ok((link, src))
     }
 
@@ -413,6 +460,7 @@ impl Sources {
     ) -> Result<(&Link, &Value), SourceError> {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
+        let fragment = decode_lossy(&fragment);
         if fragment.starts_with('/') {
             self.resolve_ptr(uri, &base_uri, &fragment, resolvers, deserializers)
                 .await

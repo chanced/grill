@@ -11,6 +11,7 @@ use crate::{
     output::{self, Annotation, AnnotationOrError, BoxedError, Translator},
     schema::{Anchor, Identifier, Ref, Schemas},
     source::Sources,
+    uri::{decode, decode_lossy},
     AbsoluteUri, Key, Output, Schema, Structure, Uri,
 };
 use dyn_clone::{clone_trait_object, DynClone};
@@ -216,7 +217,7 @@ impl<'i> Compile<'i> {
     pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
         let mut uri = self.absolute_uri().clone();
 
-        if let Some(fragment) = uri.fragment() {
+        if let Some(fragment) = uri.fragment_decoded_lossy() {
             let mut ptr = fragment.parse::<Pointer>()?;
             ptr.append(path);
             uri.set_fragment(Some(&ptr))?;
@@ -415,7 +416,7 @@ impl<'s> Context<'s> {
             let tok: Token = keyword.into();
             keyword_location.push_back(tok.clone());
             if let Ok(mut ptr) = absolute_keyword_location
-                .fragment()
+                .fragment_decoded_lossy()
                 .unwrap_or_default()
                 .parse::<Pointer>()
             {

@@ -13,7 +13,7 @@ use crate::{
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Structure,
+    AbsoluteUri, Interrogator, Key, Schema, Structure,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
@@ -26,6 +26,7 @@ struct RefToResolve {
 
 /// A pending schema to compile
 struct SchemaToCompile {
+    key: Option<Key>,
     uri: AbsoluteUri,
     path: Option<Pointer>,
     parent: Option<Key>,
@@ -64,7 +65,9 @@ impl<'i> Compiler<'i> {
     }
     pub(crate) async fn compile(mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
         let mut q = VecDeque::new();
+
         q.push_front(SchemaToCompile {
+            key: None,
             uri: uri.clone(),
             parent: None,
             path: None,
@@ -90,7 +93,13 @@ impl<'i> Compiler<'i> {
             .collect::<Result<Vec<_>, _>>()?;
         let mut q = VecDeque::default();
         for uri in &uris {
+            if uri == " http://localhost:1234/draft2020-12/root#/$defs/B" {
+                println!("!!!!!!!!F OUND IT");
+                dbg!(&uri);
+            }
+
             q.push_back(SchemaToCompile {
+                key: None,
                 uri: uri.clone(),
                 path: None,
                 parent: None,
@@ -129,6 +138,7 @@ impl<'i> Compiler<'i> {
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), (bool, CompileError)> {
         let SchemaToCompile {
+            key,
             uri,
             mut path,
             mut parent,
@@ -136,14 +146,27 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
+        if let Some(host) = uri.host() {
+            if host != "json-schema.org" {
+                println!("  - compiling {uri}");
+            }
+        }
 
+        if uri == "http://localhost:1234/draft2020-12/root#/$defs/A" {
+            println!("  - target");
+        }
         let (link, src) = self
             .source(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+
+        if uri.starts_with("http://localhost:1234/draft2020-12") {
+            // println!("{}", &src);
+        }
+
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
-        if let Some(key) = self.schemas.get_key(&uri) {
+        if let Some(key) = key.or(self.schemas.get_key(&uri)) {
             let path = self
                 .schemas
                 .get(key, self.sources)
@@ -151,25 +174,20 @@ impl<'i> Compiler<'i> {
                 .path
                 .clone()
                 .into_owned();
-            let ready = self
-                .queue_refs_and_subschemas(key, &uri, &path, default_dialect_idx, &src, q)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-            if !ready {
-                // kicking resolve_ref and setup_keywords down the road until all
-                // subschemas are compiled and refs are resolved
-                q.push_back(SchemaToCompile {
-                    uri,
-                    path: Some(path.clone()),
+            return self
+                .maybe_finalize(
+                    key,
+                    &uri,
+                    path,
+                    &src,
+                    dialect_idx,
                     parent,
-                    default_dialect_idx,
-                    continue_on_err: false,
-                    ref_: ref_.clone(),
-                });
-                return Ok(());
-            }
-
-            return self.finalize(key, &uri, dialect_idx, ref_, continue_on_err);
+                    ref_,
+                    continue_on_err,
+                    q,
+                )
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri));
         }
 
         self.validate(dialect_idx, &src)
@@ -178,13 +196,21 @@ impl<'i> Compiler<'i> {
         let (uri, id, mut uris) = identify(&link, &src, &self.dialects[dialect_idx])
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-        let schema_to_compile = || SchemaToCompile {
-            uri: uri.clone(),
-            path: path.clone(),
-            parent,
-            default_dialect_idx,
-            continue_on_err,
-            ref_: ref_.clone(),
+        let schema_to_compile = || {
+            if uri == " http://localhost:1234/draft2020-12/root#/$defs/B" {
+                println!("!!!!!!!!F OUND IT");
+                dbg!(&uri);
+            }
+
+            SchemaToCompile {
+                key: None,
+                uri: uri.clone(),
+                path: path.clone(),
+                parent,
+                default_dialect_idx,
+                continue_on_err,
+                ref_: ref_.clone(),
+            }
         };
         if id.is_some() {
             path = Some(Pointer::default());
@@ -210,6 +236,13 @@ impl<'i> Compiler<'i> {
         add_uris_from_anchors(&uri, &mut uris, &anchors)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
+        if uris
+            .iter()
+            .any(|uri| uri == "http://localhost:1234/draft2020-12/root#/$defs/B")
+        {
+            println!("!!!!!!!!!!!!!!!!!!!!!!!!\n{uris:#?}");
+        }
+
         self.sources
             .link_all(id.as_ref(), &uris, &link)
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
@@ -229,30 +262,18 @@ impl<'i> Compiler<'i> {
             ))
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
-        let ready = self
-            .queue_refs_and_subschemas(key, &uri, &path, default_dialect_idx, &src, q)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        if !ready {
-            q.push_back(SchemaToCompile {
-                uri: uri.clone(),
-                path: Some(path.clone()),
-                parent,
-                default_dialect_idx,
-                continue_on_err: false,
-                ref_,
-            });
-            return Ok(());
-        }
-
-        if let Some(ref_) = ref_ {
-            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        }
-
-        self.setup_keywords(key, &self.dialects[dialect_idx])
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-        Ok(())
+        self.maybe_finalize(
+            key,
+            &uri,
+            path,
+            &src,
+            dialect_idx,
+            parent,
+            ref_,
+            continue_on_err,
+            q,
+        )
+        .map_err(|err| self.handle_err(err, continue_on_err, &uri))
     }
 
     fn handle_err(
@@ -278,44 +299,54 @@ impl<'i> Compiler<'i> {
         }
     }
 
-    fn finalize(
+    fn maybe_finalize(
         &mut self,
         key: Key,
         uri: &AbsoluteUri,
+        path: Pointer,
+        src: &Value,
         dialect_idx: usize,
+        parent: Option<Key>,
         ref_: Option<RefToResolve>,
         continue_on_err: bool,
-    ) -> Result<(), (bool, CompileError)> {
-        if let Some(ref_) = ref_ {
-            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)
-                .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
-        }
-        if !self.schemas.has_keywords(key) {
-            self.setup_keywords(key, &self.dialects[dialect_idx])
-                .map_err(|err| self.handle_err(err, continue_on_err, uri))?;
-        }
-        self.schemas.set_compiled(key);
-        Ok(())
-    }
-
-    /// returns `true` if this schema is ready for finalization
-    fn queue_refs_and_subschemas(
-        &mut self,
-        key: Key,
-        uri: &AbsoluteUri,
-        path: &Pointer,
-        default_dialect_idx: usize,
-        src: &Value,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<bool, CompileError> {
-        let has_subschemas = self.queue_subschemas(key, uri, path, default_dialect_idx, src, q)?;
-        let has_refs = self.queue_refs(key, default_dialect_idx, src, q)?;
-        if has_subschemas || has_refs {
+    ) -> Result<(), CompileError> {
+        if self.schemas.is_compiled(key) {
+            return Ok(());
+        }
+        let kick_back = |q: &mut VecDeque<SchemaToCompile>| {
             // kicking resolve_ref and setup_keywords down the road until all
             // subschemas are compiled and refs are resolved
-            return Ok(false);
+            if uri == "http://localhost:1234/draft2020-12/root#/$defs/B" {
+                println!("!!!!!!!!!!!!!!!!!!!!!!!!\n{uri}");
+            }
+            q.push_back(SchemaToCompile {
+                key: Some(key),
+                uri: uri.clone(),
+                path: Some(path.clone()),
+                parent,
+                default_dialect_idx: dialect_idx,
+                continue_on_err,
+                ref_: ref_.clone(),
+            });
+            Ok(())
+        };
+
+        if self.queue_subschemas(key, uri, &path, dialect_idx, src, q)? {
+            return kick_back(q);
         }
-        Ok(true)
+        if self.queue_refs(key, dialect_idx, src, q)? {
+            return kick_back(q);
+        }
+        if !self.schemas.has_keywords(key) {
+            self.setup_keywords(key, &self.dialects[dialect_idx])?;
+        }
+        if let Some(ref_) = ref_ {
+            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)?;
+        }
+        self.setup_keywords(key, &self.dialects[dialect_idx])?;
+        self.schemas.set_compiled(key);
+        Ok(())
     }
 
     fn queue_pathed(
@@ -339,7 +370,7 @@ impl<'i> Compiler<'i> {
     ) -> Result<(), (bool, CompileError)> {
         let mut root_uri = s.uri.clone();
         root_uri.set_fragment(None).unwrap();
-        let anchor = s.uri.fragment().unwrap_or_default();
+        let anchor = s.uri.fragment_decoded_lossy().unwrap_or_default();
 
         // if the root uri is indexed and this schema was not found by now then
         // the anchor is unknown
@@ -361,6 +392,7 @@ impl<'i> Compiler<'i> {
         //
         // if the anchor is not found then an error should be raised.
         q.push_front(SchemaToCompile {
+            key: None,
             uri: root_uri,
             path: Some(Pointer::default()),
             parent: None,
@@ -454,6 +486,7 @@ impl<'i> Compiler<'i> {
             } else {
                 has_unresolved_refs = true;
                 q.push_front(SchemaToCompile {
+                    key: None,
                     uri: ref_uri,
                     path: None,
                     parent: None,
@@ -492,9 +525,10 @@ impl<'i> Compiler<'i> {
             } else {
                 uri.set_fragment(Some(&subschema_path))?;
             }
-            if !self.schemas.contains_uri(&uri) {
+            if !self.schemas.is_compiled_by_uri(&uri) {
                 has_subschemas = true;
                 q.push_front(SchemaToCompile {
+                    key: None,
                     uri,
                     path: Some(subschema_path),
                     parent: Some(key),
@@ -512,9 +546,10 @@ impl<'i> Compiler<'i> {
         target_uri: &AbsoluteUri,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), CompileError> {
-        let mut path = Pointer::parse(target_uri.fragment().unwrap())
+        let mut path = Pointer::parse(&target_uri.fragment_decoded_lossy().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
         q.push_front(SchemaToCompile {
+            key: None,
             uri: target_uri.clone(),
             path: Some(path.clone()),
             parent: None,
@@ -537,6 +572,7 @@ impl<'i> Compiler<'i> {
                 continue;
             }
             q.push_front(SchemaToCompile {
+                key: None,
                 uri,
                 path: Some(path.clone()),
                 parent: None,
@@ -554,6 +590,7 @@ impl<'i> Compiler<'i> {
 
         q.push_front(SchemaToCompile {
             uri,
+            key: None,
             path: None,
             parent: None,
             default_dialect_idx: self.dialects.default_index(),
@@ -600,10 +637,10 @@ impl<'i> Compiler<'i> {
         let parent = self.schemas.get_compiled(parent).unwrap();
         #[allow(clippy::explicit_iter_loop)]
         for uri in parent.uris.iter() {
-            let fragment = uri.fragment().unwrap_or_default();
+            let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
             if fragment.is_empty() || fragment.starts_with('/') {
                 let mut uri = uri.clone();
-                let mut uri_path = Pointer::parse(fragment)
+                let mut uri_path = Pointer::parse(&fragment)
                     .map_err(|e| CompileError::FailedToParsePointer(e.into()))?;
                 uri_path.append(path);
                 uri.set_fragment(Some(&uri_path))?;
@@ -662,7 +699,7 @@ fn add_uris_from_anchors(
 fn is_anchored(uri: &AbsoluteUri) -> bool {
     // if the schema is anchored (i.e. has a non json ptr fragment) then
     // compile the root (non-fragmented uri) and attempt to locate the anchor.
-    let fragment = uri.fragment().unwrap_or_default().trim();
+    let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
     !fragment.is_empty() && !fragment.starts_with('/')
 }
 
