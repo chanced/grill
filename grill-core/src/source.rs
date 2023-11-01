@@ -143,7 +143,7 @@ impl Store {
             if uri == "http://localhost:1234/draft2020-12/nested.json#/$defs/A/$defs/B" {
                 println!(
                     "INSERTING {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
-                    
+
                 );
                 println!("{:#?}", self.index);
             }
