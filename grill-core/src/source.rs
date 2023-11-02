@@ -99,9 +99,9 @@ impl Deref for Source<'_> {
 }
 
 #[derive(Clone, Debug, Default)]
-struct Store {
+pub(crate) struct Store {
     table: SlotMap<SourceKey, Cow<'static, Value>>,
-    index: HashMap<AbsoluteUri, Link>,
+    pub(crate) index: HashMap<AbsoluteUri, Link>,
 }
 impl Store {
     fn check_and_get_occupied(
@@ -205,7 +205,7 @@ impl Store {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Sources {
     store: Store,
-    sandbox: Option<Store>,
+    pub(crate) sandbox: Option<Store>,
 }
 
 impl Sources {
@@ -261,7 +261,7 @@ impl Sources {
         path: Pointer,
     ) -> Result<&Link, LinkError> {
         if !from.starts_with("https://json") {
-            println!("LINKING from {from} TO {to}");
+            println!("LINK\t{from} -> {to}");
         }
         let key = self
             .store_mut()

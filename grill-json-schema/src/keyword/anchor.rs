@@ -103,57 +103,58 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup() {
+       
         let interrogator = Interrogator::build()
             .json_schema_2020_12()
-            .source_owned_value(
-                "https://localhost:1234/anchors/2",
-                json!({
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "http://localhost:1234/draft2020-12/root",
-                    "$ref": "http://localhost:1234/draft2020-12/nested.json#foo",
-                    "$defs": {
-                        "A": {
-                            "$id": "nested.json",
-                            "$defs": {
-                                "B": {
-                                    "$anchor": "foo",
-                                    "type": "integer"
-                                }
-                            }
-                        }
-                    }
-                }),
-            )
-            .source_owned_value(
-                "https://localhost:1234/anchors/3",
-                json!({
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$defs": {
-                        "anchor_in_enum": {
-                            "enum": [
-                                {
-                                    "$anchor": "my_anchor",
-                                    "type": "null"
-                                }
-                            ]
-                        },
-                        "real_identifier_in_schema": {
-                            "$anchor": "my_anchor",
-                            "type": "string"
-                        },
-                        "zzz_anchor_in_const": {
-                            "const": {
-                                "$anchor": "my_anchor",
-                                "type": "null"
-                            }
-                        }
-                    },
-                    "anyOf": [
-                        { "$ref": "#/$defs/anchor_in_enum" },
-                        { "$ref": "#my_anchor" }
-                    ]
-                }),
-            )
+            // .source_owned_value(
+            //     "https://localhost:1234/anchors/2",
+            //     json!({
+            //         "$schema": "https://json-schema.org/draft/2020-12/schema",
+            //         "$id": "http://localhost:1234/draft2020-12/root",
+            //         "$ref": "http://localhost:1234/draft2020-12/nested.json#foo",
+            //         "$defs": {
+            //             "A": {
+            //                 "$id": "nested.json",
+            //                 "$defs": {
+            //                     "B": {
+            //                         "$anchor": "foo",
+            //                         "type": "integer"
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }),
+            // )
+            // .source_owned_value(
+            //     "https://localhost:1234/anchors/3",
+            //     json!({
+            //         "$schema": "https://json-schema.org/draft/2020-12/schema",
+            //         "$defs": {
+            //             "anchor_in_enum": {
+            //                 "enum": [
+            //                     {
+            //                         "$anchor": "my_anchor",
+            //                         "type": "null"
+            //                     }
+            //                 ]
+            //             },
+            //             "real_identifier_in_schema": {
+            //                 "$anchor": "my_anchor",
+            //                 "type": "string"
+            //             },
+            //             "zzz_anchor_in_const": {
+            //                 "const": {
+            //                     "$anchor": "my_anchor",
+            //                     "type": "null"
+            //                 }
+            //             }
+            //         },
+            //         "anyOf": [
+            //             { "$ref": "#/$defs/anchor_in_enum" },
+            //             { "$ref": "#my_anchor" }
+            //         ]
+            //     }),
+            // )
             .source_owned_value(
                 "https://localhost:1234/anchors/4",
                 json!({

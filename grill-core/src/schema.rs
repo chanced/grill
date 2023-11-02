@@ -469,6 +469,11 @@ impl Schemas {
     pub(crate) fn has_keywords(&self, key: Key) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
+
+    pub(crate) fn has_keywords_by_uri(&self, uri: &AbsoluteUri) -> bool {
+        self.get_key(uri)
+            .map_or(false, |key| self.has_keywords(key))
+    }
     pub(crate) fn get_uri(&mut self, key: Key) -> Option<&AbsoluteUri> {
         self.store()
             .index
@@ -489,8 +494,8 @@ impl Schemas {
         }
         &self.store
     }
-    pub(crate) fn get_key(&self, id: &AbsoluteUri) -> Option<Key> {
-        self.store().get_index(id)
+    pub(crate) fn get_key(&self, uri: &AbsoluteUri) -> Option<Key> {
+        self.store().get_index(uri)
     }
     // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
     //     self.sandbox().index_entry(id)

@@ -138,6 +138,35 @@ impl<'i> Compiler<'i> {
         schema_to_compile: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), (bool, CompileError)> {
+        println!("##############################################################################################################");
+        println!("COMPILE SCHEMA");
+        dbg!(&schema_to_compile.uri);
+        println!(
+            "{}",
+            self.sources
+                .sandbox
+                .as_ref()
+                .unwrap()
+                .index
+                .iter()
+                .filter(|(k, _)| !k.starts_with("https://json"))
+                .map(|(k, v)| format!("\n{k}: {v:#?}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        // println!("##############################################################################################################");
+        // println!("##############################################################################################################");
+        // println!(
+        //     "{}",
+        //     q.iter()
+        //         .map(|v| v.uri.to_string())
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
+        // println!("##############################################################################################################");
+        // println!("##############################################################################################################");
+        // println!("##############################################################################################################");
+
         let SchemaToCompile {
             key,
             uri,
@@ -147,29 +176,11 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
-        if let Some(host) = uri.host() {
-            if host != "json-schema.org" {
-                println!("  - compiling {uri}");
-                println!(
-                    "q:\n{:?}",
-                    q.iter()
-                        .map(|s| (
-                            s.uri.to_string(),
-                            s.path.clone().unwrap_or_default().to_string()
-                        ))
-                        .collect::<Vec<_>>()
-                );
-            }
-        }
 
         let (link, src) = self
             .source(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
-
-        if uri.starts_with("http://localhost:1234/draft2020-12") {
-            // println!("{}", &src);
-        }
 
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
 
@@ -313,23 +324,33 @@ impl<'i> Compiler<'i> {
         continue_on_err: bool,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), CompileError> {
+        let src_str = serde_json::to_string_pretty(src).unwrap();
         if !uri.starts_with("https://json-schema") {
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             println!("MAYBE FINALIZE");
             println!("uri: {uri}");
             println!("path: \"{path}\"");
-            println!("src: {src}");
+            println!("{src_str}");
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
 
         if self.schemas.is_compiled(key) {
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            println!("ALREADY FINALIZED");
+            println!("uri: {uri}");
+            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             return Ok(());
         }
         let kick_back = |q: &mut VecDeque<SchemaToCompile>| {
             // kicking resolve_ref and setup_keywords down the road until all
             // subschemas are compiled and refs are resolved
-            if uri == "http://localhost:1234/draft2020-12/root#/$defs/B" {
-                println!("!!!!!!!!!!!!!!!!!!!!!!!!\n{uri}");
+            if !uri.starts_with("https://json") {
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                println!("KICK BACK");
+                dbg!(&uri);
+                dbg!(&path);
+                println!("{src_str}");
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             }
             q.push_back(SchemaToCompile {
                 key: Some(key),
@@ -343,31 +364,51 @@ impl<'i> Compiler<'i> {
             Ok(())
         };
 
-        if uri.starts_with("http://localhost:1234/draft2020-12") {
+        // if !uri.starts_with("https://json") {
+        //     println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        //     println!("QUEUING SUBSCHEMAS");
+        //     println!("uri:\t{uri}");
+        //     println!("path:\t{path}");
+        //     println!("src:\t{src_str}");
+        //     println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        // }
+
+        if self.queue_subschemas(key, uri, &path, dialect_idx, src, q)? {
+            println!("++++ SUBSCHEMAS KICKBACK");
+            return kick_back(q);
+        }
+        if !uri.starts_with("https://json") {
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-            println!("QUEUING SUBSCHEMAS");
+            println!("QUEUING REFS");
             println!("uri:\t{uri}");
             println!("path:\t{path}");
-            println!("src:\t{src}");
+            println!("src:\t{src_str}");
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
 
-        if self.queue_subschemas(key, uri, &path, dialect_idx, src, q)? {
-            return kick_back(q);
-        }
-        if uri.starts_with("http://localhost:1234/draft2020-12") {
-            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        }
         if self.queue_refs(key, dialect_idx, src, q)? {
+            println!("++++ REFS KICKBACK");
             return kick_back(q);
         }
+
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        println!("CHECKING KEYWORDS");
+
         if !self.schemas.has_keywords(key) {
+            println!("SETUP KEYWORDS");
             self.setup_keywords(key, &self.dialects[dialect_idx])?;
         }
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        println!("CHECKING REF");
+
         if let Some(ref_) = ref_ {
             self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)?;
         }
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        println!("SETTING COMPILED");
+        dbg!(uri);
         self.schemas.set_compiled(key);
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         Ok(())
     }
 
@@ -426,6 +467,11 @@ impl<'i> Compiler<'i> {
     }
 
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        println!("SETUP KEYWORDS");
+        println!("key:\t{key:?}");
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
             let mut keywords = Vec::new();
@@ -454,6 +500,13 @@ impl<'i> Compiler<'i> {
         referenced_uri: AbsoluteUri,
         ref_: Ref,
     ) -> Result<(), CompileError> {
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        println!("RESOLVE REF");
+        dbg!(&ref_);
+        dbg!(referrer_key);
+        dbg!(referenced_key);
+        dbg!(&referenced_uri);
+        println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         self.add_reference(referrer_key, referenced_key, referenced_uri, ref_)?;
         self.schemas.add_dependent(referenced_key, referrer_key);
         Ok(())
@@ -541,12 +594,13 @@ impl<'i> Compiler<'i> {
         src: &Value,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<bool, CompileError> {
+        let src_str = serde_json::to_string_pretty(src).unwrap();
         if !uri.starts_with("https://json") {
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             println!("QUEUE SUBSCHEMAS");
             dbg!(&uri);
             dbg!(path);
-            dbg!(src);
+            println!("{src_str}");
             println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
         let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
@@ -565,20 +619,22 @@ impl<'i> Compiler<'i> {
             } else {
                 uri.set_fragment(Some(&subschema_path))?;
             }
-            if uri == "http://localhost:1234/draft2020-12/root#/$defs/B" {
-                println!("!!!!!!!!FOUND IT");
+            if !uri.starts_with("https://json") {
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                println!("SUBSCHEMA");
                 dbg!(&uri);
                 dbg!(&path);
-                dbg!(src);
+                dbg!(&subschema_path);
             }
-            if !self.schemas.is_compiled_by_uri(&uri) {
+            if !self.schemas.has_keywords_by_uri(&uri) {
                 has_subschemas = true;
                 // if q.iter()
                 //     .any(|s| s.uri == uri && s.path.as_ref() == Some(&subschema_path))
                 // {
                 //     continue;
                 // }
-                q.push_front(SchemaToCompile {
+
+                let subschema = SchemaToCompile {
                     key: None,
                     uri,
                     path: Some(subschema_path.clone()),
@@ -586,7 +642,16 @@ impl<'i> Compiler<'i> {
                     default_dialect_idx: dialect_idx,
                     continue_on_err: false,
                     ref_: None,
-                });
+                };
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                println!("QUEUING SUBSCEHMA");
+                dbg!(&subschema);
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                q.push_front(subschema);
+            } else if !uri.starts_with("https://json") {
+                println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                println!("HAS KEYWORDS");
+                dbg!(&uri);
             }
         }
         Ok(has_subschemas)
@@ -661,9 +726,9 @@ impl<'i> Compiler<'i> {
             .sources
             .resolve_link(uri.clone(), self.resolvers, self.deserializers)
             .await?;
-        let mut source = self.sources.get(link.key);
-        if !link.path.is_empty() {
-            source = source.resolve(&link.path).unwrap();
+        let mut source = self.sources.get(link.src_key);
+        if !link.src_path.is_empty() {
+            source = source.resolve(&link.src_path).unwrap();
         }
         let source = source.clone();
         Ok((link, source))
@@ -769,7 +834,7 @@ fn identify(
     source: &Value,
     dialect: &Dialect,
 ) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError> {
-    let (id, uris) = dialect.identify(link.uri.clone(), &link.path, source)?;
+    let (id, uris) = dialect.identify(link.uri.clone(), &link.src_path, source)?;
     // if identify did not find a primary id, use the uri + pointer fragment
     // as the lookup which will be at the first position in the uris list
     let uri = id.as_ref().unwrap_or(&uris[0]);
