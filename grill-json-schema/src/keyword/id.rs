@@ -8,7 +8,6 @@ use serde_json::Value;
 use grill_core::{
     error::IdentifyError,
     keyword::{self, Kind, Unimplemented},
-    schema::Identifier,
     Uri,
 };
 
@@ -45,7 +44,7 @@ impl keyword::Keyword for Id {
     fn identify(
         &self,
         schema: &Value,
-    ) -> Result<Result<Option<Identifier>, IdentifyError>, Unimplemented> {
+    ) -> Result<Result<Option<Uri>, IdentifyError>, Unimplemented> {
         let id = schema.get(self.keyword);
         Ok(match id {
             Some(Value::String(id)) => match Uri::parse(id) {
@@ -53,7 +52,7 @@ impl keyword::Keyword for Id {
                     if !self.allow_fragment && !uri.is_fragment_empty_or_none() {
                         return Ok(Err(IdentifyError::FragmentedId(uri)));
                     }
-                    Ok(Some(Identifier::Primary(uri)))
+                    Ok(Some(uri))
                 }
                 Err(e) => Err(e.into()),
             },

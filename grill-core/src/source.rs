@@ -19,7 +19,7 @@ use std::{
     convert::AsRef,
     ops::Deref,
 };
-use tracing::instrument;
+use tracing::{instrument, Level};
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 
@@ -67,7 +67,7 @@ pub struct Source<'i> {
 }
 
 impl<'i> Source<'i> {
-    pub(crate) fn new(uri: &AbsoluteUri, src: &'i Link, sources: &'i Sources) -> Source<'i> {
+    pub(crate) fn new(uri: &'i AbsoluteUri, src: &'i Link, sources: &'i Sources) -> Source<'i> {
         let mut value = sources.get(src.src_key);
         if !src.src_path.is_empty() {
             value = value.resolve(&src.src_path).unwrap();
@@ -138,7 +138,7 @@ impl Store {
         }
         if fragment.starts_with('/') {
             let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
-            let link = Link::new(src_key, ptr);
+            let link = Link::new(src_key, ptr.clone());
             self.index.insert(uri.clone(), link.clone());
             let key = self.index.get(&uri).unwrap().src_key;
             let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
@@ -165,10 +165,8 @@ impl Store {
         }
     }
 
-    fn insert_link(&mut self, key: SourceKey, uri: AbsoluteUri, path: Pointer) -> &mut Link {
-        self.index
-            .entry(uri.clone())
-            .or_insert(Link::new(key, path))
+    fn insert_link(&mut self, uri: AbsoluteUri, link: Link) -> &mut Link {
+        self.index.entry(uri).or_insert(link)
     }
 
     fn get(&self, key: SourceKey) -> &Value {
@@ -247,28 +245,17 @@ impl Sources {
         self.sandbox = None;
     }
 
-    #[instrument(skip(self), level = "trace")]
-    pub(crate) fn link(
-        &mut self,
-        from: AbsoluteUri,
-        path: Pointer,
-        to: &Link,
-    ) -> Result<&Link, LinkError> {
-        let link = Link::new(to.src_key, path);
+    #[instrument(skip(self), level = Level::TRACE)]
+    pub(crate) fn link(&mut self, from: &AbsoluteUri, to: &Link) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(from.clone()) {
-            Entry::Occupied(_) => self.check_existing_link(link),
-            Entry::Vacant(_) => self.create_link(from, link),
+            Entry::Occupied(_) => self.check_existing_link(from, to.clone()),
+            Entry::Vacant(_) => self.create_link(from.clone(), to.clone()),
         }
     }
 
-    pub(crate) fn link_all(
-        &mut self,
-        from: &[AbsoluteUri],
-        path: Pointer,
-        to: &Link,
-    ) -> Result<(), LinkError> {
+    pub(crate) fn link_all(&mut self, from: &[AbsoluteUri], to: &Link) -> Result<(), LinkError> {
         for from_uri in from {
-            self.link(from_uri.clone(), path.clone(), to)?;
+            self.link(from_uri, to)?;
         }
         Ok(())
     }
@@ -279,11 +266,11 @@ impl Sources {
 
     pub(crate) async fn resolve_link(
         &mut self,
-        uri: AbsoluteUri,
+        uri: &AbsoluteUri,
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<Link, SourceError> {
-        let (link, _) = self.resolve(&uri, resolvers, deserializers).await?;
+        let (link, _) = self.resolve(uri, resolvers, deserializers).await?;
         Ok(link.clone())
     }
 
@@ -333,14 +320,15 @@ impl Sources {
         self.insert_value(uri, Cow::Owned(src))
     }
 
-    fn check_existing_link(&mut self, link: Link) -> Result<&Link, LinkError> {
-        let entry = self.store().get_link(&link.uri).unwrap();
+    fn check_existing_link(&mut self, uri: &AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
+        let entry = self.store().get_link(uri).unwrap();
         if &link == entry {
             return Ok(entry);
         }
         Err(LinkConflictError {
-            existing: entry.into(),
-            new: (&link).into(),
+            uri: uri.clone(),
+            existing: entry.src_path.clone(),
+            new: link.src_path,
         }
         .into())
     }
@@ -348,13 +336,21 @@ impl Sources {
     fn create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => {
-                let root = self.store().get_link(&from).unwrap();
-                let root_src = self.store().get(root.src_key);
-                root_src.resolve(&link.src_path)?;
-                let link = self.store_mut().link_entry(from).or_insert(link);
-                Ok(link)
+                let existing_link = self.store().get_link(&from).unwrap();
+                if &link != existing_link {
+                    return Err(LinkConflictError {
+                        uri: from.clone(),
+                        existing: existing_link.src_path.clone(),
+                        new: link.src_path,
+                    }
+                    .into());
+                }
+                Ok(existing_link)
             }
-            Entry::Vacant(_) => Err(LinkError::NotFound(from)),
+            Entry::Vacant(_) => {
+                self.store_mut().insert_link(from.clone(), link);
+                Ok(self.store().get_link(&from).unwrap())
+            }
         }
     }
 
@@ -375,28 +371,26 @@ impl Sources {
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
-        let link = if let Some(link) = self.store().get_link(base_uri) {
+        let link = if let Some(link) = self.store().get_link(base_uri).cloned() {
             link
         } else {
             let (link, _) = self
                 .resolve_external(uri, base_uri, fragment, resolvers, deserializers)
                 .await?;
-            link
-        }
-        .clone();
-        let src = self.store().get(link.src_key).clone();
+            link.clone()
+        };
+        let Link {
+            src_key,
+            mut src_path,
+        } = link;
+
         let fragment = Pointer::parse(fragment)?;
-        let mut path = link.src_path.clone();
-        path.append(&fragment);
-
-        let src = path.resolve(&src).map_err(PointerError::from)?;
-
-        self.create_link(uri.clone())?;
-
+        src_path.append(&fragment);
+        self.create_link(uri.clone(), Link::new(src_key, src_path.clone()))?;
         let src = self
             .store()
-            .get(link.src_key)
-            .resolve(&path)
+            .get(src_key)
+            .resolve(&src_path)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(uri).unwrap();
         Ok((link, src))
@@ -445,15 +439,15 @@ impl Sources {
 
         let ptr = Pointer::parse(fragment).map_err(PointerError::from)?;
 
-        let link = self.store().get_link(base_uri).unwrap().clone();
-
-        self.store_mut()
-            .insert_link(link.src_key, uri.clone(), ptr.clone());
-
+        let mut link = self.store().get_link(base_uri).unwrap().clone();
+        link.src_path.append(&ptr);
+        let src_key = link.src_key;
+        let src_path = link.src_path.clone();
+        self.store_mut().insert_link(uri.clone(), link);
         let src = self
             .store()
-            .get(link.src_key)
-            .resolve(&ptr)
+            .get(src_key)
+            .resolve(&src_path)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(uri).unwrap();
 
@@ -763,7 +757,6 @@ mod tests {
             .unwrap();
         assert_eq!(src, &value);
         assert_eq!(link.src_path, Pointer::default());
-        assert_eq!(link.uri, base_uri);
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
 
@@ -781,7 +774,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(link.src_path, Pointer::default());
-        assert_eq!(link.uri, base_uri);
         assert_eq!(src, &value);
         assert_eq!(sources.store_mut().index.len(), 1);
         assert_eq!(sources.store_mut().table.len(), 1);

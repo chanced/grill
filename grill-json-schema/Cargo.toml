@@ -17,9 +17,11 @@ paste        = { workspace = true }
 regex        = { workspace = true }
 serde_json   = { workspace = true }
 thiserror    = { workspace = true }
+tracing      = { workspace = true }
 
 [dev-dependencies]
-grill   = { workspace = true }
-mockall = { workspace = true }
-similar = { workspace = true }
-tokio   = { version = "1.28", features = ["full"] }
+grill              = { workspace = true }
+mockall            = { workspace = true }
+similar            = { workspace = true }
+tokio              = { version = "1.28", features = ["full"] }
+tracing-subscriber = { workspace = true }

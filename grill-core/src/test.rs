@@ -19,7 +19,7 @@ pub fn build_dialect() -> dialect::Build {
             })),
         )
         .add_keyword(keyword::id::Id::new("$id", false))
-        .add_keyword(keyword::schema::Schema::new("$schema", false))
+        .add_keyword(keyword::schema::SchemaKeyword::new("$schema", false))
 }
 pub mod keyword {
 
@@ -30,7 +30,6 @@ pub mod keyword {
         use crate::{
             error::{self, IdentifyError},
             keyword::{self, Kind, Unimplemented},
-            schema::Identifier,
             Uri,
         };
         use std::fmt::Display;
@@ -71,7 +70,7 @@ pub mod keyword {
             fn identify(
                 &self,
                 schema: &Value,
-            ) -> Result<Result<Option<Identifier>, IdentifyError>, Unimplemented> {
+            ) -> Result<Result<Option<Uri>, IdentifyError>, Unimplemented> {
                 let id = schema.get(self.keyword);
                 Ok(match id {
                     Some(Value::String(id)) => match Uri::parse(id) {
@@ -79,7 +78,7 @@ pub mod keyword {
                             if !self.allow_fragment && !uri.is_fragment_empty_or_none() {
                                 return Ok(Err(IdentifyError::FragmentedId(uri)));
                             }
-                            Ok(Some(Identifier::Primary(uri)))
+                            Ok(Some(uri))
                         }
                         Err(e) => Err(e.into()),
                     },
@@ -120,12 +119,12 @@ pub mod keyword {
         use serde_json::Value;
 
         #[derive(Debug, Clone)]
-        pub struct Schema {
+        pub struct SchemaKeyword {
             pub keyword: &'static str,
             pub allow_fragment: bool,
         }
 
-        impl Schema {
+        impl SchemaKeyword {
             #[must_use]
             pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
                 Self {
@@ -134,7 +133,7 @@ pub mod keyword {
                 }
             }
         }
-        impl keyword::Keyword for Schema {
+        impl keyword::Keyword for SchemaKeyword {
             fn kind(&self) -> Kind {
                 self.keyword.into()
             }

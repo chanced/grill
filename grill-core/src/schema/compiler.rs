@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
-use tracing::instrument;
+use tracing::{instrument, trace, Level};
 
 use crate::{
     anymap::AnyMap,
@@ -129,7 +129,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self, q), level = "debug")]
+    #[instrument(skip(self), level = Level::TRACE)]
     #[allow(clippy::too_many_lines)]
     async fn compile_schema(
         &mut self,
@@ -139,20 +139,26 @@ impl<'i> Compiler<'i> {
         let SchemaToCompile {
             key,
             uri,
-            path,
+            mut path,
             mut parent,
             default_dialect_idx,
             continue_on_err,
             ref_,
         } = schema_to_compile;
 
+        if !uri.starts_with("https://json") {
+            trace!("compiling {uri}");
+        }
+
         let (link, src) = self
             .source(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        if !uri.starts_with("https://json") {
+            trace!(?src);
+        }
 
         let dialect_idx = self.dialect_idx(&src, default_dialect_idx);
-
         if let Some(key) = key.or(self.schemas.get_key(&uri)) {
             let schema = self.schemas.get(key, self.sources).unwrap();
             let path = schema.path.clone().into_owned();
@@ -172,9 +178,6 @@ impl<'i> Compiler<'i> {
                 .map_err(|err| self.handle_err(err, continue_on_err, &uri));
         }
 
-        // uri gets shadowed below. This uri is known to have a link.
-        let linked_uri = uri.clone();
-
         self.validate(dialect_idx, &src)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
@@ -192,22 +195,25 @@ impl<'i> Compiler<'i> {
         };
 
         if id.is_some() {
-            // TODO: Link parent URIs
+            self.add_parent_uris(&mut uris, &Pointer::default(), parent)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            path = Some(Pointer::default());
             parent = None;
         } else if parent.is_none() && path.is_none() && has_ptr_fragment(&uri) {
             return self.queue_pathed(schema_to_compile(), q);
         } else if is_anchored(&uri) {
             return self.queue_anchored(schema_to_compile(), q);
+        } else if parent.is_none() && path.is_none() {
+            path = Some(Pointer::default());
         }
-        // else if parent.is_none() && path.is_none() {
-        //     path = Some(Pointer::default());
-        // }
 
-        // // path should now have a value
-        // let path = path.expect("path should be set");
+        // path should now have a value
+        let path = path.expect("path should be set");
 
-        self.add_parent_uris_with_path(&mut uris, &path, parent)
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        if !path.is_empty() {
+            self.add_parent_uris(&mut uris, &path, parent)
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        }
 
         let anchors = self
             .find_anchors(dialect_idx, &src)
@@ -217,7 +223,7 @@ impl<'i> Compiler<'i> {
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
         self.sources
-            .link_all(id.as_ref(), &uris, &link)
+            .link_all(&uris, &link)
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
         let dialect_uri = self.dialects[dialect_idx].id().clone();
@@ -271,8 +277,7 @@ impl<'i> Compiler<'i> {
             _ => (false, err),
         }
     }
-
-    #[instrument(skip(self, q), level = "trace")]
+    #[instrument(skip(self,q), level = Level::TRACE)]
     fn maybe_finalize(
         &mut self,
         key: Key,
@@ -285,7 +290,6 @@ impl<'i> Compiler<'i> {
         continue_on_err: bool,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), CompileError> {
-        let src_str = serde_json::to_string_pretty(src).unwrap();
         if self.schemas.is_compiled(key) {
             return Ok(());
         }
@@ -321,7 +325,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self, q), level = "trace")]
+    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_pathed(
         &mut self,
         s: SchemaToCompile,
@@ -336,7 +340,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self, q), level = "trace")]
+    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_anchored(
         &mut self,
         s: SchemaToCompile,
@@ -377,7 +381,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = Level::TRACE)]
     fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
         let keywords = {
             let schema = self.schemas.get(key, self.sources).unwrap();
@@ -482,7 +486,7 @@ impl<'i> Compiler<'i> {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
     }
 
-    #[instrument(skip(self, q), level = "trace")]
+    #[instrument(skip(self, q), level = Level::TRACE)]
     fn queue_subschemas(
         &mut self,
         key: Key,
@@ -492,7 +496,6 @@ impl<'i> Compiler<'i> {
         src: &Value,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<bool, CompileError> {
-        let src_str = serde_json::to_string_pretty(src).unwrap();
         let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
         let mut path = path.clone();
         if path.is_empty() && fragment.starts_with('/') {
@@ -526,7 +529,7 @@ impl<'i> Compiler<'i> {
         Ok(has_subschemas)
     }
 
-    #[instrument(skip(self, q), level = "trace")]
+    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_ancestors(
         &mut self,
         target_uri: &AbsoluteUri,
@@ -587,12 +590,13 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = Level::TRACE)]
     async fn source(&mut self, uri: &AbsoluteUri) -> Result<(Link, Value), CompileError> {
         let link = self
             .sources
-            .resolve_link(uri.clone(), self.resolvers, self.deserializers)
+            .resolve_link(uri, self.resolvers, self.deserializers)
             .await?;
+
         let mut source = self.sources.get(link.src_key);
         if !link.src_path.is_empty() {
             source = source.resolve(&link.src_path).unwrap();
@@ -601,7 +605,7 @@ impl<'i> Compiler<'i> {
         Ok((link, source))
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = Level::TRACE)]
     fn find_anchors(
         &mut self,
         dialect_idx: usize,
@@ -614,9 +618,9 @@ impl<'i> Compiler<'i> {
             .anchors(src)?)
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = Level::TRACE)]
     #[allow(clippy::unnecessary_wraps)]
-    fn add_parent_uris_with_path(
+    fn add_parent_uris(
         &mut self,
         uris: &mut Vec<AbsoluteUri>,
         path: &Pointer,
@@ -629,7 +633,7 @@ impl<'i> Compiler<'i> {
         #[allow(clippy::explicit_iter_loop)]
         for uri in parent.uris.iter() {
             let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
-            if fragment.is_empty() || fragment.starts_with('/') {
+            if !path.is_empty() && (fragment.is_empty() || fragment.starts_with('/')) {
                 let mut uri = uri.clone();
                 let mut uri_path = Pointer::parse(&fragment)
                     .map_err(|e| CompileError::FailedToParsePointer(e.into()))?;
@@ -643,7 +647,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = Level::TRACE)]
     fn validate(&mut self, dialect_idx: usize, src: &Value) -> Result<(), CompileError> {
         if !self.validate {
             return Ok(());
@@ -672,7 +676,7 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 }
-#[instrument(level = "trace")]
+#[instrument(level = Level::TRACE)]
 fn add_uris_from_anchors(
     base_uri: &AbsoluteUri,
     uris: &mut Vec<AbsoluteUri>,
@@ -699,13 +703,12 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-#[instrument(level = "trace")]
+#[instrument(level = Level::TRACE)]
 fn identify(
     uri: &AbsoluteUri,
     source: &Value,
     dialect: &Dialect,
 ) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError> {
-    let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
     let (id, uris) = dialect.identify(uri.clone(), source)?;
     // if identify did not find a primary id, use the uri + pointer fragment
     // as the lookup which will be at the first position in the uris list

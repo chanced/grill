@@ -378,12 +378,18 @@ pub enum LinkError {
 
 /// Source was linked from multiple schemas.
 #[derive(Debug, Error)]
-#[error("source address {:?} @ {:?} already assigned to {:?} @ {:?}", new.0, new.1, existing.0, existing.1)]
+#[error(
+    "source address {:?} @ {:?} already assigned to {:?}",
+    uri,
+    new,
+    existing
+)]
 pub struct LinkConflictError {
+    pub uri: AbsoluteUri,
     /// The existing schema location.
-    pub existing: (AbsoluteUri, Pointer),
+    pub existing: Pointer,
     /// The new schema location.
-    pub new: (AbsoluteUri, Pointer),
+    pub new: Pointer,
 }
 
 /*

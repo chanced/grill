@@ -138,7 +138,7 @@ impl Dialect {
                 continue;
             };
             let uri = uri.resolve(&id)?;
-            primary.get_or_insert(uri);
+            primary.get_or_insert(uri.clone());
             uris.push(uri);
         }
         Ok((primary, uris))
@@ -574,7 +574,7 @@ mod tests {
         let id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
         let dialect = Dialect::build(id.clone())
             .add_metaschema(id.clone(), Cow::Owned(json!({})))
-            .add_keyword(test::keyword::schema::Schema::new("$schema", true))
+            .add_keyword(test::keyword::schema::SchemaKeyword::new("$schema", true))
             .add_keyword(test::keyword::id::Id::new("$id", true))
             .finish()
             .unwrap();
