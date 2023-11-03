@@ -6,7 +6,7 @@ use crate::{
         ResolveError, ResolveErrors, SourceConflictError, SourceError,
     },
     uri::decode_lossy,
-    AbsoluteUri, Key,
+    AbsoluteUri,
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
@@ -19,6 +19,7 @@ use std::{
     convert::AsRef,
     ops::Deref,
 };
+use tracing::instrument;
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 
@@ -246,28 +247,28 @@ impl Sources {
         self.sandbox = None;
     }
 
+    #[instrument(skip(self), level = "trace")]
     pub(crate) fn link(
         &mut self,
         from: AbsoluteUri,
-        to: AbsoluteUri,
         path: Pointer,
+        to: &Link,
     ) -> Result<&Link, LinkError> {
-        let key = self
-            .store_mut()
-            .get_link(&to)
-            .ok_or_else(|| LinkError::NotFound(to.clone()))
-            .map_err(|err| err)?
-            .src_key;
-        let link = Link::new(key, path);
+        let link = Link::new(to.src_key, path);
         match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => self.check_existing_link(link),
             Entry::Vacant(_) => self.create_link(from, link),
         }
     }
 
-    pub(crate) fn link_all(&mut self, from: &[AbsoluteUri], to: Link) -> Result<(), LinkError> {
+    pub(crate) fn link_all(
+        &mut self,
+        from: &[AbsoluteUri],
+        path: Pointer,
+        to: &Link,
+    ) -> Result<(), LinkError> {
         for from_uri in from {
-            self.link(from_uri.clone(), to_uri.clone(), to_path.clone())?;
+            self.link(from_uri.clone(), path.clone(), to)?;
         }
         Ok(())
     }
