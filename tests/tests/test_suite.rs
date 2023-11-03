@@ -4,6 +4,10 @@ use grill::{AbsoluteUri, Interrogator, JsonSchema, Uri};
 
 #[tokio::test]
 async fn test_draft_2020_12() {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .init();
+
     let uri = AbsoluteUri::parse("http://localhost:1234/draft2020-12/root").unwrap();
     let resolved = uri.resolve(&Uri::parse("nested.json").unwrap());
     println!("{resolved:?}");
@@ -12,10 +16,10 @@ async fn test_draft_2020_12() {
         path.push("tests");
     }
     std::env::set_current_dir(path).unwrap();
-    let mut interrogator = Interrogator::build()
+    let interrogator = Interrogator::build()
         .json_schema_2020_12()
         .finish()
         .await
         .unwrap();
-    tests::load(&mut interrogator, "draft2020-12").await;
+    tests::run(interrogator, "draft2020-12").await;
 }

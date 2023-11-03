@@ -11,9 +11,15 @@ pub struct TestCases {
     test_cases: Vec<TestCase>,
 }
 impl TestCases {
-    async fn setup_interrogator(&mut self, interrogator: &mut Interrogator) {
+    async fn setup_interrogator(&mut self, mut interrogator: Interrogator) {
         for (i, case) in self.test_cases.iter_mut().enumerate() {
+            println!("==================================================================================");
             println!("compiling {i} of {}", self.filename);
+            println!("==================================================================================");
+            println!("{}", case.description);
+            println!("==================================================================================");
+            println!("{}", serde_json::to_string_pretty(&case.schema).unwrap());
+            println!("==================================================================================");
             let uri = format!("https://example.com/test-suit/{}_{i}", self.filename);
             interrogator
                 .source_owned_value(&uri, case.schema.clone())
@@ -23,6 +29,7 @@ impl TestCases {
                 })
                 .unwrap();
             case.schema_key = interrogator.compile(&uri).await.unwrap();
+            println!("==================================================================================");
         }
     }
 }
@@ -43,10 +50,10 @@ pub struct Test {
     pub valid: bool,
 }
 
-pub async fn load(interrogator: &mut Interrogator, draft: &str) -> Vec<TestCases> {
+pub async fn run(interrogator: Interrogator, draft: &str) -> Vec<TestCases> {
     let mut cases = load_cases(draft);
     for case in &mut cases {
-        case.setup_interrogator(interrogator).await;
+        case.setup_interrogator(interrogator.clone()).await;
     }
     cases
 }

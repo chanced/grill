@@ -124,6 +124,9 @@ impl Store {
         uri: AbsoluteUri,
         src: Cow<'static, Value>,
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
+        if !uri.starts_with("https://json") {
+            println!("SOURCING: {uri}");
+        }
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = decode_lossy(&fragment);
@@ -144,7 +147,6 @@ impl Store {
             let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
             return Ok((key, link, Cow::Owned(src)));
         }
-
         Ok((src_key, link, src))
     }
 
@@ -158,7 +160,6 @@ impl Store {
         if !fragment.is_empty() {
             return Err(SourceError::UnexpectedUriFragment(uri.clone()));
         }
-
         match self.index.entry(uri.clone()) {
             Entry::Occupied(_) => self.check_and_get_occupied(uri, src),
             Entry::Vacant(_) => self.insert_vacant(uri, src),

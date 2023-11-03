@@ -148,6 +148,19 @@ impl<'i> Compiler<'i> {
 
         if !uri.starts_with("https://json") {
             trace!("compiling {uri}");
+            println!(
+                "{}",
+                self.sources
+                    .sandbox
+                    .as_ref()
+                    .unwrap()
+                    .index
+                    .iter()
+                    .filter(|(k, _)| !k.starts_with("https://json"))
+                    .map(|(k, v)| format!("  - {k}: {v:?}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
         }
 
         let (link, src) = self
