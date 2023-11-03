@@ -4,6 +4,7 @@
 use crate::{
     error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError, UriError},
     keyword::{Keyword, Unimplemented},
+    source::Link,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Key, Src,
 };
@@ -126,38 +127,19 @@ impl Dialect {
     /// [`Schema`](`crate::schema::Schema`) can be referenced by.
     pub fn identify(
         &self,
-        mut base_uri: AbsoluteUri,
-        path: &Pointer,
+        uri: AbsoluteUri,
         schema: &Value,
     ) -> Result<(Option<AbsoluteUri>, Vec<AbsoluteUri>), IdentifyError> {
-        let mut uris = Vec::new();
-        if path.is_empty() {
-            base_uri.set_fragment(None)?;
-        } else {
-            base_uri.set_fragment(Some(path))?;
-        }
-        uris.push(base_uri.clone());
-
+        let mut uris = vec![uri.clone()];
         let mut primary = None;
-        let mut secondary_uris = Vec::new();
 
         for idx in self.identify_indexes.iter().copied() {
             let Some(id) = self.keywords[idx as usize].identify(schema).unwrap()? else {
                 continue;
             };
-            if id.is_primary() && primary.is_none() {
-                let uri = id.take_uri();
-                base_uri = base_uri.resolve(&uri)?;
-                primary = Some(base_uri.clone());
-            } else {
-                secondary_uris.push(id.take_uri());
-            }
-        }
-        for uri in secondary_uris {
-            uris.push(base_uri.resolve(&uri)?);
-        }
-        if let Some(primary) = primary.clone() {
-            uris.push(primary);
+            let uri = uri.resolve(&id)?;
+            primary.get_or_insert(uri);
+            uris.push(uri);
         }
         Ok((primary, uris))
     }
@@ -592,8 +574,8 @@ mod tests {
         let id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
         let dialect = Dialect::build(id.clone())
             .add_metaschema(id.clone(), Cow::Owned(json!({})))
-            .add_keyword(test::keyword::schema::Keyword::new("$schema", true))
-            .add_keyword(test::keyword::id::Keyword::new("$id", true))
+            .add_keyword(test::keyword::schema::Schema::new("$schema", true))
+            .add_keyword(test::keyword::id::Id::new("$id", true))
             .finish()
             .unwrap();
 

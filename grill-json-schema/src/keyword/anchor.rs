@@ -103,7 +103,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup() {
-       
         let interrogator = Interrogator::build()
             .json_schema_2020_12()
             // .source_owned_value(

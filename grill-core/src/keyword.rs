@@ -9,7 +9,7 @@ use crate::{
     anymap::AnyMap,
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, NumberError, RefError},
     output::{self, Annotation, AnnotationOrError, BoxedError, Translator},
-    schema::{Anchor, Identifier, Ref, Schemas},
+    schema::{Anchor, Ref, Schemas},
     source::Sources,
     AbsoluteUri, Key, Output, Schema, Structure, Uri,
 };
@@ -665,7 +665,7 @@ pub trait Keyword: Any + Send + Sync + DynClone + fmt::Debug {
     fn identify(
         &self,
         schema: &Value,
-    ) -> Result<Result<Option<Identifier>, IdentifyError>, Unimplemented> {
+    ) -> Result<Result<Option<Uri>, IdentifyError>, Unimplemented> {
         Err(Unimplemented)
     }
 

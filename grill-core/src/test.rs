@@ -18,8 +18,8 @@ pub fn build_dialect() -> dialect::Build {
                 "$schema": uri.clone()
             })),
         )
-        .add_keyword(keyword::id::Keyword::new("$id", false))
-        .add_keyword(keyword::schema::Keyword::new("$schema", false))
+        .add_keyword(keyword::id::Id::new("$id", false))
+        .add_keyword(keyword::schema::Schema::new("$schema", false))
 }
 pub mod keyword {
 
@@ -35,12 +35,12 @@ pub mod keyword {
         };
         use std::fmt::Display;
         #[derive(Debug, Clone)]
-        pub struct Keyword {
+        pub struct Id {
             pub keyword: &'static str,
             pub allow_fragment: bool,
         }
 
-        impl Keyword {
+        impl Id {
             #[must_use]
             pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
                 Self {
@@ -58,13 +58,13 @@ pub mod keyword {
             }
         }
 
-        impl Display for Keyword {
+        impl Display for Id {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{} keyword", self.keyword)
             }
         }
 
-        impl crate::keyword::Keyword for Keyword {
+        impl crate::keyword::Keyword for Id {
             fn kind(&self) -> Kind {
                 self.keyword.into()
             }
@@ -120,12 +120,12 @@ pub mod keyword {
         use serde_json::Value;
 
         #[derive(Debug, Clone)]
-        pub struct Keyword {
+        pub struct Schema {
             pub keyword: &'static str,
             pub allow_fragment: bool,
         }
 
-        impl Keyword {
+        impl Schema {
             #[must_use]
             pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
                 Self {
@@ -134,7 +134,7 @@ pub mod keyword {
                 }
             }
         }
-        impl keyword::Keyword for Keyword {
+        impl keyword::Keyword for Schema {
             fn kind(&self) -> Kind {
                 self.keyword.into()
             }

@@ -140,12 +140,12 @@ impl CompiledSchema {
     }
 }
 impl CompiledSchema {
-    ///// Returns most relevant URI for the schema, either using the `$id` or the
-    ///// most relevant as determined by the schema's ancestory or source.
-    // #[must_use]
-    // pub(crate) fn absolute_uri(&self) -> &AbsoluteUri {
-    //     self.id.as_ref().unwrap_or(&self.uris[0])
-    // }
+    /// Returns most relevant URI for the schema, either using the `$id` or the
+    /// most relevant as determined by the schema's ancestory or source.
+    #[must_use]
+    pub(crate) fn absolute_uri(&self) -> &AbsoluteUri {
+        self.id.as_ref().unwrap_or(&self.uris[0])
+    }
 }
 
 impl PartialEq for CompiledSchema {
@@ -584,7 +584,7 @@ impl Schemas {
             id: schema.id.as_ref().map(Cow::Borrowed),
             path: Cow::Borrowed(&schema.path),
             metaschema: Cow::Borrowed(&schema.metaschema),
-            source: Source::new(&schema.link, sources),
+            source: Source::new(schema.absolute_uri(), &schema.link, sources),
             uris: Cow::Borrowed(&schema.uris),
             keywords: Cow::Borrowed(&schema.keywords),
             parent: schema.parent,
@@ -683,88 +683,6 @@ pub struct Reference {
 }
 
 impl Reference {}
-
-/// An identifier for a schema, returned from [`Keyword::identify`]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Identifier {
-    /// The primary id (e.g. `$id`, `id`)
-    Primary(Uri),
-    /// Secondary id (e.g. `$anchor`, `$dynamicAnchor`)
-    Secondary(Uri),
-}
-
-impl PartialEq<Uri> for Identifier {
-    fn eq(&self, other: &Uri) -> bool {
-        match self {
-            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == other,
-        }
-    }
-}
-
-impl PartialEq<Identifier> for Uri {
-    fn eq(&self, other: &Identifier) -> bool {
-        match other {
-            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == self,
-        }
-    }
-}
-impl PartialEq<AbsoluteUri> for Identifier {
-    fn eq(&self, other: &AbsoluteUri) -> bool {
-        match self {
-            Identifier::Primary(uri) | Identifier::Secondary(uri) => other == uri,
-        }
-    }
-}
-
-impl PartialEq<Identifier> for AbsoluteUri {
-    fn eq(&self, other: &Identifier) -> bool {
-        match other {
-            Identifier::Primary(uri) | Identifier::Secondary(uri) => uri == other,
-        }
-    }
-}
-
-impl Identifier {
-    /// Returns `true` if the identifier is [`Primary`].
-    ///
-    /// [`Primary`]: Identifier::Primary
-    #[must_use]
-    pub fn is_primary(&self) -> bool {
-        matches!(self, Self::Primary(..))
-    }
-
-    /// Returns `true` if the identifier is [`Secondary`].
-    ///
-    /// [`Secondary`]: Identifier::Secondary
-    #[must_use]
-    pub fn is_secondary(&self) -> bool {
-        matches!(self, Self::Secondary(..))
-    }
-
-    /// Returns a reference to the [`Uri`] of the identifier.
-    #[must_use]
-    pub fn uri(&self) -> &Uri {
-        match self {
-            Self::Secondary(uri) | Self::Primary(uri) => uri,
-        }
-    }
-
-    /// Takes ownership of the [`Uri`] of the identifier.
-    #[must_use]
-    pub fn take_uri(self) -> Uri {
-        match self {
-            Self::Secondary(uri) | Self::Primary(uri) => uri,
-        }
-    }
-}
-
-impl PartialEq<str> for Identifier {
-    fn eq(&self, other: &str) -> bool {
-        match self {
-            Self::Primary(uri) | Self::Secondary(uri) => uri == other,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {}

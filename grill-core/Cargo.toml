@@ -35,14 +35,16 @@ slotmap          = { workspace = true }
 strum            = { workspace = true }
 thiserror        = { workspace = true }
 toml             = { workspace = true, optional = true }
+tracing          = { workspace = true }
 url              = { workspace = true }
 urn              = { workspace = true }
 
 [dev-dependencies]
-grill   = { workspace = true }
-mockall = { workspace = true }
-similar = { workspace = true }
-tokio   = { version = "1.28", features = ["full"] }
+grill              = { workspace = true }
+mockall            = { workspace = true }
+similar            = { workspace = true }
+tokio              = { workspace = true, features = ["full"] }
+tracing-subscriber = { workspace = true }
 
 [features]
 default = []

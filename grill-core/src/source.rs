@@ -6,7 +6,7 @@ use crate::{
         ResolveError, ResolveErrors, SourceConflictError, SourceError,
     },
     uri::decode_lossy,
-    AbsoluteUri,
+    AbsoluteUri, Key,
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
@@ -66,15 +66,15 @@ pub struct Source<'i> {
 }
 
 impl<'i> Source<'i> {
-    pub(crate) fn new(src: &'i Link, sources: &'i Sources) -> Source<'i> {
-        let mut value = sources.get(src.key);
-        if !src.path.is_empty() {
-            value = value.resolve(&src.path).unwrap();
+    pub(crate) fn new(uri: &AbsoluteUri, src: &'i Link, sources: &'i Sources) -> Source<'i> {
+        let mut value = sources.get(src.src_key);
+        if !src.src_path.is_empty() {
+            value = value.resolve(&src.src_path).unwrap();
         }
         Self {
-            key: src.key,
-            uri: Cow::Borrowed(&src.uri),
-            path: Cow::Borrowed(&src.path),
+            key: src.src_key,
+            uri: Cow::Borrowed(uri),
+            path: Cow::Borrowed(&src.src_path),
             value: Cow::Borrowed(value),
         }
     }
@@ -109,7 +109,7 @@ impl Store {
         uri: AbsoluteUri,
         src: Cow<'static, Value>,
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
-        let key = self.index.get(&uri).unwrap().key;
+        let key = self.index.get(&uri).unwrap().src_key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
             return Err(SourceConflictError { uri: uri.clone() }.into());
@@ -117,6 +117,7 @@ impl Store {
         let link = self.index.get(&uri).unwrap().clone();
         Ok((key, link, existing_src))
     }
+
     fn insert_vacant(
         &mut self,
         uri: AbsoluteUri,
@@ -125,34 +126,25 @@ impl Store {
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = decode_lossy(&fragment);
-        let key = self.table.insert(src);
-        let src = self.table.get(key).unwrap().clone();
-        self.index.insert(
-            base_uri.clone(),
-            Link::new(key, base_uri.clone(), Pointer::default()),
-        );
-        let link = self.index.get(&base_uri).unwrap().clone();
+        let src_key = self.table.insert(src);
+        let src = self.table.get(src_key).unwrap().clone();
+
+        let link = Link::new(src_key, Pointer::default());
+        self.index.insert(base_uri.clone(), link.clone());
+
         if fragment.is_empty() {
-            return Ok((key, link, src));
+            return Ok((src_key, link, src));
         }
         if fragment.starts_with('/') {
             let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
-            self.index
-                .insert(uri.clone(), Link::new(key, uri.clone(), ptr.clone()));
-
-            if uri == "http://localhost:1234/draft2020-12/nested.json#/$defs/A/$defs/B" {
-                println!(
-                    "INSERTING {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
-
-                );
-                println!("{:#?}", self.index);
-            }
-
-            let key = self.index.get(&uri).unwrap().key;
+            let link = Link::new(src_key, ptr);
+            self.index.insert(uri.clone(), link.clone());
+            let key = self.index.get(&uri).unwrap().src_key;
             let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
             return Ok((key, link, Cow::Owned(src)));
         }
-        Ok((key, link, src))
+
+        Ok((src_key, link, src))
     }
 
     fn insert(
@@ -175,7 +167,7 @@ impl Store {
     fn insert_link(&mut self, key: SourceKey, uri: AbsoluteUri, path: Pointer) -> &mut Link {
         self.index
             .entry(uri.clone())
-            .or_insert(Link::new(key, uri, path))
+            .or_insert(Link::new(key, path))
     }
 
     fn get(&self, key: SourceKey) -> &Value {
@@ -260,39 +252,22 @@ impl Sources {
         to: AbsoluteUri,
         path: Pointer,
     ) -> Result<&Link, LinkError> {
-        if !from.starts_with("https://json") {
-            println!("LINK\t{from} -> {to}");
-        }
         let key = self
             .store_mut()
             .get_link(&to)
             .ok_or_else(|| LinkError::NotFound(to.clone()))
-            .map_err(|err| {
-                println!("ERRRORRORORORROROROROROORRO");
-                err
-            })?
-            .key;
-        let link = Link::new(key, to, path.clone());
-
+            .map_err(|err| err)?
+            .src_key;
+        let link = Link::new(key, path);
         match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => self.check_existing_link(link),
             Entry::Vacant(_) => self.create_link(from, link),
         }
     }
 
-    pub(crate) fn link_all(
-        &mut self,
-        primary: Option<&AbsoluteUri>,
-        from: &[AbsoluteUri],
-        to: &Link,
-    ) -> Result<(), LinkError> {
-        let to_uri = to.uri.clone();
-        let to_path = to.path.clone();
-        if let Some(primary) = primary {
-            self.link(primary.clone(), to_uri.clone(), to_path.clone())?;
-        }
-        for uri in from {
-            self.link(uri.clone(), to_uri.clone(), to_path.clone())?;
+    pub(crate) fn link_all(&mut self, from: &[AbsoluteUri], to: Link) -> Result<(), LinkError> {
+        for from_uri in from {
+            self.link(from_uri.clone(), to_uri.clone(), to_path.clone())?;
         }
         Ok(())
     }
@@ -370,15 +345,15 @@ impl Sources {
     }
 
     fn create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
-        match self.store_mut().link_entry(link.root_uri.clone()) {
+        match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => {
-                let root = self.store().get_link(&link.root_uri).unwrap();
-                let root_src = self.store().get(root.key);
-                root_src.resolve(&link.path)?;
+                let root = self.store().get_link(&from).unwrap();
+                let root_src = self.store().get(root.src_key);
+                root_src.resolve(&link.src_path)?;
                 let link = self.store_mut().link_entry(from).or_insert(link);
                 Ok(link)
             }
-            Entry::Vacant(_) => Err(LinkError::NotFound(link.root_uri.clone())),
+            Entry::Vacant(_) => Err(LinkError::NotFound(from)),
         }
     }
 
@@ -400,61 +375,29 @@ impl Sources {
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
         let link = if let Some(link) = self.store().get_link(base_uri) {
-            if uri.starts_with("!https://json-schema.org/draft/2020-12"){
-            println!(
-                    "resolving internal link for:\n\turi: {uri}\n\tbase_uri:{base_uri}\n\tfragment:{fragment}\n\n",
-            );
-        }
             link
-        }                else {
+        } else {
             let (link, _) = self
                 .resolve_external(uri, base_uri, fragment, resolvers, deserializers)
                 .await?;
             link
         }
         .clone();
-        let src = self.store().get(link.key).clone();
-
-        if uri.host().as_deref() != Some("json-schema.org") {
-            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-            println!(
-                "RESOLVING \n\tfragment: {fragment}\n\turi: {uri}\n\tbase_uri: {base_uri}\n\t{link:?}\n\t{src}",
-            );
-            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        }
-
-        // println!("{:#?}", self.sandbox.as_ref().unwrap().index);
+        let src = self.store().get(link.src_key).clone();
         let fragment = Pointer::parse(fragment)?;
-        let mut path = link.path.clone();
+        let mut path = link.src_path.clone();
         path.append(&fragment);
 
         let src = path.resolve(&src).map_err(PointerError::from)?;
-        if uri.starts_with("!https://json-schema.org/draft/2020-12") {
-            println!("CREATING LINK FOR {uri}\n\turi:\t\t{uri}\n\tbase_uri:\t{base_uri}\n\tfragment:\t{fragment}\n\tsrc:\t\t{src}\n\n",);
-        }
 
-        self.create_link(uri.clone(), Link::new(link.key, uri.clone(), path.clone()))?;
+        self.create_link(uri.clone())?;
+
         let src = self
             .store()
-            .get(link.key)
+            .get(link.src_key)
             .resolve(&path)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(uri).unwrap();
-        if uri.starts_with("!https://json-schema.org/draft/2020-12") {
-            println!("CREATED\t{link:?}");
-            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-            println!(
-                "{:#?}",
-                self.sandbox
-                    .as_ref()
-                    .unwrap()
-                    .index
-                    .iter()
-                    .filter(|(_, v)| v.uri.host().as_deref() != Some("json-schema.org"))
-                    .collect::<HashMap<_, _>>()
-            );
-            println!("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        }
         Ok((link, src))
     }
 
@@ -495,7 +438,7 @@ impl Sources {
 
         if fragment.is_empty() || !fragment.starts_with('/') {
             let link = self.store().get_link(base_uri).unwrap();
-            let src = self.store().get(link.key);
+            let src = self.store().get(link.src_key);
             return Ok((link, src));
         }
 
@@ -504,11 +447,11 @@ impl Sources {
         let link = self.store().get_link(base_uri).unwrap().clone();
 
         self.store_mut()
-            .insert_link(link.key, uri.clone(), ptr.clone());
+            .insert_link(link.src_key, uri.clone(), ptr.clone());
 
         let src = self
             .store()
-            .get(link.key)
+            .get(link.src_key)
             .resolve(&ptr)
             .map_err(PointerError::from)?;
         let link = self.store().get_link(uri).unwrap();
@@ -517,9 +460,9 @@ impl Sources {
     }
     fn resolve_internal(&self, uri: &AbsoluteUri) -> Result<(&Link, &Value), SourceError> {
         let link = self.store().get_link(uri).unwrap();
-        let mut src = self.store().get(link.key);
-        if !link.path.is_empty() {
-            src = src.resolve(&link.path).map_err(PointerError::from)?;
+        let mut src = self.store().get(link.src_key);
+        if !link.src_path.is_empty() {
+            src = src.resolve(&link.src_path).map_err(PointerError::from)?;
         }
         Ok((link, src))
     }
@@ -629,29 +572,20 @@ pub fn deserialize_toml(data: &str) -> Result<Value, erased_serde::Error> {
 /// A file reference
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Link {
-    pub(crate) key: SourceKey,
-    pub(crate) uri: AbsoluteUri,
-    pub(crate) root_uri: AbsoluteUri,
-    pub(crate) path: Pointer,
+    pub(crate) src_key: SourceKey,
+    pub(crate) src_path: Pointer,
 }
 
 impl Link {
-    pub(crate) fn new(key: SourceKey, uri: AbsoluteUri, path: Pointer) -> Self {
-        let mut root_uri = uri.clone();
-        root_uri.set_fragment(None).unwrap();
-        Self {
-            key,
-            uri,
-            root_uri,
-            path,
-        }
+    pub(crate) fn new(src_key: SourceKey, src_path: Pointer) -> Self {
+        Self { src_key, src_path }
     }
 }
-impl From<&Link> for (AbsoluteUri, Pointer) {
-    fn from(value: &Link) -> Self {
-        (value.uri.clone(), value.path.clone())
-    }
-}
+// impl From<&Link> for (AbsoluteUri, Pointer) {
+//     fn from(value: &Link) -> Self {
+//         (value.uri.clone(), value.src_path.clone())
+//     }
+// }
 
 /// A trait which is capable of resolving a [`Source`] at the given [`AbsoluteUri`].
 #[async_trait]
@@ -804,7 +738,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(src, &get_value());
-        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.src_path, Pointer::default());
 
         //=============================================================\\
         //                           pointer                           \\
@@ -819,7 +753,7 @@ mod tests {
         let (link, src) = result.unwrap();
 
         assert_eq!(src, &value["foo"]);
-        assert_eq!(link.path, Pointer::parse("/foo").unwrap());
+        assert_eq!(link.src_path, Pointer::parse("/foo").unwrap());
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
         let (link, src) = sources
@@ -827,7 +761,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(src, &value);
-        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.src_path, Pointer::default());
         assert_eq!(link.uri, base_uri);
         assert_eq!(sources.store_mut().index.len(), 2);
         assert_eq!(sources.store_mut().table.len(), 1);
@@ -845,7 +779,7 @@ mod tests {
             .resolve(&uri, &resolvers, &deserializers)
             .await
             .unwrap();
-        assert_eq!(link.path, Pointer::default());
+        assert_eq!(link.src_path, Pointer::default());
         assert_eq!(link.uri, base_uri);
         assert_eq!(src, &value);
         assert_eq!(sources.store_mut().index.len(), 1);

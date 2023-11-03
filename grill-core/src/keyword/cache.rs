@@ -259,7 +259,6 @@ impl Numbers {
 struct LenHasher(u64);
 impl Hasher for LenHasher {
     fn write(&mut self, bytes: &[u8]) {
-        println!("bytes: {bytes:?}");
         unreachable!();
     }
 
