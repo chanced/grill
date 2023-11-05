@@ -12,12 +12,12 @@ use crate::{
     error::{CompileError, UnknownAnchorError},
     keyword::{
         cache::{Numbers, Values},
-        Compile,
+        Compile, Keyword,
     },
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Structure,
+    AbsoluteUri, Interrogator, Key, Schema, Structure,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
@@ -74,6 +74,8 @@ pub(crate) struct Compiler<'i> {
     dialect_idxs: HashMap<AbsoluteUri, usize>,
     primary_uris: HashMap<AbsoluteUri, AbsoluteUri>,
     paths: HashMap<AbsoluteUri, Pointer>,
+    refs: HashMap<AbsoluteUri, Vec<Ref>>,
+    keywords: HashMap<AbsoluteUri, &'i [Box<dyn Keyword>]>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -97,6 +99,8 @@ impl<'i> Compiler<'i> {
             dialect_idxs: HashMap::default(),
             primary_uris: HashMap::default(),
             paths: HashMap::default(),
+            refs: HashMap::default(),
+            keywords: HashMap::default(),
         }
     }
 
@@ -128,13 +132,6 @@ impl<'i> Compiler<'i> {
             .collect::<Result<Vec<_>, _>>()?;
         let mut q = VecDeque::default();
         for uri in &uris {
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-
             q.push_back(SchemaToCompile {
                 key: None,
                 uri: uri.clone(),
@@ -165,9 +162,12 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    async fn link_and_source(&mut self, uri: &AbsoluteUri) -> Result<(Link, Value), CompileError> {
+    async fn precompile(
+        &mut self,
+        uri: &AbsoluteUri,
+    ) -> Result<Option<(Link, Value)>, CompileError> {
         println!("===============================================================================");
-        println!("LINKING AND SOURCING\n\turi:\t{uri}");
+        println!("PRECOMPILE\n\turi:\t{uri}");
         let mut linked = self
             .linked
             .iter()
@@ -193,24 +193,18 @@ impl<'i> Compiler<'i> {
             println!(
                 "==============================================================================="
             );
-            return Ok((link.clone(), src.clone()));
+            return Ok(Some((link.clone(), src.clone())));
         }
         println!("-------------------------------------------------------------------------------");
         println!("DOES NOT CONTAIN LINKED {uri}");
         println!("===============================================================================");
-        self.link_all(uri.clone()).await?;
-
-        let (link, src) = self
-            .sources
-            .resolve(uri, self.resolvers, self.deserializers)
-            .await?;
-
-        let src = src.clone();
-
-        Ok((link.clone(), src))
+        self.prepare_all(uri.clone()).await?
     }
 
-    async fn link_all(&mut self, uri: AbsoluteUri) -> Result<(), CompileError> {
+    async fn prepare_all(
+        &mut self,
+        uri: AbsoluteUri,
+    ) -> Result<Option<(Link, Value)>, CompileError> {
         println!("===============================================================================");
         println!("LINKING ALL\t{uri}");
         let mut base_uri = uri.clone();
@@ -220,6 +214,7 @@ impl<'i> Compiler<'i> {
             .sources
             .resolve(&base_uri, self.resolvers, self.deserializers)
             .await?;
+
         let src = src.clone();
         let link = link.clone();
         let mut q = Vec::new();
@@ -238,14 +233,21 @@ impl<'i> Compiler<'i> {
         });
 
         while let Some(loc) = q.pop() {
-            self.link(loc, &mut q)?;
+            self.prepare(loc, &mut q)?;
         }
         println!("DONE LINKING ALL {uri}");
         println!("===============================================================================");
+
+        let (link, src) = self
+            .sources
+            .resolve(uri, self.resolvers, self.deserializers)
+            .await?;
+
+        let src = src.clone();
         Ok(())
     }
 
-    fn link<'v>(
+    fn prepare<'v>(
         &mut self,
         loc: Location<'v>,
         q: &mut Vec<Location<'v>>,
@@ -340,12 +342,15 @@ impl<'i> Compiler<'i> {
             self.primary_uris.insert(other.clone(), uri.clone());
             self.linked.insert(other.clone());
         }
+
         self.ids.insert(uri.clone(), id);
         self.paths.insert(uri.clone(), rel_path);
         self.dialect_idxs.insert(uri.clone(), dialect_idx);
         self.anchors.insert(uri.clone(), anchors);
         self.uris.insert(uri.clone(), uris);
         self.subschemas.insert(uri.clone(), subschemas);
+        self.keywords.insert(uri.clone(), dialect.keywords());
+        self.refs.insert(uri.clone(), dialect.refs(src)?);
         self.linked.insert(uri);
         Ok(())
     }
@@ -363,13 +368,8 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
-        if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            println!("well...");
-        }
-
-        println!("COMPILING {uri}");
         let (link, src) = self
-            .link_and_source(&uri)
+            .precompile(&uri)
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
@@ -379,16 +379,7 @@ impl<'i> Compiler<'i> {
             let schema = self.schemas.get(key, self.sources).unwrap().clone();
             let uri = schema.absolute_uri().clone();
             return self
-                .maybe_finalize(
-                    key,
-                    &uri,
-                    &src,
-                    dialect_idx,
-                    parent,
-                    ref_,
-                    continue_on_err,
-                    q,
-                )
+                .maybe_finalize(key, &uri, parent, ref_, continue_on_err, q)
                 .map_err(|err| self.handle_err(err, continue_on_err, &uri));
         }
 
@@ -403,12 +394,6 @@ impl<'i> Compiler<'i> {
         }
         if parent.is_none() && has_ptr_fragment(&uri) {
             self.uris.insert(uri.clone(), uris);
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-                dbg!("DANGER WILL ROBINSON");
-            }
             return self.queue_pathed(
                 SchemaToCompile {
                     key: None,
@@ -448,17 +433,8 @@ impl<'i> Compiler<'i> {
             ))
             .map_err(|err| self.handle_err(err.into(), continue_on_err, &uri))?;
 
-        self.maybe_finalize(
-            key,
-            &uri,
-            &src,
-            dialect_idx,
-            parent,
-            ref_,
-            continue_on_err,
-            q,
-        )
-        .map_err(|err| self.handle_err(err, continue_on_err, &uri))
+        self.maybe_finalize(key, &uri, parent, ref_, continue_on_err, q)
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))
     }
 
     fn handle_err(
@@ -483,13 +459,55 @@ impl<'i> Compiler<'i> {
             _ => (false, err),
         }
     }
-    #[instrument(skip(self,q), level = Level::TRACE)]
+
+    fn remaining_subschemas(
+        &mut self,
+        key: Key,
+        uri: &AbsoluteUri,
+    ) -> Result<Vec<SchemaToCompile>, CompileError> {
+        let existing = self.subschemas.get_mut(uri).unwrap();
+        let (remaining, subschemas) = subschemas(key, uri, existing.iter(), self.schemas)?;
+        *existing = remaining;
+        Ok(subschemas)
+    }
+
+    fn remaining_refs(
+        &mut self,
+        key: Key,
+        mut base_uri: AbsoluteUri,
+    ) -> Result<Vec<SchemaToCompile>, CompileError> {
+        let refs = self.refs.get(&base_uri).unwrap().clone();
+        let mut to_queue = Vec::with_capacity(refs.len());
+        let mut remaining = Vec::with_capacity(refs.len());
+        base_uri.set_fragment(None).unwrap();
+        for ref_ in refs.iter().cloned() {
+            let ref_uri = base_uri.resolve(&ref_.uri)?;
+            if self.schemas.contains_uri(&ref_uri) {
+                let ref_key = self.schemas.get_key(&ref_uri).unwrap();
+                self.resolve_ref(key, ref_key, ref_uri, ref_)?;
+            } else {
+                remaining.push(ref_.clone());
+                to_queue.push(SchemaToCompile {
+                    key: None,
+                    uri: ref_uri,
+                    parent: None,
+                    continue_on_err: false,
+                    ref_: Some(RefToResolve {
+                        referrer_key: key,
+                        ref_,
+                    }),
+                });
+            }
+        }
+        let refs = self.refs.get_mut(&base_uri).unwrap();
+        *refs = remaining;
+        Ok(to_queue)
+    }
+
     fn maybe_finalize(
         &mut self,
         key: Key,
         uri: &AbsoluteUri,
-        src: &Value,
-        dialect_idx: usize,
         parent: Option<Key>,
         ref_: Option<RefToResolve>,
         continue_on_err: bool,
@@ -498,33 +516,37 @@ impl<'i> Compiler<'i> {
         if self.schemas.is_compiled(key) {
             return Ok(());
         }
-        let kick_back = |q: &mut VecDeque<SchemaToCompile>| {
+        let kickback = |q: &mut VecDeque<SchemaToCompile>| {
             // kicking resolve_ref and setup_keywords down the road until all
             // subschemas are compiled and refs are resolved
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-
-            q.push_back(SchemaToCompile {
-                key: Some(key),
-                uri: uri.clone(),
-                parent,
-                continue_on_err,
-                ref_: ref_.clone(),
-            });
+            push_back(
+                q,
+                SchemaToCompile {
+                    key: Some(key),
+                    uri: uri.clone(),
+                    parent,
+                    continue_on_err,
+                    ref_: ref_.clone(),
+                },
+            );
             Ok(())
         };
-        if self.queue_subschemas(key, uri, dialect_idx, src, q)? {
-            return kick_back(q);
+
+        let subschemas = self.remaining_subschemas(key, uri)?;
+        if !subschemas.is_empty() {
+            append_all_front(q, subschemas);
+            return kickback(q);
         }
-        if self.queue_refs(key, dialect_idx, src, q)? {
-            return kick_back(q);
+
+        let refs = self.remaining_refs(key, uri.clone())?;
+        if !refs.is_empty() {
+            append_all_front(q, refs);
+            return kickback(q);
         }
+
         if !self.schemas.has_keywords(key) {
-            self.setup_keywords(key, &self.dialects[dialect_idx])?;
+            let keywords = self.keywords_for(key, self.keywords.get(uri).unwrap())?;
+            self.schemas.set_keywords(key, keywords);
         }
 
         if let Some(ref_) = ref_ {
@@ -540,18 +562,12 @@ impl<'i> Compiler<'i> {
         s: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
     ) -> Result<(), (bool, CompileError)> {
-        if s.uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        if s.uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-            dbg!("DANGER WILL ROBINSON");
-        }
         // if parent is None and this schema is not a document root (does
         // not have an $id/id) then find the most relevant ancestor and
         // compile it. Doing so will also compile this schema.
         self.queue_ancestors(&s.uri, q)
             .map_err(|err| self.handle_err(err, s.continue_on_err, &s.uri))?;
-        q.push_back(s);
+        push_back(q, s);
         Ok(())
     }
 
@@ -580,53 +596,44 @@ impl<'i> Compiler<'i> {
         // need to compile the root schema first in order to locate the anchor
         //
         // adding this schema to the front of the queue
-        if s.uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        if s.uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        q.push_front(s);
+        push_front(q, s);
         // putting the root ahead of it
         //
         // if the anchor is not found then an error should be raised.
-        if root_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        if root_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        q.push_front(SchemaToCompile {
-            key: None,
-            uri: root_uri,
-            parent: None,
-            continue_on_err: false,
-            ref_: None,
-        });
+        push_front(
+            q,
+            SchemaToCompile {
+                key: None,
+                uri: root_uri,
+                parent: None,
+                continue_on_err: false,
+                ref_: None,
+            },
+        );
         Ok(())
     }
 
-    #[instrument(skip(self), level = Level::TRACE)]
-    fn setup_keywords(&mut self, key: Key, dialect: &Dialect) -> Result<(), CompileError> {
-        let keywords = {
-            let schema = self.schemas.get(key, self.sources).unwrap();
-            let mut keywords = Vec::new();
-            for mut keyword in dialect.keywords().iter().cloned() {
-                let mut compile = Compile {
-                    absolute_uri: schema.absolute_uri(),
-                    schemas: self.schemas,
-                    numbers: self.numbers,
-                    value_cache: self.values,
-                    state: self.global_state,
-                };
-                if keyword.compile(&mut compile, schema.clone())? {
-                    keywords.push(keyword);
-                }
+    fn keywords_for(
+        &mut self,
+        key: Key,
+        possible: &[Box<dyn Keyword>],
+    ) -> Result<Box<[Box<dyn Keyword>]>, CompileError> {
+        let schema = self.schemas.get(key, self.sources).unwrap();
+        let mut keywords = Vec::new();
+        for mut keyword in possible.iter().cloned() {
+            let mut compile = Compile {
+                absolute_uri: schema.absolute_uri(),
+                schemas: self.schemas,
+                numbers: self.numbers,
+                value_cache: self.values,
+                state: self.global_state,
+            };
+            if keyword.compile(&mut compile, schema.clone())? {
+                keywords.push(keyword);
             }
-            keywords.into_boxed_slice()
-        };
-        self.schemas.get_mut(key).unwrap().keywords = keywords;
-        Ok(())
+        }
+        let keywords = keywords.into_boxed_slice();
+        Ok(keywords)
     }
 
     fn resolve_ref(
@@ -661,56 +668,6 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn queue_refs(
-        &mut self,
-        key: Key,
-        default_dialect_idx: usize,
-        src: &Value,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<bool, CompileError> {
-        let dialect = &self.dialects[default_dialect_idx];
-        let refs = dialect.refs(src)?;
-        let dependent_uri = self
-            .schemas
-            .get(key, self.sources)
-            .unwrap()
-            .absolute_uri()
-            .clone();
-
-        let mut base_uri = dependent_uri.clone();
-        base_uri.set_fragment(None).unwrap();
-
-        let mut has_unresolved_refs = false;
-        for ref_ in refs {
-            let ref_uri = base_uri.resolve(&ref_.uri)?;
-            if self.schemas.contains_uri(&ref_uri) {
-                let ref_key = self.schemas.get_key(&ref_uri).unwrap();
-                self.resolve_ref(key, ref_key, ref_uri, ref_)?;
-            } else {
-                has_unresolved_refs = true;
-                if ref_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-                    dbg!("DANGER WILL ROBINSON");
-                }
-                if ref_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-                    dbg!("DANGER WILL ROBINSON");
-                }
-                q.push_front(SchemaToCompile {
-                    key: None,
-                    uri: ref_uri,
-                    parent: None,
-                    continue_on_err: false,
-                    ref_: Some(RefToResolve {
-                        referrer_key: key,
-                        ref_,
-                    }),
-                });
-            }
-        }
-
-        Ok(has_unresolved_refs)
-    }
-
     fn dialect_idx(&self, src: &Value, default: usize) -> usize {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
     }
@@ -725,20 +682,16 @@ impl<'i> Compiler<'i> {
         let mut path = Pointer::parse(&target_uri.fragment_decoded_lossy().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
 
-        if target_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        if target_uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-
-        q.push_front(SchemaToCompile {
-            key: None,
-            uri: target_uri.clone(),
-            parent: None,
-            continue_on_err: true,
-            ref_: None,
-        });
+        push_front(
+            q,
+            SchemaToCompile {
+                key: None,
+                uri: target_uri.clone(),
+                parent: None,
+                continue_on_err: true,
+                ref_: None,
+            },
+        );
         while !path.is_root() {
             path.pop_back();
             let mut uri = target_uri.clone();
@@ -754,20 +707,16 @@ impl<'i> Compiler<'i> {
                 continue;
             }
 
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-            if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-                dbg!("DANGER WILL ROBINSON");
-            }
-
-            q.push_front(SchemaToCompile {
-                key: None,
-                uri,
-                parent: None,
-                continue_on_err: true,
-                ref_: None,
-            });
+            push_front(
+                q,
+                SchemaToCompile {
+                    key: None,
+                    uri,
+                    parent: None,
+                    continue_on_err: true,
+                    ref_: None,
+                },
+            );
         }
         let mut uri = target_uri.clone();
         uri.set_fragment(None).unwrap();
@@ -776,20 +725,16 @@ impl<'i> Compiler<'i> {
             return Err(CompileError::SchemaNotFound(target_uri.clone()));
         }
 
-        if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/1" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-        if uri == "https://json-schema.org/draft/2020-12/meta/validation#/anyOf/0" {
-            dbg!("DANGER WILL ROBINSON");
-        }
-
-        q.push_front(SchemaToCompile {
-            uri,
-            key: None,
-            parent: None,
-            continue_on_err: true,
-            ref_: None,
-        });
+        push_front(
+            q,
+            SchemaToCompile {
+                uri,
+                key: None,
+                parent: None,
+                continue_on_err: true,
+                ref_: None,
+            },
+        );
         Ok(())
     }
 
@@ -836,28 +781,22 @@ impl<'i> Compiler<'i> {
     }
 }
 
-fn queue_subschemas(
+fn subschemas<'c>(
     key: Key,
     uri: &AbsoluteUri,
-    src: &Value,
-    subschemas: &mut HashMap<AbsoluteUri, HashSet<Pointer>>,
+    subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
     schemas: &Schemas,
-    q: &mut VecDeque<SchemaToCompile>,
-) -> Result<bool, CompileError> {
-    let Some(subschemas) = subschemas.get(uri) else {
-        return Ok(false);
-    };
-
-    let mut has_subschemas = false;
-    for subschema_path in subschemas {
+) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile>), CompileError> {
+    let mut q = Vec::with_capacity(subschemas.len());
+    let mut r = HashSet::with_capacity(subschemas.len());
+    for path in subschemas {
         let mut uri = uri.clone();
-        if subschema_path.is_empty() {
+        if path.is_empty() {
             uri.set_fragment(None)?;
         } else {
-            uri.set_fragment(Some(&subschema_path))?;
+            uri.set_fragment(Some(path))?;
         }
         if !schemas.has_keywords_by_uri(&uri) {
-            has_subschemas = true;
             let subschema = SchemaToCompile {
                 key: None,
                 uri,
@@ -865,11 +804,36 @@ fn queue_subschemas(
                 continue_on_err: false,
                 ref_: None,
             };
-            q.push_front(subschema);
+            q.push(subschema);
+            r.insert(path.clone());
         }
     }
-    Ok(has_subschemas)
+    Ok((r, q))
 }
+fn push_front(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
+    if new.uri == "https://json-schema.org/draft/2020-12/meta/validation#/$defs" {
+        dbg!("DANGER WILL ROBINSON");
+    }
+    q.push_front(new);
+}
+fn push_back(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
+    if new.uri == "https://json-schema.org/draft/2020-12/meta/validation#/$defs" {
+        dbg!("DANGER WILL ROBINSON");
+    }
+    q.push_back(new);
+}
+
+fn append_all_front(q: &mut VecDeque<SchemaToCompile>, other: Vec<SchemaToCompile>) -> bool {
+    if other.is_empty() {
+        return false;
+    }
+    q.reserve(other.len());
+    for s in other.into_iter().rev() {
+        push_front(q, s);
+    }
+    true
+}
+
 fn append_anchor_uris<'i>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'i AbsoluteUri,

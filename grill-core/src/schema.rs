@@ -469,7 +469,9 @@ impl Schemas {
     pub(crate) fn has_keywords(&self, key: Key) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
-
+    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[Box<dyn Keyword>]>) {
+        self.sandbox().table.get_mut(key).unwrap().keywords = keywords;
+    }
     pub(crate) fn has_keywords_by_uri(&self, uri: &AbsoluteUri) -> bool {
         self.get_key(uri)
             .map_or(false, |key| self.has_keywords(key))
