@@ -22,6 +22,7 @@ pub struct Enum {
     /// The instance of [`TranslateEnumInvalid`] to use
     pub translate: TranslateEnumInvalid,
 }
+
 impl Enum {
     /// Construct a new `Enum` keyword.
     ///

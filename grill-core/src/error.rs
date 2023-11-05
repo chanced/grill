@@ -10,7 +10,7 @@ pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 pub use url::ParseError as UrlError;
 pub use urn::Error as UrnError;
 
-use crate::{uri::AbsoluteUri, Output, Uri};
+use crate::{schema::Anchor, uri::AbsoluteUri, Output, Uri};
 use serde_json::Value;
 use std::{
     error::Error as StdError,
@@ -107,6 +107,25 @@ pub struct AnchorInvalidCharError {
     /// The character which caused the error.
     pub char: char,
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                         DuplicateAnchorErrror                         ║
+║                        ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// An error occurred while attempting to locate subschemas.
+#[derive(Debug, Error)]
+#[error("duplicate anchor found: \"{}\"", existing.name)]
+pub struct DuplicateAnchorError {
+    pub existing: Anchor,
+    pub duplicate: Anchor,
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -145,6 +164,9 @@ pub enum AnchorError {
     /// The anchor value was not of the expected type.
     #[error(transparent)]
     InvalidType(#[from] InvalidTypeError),
+
+    #[error(transparent)]
+    Duplicate(#[from] DuplicateAnchorError),
 }
 
 /*
@@ -213,6 +235,10 @@ pub enum SourceError {
     /// Failed to create a source link.
     #[error(transparent)]
     FailedToLinkSource(#[from] LinkError),
+
+    /// An unknown anchor (non-pointer fragment of a URI) was encountered
+    #[error(transparent)]
+    UnknownAnchor(UnknownAnchorError),
 }
 impl From<jsonptr::MalformedPointerError> for SourceError {
     fn from(err: jsonptr::MalformedPointerError) -> Self {
@@ -381,15 +407,15 @@ pub enum LinkError {
 #[error(
     "source address {:?} @ {:?} already assigned to {:?}",
     uri,
-    new,
-    existing
+    new_path,
+    existing_path
 )]
 pub struct LinkConflictError {
     pub uri: AbsoluteUri,
     /// The existing schema location.
-    pub existing: Pointer,
+    pub existing_path: Pointer,
     /// The new schema location.
-    pub new: Pointer,
+    pub new_path: Pointer,
 }
 
 /*
@@ -841,6 +867,9 @@ pub enum CompileError {
     /// A regular expression failed to parse
     #[error(transparent)]
     FailedToEvaluateRegex(#[from] regex::Error),
+
+    #[error("length of uri exceeds maximum size of 4GB after setting fragment")]
+    UriFragmentOverflow { uri: AbsoluteUri, fragment: String },
 
     /// Custom errors returned by a [`Keyword`]
     #[error(transparent)]

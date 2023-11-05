@@ -246,17 +246,27 @@ impl Sources {
         self.sandbox = None;
     }
 
-    #[instrument(skip(self), level = Level::TRACE)]
-    pub(crate) fn link(&mut self, from: &AbsoluteUri, to: &Link) -> Result<&Link, LinkError> {
+    pub(crate) fn insert_link(&mut self, uri: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
+        match self.store_mut().link_entry(uri.clone()) {
+            Entry::Occupied(_) => self.check_existing_link(&uri, link),
+            Entry::Vacant(_) => self.create_link(uri, link),
+        }
+    }
+
+    pub(crate) fn link_existing(
+        &mut self,
+        from: AbsoluteUri,
+        to: &Link,
+    ) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(from.clone()) {
-            Entry::Occupied(_) => self.check_existing_link(from, to.clone()),
+            Entry::Occupied(_) => self.check_existing_link(&from, to.clone()),
             Entry::Vacant(_) => self.create_link(from.clone(), to.clone()),
         }
     }
 
     pub(crate) fn link_all(&mut self, from: &[AbsoluteUri], to: &Link) -> Result<(), LinkError> {
         for from_uri in from {
-            self.link(from_uri, to)?;
+            self.link_existing(from_uri.clone(), to)?;
         }
         Ok(())
     }
@@ -264,16 +274,6 @@ impl Sources {
     // pub(crate) fn get_link(&self, uri: &AbsoluteUri) -> Option<&Link> {
     //     self.store().get_link(uri)
     // }
-
-    pub(crate) async fn resolve_link(
-        &mut self,
-        uri: &AbsoluteUri,
-        resolvers: &Resolvers,
-        deserializers: &Deserializers,
-    ) -> Result<Link, SourceError> {
-        let (link, _) = self.resolve(uri, resolvers, deserializers).await?;
-        Ok(link.clone())
-    }
 
     pub(crate) async fn resolve(
         &mut self,
@@ -328,8 +328,8 @@ impl Sources {
         }
         Err(LinkConflictError {
             uri: uri.clone(),
-            existing: entry.src_path.clone(),
-            new: link.src_path,
+            existing_path: entry.src_path.clone(),
+            new_path: link.src_path,
         }
         .into())
     }
@@ -341,8 +341,8 @@ impl Sources {
                 if &link != existing_link {
                     return Err(LinkConflictError {
                         uri: from.clone(),
-                        existing: existing_link.src_path.clone(),
-                        new: link.src_path,
+                        existing_path: existing_link.src_path.clone(),
+                        new_path: link.src_path,
                     }
                     .into());
                 }
@@ -403,7 +403,7 @@ impl Sources {
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
-        let mut base_uri = uri.clone();
+        let mut base_uri =  uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = decode_lossy(&fragment);
         if fragment.starts_with('/') {

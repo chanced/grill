@@ -1,10 +1,13 @@
 //! A container of [`Keyword`]s and semantics which determine how to evaluate a
 //! [`Value`] against a [`Schema`](crate::Schema).
 
+use super::{Anchor, Ref};
 use crate::{
-    error::{AnchorError, DialectError, DialectsError, IdentifyError, RefError, UriError},
+    error::{
+        AnchorError, DialectError, DialectsError, DuplicateAnchorError, IdentifyError, RefError,
+        UriError,
+    },
     keyword::{Keyword, Unimplemented},
-    source::Link,
     uri::{AbsoluteUri, TryIntoAbsoluteUri},
     Key, Src,
 };
@@ -12,8 +15,6 @@ use jsonptr::Pointer;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::{borrow::Cow, convert::Into, fmt::Debug, hash::Hash, iter::IntoIterator, ops::Deref};
-
-use super::{Anchor, Ref};
 
 /// Builds a [`Dialect`].
 pub struct Build {
@@ -55,6 +56,16 @@ impl Build {
         Dialect::new(self.id, metaschemas, self.keywords)
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Dialect                                ║
+║                               ¯¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 /// A set of keywords and semantics which are used to evaluate a [`Value`] against a
 /// schema.
@@ -155,15 +166,10 @@ impl Dialect {
     /// `Keyword` of this `Dialect`.
     ///
     #[must_use]
-    pub fn subschemas(&self, path: &Pointer, src: &Value) -> HashSet<Pointer> {
+    pub fn subschemas(&self, src: &Value) -> HashSet<Pointer> {
         self.subschemas_indexes
             .iter()
             .flat_map(|&idx| self.keywords[idx as usize].subschemas(src).unwrap())
-            .map(|p| {
-                let mut path = path.clone();
-                path.append(&p);
-                path
-            })
             .collect()
     }
 
@@ -193,14 +199,26 @@ impl Dialect {
     /// Returns [`AnchorError`] if any [`Keyword`] fails to parse the [`Anchor`]s. This could include
     /// invalid JSON types or malformed anchors.
     pub fn anchors(&self, source: &Value) -> Result<Vec<Anchor>, AnchorError> {
-        let mut anchors = Vec::new();
+        let mut anchors: Vec<Anchor> = Vec::new();
+        let mut names = HashSet::new();
         for res in self
             .anchors_indexes
             .iter()
             .copied()
             .map(|idx| self.keywords[idx as usize].anchors(source).unwrap())
         {
-            anchors.append(&mut res?);
+            for anchor in res? {
+                if names.contains(&anchor.name) {
+                    let existing = anchors.iter().find(|a| a.name == anchor.name).unwrap();
+                    return Err(DuplicateAnchorError {
+                        existing: existing.clone(),
+                        duplicate: anchor,
+                    }
+                    .into());
+                }
+                names.insert(anchor.name.clone());
+                anchors.push(anchor);
+            }
         }
         Ok(anchors)
     }
@@ -295,6 +313,16 @@ impl Debug for Dialect {
             .finish_non_exhaustive()
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Dialects                               ║
+║                               ¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 /// A collection of [`Dialect`]s.
 #[derive(Debug, Clone)]
