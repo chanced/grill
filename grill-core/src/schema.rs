@@ -374,6 +374,12 @@ impl Schemas {
         }
     }
 
+    pub fn print_sources(&self) {
+        for (uri, key) in &self.store.index {
+            println!("{uri}: {key:?}");
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn evaluate<'v>(
         &self,

@@ -25,26 +25,6 @@ use thiserror::Error;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                           LocateSchemaError                           ║
-║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An error occurred while attempting to locate subschemas.
-#[derive(Debug, Error)]
-#[error("error locating subschemas")]
-pub enum LocateSchemasError {
-    /// An error occurred locating subschemas due to a malformed anchor.
-    MalformedAnchor(#[from] AnchorError),
-    /// An error occurred locating subschemas due to an error identifying a schema.
-    FailedToIdentifySchema(#[from] IdentifyError),
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
 ║                          AnchorNotEmptyError                          ║
 ║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -795,21 +775,12 @@ pub enum CompileError {
     #[error(transparent)]
     FailedToParseUri(#[from] UriError),
 
-    /// All attached implementations of [`Resolve`](crate::resolve::Resolve)
-    /// failed to resolve a source.
-    #[error(transparent)]
-    FailedToResolve(#[from] ResolveErrors),
-
     /// Failed to resolve or deserialize a source
     #[error(transparent)]
     FailedToSource(#[from] SourceError),
 
     #[error(transparent)]
     FailedToEvaluateSchema(#[from] EvaluateError),
-
-    /// Failed to locate subschemas within a schema.
-    #[error(transparent)]
-    FailedToLocateSubschemas(#[from] LocateSchemasError),
 
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the

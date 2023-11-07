@@ -17,12 +17,13 @@ use crate::{
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Schema, Structure,
+    AbsoluteUri, Interrogator, Key, Structure,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
 
 // TODO: insert a link for the uri + an empty fragment if None (http://example/path/ -> http://example/path/#)
+// TODO: handle 07 style $ids (hashtagged)
 
 #[derive(Clone, Debug)]
 struct RefToResolve {
@@ -66,7 +67,7 @@ pub(crate) struct Compiler<'i> {
     numbers: &'i mut Numbers,
     values: &'i mut Values,
     validate: bool,
-    linked: HashSet<AbsoluteUri>,
+    indexed: HashSet<AbsoluteUri>,
     ids: HashMap<AbsoluteUri, Option<AbsoluteUri>>,
     anchors: HashMap<AbsoluteUri, Vec<Anchor>>,
     subschemas: HashMap<AbsoluteUri, HashSet<Pointer>>,
@@ -92,7 +93,7 @@ impl<'i> Compiler<'i> {
             values: &mut interrogator.values,
             validate,
             ids: HashMap::default(),
-            linked: HashSet::default(),
+            indexed: HashSet::default(),
             anchors: HashMap::default(),
             subschemas: HashMap::default(),
             uris: HashMap::default(),
@@ -166,50 +167,28 @@ impl<'i> Compiler<'i> {
         &mut self,
         uri: &AbsoluteUri,
     ) -> Result<Option<(Link, Value)>, CompileError> {
-        println!("===============================================================================");
-        println!("PRECOMPILE\n\turi:\t{uri}");
-        let mut linked = self
-            .linked
+        let mut indexed = self
+            .indexed
             .iter()
             .map(std::string::ToString::to_string)
             .collect::<Vec<_>>();
-        linked.sort();
-        println!(
-            "linked:\t{}",
-            linked
-                .into_iter()
-                .map(|s| format!("\n\t\t\t{s}"))
-                .collect::<String>()
-        );
-        if self.linked.contains(uri) {
-            println!(
-                "-------------------------------------------------------------------------------"
-            );
-            println!("CONTAINS LINKED {uri}");
+        indexed.sort();
+        if self.indexed.contains(uri) {
             let (link, src) = self
                 .sources
                 .resolve(uri, self.resolvers, self.deserializers)
                 .await?;
-            println!(
-                "==============================================================================="
-            );
             return Ok(Some((link.clone(), src.clone())));
         }
-        println!("-------------------------------------------------------------------------------");
-        println!("DOES NOT CONTAIN LINKED {uri}");
-        println!("===============================================================================");
-        self.prepare_all(uri.clone()).await?
+        self.index_all(uri.clone()).await
     }
 
-    async fn prepare_all(
-        &mut self,
-        uri: AbsoluteUri,
-    ) -> Result<Option<(Link, Value)>, CompileError> {
-        println!("===============================================================================");
-        println!("LINKING ALL\t{uri}");
+    async fn index_all(&mut self, uri: AbsoluteUri) -> Result<Option<(Link, Value)>, CompileError> {
         let mut base_uri = uri.clone();
         base_uri.set_fragment(None).unwrap();
-
+        if self.indexed.contains(&base_uri) {
+            return Ok(None);
+        }
         let (link, src) = self
             .sources
             .resolve(&base_uri, self.resolvers, self.deserializers)
@@ -233,21 +212,17 @@ impl<'i> Compiler<'i> {
         });
 
         while let Some(loc) = q.pop() {
-            self.prepare(loc, &mut q)?;
+            self.index(loc, &mut q)?;
         }
-        println!("DONE LINKING ALL {uri}");
-        println!("===============================================================================");
-
         let (link, src) = self
             .sources
-            .resolve(uri, self.resolvers, self.deserializers)
+            .resolve(&uri, self.resolvers, self.deserializers)
             .await?;
 
-        let src = src.clone();
-        Ok(())
+        Ok(Some((link.clone(), src.clone())))
     }
 
-    fn prepare<'v>(
+    fn index<'v>(
         &mut self,
         loc: Location<'v>,
         q: &mut Vec<Location<'v>>,
@@ -262,37 +237,8 @@ impl<'i> Compiler<'i> {
             src_key,
             sub_path,
         } = loc;
-        println!("===============================================================================");
-        println!("LINKING");
-        println!("\turi:\t\t{uri}");
-        println!("\tsub_path:\t{sub_path:?}");
-        println!("\trel_path:\t{rel_path:?}");
-        println!("\tabs_path:\t{abs_path:?}");
-        println!("\tdialect_idx:\t{default_dialect_idx:?}");
-        println!(
-            "\tancestry_uris:\t{}",
-            ancestry_uris.iter().fold(String::new(), |mut acc, uri| {
-                write!(&mut acc, "\n\t\t\t{uri}").unwrap();
-                acc
-            })
-        );
-
-        println!(
-            "\n\tfull:\t\t{}",
-            serde_json::to_string_pretty(src)
-                .unwrap()
-                .replace('\n', "\n\t\t\t")
-        );
 
         let src = src.resolve(&sub_path).unwrap();
-
-        println!(
-            "\n\tsrc:\t\t{}",
-            serde_json::to_string_pretty(src)
-                .unwrap()
-                .replace('\n', "\n\t\t\t")
-        );
-        println!("===============================================================================");
 
         let link = self
             .sources
@@ -340,7 +286,7 @@ impl<'i> Compiler<'i> {
         }
         for other in &uris {
             self.primary_uris.insert(other.clone(), uri.clone());
-            self.linked.insert(other.clone());
+            self.indexed.insert(other.clone());
         }
 
         self.ids.insert(uri.clone(), id);
@@ -351,7 +297,7 @@ impl<'i> Compiler<'i> {
         self.subschemas.insert(uri.clone(), subschemas);
         self.keywords.insert(uri.clone(), dialect.keywords());
         self.refs.insert(uri.clone(), dialect.refs(src)?);
-        self.linked.insert(uri);
+        self.indexed.insert(uri);
         Ok(())
     }
 
@@ -368,16 +314,19 @@ impl<'i> Compiler<'i> {
             continue_on_err,
             ref_,
         } = schema_to_compile;
-        let (link, src) = self
+        let Some((link, src)) = self
             .precompile(&uri)
             .await
-            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?
+        else {
+            return Err(CompileError::SchemaNotFound(uri.clone()))
+                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+        };
 
+        let uri = self.primary_uris.get(&uri).unwrap().clone();
         let dialect_idx = *self.dialect_idxs.get(&uri).unwrap();
 
         if let Some(key) = key.or(self.schemas.get_key(&uri)) {
-            let schema = self.schemas.get(key, self.sources).unwrap().clone();
-            let uri = schema.absolute_uri().clone();
             return self
                 .maybe_finalize(key, &uri, parent, ref_, continue_on_err, q)
                 .map_err(|err| self.handle_err(err, continue_on_err, &uri));
@@ -386,7 +335,6 @@ impl<'i> Compiler<'i> {
         self.validate(dialect_idx, &src)
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
 
-        let uri = self.primary_uris.get(&uri).unwrap().clone();
         let uris = self.uris.remove(&uri).unwrap();
         let id = self.ids.get(&uri).unwrap().clone();
         if id.is_some() {
@@ -454,7 +402,7 @@ impl<'i> Compiler<'i> {
                 if let Some(key) = self.schemas.get_key(uri) {
                     self.schemas.remove(key);
                 }
-                (false, err)
+                (continue_on_err, err)
             }
             _ => (false, err),
         }
@@ -811,15 +759,9 @@ fn subschemas<'c>(
     Ok((r, q))
 }
 fn push_front(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
-    if new.uri == "https://json-schema.org/draft/2020-12/meta/validation#/$defs" {
-        dbg!("DANGER WILL ROBINSON");
-    }
     q.push_front(new);
 }
 fn push_back(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
-    if new.uri == "https://json-schema.org/draft/2020-12/meta/validation#/$defs" {
-        dbg!("DANGER WILL ROBINSON");
-    }
     q.push_back(new);
 }
 

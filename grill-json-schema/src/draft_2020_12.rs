@@ -7,71 +7,71 @@ use std::borrow::Cow;
 /// Constructs a new [`Dialect`] for Draft 2020-12
 #[must_use]
 pub fn dialect() -> Dialect {
-    Dialect::build(json_schema_2020_12_validation_uri().clone())
-        // .add_metaschema(
-        //     json_schema_2020_12_uri().clone(),
-        //     Cow::Borrowed(json_schema_2020_12_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_core_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_core_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_content_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_content_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_format_assertion_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_format_annotation_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_metadata_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_metadata_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_output_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_output_value()),
-        // )
+    Dialect::build(json_schema_2020_12_uri().clone())
+        .add_metaschema(
+            json_schema_2020_12_uri().clone(),
+            Cow::Borrowed(json_schema_2020_12_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_core_uri(),
+            Cow::Borrowed(json_schema_2020_12_core_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_content_uri(),
+            Cow::Borrowed(json_schema_2020_12_content_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_assertion_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_annotation_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_metadata_uri(),
+            Cow::Borrowed(json_schema_2020_12_metadata_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_output_uri(),
+            Cow::Borrowed(json_schema_2020_12_output_value()),
+        )
         .add_metaschema(
             json_schema_2020_12_validation_uri(),
             Cow::Borrowed(json_schema_2020_12_validation_value()),
         )
-        // .add_metaschema(
-        //     json_schema_2020_12_applicator_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_applicator_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_content_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_content_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_format_assertion_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_format_annotation_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_metadata_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_metadata_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_output_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_output_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_validation_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_validation_value()),
-        // )
-        // .add_metaschema(
-        //     json_schema_2020_12_unevaluated_uri(),
-        //     Cow::Borrowed(json_schema_2020_12_unevaluated_value()),
-        // )
+        .add_metaschema(
+            json_schema_2020_12_applicator_uri(),
+            Cow::Borrowed(json_schema_2020_12_applicator_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_content_uri(),
+            Cow::Borrowed(json_schema_2020_12_content_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_assertion_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_assertion_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_format_annotation_uri(),
+            Cow::Borrowed(json_schema_2020_12_format_annotation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_metadata_uri(),
+            Cow::Borrowed(json_schema_2020_12_metadata_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_output_uri(),
+            Cow::Borrowed(json_schema_2020_12_output_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_validation_uri(),
+            Cow::Borrowed(json_schema_2020_12_validation_value()),
+        )
+        .add_metaschema(
+            json_schema_2020_12_unevaluated_uri(),
+            Cow::Borrowed(json_schema_2020_12_unevaluated_value()),
+        )
         .add_keyword(keyword::schema::Schema::new(SCHEMA, false))
         .add_keyword(keyword::id::Id::new(ID, false))
         .add_keyword(keyword::boolean::Boolean::default())

@@ -1,5 +1,12 @@
 [workspace]
-members  = ["grill", "grill-core", "grill-macros", "grill-json-schema", "tests"]
+members = [
+	"grill",
+	"grill-core",
+	"grill-macros",
+	"grill-json-schema",
+	"grill-test-builder",
+	"tests",
+]
 resolver = "2"
 
 [workspace.dependencies]

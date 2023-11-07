@@ -109,6 +109,8 @@ macro_rules! json_pretty_str {
     };
 }
 
+pub trait Criterion {}
+
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
 pub struct Build {
@@ -377,8 +379,8 @@ impl Build {
         self
     }
 
-    /// Adds a set of source schemas from an [`Iterator`] of
-    /// `(TryIntoAbsoluteUri, Borrow<serde_json::Value>>)`
+    /// Adds [`Iterator`] of sources in the form of a tuple consisting of
+    /// [`TryIntoAbsoluteUri`], [`Cow`]`<'static,` [`Value`]`>`.
     ///
     /// # Example
     /// ```
@@ -388,8 +390,10 @@ impl Build {
     /// # #[tokio::main]
     /// # async fn main() {
     /// let mut sources = HashMap::new();
-    /// let source = Cow::Owned(json!({"type": "string"}));
-    /// sources.insert("https://example.com/schema.json", source);
+    /// sources.insert(
+    ///     "https://example.com/schema.json",
+    ///     Cow::Owned(json!({"type": "string"})),
+    /// );
     /// let interrogator = Interrogator::build()
     ///     .json_schema_2020_12()
     ///     .source_values(sources)
@@ -409,6 +413,73 @@ impl Build {
                 .push(PendingSrc::Value(k.try_into_absolute_uri(), v));
         }
         self
+    }
+
+    /// Adds [`Iterator`] of sources in the form of a tuple consisting of
+    /// [`TryIntoAbsoluteUri`], [`Value`].
+    ///
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// # use std::{ borrow::Cow, collections::HashMap };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// sources.insert(
+    ///     "https://example.com/schema.json",
+    ///     json!({"type": "string"}),
+    /// );
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_owned_values(sources)
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn source_owned_values<I, K>(self, sources: I) -> Self
+    where
+        K: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (K, Value)>,
+    {
+        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
+    }
+
+    /// Adds [`Iterator`] of sources in the form of a tuple consisting of
+    /// [`TryIntoAbsoluteUri`], [`&'static serde_json::Value`](`Value`).
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{ AbsoluteUri, Interrogator, json_schema::Build as _ };
+    /// use once_cell::sync::Lazy;
+    /// # use std::{ collections::HashMap };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static mut SOURCES: Lazy<HashMap<AbsoluteUri,Value>> = Lazy::new(|| {
+    ///    let mut sources = HashMap::new();
+    ///     sources.insert(
+    ///         "https://example.com/schema.json",
+    ///         json!({"type": "string"}),
+    /// });
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .source_owned_values(SOURCES.get().unwrap())
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn source_static_values<I, K>(self, sources: I) -> Self
+    where
+        K: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (K, Value)>,
+    {
+        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
     }
 
     /// Adds a [`Resolve`] for resolving schema references.
@@ -580,6 +651,10 @@ impl Debug for Interrogator {
 }
 
 impl Interrogator {
+    pub fn print_source_index(&self) {
+        self.sources.print_index();
+    }
+
     /// Returns the [`Schema`] with the given `key` if it exists.
     ///
     /// # Errors
@@ -1181,6 +1256,72 @@ impl Interrogator {
             self.source(Src::Value(k.try_into_absolute_uri()?, v))?;
         }
         Ok(())
+    }
+
+    // Adds [`Iterator`] of sources in the form of a tuple consisting of
+    /// [`TryIntoAbsoluteUri`], [`Value`].
+    ///
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{ Interrogator, json_schema::Build as _ };
+    /// # use std::{ borrow::Cow, collections::HashMap };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut sources = HashMap::new();
+    /// sources.insert(
+    ///     "https://example.com/schema.json",
+    ///     json!({"type": "string"}),
+    /// );
+    /// let mut interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    ///
+    ///  interrogator.source_owned_values(sources).unwrap();
+    /// # }
+    /// ```
+    pub fn source_owned_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
+    where
+        K: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (K, Value)>,
+    {
+        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
+    }
+
+    /// Adds [`Iterator`] of sources in the form of a tuple consisting of
+    /// [`TryIntoAbsoluteUri`], [`&'static serde_json::Value`](`Value`).
+    ///
+    /// # Example
+    /// ```
+    /// use grill::{ AbsoluteUri, Interrogator, json_schema::Build as _ };
+    /// use once_cell::sync::Lazy;
+    /// # use std::{ collections::HashMap };
+    /// # use serde_json::json;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static mut SOURCES: Lazy<HashMap<AbsoluteUri,Value>> = Lazy::new(|| {
+    ///    let mut sources = HashMap::new();
+    ///     sources.insert(
+    ///         "https://example.com/schema.json",
+    ///         json!({"type": "string"}),
+    /// });
+    /// let interrogator = Interrogator::build()
+    ///     .json_schema_2020_12()
+    ///     .finish()
+    ///     .await
+    ///     .unwrap();
+    /// interrogator.source_owned_values(SOURCES.get().unwrap())
+    /// # }
+    /// ```
+    pub fn source_static_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
+    where
+        K: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (K, Value)>,
+    {
+        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
     }
 
     /// Returns a new, empty [`Build`].

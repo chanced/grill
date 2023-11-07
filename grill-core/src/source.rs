@@ -124,9 +124,6 @@ impl Store {
         uri: AbsoluteUri,
         src: Cow<'static, Value>,
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
-        if !uri.starts_with("https://json") {
-            println!("SOURCING: {uri}");
-        }
         let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = decode_lossy(&fragment);
@@ -201,6 +198,12 @@ pub(crate) struct Sources {
 }
 
 impl Sources {
+    pub fn print_index(&self) {
+        for (uri, link) in &self.store.index {
+            println!("  {uri}: {link:?}");
+        }
+    }
+
     /// Returns a new [`Sources`] instance.
     ///
     /// # Errors
@@ -403,7 +406,7 @@ impl Sources {
         resolvers: &Resolvers,
         deserializers: &Deserializers,
     ) -> Result<(&Link, &Value), SourceError> {
-        let mut base_uri =  uri.clone();
+        let mut base_uri = uri.clone();
         let fragment = base_uri.set_fragment(None).unwrap().unwrap_or_default();
         let fragment = decode_lossy(&fragment);
         if fragment.starts_with('/') {

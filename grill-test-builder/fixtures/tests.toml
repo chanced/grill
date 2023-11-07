@@ -1,0 +1,8 @@
+[json-schema-test-suite]
+base-uri  = "http://localhost:1234"
+input     = "./tests/json-schema-test-suite"
+output    = "./tests/src/json-schema"
+sources   = ["./remotes/**/*.json"]
+[json-schema-test-suite.tests]
+draft2020-12 = ["*.json", "optional/format/*.json"]
+draft7       = ["*.json", "optional/format/*.json"]

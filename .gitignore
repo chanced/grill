@@ -20,3 +20,5 @@ Cargo.lock
 .idea
 
 .vscode
+
+remotes.json
