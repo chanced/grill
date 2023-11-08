@@ -17,35 +17,38 @@
     clippy::unreadable_literal
 )]
 
-use std::{collections::HashMap, path::PathBuf};
-
-use grill::AbsoluteUri;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 mod fs;
 mod generate;
 
-pub enum Out {
-    Dir(Vec<Out>),
-    File { path: PathBuf, content: String },
-}
+pub use fs::write_files;
 
-#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+use camino::{Utf8Path, Utf8PathBuf};
+use glob::GlobError;
+use grill::AbsoluteUri;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use snafu::{ResultExt, Snafu};
+use std::{collections::HashMap, path::PathBuf};
+
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Config {
     #[serde(flatten)]
-    pub suite: HashMap<String, Suite>,
+    pub suite: HashMap<Utf8PathBuf, Suite>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Sources {
+    #[serde(rename = "strip-prefix", alias = "strip_prefix", default)]
+    pub strip_prefix: Option<Utf8PathBuf>,
+    pub paths: Vec<Utf8PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Suite {
-    /// the input path for the test suite - that is where the json files reside
-    pub input: PathBuf,
-    /// the output path for the test suite - that is where the generated files
-    /// will be written
-    pub output: PathBuf,
     /// glob patterns for json files which should be sourced, relative to
     /// `input`
-    pub sources: Vec<PathBuf>,
+    #[serde(default)]
+    pub sources: Option<Sources>,
 
     /// The base URI for the test suite
     #[serde(alias = "base_uri", rename = "base-uri")]
@@ -91,7 +94,7 @@ pub struct Suite {
     /// ]
     /// ```
     #[serde(flatten)]
-    pub tests: HashMap<PathBuf, HashMap<PathBuf, Vec<String>>>,
+    pub tests: HashMap<Utf8PathBuf, HashMap<Utf8PathBuf, Vec<Utf8PathBuf>>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -108,20 +111,68 @@ pub struct Test {
     pub valid: bool,
 }
 
-pub fn generate(cfg: Config) -> Result<String, anyhow::Error> {
-    todo!()
-    // Ok(String::default())
+pub fn generate(cwd: Utf8PathBuf, cfg: &Config) -> Result<Vec<(Utf8PathBuf, String, bool)>, Error> {
+    for (path, suite) in &cfg.suite {
+        let suite = generate::suite(path, suite)?;
+    }
+    unimplemented!()
 }
 
-fn default_tests_dir() -> PathBuf {
-    PathBuf::from("tests")
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display(
+        "failed to read or access file\"{}\"\ncaused by:\n\n{}\n", 
+        path.display(),
+        source
+    ))]
+    Io {
+        pattern: Option<Utf8PathBuf>,
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[snafu(display("path is not valid utf8: \"{path:?}\"\n"))]
+    NotUtf8 { path: PathBuf },
+
+    #[snafu(display("failed to parse glob pattern \"{pattern}\"\ncaused by:\n\n{source}\n"))]
+    Glob {
+        pattern: Utf8PathBuf,
+        source: glob::PatternError,
+    },
+    #[snafu(display("failed to load config \"{path}\":\ncaused by:\n\n{source}\n"))]
+    Deserialize {
+        path: Utf8PathBuf,
+        source: toml::de::Error,
+    },
+}
+
+impl Error {
+    #[must_use]
+    pub fn from_glob_error(err: GlobError, pattern: Utf8PathBuf) -> Self {
+        let path = err.path().to_owned();
+        Error::Io {
+            pattern: Some(pattern.clone()),
+            source: err.into_error(),
+            path,
+        }
+    }
+}
+pub fn load_cfg(path: impl AsRef<str>) -> Result<Config, Error> {
+    let path = Utf8Path::new(path.as_ref());
+    let cfg = std::fs::read_to_string(path).with_context(|_| IoSnafu {
+        path: path.to_owned(),
+        pattern: None,
+    })?;
+    toml::from_str(&cfg).with_context(|_| DeserializeSnafu {
+        path: path.to_owned(),
+    })
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    fn set_cwd() {
+    pub(crate) fn set_test_cwd() {
         let mut cwd = std::env::current_dir().unwrap();
         if cwd.ends_with("grill-test-builder") {
             cwd.pop();
@@ -131,11 +182,10 @@ mod tests {
 
     #[test]
     fn test_spike() {
-        set_cwd();
-        let cfg = std::fs::read_to_string("./grill-test-builder/fixtures/tests.toml").unwrap();
-        let cfg: Config = toml::from_str(&cfg).unwrap();
+        set_test_cwd();
+        let cfg = load_cfg(Utf8Path::new("grill-test-builder/fixtures/tests.toml"));
         println!("{cfg:?}");
-        // let op = super::generate(cfg).unwrap();
+        // let op = super::generate::suite(path, suite);
         // println!("{op}");
     }
 }
