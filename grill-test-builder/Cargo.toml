@@ -13,9 +13,8 @@ path-slash   = { version = "0.x" }
 prettyplease = { version = "0.2" }
 proc-macro2  = { version = "1.0" }
 quote        = { version = "1.0" }
-rustfmt      = { version = "0.10.0" }
 serde        = { workspace = true, features = ["derive"] }
-serde_json   = { workspace = true }
+serde_json   = { workspace = true, features = ["raw_value"] }
 snafu        = { workspace = true }
 syn          = { version = "2" }
 toml         = { workspace = true }

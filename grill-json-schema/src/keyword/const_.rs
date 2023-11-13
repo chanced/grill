@@ -239,12 +239,12 @@ mod tests {
             .unwrap();
         let value = json!(34.34);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &value)
+            .evaluate(Structure::Verbose, key, &value)
             .unwrap();
         assert!(output.is_annotation());
         let value = json!(34.3434);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &value)
+            .evaluate(Structure::Verbose, key, &value)
             .unwrap();
         assert!(!output.is_annotation());
     }

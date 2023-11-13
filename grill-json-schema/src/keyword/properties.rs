@@ -232,7 +232,7 @@ mod tests {
             "foo": 32
         });
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid)
+            .evaluate(Structure::Verbose, key, &invalid)
             .unwrap();
         assert!(!output.is_annotation());
     }

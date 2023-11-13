@@ -189,11 +189,11 @@ mod tests {
             .unwrap();
         let value = json!(34.34);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &value)
+            .evaluate(Structure::Verbose, key, &value)
             .unwrap();
         println!("++ verbose:\n{output}");
         let basic_output = interrogator
-            .evaluate(key, Structure::Basic, &value)
+            .evaluate(Structure::Basic, key, &value)
             .unwrap();
         println!("++ basic:\n{basic_output}");
     }

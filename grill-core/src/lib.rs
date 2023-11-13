@@ -28,6 +28,7 @@ pub use output::{Output, Structure};
 pub mod keyword;
 
 pub mod uri;
+use pin_project::pin_project;
 pub use uri::{AbsoluteUri, RelativeUri, Uri};
 
 pub mod schema;
@@ -43,7 +44,9 @@ pub mod anymap;
 #[cfg(test)]
 pub mod test;
 
-use std::{any, borrow::Cow, collections::HashSet, fmt::Debug, ops::Deref};
+use std::{
+    any, borrow::Cow, collections::HashSet, fmt::Debug, future::Future, ops::Deref, pin::Pin,
+};
 
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
@@ -110,6 +113,35 @@ macro_rules! json_pretty_str {
 }
 
 pub trait Criterion {}
+
+/// The `Future` returned from calling `Build::finish`.
+#[pin_project]
+pub struct Building {
+    #[pin]
+    build: Pin<Box<dyn Send + Future<Output = Result<Interrogator, BuildError>>>>,
+}
+impl Future for Building {
+    type Output = Result<Interrogator, BuildError>;
+
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        self.project().build.as_mut().poll(cx)
+    }
+}
+
+impl Building {
+    /// Constructs a new `Building`
+    #[must_use]
+    pub fn new(
+        build: impl 'static + Send + Future<Output = Result<Interrogator, BuildError>>,
+    ) -> Self {
+        Self {
+            build: Box::pin(build),
+        }
+    }
+}
 
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
@@ -537,8 +569,7 @@ impl Build {
         self
     }
 
-    /// Finalizes the build of an [`Interrogator`]
-    pub async fn finish(self) -> Result<Interrogator, BuildError> {
+    async fn building(self) -> Result<Interrogator, BuildError> {
         let Self {
             dialects,
             pending_srcs,
@@ -575,12 +606,14 @@ impl Build {
             values: Values::default(),
         };
         interrogator.compile_dialects_schemas(dialect_ids).await?;
-
-        for uri in precompile {
-            interrogator.compile(uri).await?;
-        }
-
+        interrogator.compile_all(precompile).await?;
         Ok(interrogator)
+    }
+
+    /// Finalizes the build of an [`Interrogator`]
+    #[must_use]
+    pub fn finish(self) -> Building {
+        Building::new(self.building())
     }
 
     /// Precompiles schemas at the given URIs.
@@ -977,8 +1010,8 @@ impl Interrogator {
     /// [`Structure`].
     pub fn evaluate<'v>(
         &self,
-        key: Key,
         structure: Structure,
+        key: Key,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
         let mut eval_state = AnyMap::new();

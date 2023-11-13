@@ -20,7 +20,7 @@
 mod fs;
 mod generate;
 
-pub use fs::write_files;
+pub use fs::write;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use glob::GlobError;
@@ -32,6 +32,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Config {
+    #[serde(default = "default_output", rename = "tests-dir", alias = "tests_dir")]
+    pub tests_dir: Utf8PathBuf,
     #[serde(flatten)]
     pub suite: HashMap<Utf8PathBuf, Suite>,
 }
@@ -111,11 +113,11 @@ pub struct Test {
     pub valid: bool,
 }
 
-pub fn generate(cwd: Utf8PathBuf, cfg: &Config) -> Result<Vec<(Utf8PathBuf, String, bool)>, Error> {
+pub fn generate(_cwd: PathBuf, cfg: &Config) -> Result<Vec<(Utf8PathBuf, String, bool)>, Error> {
     for (path, suite) in &cfg.suite {
-        let suite = generate::suite(path, suite)?;
+        let suite = generate::gen_suite(&[&cfg.tests_dir, path], suite)?;
     }
-    unimplemented!()
+    todo!()
 }
 
 #[derive(Snafu, Debug)]
@@ -131,7 +133,7 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    #[snafu(display("path is not valid utf8: \"{path:?}\"\n"))]
+    #[snafu(display("path is not valid utf8: {path:?}\n"))]
     NotUtf8 { path: PathBuf },
 
     #[snafu(display("failed to parse glob pattern \"{pattern}\"\ncaused by:\n\n{source}\n"))]
@@ -139,11 +141,24 @@ pub enum Error {
         pattern: Utf8PathBuf,
         source: glob::PatternError,
     },
-    #[snafu(display("failed to load config \"{path}\":\ncaused by:\n\n{source}\n"))]
-    Deserialize {
-        path: Utf8PathBuf,
+
+    #[snafu(display("failed to load config{path:?}:\ncaused by:\n\n{source}\n"))]
+    Toml {
+        path: PathBuf,
         source: toml::de::Error,
     },
+
+    #[snafu(display("failed to load test case {path:?}:\ncaused by:\n\n{source}\n"))]
+    Json {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
+    #[snafu(display("failed to parse token stream:\n{content}\n\ncaused by:\n\n{source}\n"))]
+    Syn { content: String, source: syn::Error },
+
+    #[snafu(display("failed to format source:\ncaused by:\n\n{stdout}"))]
+    RustFmt { stdout: String, stderr: String },
 }
 
 impl Error {
@@ -163,9 +178,13 @@ pub fn load_cfg(path: impl AsRef<str>) -> Result<Config, Error> {
         path: path.to_owned(),
         pattern: None,
     })?;
-    toml::from_str(&cfg).with_context(|_| DeserializeSnafu {
+    toml::from_str(&cfg).with_context(|_| TomlSnafu {
         path: path.to_owned(),
     })
+}
+
+fn default_output() -> Utf8PathBuf {
+    Utf8PathBuf::from("tests")
 }
 
 #[cfg(test)]

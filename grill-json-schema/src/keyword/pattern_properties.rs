@@ -263,7 +263,7 @@ mod tests {
             (json!({ "S_25": "This is a string", "I_0": 34 }), true),
         ] {
             let output = interrogator
-                .evaluate(key, Structure::Verbose, &data)
+                .evaluate(Structure::Verbose, key, &data)
                 .unwrap();
             assert_eq!(
                 output.is_annotation(),

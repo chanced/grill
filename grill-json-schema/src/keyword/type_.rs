@@ -478,13 +478,13 @@ mod tests {
         let valid_value = json!("test");
 
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &valid_value)
+            .evaluate(Structure::Verbose, key, &valid_value)
             .unwrap();
         assert!(output.is_annotation());
 
         let invalid_value = json!(["invalid"]);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid_value)
+            .evaluate(Structure::Verbose, key, &invalid_value)
             .unwrap();
         assert!(output.is_error());
         let key = interrogator
@@ -494,13 +494,13 @@ mod tests {
 
         let valid_value = json!(34);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &valid_value)
+            .evaluate(Structure::Verbose, key, &valid_value)
             .unwrap();
         assert!(output.is_annotation());
 
         let invalid_value = json!(34.34);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid_value)
+            .evaluate(Structure::Verbose, key, &invalid_value)
             .unwrap();
         assert!(output.is_error());
 
@@ -511,31 +511,31 @@ mod tests {
 
         let valid_value = json!(34);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &valid_value)
+            .evaluate(Structure::Verbose, key, &valid_value)
             .unwrap();
         assert!(output.is_annotation());
 
         let valid_value = json!("\"34\"");
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &valid_value)
+            .evaluate(Structure::Verbose, key, &valid_value)
             .unwrap();
         assert!(output.is_annotation());
 
         let invalid_value = json!(true);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid_value)
+            .evaluate(Structure::Verbose, key, &invalid_value)
             .unwrap();
         assert!(output.is_error());
 
         let invalid_value = json!({});
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid_value)
+            .evaluate(Structure::Verbose, key, &invalid_value)
             .unwrap();
         assert!(output.is_error());
 
         let invalid_value = json!([34]);
         let output = interrogator
-            .evaluate(key, Structure::Verbose, &invalid_value)
+            .evaluate(Structure::Verbose, key, &invalid_value)
             .unwrap();
         assert!(output.is_error());
     }

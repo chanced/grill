@@ -84,7 +84,7 @@ async fn main() {
 		(json!({}), false),
 		(json!(34), false),
 	] {
-		let o = interrogator.evaluate(key, Structure::Verbose, &value).unwrap();
+		let o = interrogator.evaluate(Structure::Verbose, key, &value).unwrap();
 		assert_eq!(o.is_valid(), expected_valid);
 	}
 }

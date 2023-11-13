@@ -165,10 +165,10 @@ mod tests {
             .unwrap();
 
         let value = json!(34);
-        let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
+        let o = interrogator.evaluate(Structure::Flag, key, &value).unwrap();
         assert!(!o.is_annotation());
         let value = json!(34.34);
-        let o = interrogator.evaluate(key, Structure::Flag, &value).unwrap();
+        let o = interrogator.evaluate(Structure::Flag, key, &value).unwrap();
         assert!(o.is_annotation());
 
         let schema = json!({
@@ -193,12 +193,12 @@ mod tests {
 
         let value = json!(34.34);
         let o = interrogator
-            .evaluate(key, Structure::Verbose, &value)
+            .evaluate(Structure::Verbose, key, &value)
             .unwrap();
         assert!(!o.is_annotation());
         let value = json!(34);
         let o = interrogator
-            .evaluate(key, Structure::Verbose, &value)
+            .evaluate(Structure::Verbose, key, &value)
             .unwrap();
         assert!(o.is_annotation());
     }
