@@ -25,6 +25,7 @@ pub use fs::write;
 use camino::{Utf8Path, Utf8PathBuf};
 use glob::GlobError;
 use grill::AbsoluteUri;
+use heck::ToLowerCamelCase;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
@@ -113,11 +114,21 @@ pub struct Test {
     pub valid: bool,
 }
 
-pub fn generate(_cwd: PathBuf, cfg: &Config) -> Result<Vec<(Utf8PathBuf, String, bool)>, Error> {
+pub fn generate(cwd: PathBuf, cfg: &Config) -> Result<Vec<(PathBuf, String, bool)>, Error> {
+    let mut files = Vec::new();
+    let mut suites = Vec::new();
     for (path, suite) in &cfg.suite {
-        let suite = generate::gen_suite(&[&cfg.tests_dir, path], suite)?;
+        let wd = cwd.join(&cfg.tests_dir).join("suite/");
+        let output = generate::suite(&[&cfg.tests_dir, path], suite)?;
+        files.reserve(output.len());
+        for (file_path, content) in output {
+            files.push((wd.join(file_path), content, true));
+        }
+        suites.push(path.to_string().to_lower_camel_case());
     }
-    todo!()
+
+    println!("{suites:#?}");
+    Ok(files)
 }
 
 #[derive(Snafu, Debug)]
@@ -157,7 +168,7 @@ pub enum Error {
     #[snafu(display("failed to parse token stream:\n{content}\n\ncaused by:\n\n{source}\n"))]
     Syn { content: String, source: syn::Error },
 
-    #[snafu(display("failed to format source:\ncaused by:\n\n{stdout}"))]
+    #[snafu(display("failed to format source:\ncaused by:\n\n{stderr}"))]
     RustFmt { stdout: String, stderr: String },
 }
 

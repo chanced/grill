@@ -1,12 +1,14 @@
-use grill::{Building, Interrogator, Key};
+mod draft2020_12;
+mod sources;
+use grill::{Finish, Interrogator, Key};
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
-pub trait Runner: Copy {
-    type Draft202012;
+pub trait Harness: Copy {
+    type Draft202012: Draft202012;
     fn draft2020_12(&self) -> Self::Draft202012;
 }
 pub trait Draft202012 {
-    fn interrogator(&self) -> Building;
+    fn interrogator(&self) -> Finish;
     fn setup_additional_properties(&self, interrogator: &mut Interrogator) {}
     fn setup_all_of(&self, interrogator: &mut Interrogator) {}
     fn setup_anchor(&self, interrogator: &mut Interrogator) {}
@@ -77,4 +79,12 @@ pub trait Draft202012 {
     fn setup_optional_format_uri_template(&self, interrogator: &mut Interrogator) {}
     fn setup_optional_format_uri(&self, interrogator: &mut Interrogator) {}
     fn setup_optional_format_uuid(&self, interrogator: &mut Interrogator) {}
+}
+async fn build(finish: grill::Finish) -> Result<grill::Interrogator, grill::error::BuildError> {
+    finish.await.map(|mut interrogator| {
+        interrogator
+            .source_static_values(sources::sources())
+            .unwrap();
+        interrogator
+    })
 }

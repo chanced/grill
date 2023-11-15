@@ -13,3 +13,8 @@ serde_json = { workspace = true, features = ["arbitrary_precision"] }
 
 [dev-dependencies]
 tokio = { version = "1.28", features = ["full"] }
+
+[[test]]
+edition = "2021"
+name    = "test-suite"
+path    = "suite/mod.rs"

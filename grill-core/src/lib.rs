@@ -116,11 +116,12 @@ pub trait Criterion {}
 
 /// The `Future` returned from calling `Build::finish`.
 #[pin_project]
-pub struct Building {
+pub struct Finish {
     #[pin]
     build: Pin<Box<dyn Send + Future<Output = Result<Interrogator, BuildError>>>>,
 }
-impl Future for Building {
+
+impl Future for Finish {
     type Output = Result<Interrogator, BuildError>;
 
     fn poll(
@@ -131,7 +132,7 @@ impl Future for Building {
     }
 }
 
-impl Building {
+impl Finish {
     /// Constructs a new `Building`
     #[must_use]
     pub fn new(
@@ -612,8 +613,8 @@ impl Build {
 
     /// Finalizes the build of an [`Interrogator`]
     #[must_use]
-    pub fn finish(self) -> Building {
-        Building::new(self.building())
+    pub fn finish(self) -> Finish {
+        Finish::new(self.building())
     }
 
     /// Precompiles schemas at the given URIs.

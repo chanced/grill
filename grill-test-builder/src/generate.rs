@@ -3,6 +3,7 @@ use std::{
     convert::AsRef,
     fs::File,
     io::Write,
+    iter::once,
 };
 
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
@@ -19,80 +20,152 @@ use crate::{
     Error, Sources, Suite, SynSnafu,
 };
 
-const RESERVED: [&str; 52] = [
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
-    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
-    "ref", "return", "Self", "self", "static", "struct", "super", "trait", "true", "type", "union",
-    "unsafe", "use", "where", "while", "abstract", "become", "box", "do", "final", "macro",
-    "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
-];
-
-#[derive(Debug)]
-pub(crate) struct SuiteOutput {
-    runner: String,
-    tests: String,
-}
-
-pub(crate) fn gen_suite(ancestry: &[&Utf8Path], suite: &Suite) -> Result<SuiteOutput, Error> {
+pub(crate) fn suite(
+    ancestry: &[&Utf8Path],
+    suite: &Suite,
+) -> Result<HashMap<Utf8PathBuf, String>, Error> {
     let Suite {
         sources,
         base_uri,
         tests,
     } = suite;
-    // janky
     let suite_name = ancestry
         .get(1)
         .expect("ancestry should have at least 2 elements");
-    let suite_name = format_ident!("{}", suite_name.as_str().to_snake_case());
-
-    let ancestry = Utf8PathBuf::from_iter(ancestry);
-    let sources = gen_sources(base_uri, &ancestry, sources.as_ref())?;
-    let file_paths = find_test_files(&ancestry, tests)?;
+    println!("generating suite: {suite_name}");
+    let suite_name = Name::new(suite_name.as_str());
+    let suite_path = Utf8PathBuf::from(suite_name.snake_ident.to_string());
+    let ancestry_path = Utf8PathBuf::from_iter(ancestry);
+    let file_paths = find_test_files(&ancestry_path, tests)?;
     let sets = file_paths
         .into_iter()
         .map(|(name, cases)| TestSet::new(name, cases))
         .collect::<Vec<_>>();
+    let mut generated_tests = gen_tests(&suite_name, &sets, base_uri)?;
+    let mut files = HashMap::with_capacity(generated_tests.len());
+    for (path, tokens) in generated_tests.drain() {
+        files.insert(path, format_src(tokens.to_string())?);
+    }
+    let sources = gen_sources(base_uri, &ancestry_path, sources.as_ref())?;
+    let has_sources = sources.is_some();
+    let sources = sources
+        .map(|sources| format_src(sources.to_string()))
+        .transpose()?;
+    if let Some(sources) = sources {
+        files.insert(suite_path.join("sources.rs"), sources);
+    }
 
-    let tests = gen_tests(&suite_name, &sets)?;
-    let lib = gen_runners(&sets);
-    todo!()
-    // let tests = format_src(tests.to_string())?;
-    // let lib = format_src(lib.to_string())?;
-    // Ok(SuiteOutput { runner: lib, tests })
+    let (mod_path, mod_file) = gen_root_mod(&suite_name, sets, has_sources);
+    files.insert(mod_path, format_src(mod_file.to_string())?);
+    Ok(files)
 }
 
-fn gen_runners(sets: &[TestSet]) -> TokenStream {
-    let assoc_types = sets.iter().map(TestSet::runner_assoc_types);
-    let accessors = sets.iter().map(TestSet::runner_accessors);
-    let traits = sets.iter().map(TestSet::runner_trait);
+fn gen_header(suite: &Name, path: &Utf8Path, ancestry: &[&Name]) -> TokenStream {
+    let names = ancestry.iter().map(|name| &name.snake_ident);
+    let path_str = path.to_string();
+    let dialect = &ancestry[0].pascal_ident;
+    let suite = &suite.snake_ident;
+    dbg!(&ancestry);
+    if ancestry.len() <= 1 {
+        // bailing on top level as that header is different
+        return quote!();
+    }
+    let setup_fn = format_ident!("setup_{}", ancestry.last().unwrap().snake_ident);
+    quote!(
+        use crate::#suite::#dialect;
+        async fn interrogator() {
+            let mut interrogator = super::interrogator().await;
+            #dialect::#setup_fn(&crate::Harness, &mut interrogator);
+            todo!()
+        }
+    )
+}
+fn gen_root_mod(suite: &Name, sets: Vec<TestSet>, has_sources: bool) -> (Utf8PathBuf, TokenStream) {
+    let harness = gen_harness(&sets);
+    let mod_path = Utf8PathBuf::from(format!("{}/mod.rs", suite.snake_ident));
+    let mut mods = sets
+        .iter()
+        .map(|s| {
+            let name = &s.name.snake_ident;
+            quote!(mod #name;)
+        })
+        .collect::<Vec<_>>();
+    if has_sources {
+        mods.push(quote!(
+            mod sources;
+        ));
+    }
+    (
+        mod_path,
+        quote! {
+            #(#mods)*
+            #harness
+        },
+    )
+}
+
+fn build_fn() -> TokenStream {
+    quote! {
+        async fn build(finish: grill::Finish) -> Result<grill::Interrogator, grill::error::BuildError> {
+            finish
+                .await
+                .map(|mut interrogator| {
+                    interrogator.source_static_values(sources::sources()).unwrap();
+                    interrogator
+                })
+        }
+    }
+}
+
+fn gen_harness(sets: &[TestSet]) -> TokenStream {
+    let assoc_types = sets.iter().map(TestSet::harness_assoc_types);
+    let accessors = sets.iter().map(TestSet::harness_accessors);
+    let traits = sets.iter().map(TestSet::harness_trait);
+    let build_fn = build_fn();
     quote! {
         use serde_json::{json, Value};
         use once_cell::sync::Lazy;
-        use grill::{ Interrogator, Key, Building };
+        use grill::{ Interrogator, Key, Finish };
 
-        pub trait Runner: Copy {
+        pub trait Harness: Copy {
             #(#assoc_types)*
             #(#accessors)*
         }
         #(#traits)*
+
+        #build_fn
+
     }
 }
 
-fn gen_tests(suite: &Ident, sets: &[TestSet]) -> Result<HashMap<Utf8PathBuf, TokenStream>, Error> {
+fn gen_tests(
+    suite: &Name,
+    sets: &[TestSet],
+    base_uri: &AbsoluteUri,
+) -> Result<HashMap<Utf8PathBuf, TokenStream>, Error> {
     let mut tests = HashMap::new();
+
     for set in sets {
-        let path = Utf8PathBuf::from(set.name.snake.to_string());
-        let mut output = set.tests(suite, Vec::new())?;
+        let path = Utf8PathBuf::from(suite.snake_ident.to_string());
+        let mut output = set.tests(suite, base_uri, Vec::new())?;
         for (k, v) in output.drain() {
             tests.insert(path.join(k), v);
         }
     }
-    Ok(tests)
+    Ok(tests
+        .into_iter()
+        .map(|(path, (ancestry, src))| {
+            let mut header = gen_header(suite, &path, &ancestry);
+            header.extend(src);
+            (path, header)
+        })
+        .collect())
 }
 
 fn format_src(src: String) -> Result<String, Error> {
     use std::process::{Command, Stdio};
     let mut cmd = Command::new("rustfmt")
+        .arg("--edition=2021")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -127,42 +200,50 @@ fn gen_sources(
     base_uri: &AbsoluteUri,
     ancestry: impl AsRef<Utf8Path>,
     sources: Option<&Sources>,
-) -> Result<TokenStream, Error> {
+) -> Result<Option<TokenStream>, Error> {
     let Some(sources) = sources else {
-        return Ok(TokenStream::new());
+        return Ok(None);
     };
-    let mut entries = Vec::new();
+    let mut array_entries = Vec::new();
+    let mut functions = Vec::new();
+
     for file in fs::open([ancestry], &sources.paths) {
         let mut file = file?;
-
         let content = file.read_to_string()?;
-
         let content: TokenStream =
             syn::parse_str(&content).with_context(|_| SynSnafu { content })?;
-
         let mut path = &*file.path.rel;
         if let Some(prefix) = &sources.strip_prefix {
             path = path.strip_prefix(prefix).expect("strip prefix of path");
         }
-
         let uri = source_uri(base_uri, path);
-        let content = quote! {
-            (#uri, json!(#content)),
-        };
-        entries.push(content);
-    }
 
+        let function_name = format_ident!("source_{}", path.as_str().to_snake_case());
+        functions.push(quote! {
+            fn #function_name() -> (&'static str, Value) {
+                (#uri, json!(#content))
+            }
+        });
+        let content = quote!(#function_name(),);
+
+        array_entries.push(content);
+    }
+    let len = syn::Index::from(array_entries.len());
     let src = quote! {
-        fn sources() -> &'static [(&'static str, Value)] {
-            static VALUES: Lazy<Vec<(&'static str, Value)>> = Lazy::new(|| {
-                Vec::from(
-                    [#(#entries)*]
-                )
+        use serde_json::{json, Value};
+        use once_cell::sync::Lazy;
+
+        pub(super) fn sources() -> [(&'static str, Value); #len] {
+            static VALUES: Lazy<[(&'static str, Value); #len]> = Lazy::new(|| {
+                [#(#array_entries)*]
             });
-            &VALUES
+            *VALUES
         }
+
+        #(#functions)*
     };
-    Ok(src)
+    let src = format_src(src.to_string())?;
+    Ok(Some(syn::parse_str(&src).unwrap()))
 }
 
 fn find_test_files(
@@ -186,23 +267,38 @@ fn find_test_files(
 #[derive(Debug)]
 struct Name {
     string: String,
-    snake: Ident,
-    pascal: Ident,
+    snake_ident: Ident,
+    snake_pathbuf: Utf8PathBuf,
+    pascal_ident: Ident,
 }
 
 impl Name {
+    const RESERVED: [&str; 52] = [
+        "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+        "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move",
+        "mut", "pub", "ref", "return", "Self", "self", "static", "struct", "super", "trait",
+        "true", "type", "union", "unsafe", "use", "where", "while", "abstract", "become", "box",
+        "do", "final", "macro", "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+    ];
     pub fn new(name: &str) -> Self {
-        // let mut snake = name.as_str().to_snake_case();
-        // if RESERVED.contains(&&*snake) {
-        //     snake = format!("{snake}_");
-        // }
+        let snake = Self::snake(name);
         Self {
             string: name.to_string(),
-            snake: format_ident!("{}", name.to_snake_case()),
-            pascal: format_ident!("{}", name.to_pascal_case()),
+            snake_ident: format_ident!("{}", snake),
+            snake_pathbuf: Utf8PathBuf::from(snake),
+            pascal_ident: format_ident!("{}", name.to_pascal_case()),
         }
     }
+
+    fn snake(name: &str) -> String {
+        let mut name = name.to_snake_case();
+        if Self::RESERVED.contains(&&*name) {
+            name.push('_');
+        }
+        name
+    }
 }
+
 #[derive(Debug)]
 struct TestSet {
     name: Name,
@@ -226,67 +322,65 @@ impl TestSet {
 
     fn tests<'t>(
         &'t self,
-        suite: &'t Ident,
-        mut ancestry: Vec<&'t Ident>,
-    ) -> Result<HashMap<Utf8PathBuf, TokenStream>, Error> {
-        ancestry.push(&self.name.snake);
-
-        let mods = &self
+        suite: &'t Name,
+        base_uri: &AbsoluteUri,
+        mut ancestry: Vec<&'t Name>,
+    ) -> Result<HashMap<Utf8PathBuf, (Vec<&'t Name>, TokenStream)>, Error> {
+        let _ = base_uri;
+        ancestry.push(&self.name);
+        let mut mods = self
             .sets
             .iter()
-            .map(|set| {
-                let name = &set.name.snake;
-                quote!(mod #name;)
-            })
-            .collect::<TokenStream>();
+            .map(|set| &set.name.snake_ident)
+            .map(|name| quote!(mod #name;))
+            .collect::<Vec<_>>();
+
         let mut files = HashMap::new();
-        let set_path = Utf8PathBuf::from(self.name.snake.to_string());
+        let set_path = Utf8PathBuf::from(self.name.snake_ident.to_string());
         for path in &self.cases {
             let cases = open_test_cases(path)?;
             let src: TokenStream = cases
                 .iter()
-                .map(|case| case.generate(suite, path, &ancestry))
+                .enumerate()
+                .map(|(i, case)| case.generate(i, suite, path, &ancestry))
                 .collect();
-
             let mut path = set_path.join(&path.rel);
             let mut filename = Utf8PathBuf::from(path.file_name().unwrap());
             path.pop();
             filename.set_extension("");
-            let mut filename = Utf8PathBuf::from(filename.as_str().to_snake_case());
+            let mod_name = Name::new(filename.as_str());
+            let name = &mod_name.snake_ident;
+            mods.push(quote! { mod #name; });
+            let mut filename = Utf8PathBuf::from(name.to_string());
             filename.set_extension("rs");
-
-            files.insert(path.join(filename), src);
+            files.insert(path.join(filename), (ancestry.clone(), src));
         }
 
-        let rel_path = Utf8PathBuf::from(self.name.snake.to_string());
-        let mod_tokens = quote! {
-            #mods
-        };
-        files.insert(rel_path.join("mod.rs"), mod_tokens);
+        let rel_path = Utf8PathBuf::from(self.name.snake_ident.to_string());
+
+        let mod_content = gen_tests_mods(&ancestry, &mods);
+        files.insert(rel_path.join("mod.rs"), (ancestry.clone(), mod_content));
 
         for set in &self.sets {
-            let mut set_files = set.tests(suite, ancestry.clone())?;
-            for (k, v) in set_files.drain() {
-                files.insert(rel_path.join(k), v);
+            let mut set_files = set.tests(suite, base_uri, ancestry.clone())?;
+            for (path, src) in set_files.drain() {
+                files.insert(rel_path.join(path), src);
             }
         }
-
-        println!("{:#?}", files.keys());
-
         Ok(files)
     }
 
-    fn runner_accessors(&self) -> TokenStream {
-        let name_pascal = &self.name.pascal;
-        let name_snake = &self.name.snake;
+    fn harness_accessors(&self) -> TokenStream {
+        let name_pascal = &self.name.pascal_ident;
+        let name_snake = &self.name.snake_ident;
         quote! {
             fn #name_snake(&self) -> Self::#name_pascal;
         }
     }
-    fn runner_assoc_types(&self) -> TokenStream {
-        let name = &self.name.pascal;
+    fn harness_assoc_types(&self) -> TokenStream {
+        let name = &self.name.pascal_ident;
         quote! {
-            type #name;
+            type #name: #name;
         }
     }
     fn descendant_paths(&self) -> Vec<Utf8PathBuf> {
@@ -303,7 +397,7 @@ impl TestSet {
         }
         paths
     }
-    fn runner_trait_methods(&self) -> TokenStream {
+    fn harness_trait_methods(&self) -> TokenStream {
         self.descendant_paths()
             .into_iter()
             .map(|mut path| {
@@ -354,15 +448,40 @@ impl TestSet {
         None
     }
 
-    fn runner_trait(&self) -> TokenStream {
-        let name = &self.name.pascal;
-        let methods = self.runner_trait_methods();
+    fn harness_trait(&self) -> TokenStream {
+        let name = &self.name.pascal_ident;
+        let methods = self.harness_trait_methods();
         quote! {
             pub trait #name {
-                fn interrogator(&self) -> Building;
+                fn interrogator(&self) -> Finish;
                 #methods
             }
         }
+    }
+}
+
+fn gen_tests_mods(ancestry: &[&Name], mods: &[TokenStream]) -> TokenStream {
+    let dialect = &ancestry[0].pascal_ident;
+
+    let interrogator = if ancestry.len() == 1 {
+        quote! {
+            async fn interrogator() -> Result<Interrogator, &'static BuildError> {
+                use once_cell::sync::Lazy;
+                use super::#dialect;
+                static INTERROGATOR: Lazy<Result<Interrogator, BuildError>> = Lazy::new(|| async move {
+                    super::build(#dialect::interrogator(&crate::Harness)).await
+                });
+                INTERROGATOR.await.as_ref().map(|i| i.clone())
+            }
+        }
+    } else {
+        quote!()
+    };
+
+    quote! {
+        use grill::{Interrogator, error::BuildError};
+        #interrogator
+        #(#mods)*
     }
 }
 
@@ -388,24 +507,17 @@ fn open_test_cases(path: &Path) -> Result<Vec<TestCase>, Error> {
 }
 
 impl TestCase {
-    fn generate(&self, suite: &Ident, path: &Path, ancestry: &[&Ident]) -> TokenStream {
+    fn generate(&self, i: usize, suite: &Name, path: &Path, ancestry: &[&Name]) -> TokenStream {
         let description = &self.description;
-        let setup_fn_calls = ancestry
-            .iter()
-            .map(|&ancestor| format_ident!("setup_{ancestor}"))
-            .map(|setup_fn| {
-                quote! {
-                    tests::#suite().#setup_fn(&mut interrogator);
-                }
-            });
+        let suite_snake = &suite.snake_ident;
 
-        let mut name = description.to_snake_case();
-        if RESERVED.contains(&&*name) {
-            name.push('_');
-        }
-        let name = format_ident!("{}", description.to_snake_case());
+        let name = format_ident!("{}_{i}", Name::snake(description));
         let schema = self.schema.to_string();
-        let tests = self.tests.iter().map(|test| test.generate(&name, suite));
+        let tests = self
+            .tests
+            .iter()
+            .enumerate()
+            .map(|(i, test)| test.generate(i, &name, suite));
 
         quote! {
             mod #name {
@@ -423,71 +535,27 @@ struct Test {
 }
 
 impl Test {
-    fn generate(&self, name: &Ident, suite: &Ident) -> TokenStream {
+    fn generate(&self, i: usize, name: &Ident, suite: &Name) -> TokenStream {
         let Self {
             data,
             description,
             valid,
         } = self;
-        let setup_fn = format_ident!("setup_{name}");
+
         let data = data.to_string();
-        let name = format_ident!("test_{}", description.to_snake_case());
+
+        let description = description
+            .replace("<=", "lte")
+            .replace(">=", "gte")
+            .replace('<', "lt")
+            .replace('>', "gt")
+            .replace('=', "eq");
+        let name = format_ident!("test{}_{}", i, Name::snake(&description));
+
         quote! {
             #[tokio::test]
-            fn #name() {
-            ///    let description = #description;
-            ///    let data = match serde_json::from_str(#data) {
-            ///        Ok(data) => data,
-            ///        Err(err) => panic!("failed to parse data for {description} \n caused by:\n\n{err:?}"),
-            ///    };
-            ///    let key = match key().await {
-            ///        Ok(key) => key,
-            ///        Err(err) => panic!("failed to compile schema for {description} \n caused by:\n\n{err:?}"),
-            ///    }
-            ///    let test = Test{
-            ///        schema_key: key,
-            ///        description: #description,
-            ///        data: data,
-            ///        valid: #valid
-            ///    };
-            ///    let mut interrogator = interrogator().await;
-            ///    let builder = RUNNER.#setup_fn(&mut builder, &test);
-            ///    let result = interrogator.evaluate(Structure::Flag, key,  &data);
-            ///    assert_eq!(result.valid, valid, "{description}");
-            struct X;
+            async fn #name() {
             }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::{load_cfg, tests::set_test_cwd};
-    #[test]
-    fn test_suite() {
-        set_test_cwd();
-        let cwd = std::env::current_dir().unwrap();
-        let cfg = load_cfg(Utf8Path::new("grill-test-builder/fixtures/tests.toml")).unwrap();
-
-        for (path, suite) in &cfg.suite {
-            // let file = syn::parse_file(&s.to_string()).unwrap();
-            let content = match gen_suite(&[&cfg.tests_dir, path], suite) {
-                Ok(content) => content,
-                Err(err) => panic!("{err}"),
-            };
-            let runner = cwd.join(&cfg.tests_dir).join("tests/").join(path);
-            std::fs::create_dir_all(&runner).unwrap();
-            let runner = runner.join("runner.rs");
-            let tests = cwd.join(&cfg.tests_dir).join("tests/").join(path);
-            std::fs::create_dir_all(&tests).unwrap();
-            let tests = tests.join("tests.rs");
-            println!("writing {runner:?}");
-            // let content = prettyplease::unparse(&file).to_string();
-            std::fs::write(runner, content.runner).unwrap();
-            println!("writing {tests:?}");
-            std::fs::write(tests, content.tests).unwrap();
         }
     }
 }
