@@ -1,8 +1,7 @@
-use super::{build, Draft202012, Harness as _};
-use crate::Harness;
-use futures::executor::block_on;
+use super::*;
 use grill::{error::BuildError, Interrogator};
-async fn interrogator() -> Result<Interrogator, &'static BuildError> {
+fn interrogator() -> Result<Interrogator, &'static BuildError> {
+    use crate::Harness;
     use std::sync::OnceLock;
     static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
     INTERROGATOR

@@ -169,7 +169,7 @@ pub enum Error {
     Syn { content: String, source: syn::Error },
 
     #[snafu(display("failed to format source:\ncaused by:\n\n{stderr}"))]
-    RustFmt { stdout: String, stderr: String },
+    RustFmt { stderr: String },
 }
 
 impl Error {

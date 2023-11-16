@@ -1,9 +1,12 @@
-use crate::json_schema_test_suite::Draft202012;
-async fn interrogator() {
-    let mut interrogator = super::interrogator().await;
-    Draft202012::setup_format(&crate::Harness, &mut interrogator);
-    todo!()
+use super::*;
+fn interrogator() -> Result<Interrogator, &'static BuildError> {
+    let mut interrogator = super::interrogator();
+    if let Ok(interrogator) = interrogator.as_mut() {
+        crate::Harness.setup_optional_format(interrogator)
+    }
+    interrogator
 }
+use super::*;
 use grill::{error::BuildError, Interrogator};
 mod date;
 mod date_time;

@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
-pub(super) fn sources() -> [(&'static str, Value); 73] {
+pub(super) fn sources() -> impl Iterator<Item = (&'static str, &'static Value)> {
     static VALUES: Lazy<[(&'static str, Value); 73]> = Lazy::new(|| {
         [
             source_base_uri_change_folder_integer_json(),
@@ -78,7 +78,7 @@ pub(super) fn sources() -> [(&'static str, Value); 73] {
             source_urn_ref_string_json(),
         ]
     });
-    *VALUES
+    VALUES.iter().map(|(uri, schema)| (*uri, schema))
 }
 fn source_base_uri_change_folder_integer_json() -> (&'static str, Value) {
     (

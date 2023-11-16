@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    hash::{BuildHasher, BuildHasherDefault, Hasher},
+    hash::{BuildHasher, Hasher},
     sync::Arc,
 };
 
@@ -258,7 +258,7 @@ impl Numbers {
 #[derive(Clone, Default)]
 struct LenHasher(u64);
 impl Hasher for LenHasher {
-    fn write(&mut self, bytes: &[u8]) {
+    fn write(&mut self, _bytes: &[u8]) {
         unreachable!();
     }
 

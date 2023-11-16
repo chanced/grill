@@ -60,26 +60,46 @@ pub(crate) fn suite(
     Ok(files)
 }
 
-fn gen_header(suite: &Name, path: &Utf8Path, ancestry: &[&Name]) -> TokenStream {
-    let names = ancestry.iter().map(|name| &name.snake_ident);
-    let path_str = path.to_string();
-    let dialect = &ancestry[0].pascal_ident;
-    let suite = &suite.snake_ident;
-    dbg!(&ancestry);
-    if ancestry.len() <= 1 {
-        // bailing on top level as that header is different
+fn gen_header(_suite: &Name, path: &Utf8Path, ancestry: &[&Name]) -> TokenStream {
+    if ancestry.len() <= 1 && path.file_name() == Some("mod.rs") {
+        // bailing on top level as that header is generated in `gen_tests_mods`
         return quote!();
     }
-    let setup_fn = format_ident!("setup_{}", ancestry.last().unwrap().snake_ident);
+    let path = path.with_extension("");
+    let mut setup_fn = Vec::new();
+    if ancestry.len() > 1 {
+        setup_fn.push(
+            ancestry
+                .last()
+                .map(|ancestor| &ancestor.snake_ident)
+                .unwrap(),
+        );
+    }
+
+    let mut path_comps = path
+        .components()
+        .filter(|comp| matches!(comp, Utf8Component::Normal(_)))
+        .skip(2)
+        .collect::<Vec<_>>();
+    let mod_comp = Utf8Component::Normal("mod");
+    if path_comps.last() == Some(&mod_comp) {
+        path_comps.pop();
+    }
+    let path = Utf8PathBuf::from_iter(path_comps);
+    let setup_fn = format_ident!("setup_{}", path.as_str().to_snake_case());
+
     quote!(
-        use crate::#suite::#dialect;
-        async fn interrogator() {
-            let mut interrogator = super::interrogator().await;
-            #dialect::#setup_fn(&crate::Harness, &mut interrogator);
-            todo!()
+        use super::*;
+        fn interrogator() -> Result<Interrogator, &'static BuildError> {
+            let mut interrogator = super::interrogator();
+            if let Ok(interrogator) = interrogator.as_mut() {
+                crate::Harness.#setup_fn(interrogator)
+            }
+            interrogator
         }
     )
 }
+
 fn gen_root_mod(suite: &Name, sets: Vec<TestSet>, has_sources: bool) -> (Utf8PathBuf, TokenStream) {
     let harness = gen_harness(&sets);
     let mod_path = Utf8PathBuf::from(format!("{}/mod.rs", suite.snake_ident));
@@ -107,7 +127,7 @@ fn gen_root_mod(suite: &Name, sets: Vec<TestSet>, has_sources: bool) -> (Utf8Pat
 fn build_fn() -> TokenStream {
     quote! {
         async fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
-            futures::executor::block_on(|| build.source_static_values(sources::sources()))
+            block_on(build.source_static_values(sources::sources()).finish())
         }
     }
 }
@@ -118,16 +138,14 @@ fn gen_harness(sets: &[TestSet]) -> TokenStream {
     let traits = sets.iter().map(TestSet::harness_trait);
     let build_fn = build_fn();
     quote! {
-        use serde_json::{json, Value};
-        use once_cell::sync::Lazy;
-        use grill::{ Interrogator, Key, Finish };
+        use grill::{ Interrogator};
+        use futures::executor::block_on;
 
         pub trait Harness: Copy {
             #(#assoc_types)*
             #(#accessors)*
         }
         #(#traits)*
-
         #build_fn
 
     }
@@ -176,7 +194,6 @@ fn format_src(src: String) -> Result<String, Error> {
 
     if !output.status.success() {
         return Err(Error::RustFmt {
-            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
             stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
         });
     }
@@ -228,11 +245,11 @@ fn gen_sources(
         use serde_json::{json, Value};
         use once_cell::sync::Lazy;
 
-        pub(super) fn sources() -> [(&'static str, Value); #len] {
+        pub(super) fn sources() -> impl Iterator<Item = (&'static str, &'static Value)> {
             static VALUES: Lazy<[(&'static str, Value); #len]> = Lazy::new(|| {
                 [#(#array_entries)*]
             });
-            *VALUES
+            VALUES.iter().map(|(uri, schema)| (*uri, schema))
         }
 
         #(#functions)*
@@ -263,7 +280,6 @@ fn find_test_files(
 struct Name {
     string: String,
     snake_ident: Ident,
-    snake_pathbuf: Utf8PathBuf,
     pascal_ident: Ident,
 }
 
@@ -280,7 +296,6 @@ impl Name {
         Self {
             string: name.to_string(),
             snake_ident: format_ident!("{}", snake),
-            snake_pathbuf: Utf8PathBuf::from(snake),
             pascal_ident: format_ident!("{}", name.to_pascal_case()),
         }
     }
@@ -337,7 +352,7 @@ impl TestSet {
             let src: TokenStream = cases
                 .iter()
                 .enumerate()
-                .map(|(i, case)| case.generate(i, suite, path, &ancestry))
+                .map(|(i, case)| case.generate(i, base_uri, suite, path, &ancestry))
                 .collect();
             let mut path = set_path.join(&path.rel);
             let mut filename = Utf8PathBuf::from(path.file_name().unwrap());
@@ -447,6 +462,7 @@ impl TestSet {
         let name = &self.name.pascal_ident;
         let methods = self.harness_trait_methods();
         quote! {
+            #[allow(unused_variables)]
             pub trait #name {
                 fn build(&self) -> grill::Build;
                 #methods
@@ -467,16 +483,12 @@ impl TestSet {
 // }
 
 fn gen_tests_mods(ancestry: &[&Name], mods: &[TokenStream]) -> TokenStream {
-    let dialect = &ancestry[0].pascal_ident;
     let method = &ancestry[0].snake_ident;
     let interrogator = if ancestry.len() == 1 {
         quote! {
-            use futures::executor::block_on;
-            use super::{ #dialect, Harness as _, build };
-            use crate::Harness;
-
-            async fn interrogator() -> Result<Interrogator, &'static BuildError> {
+            fn interrogator() -> Result<Interrogator, &'static BuildError> {
                 use std::sync::OnceLock;
+                use crate::Harness;
                 static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
                 INTERROGATOR
                     .get_or_init(|| block_on(build(Harness.#method().build())))
@@ -490,6 +502,8 @@ fn gen_tests_mods(ancestry: &[&Name], mods: &[TokenStream]) -> TokenStream {
 
     quote! {
         use grill::{Interrogator, error::BuildError};
+        use super::*;
+
         #interrogator
         #(#mods)*
     }
@@ -517,20 +531,51 @@ fn open_test_cases(path: &Path) -> Result<Vec<TestCase>, Error> {
 }
 
 impl TestCase {
-    fn generate(&self, i: usize, suite: &Name, path: &Path, ancestry: &[&Name]) -> TokenStream {
+    fn generate(
+        &self,
+        i: usize,
+        uri: &AbsoluteUri,
+        suite: &Name,
+        path: &Path,
+        _ancestry: &[&Name],
+    ) -> TokenStream {
         let description = &self.description;
-        let suite_snake = &suite.snake_ident;
 
         let name = format_ident!("{}_{i}", Name::snake(description));
         let schema = self.schema.to_string();
+
         let tests = self
             .tests
             .iter()
             .enumerate()
             .map(|(i, test)| test.generate(i, &name, suite));
-
+        let rel_uri = Uri::parse(path.rel.as_str()).expect("path should parse as a URI");
+        let uri = uri.resolve(&rel_uri).unwrap().to_string();
         quote! {
             mod #name {
+                use super::*;
+                use grill::{error::CompileError, Key, Structure};
+
+                fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
+                    use std::sync::OnceLock;
+                    const SCHEMA: &str = #schema;
+                    const URI: &str = #uri;
+                    static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
+                    INTERROGATOR
+                        .get_or_init(|| {
+                            let mut interrogator = super::interrogator()
+                                .map_err(|err| panic!("failed to build interrogator:\n{}", err))
+                                .unwrap();
+                            interrogator
+                                .source_str(URI, SCHEMA)
+                                .map_err(|err| panic!("failed to source schema:\n: {err}"))
+                                .unwrap();
+                            let key = block_on(interrogator.compile(#uri))?;
+                            Ok((key, interrogator))
+                        })
+                        .as_ref()
+                        .map(Clone::clone)
+                }
                 #(#tests)*
             }
         }
@@ -545,7 +590,7 @@ struct Test {
 }
 
 impl Test {
-    fn generate(&self, i: usize, name: &Ident, suite: &Name) -> TokenStream {
+    fn generate(&self, i: usize, _name: &Ident, _suite: &Name) -> TokenStream {
         let Self {
             data,
             description,
@@ -565,6 +610,30 @@ impl Test {
         quote! {
             #[test]
             fn #name() {
+                let description = #description;
+                let (key, interrogator) = match setup() {
+                    Ok((key, interrogator)) => (key, interrogator),
+                    Err(err) => {
+                        panic!("failed to setup test for {}\n:{}", description, err);
+                    }
+                };
+
+                let data = #data;
+                let data = match serde_json::from_str(data) {
+                    Ok(data) => data,
+                    Err(err) => {
+                        panic!("failed to parse data as json:\n{}", err);
+                    }
+                };
+
+                let output = match interrogator.evaluate(Structure::Flag, key, &data) {
+                    Ok(output) => output,
+                    Err(err) => {
+                        panic!("failed to evaluate schema:\n{}", err);
+                    }
+                };
+
+                assert_eq!(output.valid(), #valid, "expected ")
             }
         }
     }

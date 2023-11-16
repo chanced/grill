@@ -28,7 +28,6 @@ pub use output::{Output, Structure};
 pub mod keyword;
 
 pub mod uri;
-use pin_project::pin_project;
 pub use uri::{AbsoluteUri, RelativeUri, Uri};
 
 pub mod schema;
@@ -475,9 +474,9 @@ impl Build {
     pub fn source_static_values<I, K>(self, sources: I) -> Self
     where
         K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Value)>,
+        I: IntoIterator<Item = (K, &'static Value)>,
     {
-        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
+        self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Borrowed(v))))
     }
 
     /// Adds a [`Resolve`] for resolving schema references.

@@ -1,3 +1,4 @@
+#![allow(clippy::assertions_on_constants, clippy::bool_assert_comparison)]
 use grill::{Interrogator, JsonSchema};
 
 mod json_schema_test_suite;
@@ -8,7 +9,7 @@ impl json_schema_test_suite::Harness for Harness {
     type Draft202012 = Harness;
 
     fn draft2020_12(&self) -> Self::Draft202012 {
-        todo!()
+        *self
     }
 }
 
