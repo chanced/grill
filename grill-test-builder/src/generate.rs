@@ -106,13 +106,8 @@ fn gen_root_mod(suite: &Name, sets: Vec<TestSet>, has_sources: bool) -> (Utf8Pat
 
 fn build_fn() -> TokenStream {
     quote! {
-        async fn build(finish: grill::Finish) -> Result<grill::Interrogator, grill::error::BuildError> {
-            finish
-                .await
-                .map(|mut interrogator| {
-                    interrogator.source_static_values(sources::sources()).unwrap();
-                    interrogator
-                })
+        async fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
+            futures::executor::block_on(|| build.source_static_values(sources::sources()))
         }
     }
 }
@@ -453,25 +448,40 @@ impl TestSet {
         let methods = self.harness_trait_methods();
         quote! {
             pub trait #name {
-                fn interrogator(&self) -> Finish;
+                fn build(&self) -> grill::Build;
                 #methods
             }
         }
     }
 }
 
+// use crate::json_schema_test_suite::{Draft202012, Harness};
+// async fn interrogator() -> Result<Interrogator, &'static BuildError> {
+//     static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
+//     INTERROGATOR.get_or_init(|| {
+//         futures::executor::block_on(crate::json_schema_test_suite::build(
+//             crate::Harness.draft2020_12().interrogator(),
+//         ))
+//     });
+//     todo!()
+// }
+
 fn gen_tests_mods(ancestry: &[&Name], mods: &[TokenStream]) -> TokenStream {
     let dialect = &ancestry[0].pascal_ident;
-
+    let method = &ancestry[0].snake_ident;
     let interrogator = if ancestry.len() == 1 {
         quote! {
+            use futures::executor::block_on;
+            use super::{ #dialect, Harness as _, build };
+            use crate::Harness;
+
             async fn interrogator() -> Result<Interrogator, &'static BuildError> {
-                use once_cell::sync::Lazy;
-                use super::#dialect;
-                static INTERROGATOR: Lazy<Result<Interrogator, BuildError>> = Lazy::new(|| async move {
-                    super::build(#dialect::interrogator(&crate::Harness)).await
-                });
-                INTERROGATOR.await.as_ref().map(|i| i.clone())
+                use std::sync::OnceLock;
+                static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
+                INTERROGATOR
+                    .get_or_init(|| block_on(build(Harness.#method().build())))
+                    .as_ref()
+                    .map(Clone::clone)
             }
         }
     } else {
@@ -553,8 +563,8 @@ impl Test {
         let name = format_ident!("test{}_{}", i, Name::snake(&description));
 
         quote! {
-            #[tokio::test]
-            async fn #name() {
+            #[test]
+            fn #name() {
             }
         }
     }

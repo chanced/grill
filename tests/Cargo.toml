@@ -9,10 +9,8 @@ once_cell  = { workspace = true }
 serde      = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 
-[build-dependencies]
-
 [dev-dependencies]
-tokio = { version = "1.28", features = ["full"] }
+futures = { version = "0.3.29" }
 
 [[test]]
 edition = "2021"

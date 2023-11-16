@@ -45,7 +45,13 @@ pub mod anymap;
 pub mod test;
 
 use std::{
-    any, borrow::Cow, collections::HashSet, fmt::Debug, future::Future, ops::Deref, pin::Pin,
+    any,
+    borrow::Cow,
+    collections::HashSet,
+    fmt::Debug,
+    future::{Future, IntoFuture},
+    ops::Deref,
+    pin::Pin,
 };
 
 use jsonptr::Pointer;
@@ -112,38 +118,6 @@ macro_rules! json_pretty_str {
     };
 }
 
-pub trait Criterion {}
-
-/// The `Future` returned from calling `Build::finish`.
-#[pin_project]
-pub struct Finish {
-    #[pin]
-    build: Pin<Box<dyn Send + Future<Output = Result<Interrogator, BuildError>>>>,
-}
-
-impl Future for Finish {
-    type Output = Result<Interrogator, BuildError>;
-
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        self.project().build.as_mut().poll(cx)
-    }
-}
-
-impl Finish {
-    /// Constructs a new `Building`
-    #[must_use]
-    pub fn new(
-        build: impl 'static + Send + Future<Output = Result<Interrogator, BuildError>>,
-    ) -> Self {
-        Self {
-            build: Box::pin(build),
-        }
-    }
-}
-
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
 pub struct Build {
@@ -157,20 +131,11 @@ pub struct Build {
     numbers: Vec<Number>,
 }
 
-enum PendingSrc {
-    Bytes(Result<AbsoluteUri, UriError>, Vec<u8>),
-    String(Result<AbsoluteUri, UriError>, String),
-    Value(Result<AbsoluteUri, UriError>, Cow<'static, Value>),
-}
-impl TryFrom<PendingSrc> for Src {
-    type Error = SourceError;
-
-    fn try_from(src: PendingSrc) -> Result<Self, Self::Error> {
-        Ok(match src {
-            PendingSrc::Bytes(uri, bytes) => Src::String(uri?, String::from_utf8(bytes)?),
-            PendingSrc::String(uri, string) => Src::String(uri?, string),
-            PendingSrc::Value(uri, value) => Src::Value(uri?, value),
-        })
+impl IntoFuture for Build {
+    type Output = Result<Interrogator, BuildError>;
+    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'static>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move { self.finish().await })
     }
 }
 
@@ -570,7 +535,10 @@ impl Build {
         self
     }
 
-    async fn building(self) -> Result<Interrogator, BuildError> {
+    /// Finishes building the [`Interrogator`]. Alternatively, you can simply
+    /// `await` any method as `Build` implements [`IntoFuture`].
+    ///
+    pub async fn finish(self) -> Result<Interrogator, BuildError> {
         let Self {
             dialects,
             pending_srcs,
@@ -611,12 +579,6 @@ impl Build {
         Ok(interrogator)
     }
 
-    /// Finalizes the build of an [`Interrogator`]
-    #[must_use]
-    pub fn finish(self) -> Finish {
-        Finish::new(self.building())
-    }
-
     /// Precompiles schemas at the given URIs.
     ///
     /// # Example
@@ -650,14 +612,6 @@ impl Build {
         }
         self
     }
-}
-
-fn srcs(mut srcs: Vec<Src>, pending_srcs: Vec<PendingSrc>) -> Result<Vec<Src>, SourceError> {
-    srcs.reserve(pending_srcs.len());
-    for pending in pending_srcs {
-        srcs.push(pending.try_into()?);
-    }
-    Ok(srcs)
 }
 
 /// Compiles and evaluates JSON Schemas.
@@ -1418,25 +1372,31 @@ impl Interrogator {
         self.schemas.rollback_txn();
         self.sources.rollback_txn();
     }
+}
 
-    // /// requires <https://github.com/rust-lang/rust/issues/62290> be made stable.
-    // fn txn<F, O, E>(&mut self, f: F) -> Result<O, E>
-    // where
-    //     F: FnOnce(&mut Self) -> Result<O, E>,
-    // {
-    //     self.start_txn();
-    //     let result = f(self);
-    //     match result {
-    //         Ok(res) => {
-    //             self.commit_txn();
-    //             Ok(res)
-    //         }
-    //         Err(err) => {
-    //             self.rollback_txn();
-    //             Err(err)
-    //         }
-    //     }
-    // }
+enum PendingSrc {
+    Bytes(Result<AbsoluteUri, UriError>, Vec<u8>),
+    String(Result<AbsoluteUri, UriError>, String),
+    Value(Result<AbsoluteUri, UriError>, Cow<'static, Value>),
+}
+impl TryFrom<PendingSrc> for Src {
+    type Error = SourceError;
+
+    fn try_from(src: PendingSrc) -> Result<Self, Self::Error> {
+        Ok(match src {
+            PendingSrc::Bytes(uri, bytes) => Src::String(uri?, String::from_utf8(bytes)?),
+            PendingSrc::String(uri, string) => Src::String(uri?, string),
+            PendingSrc::Value(uri, value) => Src::Value(uri?, value),
+        })
+    }
+}
+
+fn srcs(mut srcs: Vec<Src>, pending_srcs: Vec<PendingSrc>) -> Result<Vec<Src>, SourceError> {
+    srcs.reserve(pending_srcs.len());
+    for pending in pending_srcs {
+        srcs.push(pending.try_into()?);
+    }
+    Ok(srcs)
 }
 
 // #[cfg(test)]

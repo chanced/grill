@@ -1,4 +1,4 @@
-use grill::Interrogator;
+use grill::{Interrogator, JsonSchema};
 
 mod json_schema_test_suite;
 
@@ -13,7 +13,7 @@ impl json_schema_test_suite::Harness for Harness {
 }
 
 impl json_schema_test_suite::Draft202012 for Harness {
-    fn interrogator(&self) -> grill::Finish {
-        Interrogator::build().finish()
+    fn build(&self) -> grill::Build {
+        Interrogator::build().json_schema_2020_12()
     }
 }

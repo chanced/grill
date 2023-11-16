@@ -8,7 +8,7 @@ pub trait Harness: Copy {
     fn draft2020_12(&self) -> Self::Draft202012;
 }
 pub trait Draft202012 {
-    fn interrogator(&self) -> Finish;
+    fn build(&self) -> grill::Build;
     fn setup_additional_properties(&self, interrogator: &mut Interrogator) {}
     fn setup_all_of(&self, interrogator: &mut Interrogator) {}
     fn setup_anchor(&self, interrogator: &mut Interrogator) {}
@@ -80,11 +80,6 @@ pub trait Draft202012 {
     fn setup_optional_format_uri(&self, interrogator: &mut Interrogator) {}
     fn setup_optional_format_uuid(&self, interrogator: &mut Interrogator) {}
 }
-async fn build(finish: grill::Finish) -> Result<grill::Interrogator, grill::error::BuildError> {
-    finish.await.map(|mut interrogator| {
-        interrogator
-            .source_static_values(sources::sources())
-            .unwrap();
-        interrogator
-    })
+async fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
+    futures::executor::block_on(|| build.source_static_values(sources::sources()))
 }

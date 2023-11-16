@@ -1,13 +1,14 @@
-use std::pin::Pin;
-
+use super::{build, Draft202012, Harness as _};
+use crate::Harness;
+use futures::executor::block_on;
 use grill::{error::BuildError, Interrogator};
 async fn interrogator() -> Result<Interrogator, &'static BuildError> {
-    use super::Draft202012;
-    use once_cell::sync::Lazy;
-    static INTERROGATOR: Lazy<
-        Pin<Box<dyn Sync + Send + std::future::Future<Output = Result<Interrogator, BuildError>>>>,
-    > = Lazy::new(|| Box::pin(super::build(Draft202012::interrogator(&crate::Harness))));
-    INTERROGATOR.await.as_ref().map(|i| i.clone())
+    use std::sync::OnceLock;
+    static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
+    INTERROGATOR
+        .get_or_init(|| block_on(build(Harness.draft2020_12().build())))
+        .as_ref()
+        .map(Clone::clone)
 }
 mod additional_properties;
 mod all_of;
