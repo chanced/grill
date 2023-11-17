@@ -58,7 +58,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_all_string_formats_ignore_floats() {
@@ -84,7 +84,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_all_string_formats_ignore_objects() {
@@ -110,7 +110,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test3_all_string_formats_ignore_arrays() {
@@ -136,7 +136,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test4_all_string_formats_ignore_booleans() {
@@ -162,7 +162,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test5_all_string_formats_ignore_nulls() {
@@ -188,7 +188,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test6_a_valid_iri() {
@@ -214,7 +214,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test7_a_valid_protocol_relative_iri_reference() {
@@ -240,7 +240,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test8_a_valid_relative_iri_reference() {
@@ -266,7 +266,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test9_an_invalid_iri_reference() {
@@ -292,7 +292,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test10_a_valid_iri_reference() {
@@ -318,7 +318,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test11_a_valid_iri_fragment() {
@@ -344,7 +344,7 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test12_an_invalid_iri_fragment() {
@@ -370,6 +370,6 @@ mod validation_of_iri_references_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }

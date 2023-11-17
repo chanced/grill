@@ -57,7 +57,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_all_string_formats_ignore_floats() {
@@ -83,7 +83,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_all_string_formats_ignore_objects() {
@@ -109,7 +109,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test3_all_string_formats_ignore_arrays() {
@@ -135,7 +135,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test4_all_string_formats_ignore_booleans() {
@@ -161,7 +161,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test5_all_string_formats_ignore_nulls() {
@@ -187,7 +187,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test6_a_valid_date_time_string() {
@@ -213,7 +213,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test7_a_valid_date_time_string_without_second_fraction() {
@@ -239,7 +239,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test8_a_valid_date_time_string_with_plus_offset() {
@@ -265,7 +265,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test9_a_valid_date_time_string_with_minus_offset() {
@@ -291,7 +291,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test10_a_valid_date_time_with_a_leap_second_utc() {
@@ -317,7 +317,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test11_a_valid_date_time_with_a_leap_second_with_minus_offset() {
@@ -343,7 +343,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test12_an_invalid_date_time_past_leap_second_utc() {
@@ -369,7 +369,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test13_an_invalid_date_time_with_leap_second_on_a_wrong_minute_utc() {
@@ -395,7 +395,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test14_an_invalid_date_time_with_leap_second_on_a_wrong_hour_utc() {
@@ -421,7 +421,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test15_an_invalid_day_in_date_time_string() {
@@ -447,7 +447,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test16_an_invalid_offset_in_date_time_string() {
@@ -473,7 +473,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test17_an_invalid_closing_z_after_time_zone_offset() {
@@ -499,7 +499,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test18_an_invalid_date_time_string() {
@@ -525,7 +525,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test19_case_insensitive_t_and_z() {
@@ -551,7 +551,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test20_only_rfc3339_not_all_of_iso_8601_are_valid() {
@@ -577,7 +577,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test21_invalid_non_padded_month_dates() {
@@ -603,7 +603,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test22_invalid_non_padded_day_dates() {
@@ -629,7 +629,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test23_invalid_non_ascii_৪_a_bengali_4_in_date_portion() {
@@ -655,7 +655,7 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test24_invalid_non_ascii_৪_a_bengali_4_in_time_portion() {
@@ -681,6 +681,6 @@ mod validation_of_date_time_strings_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }

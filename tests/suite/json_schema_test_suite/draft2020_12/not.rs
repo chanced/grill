@@ -57,7 +57,7 @@ mod not_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_disallowed() {
@@ -83,7 +83,7 @@ mod not_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod not_multiple_types_1 {
@@ -137,7 +137,7 @@ mod not_multiple_types_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_mismatch() {
@@ -163,7 +163,7 @@ mod not_multiple_types_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_other_mismatch() {
@@ -189,7 +189,7 @@ mod not_multiple_types_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod not_more_complex_schema_2 {
@@ -250,7 +250,7 @@ mod not_more_complex_schema_2 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_other_match() {
@@ -276,7 +276,7 @@ mod not_more_complex_schema_2 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_mismatch() {
@@ -302,7 +302,7 @@ mod not_more_complex_schema_2 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod forbidden_property_3 {
@@ -360,7 +360,7 @@ mod forbidden_property_3 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_property_absent() {
@@ -386,7 +386,7 @@ mod forbidden_property_3 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod not_with_boolean_schema_true_4 {
@@ -440,7 +440,7 @@ mod not_with_boolean_schema_true_4 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod not_with_boolean_schema_false_5 {
@@ -494,7 +494,7 @@ mod not_with_boolean_schema_false_5 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod collect_annotations_inside_a_not_even_if_collection_is_disabled_6 {
@@ -555,7 +555,7 @@ mod collect_annotations_inside_a_not_even_if_collection_is_disabled_6 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_annotations_are_still_collected_inside_a_not() {
@@ -581,6 +581,6 @@ mod collect_annotations_inside_a_not_even_if_collection_is_disabled_6 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }

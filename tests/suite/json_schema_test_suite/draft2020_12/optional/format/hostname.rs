@@ -57,7 +57,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_all_string_formats_ignore_floats() {
@@ -83,7 +83,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_all_string_formats_ignore_objects() {
@@ -109,7 +109,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test3_all_string_formats_ignore_arrays() {
@@ -135,7 +135,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test4_all_string_formats_ignore_booleans() {
@@ -161,7 +161,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test5_all_string_formats_ignore_nulls() {
@@ -187,7 +187,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test6_a_valid_host_name() {
@@ -213,7 +213,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test7_a_valid_punycoded_idn_hostname() {
@@ -239,7 +239,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test8_a_host_name_starting_with_an_illegal_character() {
@@ -265,7 +265,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test9_a_host_name_containing_illegal_characters() {
@@ -291,7 +291,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test10_a_host_name_with_a_component_too_long() {
@@ -317,7 +317,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test11_starts_with_hyphen() {
@@ -343,7 +343,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test12_ends_with_hyphen() {
@@ -369,7 +369,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test13_starts_with_underscore() {
@@ -395,7 +395,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test14_ends_with_underscore() {
@@ -421,7 +421,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test15_contains_underscore() {
@@ -447,7 +447,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test16_maximum_label_length() {
@@ -473,7 +473,7 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test17_exceeds_maximum_label_length() {
@@ -499,6 +499,6 @@ mod validation_of_host_names_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }

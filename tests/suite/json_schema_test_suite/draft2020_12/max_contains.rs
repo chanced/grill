@@ -57,7 +57,7 @@ mod max_contains_without_contains_is_ignored_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_two_items_still_valid_against_lone_max_contains() {
@@ -83,7 +83,7 @@ mod max_contains_without_contains_is_ignored_0 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod max_contains_with_contains_1 {
@@ -138,7 +138,7 @@ mod max_contains_with_contains_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_all_elements_match_valid_max_contains() {
@@ -164,7 +164,7 @@ mod max_contains_with_contains_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_all_elements_match_invalid_max_contains() {
@@ -190,7 +190,7 @@ mod max_contains_with_contains_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test3_some_elements_match_valid_max_contains() {
@@ -216,7 +216,7 @@ mod max_contains_with_contains_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test4_some_elements_match_invalid_max_contains() {
@@ -242,7 +242,7 @@ mod max_contains_with_contains_1 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod max_contains_with_contains_value_with_a_decimal_2 {
@@ -297,7 +297,7 @@ mod max_contains_with_contains_value_with_a_decimal_2 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_too_many_elements_match_invalid_max_contains() {
@@ -323,7 +323,7 @@ mod max_contains_with_contains_value_with_a_decimal_2 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
 mod min_contains_max_contains_3 {
@@ -379,7 +379,7 @@ mod min_contains_max_contains_3 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test1_min_contains_lt_actual_lt_max_contains() {
@@ -405,7 +405,7 @@ mod min_contains_max_contains_3 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
     #[test]
     fn test2_min_contains_lt_max_contains_lt_actual() {
@@ -431,6 +431,6 @@ mod min_contains_max_contains_3 {
             }
         };
         let valid_msg = if expected_valid { "valid" } else { "invalid" };
-        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  expected: {valid_msg}\n  schema:{SCHEMA}\n  data: {data}")
     }
 }
