@@ -1,2 +1,0 @@
-[env]
-RUSTDOCFLAGS = "--cfg docsrs"
