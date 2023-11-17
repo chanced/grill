@@ -36,7 +36,6 @@ mod exclusive_maximum_validation_0 {
     }
     #[test]
     fn test0_below_the_exclusive_maximum_is_valid() {
-        use super::DESCRIPTION;
         let description = "below the exclusiveMaximum is valid";
         let data = "2.2";
         let expected_valid = true;
@@ -58,11 +57,11 @@ mod exclusive_maximum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_boundary_point_is_invalid() {
-        use super::DESCRIPTION;
         let description = "boundary point is invalid";
         let data = "3.0";
         let expected_valid = false;
@@ -84,11 +83,11 @@ mod exclusive_maximum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_above_the_exclusive_maximum_is_invalid() {
-        use super::DESCRIPTION;
         let description = "above the exclusiveMaximum is invalid";
         let data = "3.5";
         let expected_valid = false;
@@ -110,11 +109,11 @@ mod exclusive_maximum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_ignores_non_numbers() {
-        use super::DESCRIPTION;
         let description = "ignores non-numbers";
         let data = "\"x\"";
         let expected_valid = true;
@@ -136,6 +135,7 @@ mod exclusive_maximum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

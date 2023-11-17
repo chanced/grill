@@ -38,7 +38,6 @@ mod a_schema_given_for_prefix_items_0 {
     }
     #[test]
     fn test0_correct_types() {
-        use super::DESCRIPTION;
         let description = "correct types";
         let data = "[ 1, \"foo\" ]";
         let expected_valid = true;
@@ -60,11 +59,11 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_wrong_types() {
-        use super::DESCRIPTION;
         let description = "wrong types";
         let data = "[ \"foo\", 1 ]";
         let expected_valid = false;
@@ -86,11 +85,11 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_incomplete_array_of_items() {
-        use super::DESCRIPTION;
         let description = "incomplete array of items";
         let data = "[ 1 ]";
         let expected_valid = true;
@@ -112,11 +111,11 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_array_with_additional_items() {
-        use super::DESCRIPTION;
         let description = "array with additional items";
         let data = "[ 1, \"foo\", true ]";
         let expected_valid = true;
@@ -138,11 +137,11 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_empty_array() {
-        use super::DESCRIPTION;
         let description = "empty array";
         let data = "[ ]";
         let expected_valid = true;
@@ -164,11 +163,11 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_java_script_pseudo_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "JavaScript pseudo-array is valid";
         let data = "{\n                    \"0\": \"invalid\",\n                    \"1\": \"valid\",\n                    \"length\": 2\n                }" ;
         let expected_valid = true;
@@ -190,7 +189,8 @@ mod a_schema_given_for_prefix_items_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod prefix_items_with_boolean_schemas_1 {
@@ -222,7 +222,6 @@ mod prefix_items_with_boolean_schemas_1 {
     }
     #[test]
     fn test0_array_with_one_item_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with one item is valid";
         let data = "[ 1 ]";
         let expected_valid = true;
@@ -244,11 +243,11 @@ mod prefix_items_with_boolean_schemas_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_array_with_two_items_is_invalid() {
-        use super::DESCRIPTION;
         let description = "array with two items is invalid";
         let data = "[ 1, \"foo\" ]";
         let expected_valid = false;
@@ -270,11 +269,11 @@ mod prefix_items_with_boolean_schemas_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_empty_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "empty array is valid";
         let data = "[]";
         let expected_valid = true;
@@ -296,7 +295,8 @@ mod prefix_items_with_boolean_schemas_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_items_are_allowed_by_default_2 {
@@ -328,7 +328,6 @@ mod additional_items_are_allowed_by_default_2 {
     }
     #[test]
     fn test0_only_the_first_item_is_validated() {
-        use super::DESCRIPTION;
         let description = "only the first item is validated";
         let data = "[1, \"foo\", false]";
         let expected_valid = true;
@@ -350,7 +349,8 @@ mod additional_items_are_allowed_by_default_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod prefix_items_with_null_instance_elements_3 {
@@ -386,7 +386,6 @@ mod prefix_items_with_null_instance_elements_3 {
     }
     #[test]
     fn test0_allows_null_elements() {
-        use super::DESCRIPTION;
         let description = "allows null elements";
         let data = "[ null ]";
         let expected_valid = true;
@@ -408,6 +407,7 @@ mod prefix_items_with_null_instance_elements_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

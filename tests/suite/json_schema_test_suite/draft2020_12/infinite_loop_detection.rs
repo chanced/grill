@@ -53,7 +53,6 @@ mod evaluating_the_same_schema_location_against_the_same_data_location_twice_is_
     }
     #[test]
     fn test0_passing_case() {
-        use super::DESCRIPTION;
         let description = "passing case";
         let data = "{ \"foo\": 1 }";
         let expected_valid = true;
@@ -75,11 +74,11 @@ mod evaluating_the_same_schema_location_against_the_same_data_location_twice_is_
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_failing_case() {
-        use super::DESCRIPTION;
         let description = "failing case";
         let data = "{ \"foo\": \"a string\" }";
         let expected_valid = false;
@@ -101,6 +100,7 @@ mod evaluating_the_same_schema_location_against_the_same_data_location_twice_is_
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

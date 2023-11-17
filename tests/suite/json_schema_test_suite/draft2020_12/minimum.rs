@@ -35,7 +35,6 @@ mod minimum_validation_0 {
     }
     #[test]
     fn test0_above_the_minimum_is_valid() {
-        use super::DESCRIPTION;
         let description = "above the minimum is valid";
         let data = "2.6";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_boundary_point_is_valid() {
-        use super::DESCRIPTION;
         let description = "boundary point is valid";
         let data = "1.1";
         let expected_valid = true;
@@ -83,11 +82,11 @@ mod minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_below_the_minimum_is_invalid() {
-        use super::DESCRIPTION;
         let description = "below the minimum is invalid";
         let data = "0.6";
         let expected_valid = false;
@@ -109,11 +108,11 @@ mod minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_ignores_non_numbers() {
-        use super::DESCRIPTION;
         let description = "ignores non-numbers";
         let data = "\"x\"";
         let expected_valid = true;
@@ -135,7 +134,8 @@ mod minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod minimum_validation_with_signed_integer_1 {
@@ -167,7 +167,6 @@ mod minimum_validation_with_signed_integer_1 {
     }
     #[test]
     fn test0_negative_above_the_minimum_is_valid() {
-        use super::DESCRIPTION;
         let description = "negative above the minimum is valid";
         let data = "-1";
         let expected_valid = true;
@@ -189,11 +188,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_positive_above_the_minimum_is_valid() {
-        use super::DESCRIPTION;
         let description = "positive above the minimum is valid";
         let data = "0";
         let expected_valid = true;
@@ -215,11 +214,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_boundary_point_is_valid() {
-        use super::DESCRIPTION;
         let description = "boundary point is valid";
         let data = "-2";
         let expected_valid = true;
@@ -241,11 +240,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_boundary_point_with_float_is_valid() {
-        use super::DESCRIPTION;
         let description = "boundary point with float is valid";
         let data = "-2.0";
         let expected_valid = true;
@@ -267,11 +266,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_float_below_the_minimum_is_invalid() {
-        use super::DESCRIPTION;
         let description = "float below the minimum is invalid";
         let data = "-2.0001";
         let expected_valid = false;
@@ -293,11 +292,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_int_below_the_minimum_is_invalid() {
-        use super::DESCRIPTION;
         let description = "int below the minimum is invalid";
         let data = "-3";
         let expected_valid = false;
@@ -319,11 +318,11 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test6_ignores_non_numbers() {
-        use super::DESCRIPTION;
         let description = "ignores non-numbers";
         let data = "\"x\"";
         let expected_valid = true;
@@ -345,6 +344,7 @@ mod minimum_validation_with_signed_integer_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

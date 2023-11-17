@@ -43,7 +43,6 @@ mod a_dynamic_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a
     }
     #[test]
     fn test0_an_array_of_strings_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is valid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = true;
@@ -65,11 +64,11 @@ mod a_dynamic_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_containing_non_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array containing non-strings is invalid";
         let data = "[\"foo\", 42]";
         let expected_valid = false;
@@ -91,7 +90,8 @@ mod a_dynamic_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_to_an_anchor_in_the_same_schema_resource_behaves_like_a_normal_ref_to_an_anchor_1 {
@@ -131,7 +131,6 @@ mod a_dynamic_ref_to_an_anchor_in_the_same_schema_resource_behaves_like_a_normal
     }
     #[test]
     fn test0_an_array_of_strings_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is valid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = true;
@@ -153,11 +152,11 @@ mod a_dynamic_ref_to_an_anchor_in_the_same_schema_resource_behaves_like_a_normal
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_containing_non_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array containing non-strings is invalid";
         let data = "[\"foo\", 42]";
         let expected_valid = false;
@@ -179,7 +178,8 @@ mod a_dynamic_ref_to_an_anchor_in_the_same_schema_resource_behaves_like_a_normal
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_ref_to_an_anchor_2 {
@@ -219,7 +219,6 @@ mod a_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_
     }
     #[test]
     fn test0_an_array_of_strings_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is valid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = true;
@@ -241,11 +240,11 @@ mod a_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_containing_non_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array containing non-strings is invalid";
         let data = "[\"foo\", 42]";
         let expected_valid = false;
@@ -267,7 +266,8 @@ mod a_ref_to_a_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_resolves_to_the_first_dynamic_anchor_still_in_scope_that_is_encountered_when_the_schema_is_evaluated_3 {
@@ -317,7 +317,6 @@ mod a_dynamic_ref_resolves_to_the_first_dynamic_anchor_still_in_scope_that_is_en
     }
     #[test]
     fn test0_an_array_of_strings_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is valid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = true;
@@ -339,11 +338,11 @@ mod a_dynamic_ref_resolves_to_the_first_dynamic_anchor_still_in_scope_that_is_en
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_containing_non_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array containing non-strings is invalid";
         let data = "[\"foo\", 42]";
         let expected_valid = false;
@@ -365,7 +364,8 @@ mod a_dynamic_ref_resolves_to_the_first_dynamic_anchor_still_in_scope_that_is_en
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_without_anchor_in_fragment_behaves_identical_to_ref_4 {
@@ -416,7 +416,6 @@ mod a_dynamic_ref_without_anchor_in_fragment_behaves_identical_to_ref_4 {
     }
     #[test]
     fn test0_an_array_of_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is invalid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = false;
@@ -438,11 +437,11 @@ mod a_dynamic_ref_without_anchor_in_fragment_behaves_identical_to_ref_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_of_numbers_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of numbers is valid";
         let data = "[24, 42]";
         let expected_valid = true;
@@ -464,7 +463,8 @@ mod a_dynamic_ref_without_anchor_in_fragment_behaves_identical_to_ref_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_with_intermediate_scopes_that_don_t_include_a_matching_dynamic_anchor_does_not_affect_dynamic_scope_resolution_5 {
@@ -518,7 +518,6 @@ mod a_dynamic_ref_with_intermediate_scopes_that_don_t_include_a_matching_dynamic
     }
     #[test]
     fn test0_an_array_of_strings_is_valid() {
-        use super::DESCRIPTION;
         let description = "An array of strings is valid";
         let data = "[\"foo\", \"bar\"]";
         let expected_valid = true;
@@ -540,11 +539,11 @@ mod a_dynamic_ref_with_intermediate_scopes_that_don_t_include_a_matching_dynamic
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_array_containing_non_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "An array containing non-strings is invalid";
         let data = "[\"foo\", 42]";
         let expected_valid = false;
@@ -566,7 +565,8 @@ mod a_dynamic_ref_with_intermediate_scopes_that_don_t_include_a_matching_dynamic
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod an_anchor_with_the_same_name_as_a_dynamic_anchor_is_not_used_for_dynamic_scope_resolution_6 {
@@ -616,7 +616,6 @@ mod an_anchor_with_the_same_name_as_a_dynamic_anchor_is_not_used_for_dynamic_sco
     }
     #[test]
     fn test0_any_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "Any array is valid";
         let data = "[\"foo\", 42]";
         let expected_valid = true;
@@ -638,7 +637,8 @@ mod an_anchor_with_the_same_name_as_a_dynamic_anchor_is_not_used_for_dynamic_sco
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_without_a_matching_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_ref_to_anchor_7 {
@@ -688,7 +688,6 @@ mod a_dynamic_ref_without_a_matching_dynamic_anchor_in_the_same_schema_resource_
     }
     #[test]
     fn test0_any_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "Any array is valid";
         let data = "[\"foo\", 42]";
         let expected_valid = true;
@@ -710,7 +709,8 @@ mod a_dynamic_ref_without_a_matching_dynamic_anchor_in_the_same_schema_resource_
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_with_a_non_matching_dynamic_anchor_in_the_same_schema_resource_behaves_like_a_normal_ref_to_anchor_8 {
@@ -761,7 +761,6 @@ mod a_dynamic_ref_with_a_non_matching_dynamic_anchor_in_the_same_schema_resource
     }
     #[test]
     fn test0_any_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "Any array is valid";
         let data = "[\"foo\", 42]";
         let expected_valid = true;
@@ -783,7 +782,8 @@ mod a_dynamic_ref_with_a_non_matching_dynamic_anchor_in_the_same_schema_resource
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_that_initially_resolves_to_a_schema_with_a_matching_dynamic_anchor_resolves_to_the_first_dynamic_anchor_in_the_dynamic_scope_9 {
@@ -838,7 +838,6 @@ mod a_dynamic_ref_that_initially_resolves_to_a_schema_with_a_matching_dynamic_an
     }
     #[test]
     fn test0_the_recursive_part_is_valid_against_the_root() {
-        use super::DESCRIPTION;
         let description = "The recursive part is valid against the root";
         let data = "{\n                    \"foo\": \"pass\",\n                    \"bar\": {\n                        \"baz\": { \"foo\": \"pass\" }\n                    }\n                }" ;
         let expected_valid = true;
@@ -860,11 +859,11 @@ mod a_dynamic_ref_that_initially_resolves_to_a_schema_with_a_matching_dynamic_an
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_the_recursive_part_is_not_valid_against_the_root() {
-        use super::DESCRIPTION;
         let description = "The recursive part is not valid against the root";
         let data = "{\n                    \"foo\": \"pass\",\n                    \"bar\": {\n                        \"baz\": { \"foo\": \"fail\" }\n                    }\n                }" ;
         let expected_valid = false;
@@ -886,7 +885,8 @@ mod a_dynamic_ref_that_initially_resolves_to_a_schema_with_a_matching_dynamic_an
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod a_dynamic_ref_that_initially_resolves_to_a_schema_without_a_matching_dynamic_anchor_behaves_like_a_normal_ref_to_anchor_10 {
@@ -941,7 +941,6 @@ mod a_dynamic_ref_that_initially_resolves_to_a_schema_without_a_matching_dynamic
     }
     #[test]
     fn test0_the_recursive_part_doesn_t_need_to_validate_against_the_root() {
-        use super::DESCRIPTION;
         let description = "The recursive part doesn't need to validate against the root";
         let data = "{\n                    \"foo\": \"pass\",\n                    \"bar\": {\n                        \"baz\": { \"foo\": \"fail\" }\n                    }\n                }" ;
         let expected_valid = true;
@@ -963,7 +962,8 @@ mod a_dynamic_ref_that_initially_resolves_to_a_schema_without_a_matching_dynamic
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod multiple_dynamic_paths_to_the_dynamic_ref_keyword_11 {
@@ -1023,7 +1023,6 @@ mod multiple_dynamic_paths_to_the_dynamic_ref_keyword_11 {
     }
     #[test]
     fn test0_recurse_to_any_leaf_node_floats_are_allowed() {
-        use super::DESCRIPTION;
         let description = "recurse to anyLeafNode - floats are allowed";
         let data = "{ \"alpha\": 1.1 }";
         let expected_valid = true;
@@ -1045,11 +1044,11 @@ mod multiple_dynamic_paths_to_the_dynamic_ref_keyword_11 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_recurse_to_integer_node_floats_are_not_allowed() {
-        use super::DESCRIPTION;
         let description = "recurse to integerNode - floats are not allowed";
         let data = "{ \"november\": 1.1 }";
         let expected_valid = false;
@@ -1071,7 +1070,8 @@ mod multiple_dynamic_paths_to_the_dynamic_ref_keyword_11 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod after_leaving_a_dynamic_scope_it_is_not_used_by_a_dynamic_ref_12 {
@@ -1137,7 +1137,6 @@ mod after_leaving_a_dynamic_scope_it_is_not_used_by_a_dynamic_ref_12 {
     }
     #[test]
     fn test0_string_matches_defs_thingy_but_the_dynamic_ref_does_not_stop_here() {
-        use super::DESCRIPTION;
         let description = "string matches /$defs/thingy, but the $dynamicRef does not stop here";
         let data = "\"a string\"";
         let expected_valid = false;
@@ -1159,11 +1158,11 @@ mod after_leaving_a_dynamic_scope_it_is_not_used_by_a_dynamic_ref_12 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_first_scope_is_not_in_dynamic_scope_for_the_dynamic_ref() {
-        use super::DESCRIPTION;
         let description = "first_scope is not in dynamic scope for the $dynamicRef";
         let data = "42";
         let expected_valid = false;
@@ -1185,11 +1184,11 @@ mod after_leaving_a_dynamic_scope_it_is_not_used_by_a_dynamic_ref_12 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_then_defs_thingy_is_the_final_stop_for_the_dynamic_ref() {
-        use super::DESCRIPTION;
         let description = "/then/$defs/thingy is the final stop for the $dynamicRef";
         let data = "null";
         let expected_valid = true;
@@ -1211,7 +1210,8 @@ mod after_leaving_a_dynamic_scope_it_is_not_used_by_a_dynamic_ref_12 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod strict_tree_schema_guards_against_misspelled_properties_13 {
@@ -1247,7 +1247,6 @@ mod strict_tree_schema_guards_against_misspelled_properties_13 {
     }
     #[test]
     fn test0_instance_with_misspelled_field() {
-        use super::DESCRIPTION;
         let description = "instance with misspelled field";
         let data = "{\n                    \"children\": [{\n                            \"daat\": 1\n                        }]\n                }" ;
         let expected_valid = false;
@@ -1269,11 +1268,11 @@ mod strict_tree_schema_guards_against_misspelled_properties_13 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_instance_with_correct_field() {
-        use super::DESCRIPTION;
         let description = "instance with correct field";
         let data = "{\n                    \"children\": [{\n                            \"data\": 1\n                        }]\n                }" ;
         let expected_valid = true;
@@ -1295,7 +1294,8 @@ mod strict_tree_schema_guards_against_misspelled_properties_13 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod tests_for_implementation_dynamic_anchor_and_reference_link_14 {
@@ -1338,7 +1338,6 @@ mod tests_for_implementation_dynamic_anchor_and_reference_link_14 {
     }
     #[test]
     fn test0_incorrect_parent_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect parent schema";
         let data = "{\n                    \"a\": true\n                }";
         let expected_valid = false;
@@ -1360,11 +1359,11 @@ mod tests_for_implementation_dynamic_anchor_and_reference_link_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_incorrect_extended_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"b\": 1 }\n                    ]\n                }" ;
         let expected_valid = false;
@@ -1386,11 +1385,11 @@ mod tests_for_implementation_dynamic_anchor_and_reference_link_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_correct_extended_schema() {
-        use super::DESCRIPTION;
         let description = "correct extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"a\": 1 }\n                    ]\n                }" ;
         let expected_valid = true;
@@ -1412,7 +1411,8 @@ mod tests_for_implementation_dynamic_anchor_and_reference_link_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_and_dynamic_anchor_are_independent_of_order_defs_first_15 {
@@ -1461,7 +1461,6 @@ mod ref_and_dynamic_anchor_are_independent_of_order_defs_first_15 {
     }
     #[test]
     fn test0_incorrect_parent_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect parent schema";
         let data = "{\n                    \"a\": true\n                }";
         let expected_valid = false;
@@ -1483,11 +1482,11 @@ mod ref_and_dynamic_anchor_are_independent_of_order_defs_first_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_incorrect_extended_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"b\": 1 }\n                    ]\n                }" ;
         let expected_valid = false;
@@ -1509,11 +1508,11 @@ mod ref_and_dynamic_anchor_are_independent_of_order_defs_first_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_correct_extended_schema() {
-        use super::DESCRIPTION;
         let description = "correct extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"a\": 1 }\n                    ]\n                }" ;
         let expected_valid = true;
@@ -1535,7 +1534,8 @@ mod ref_and_dynamic_anchor_are_independent_of_order_defs_first_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_and_dynamic_anchor_are_independent_of_order_ref_first_16 {
@@ -1584,7 +1584,6 @@ mod ref_and_dynamic_anchor_are_independent_of_order_ref_first_16 {
     }
     #[test]
     fn test0_incorrect_parent_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect parent schema";
         let data = "{\n                    \"a\": true\n                }";
         let expected_valid = false;
@@ -1606,11 +1605,11 @@ mod ref_and_dynamic_anchor_are_independent_of_order_ref_first_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_incorrect_extended_schema() {
-        use super::DESCRIPTION;
         let description = "incorrect extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"b\": 1 }\n                    ]\n                }" ;
         let expected_valid = false;
@@ -1632,11 +1631,11 @@ mod ref_and_dynamic_anchor_are_independent_of_order_ref_first_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_correct_extended_schema() {
-        use super::DESCRIPTION;
         let description = "correct extended schema";
         let data = "{\n                    \"elements\": [\n                        { \"a\": 1 }\n                    ]\n                }" ;
         let expected_valid = true;
@@ -1658,6 +1657,7 @@ mod ref_and_dynamic_anchor_are_independent_of_order_ref_first_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

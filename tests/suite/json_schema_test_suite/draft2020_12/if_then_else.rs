@@ -38,7 +38,6 @@ mod ignore_if_without_then_or_else_0 {
     }
     #[test]
     fn test0_valid_when_valid_against_lone_if() {
-        use super::DESCRIPTION;
         let description = "valid when valid against lone if";
         let data = "0";
         let expected_valid = true;
@@ -60,11 +59,11 @@ mod ignore_if_without_then_or_else_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_valid_when_invalid_against_lone_if() {
-        use super::DESCRIPTION;
         let description = "valid when invalid against lone if";
         let data = "\"hello\"";
         let expected_valid = true;
@@ -86,7 +85,8 @@ mod ignore_if_without_then_or_else_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ignore_then_without_if_1 {
@@ -121,7 +121,6 @@ mod ignore_then_without_if_1 {
     }
     #[test]
     fn test0_valid_when_valid_against_lone_then() {
-        use super::DESCRIPTION;
         let description = "valid when valid against lone then";
         let data = "0";
         let expected_valid = true;
@@ -143,11 +142,11 @@ mod ignore_then_without_if_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_valid_when_invalid_against_lone_then() {
-        use super::DESCRIPTION;
         let description = "valid when invalid against lone then";
         let data = "\"hello\"";
         let expected_valid = true;
@@ -169,7 +168,8 @@ mod ignore_then_without_if_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ignore_else_without_if_2 {
@@ -204,7 +204,6 @@ mod ignore_else_without_if_2 {
     }
     #[test]
     fn test0_valid_when_valid_against_lone_else() {
-        use super::DESCRIPTION;
         let description = "valid when valid against lone else";
         let data = "0";
         let expected_valid = true;
@@ -226,11 +225,11 @@ mod ignore_else_without_if_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_valid_when_invalid_against_lone_else() {
-        use super::DESCRIPTION;
         let description = "valid when invalid against lone else";
         let data = "\"hello\"";
         let expected_valid = true;
@@ -252,7 +251,8 @@ mod ignore_else_without_if_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod if_and_then_without_else_3 {
@@ -290,7 +290,6 @@ mod if_and_then_without_else_3 {
     }
     #[test]
     fn test0_valid_through_then() {
-        use super::DESCRIPTION;
         let description = "valid through then";
         let data = "-1";
         let expected_valid = true;
@@ -312,11 +311,11 @@ mod if_and_then_without_else_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_through_then() {
-        use super::DESCRIPTION;
         let description = "invalid through then";
         let data = "-100";
         let expected_valid = false;
@@ -338,11 +337,11 @@ mod if_and_then_without_else_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_valid_when_if_test_fails() {
-        use super::DESCRIPTION;
         let description = "valid when if test fails";
         let data = "3";
         let expected_valid = true;
@@ -364,7 +363,8 @@ mod if_and_then_without_else_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod if_and_else_without_then_4 {
@@ -402,7 +402,6 @@ mod if_and_else_without_then_4 {
     }
     #[test]
     fn test0_valid_when_if_test_passes() {
-        use super::DESCRIPTION;
         let description = "valid when if test passes";
         let data = "-1";
         let expected_valid = true;
@@ -424,11 +423,11 @@ mod if_and_else_without_then_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_valid_through_else() {
-        use super::DESCRIPTION;
         let description = "valid through else";
         let data = "4";
         let expected_valid = true;
@@ -450,11 +449,11 @@ mod if_and_else_without_then_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_invalid_through_else() {
-        use super::DESCRIPTION;
         let description = "invalid through else";
         let data = "3";
         let expected_valid = false;
@@ -476,7 +475,8 @@ mod if_and_else_without_then_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod validate_against_correct_branch_then_vs_else_5 {
@@ -517,7 +517,6 @@ mod validate_against_correct_branch_then_vs_else_5 {
     }
     #[test]
     fn test0_valid_through_then() {
-        use super::DESCRIPTION;
         let description = "valid through then";
         let data = "-1";
         let expected_valid = true;
@@ -539,11 +538,11 @@ mod validate_against_correct_branch_then_vs_else_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_through_then() {
-        use super::DESCRIPTION;
         let description = "invalid through then";
         let data = "-100";
         let expected_valid = false;
@@ -565,11 +564,11 @@ mod validate_against_correct_branch_then_vs_else_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_valid_through_else() {
-        use super::DESCRIPTION;
         let description = "valid through else";
         let data = "4";
         let expected_valid = true;
@@ -591,11 +590,11 @@ mod validate_against_correct_branch_then_vs_else_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_invalid_through_else() {
-        use super::DESCRIPTION;
         let description = "invalid through else";
         let data = "3";
         let expected_valid = false;
@@ -617,7 +616,8 @@ mod validate_against_correct_branch_then_vs_else_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod non_interference_across_combined_schemas_6 {
@@ -666,7 +666,6 @@ mod non_interference_across_combined_schemas_6 {
     }
     #[test]
     fn test0_valid_but_would_have_been_invalid_through_then() {
-        use super::DESCRIPTION;
         let description = "valid, but would have been invalid through then";
         let data = "-100";
         let expected_valid = true;
@@ -688,11 +687,11 @@ mod non_interference_across_combined_schemas_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_valid_but_would_have_been_invalid_through_else() {
-        use super::DESCRIPTION;
         let description = "valid, but would have been invalid through else";
         let data = "3";
         let expected_valid = true;
@@ -714,7 +713,8 @@ mod non_interference_across_combined_schemas_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod if_with_boolean_schema_true_7 {
@@ -749,7 +749,6 @@ mod if_with_boolean_schema_true_7 {
     }
     #[test]
     fn test0_boolean_schema_true_in_if_always_chooses_the_then_path_valid() {
-        use super::DESCRIPTION;
         let description = "boolean schema true in if always chooses the then path (valid)";
         let data = "\"then\"";
         let expected_valid = true;
@@ -771,11 +770,11 @@ mod if_with_boolean_schema_true_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_boolean_schema_true_in_if_always_chooses_the_then_path_invalid() {
-        use super::DESCRIPTION;
         let description = "boolean schema true in if always chooses the then path (invalid)";
         let data = "\"else\"";
         let expected_valid = false;
@@ -797,7 +796,8 @@ mod if_with_boolean_schema_true_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod if_with_boolean_schema_false_8 {
@@ -832,7 +832,6 @@ mod if_with_boolean_schema_false_8 {
     }
     #[test]
     fn test0_boolean_schema_false_in_if_always_chooses_the_else_path_invalid() {
-        use super::DESCRIPTION;
         let description = "boolean schema false in if always chooses the else path (invalid)";
         let data = "\"then\"";
         let expected_valid = false;
@@ -854,11 +853,11 @@ mod if_with_boolean_schema_false_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_boolean_schema_false_in_if_always_chooses_the_else_path_valid() {
-        use super::DESCRIPTION;
         let description = "boolean schema false in if always chooses the else path (valid)";
         let data = "\"else\"";
         let expected_valid = true;
@@ -880,7 +879,8 @@ mod if_with_boolean_schema_false_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
@@ -915,7 +915,6 @@ mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
     }
     #[test]
     fn test0_yes_redirects_to_then_and_passes() {
-        use super::DESCRIPTION;
         let description = "yes redirects to then and passes";
         let data = "\"yes\"";
         let expected_valid = true;
@@ -937,11 +936,11 @@ mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_other_redirects_to_else_and_passes() {
-        use super::DESCRIPTION;
         let description = "other redirects to else and passes";
         let data = "\"other\"";
         let expected_valid = true;
@@ -963,11 +962,11 @@ mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_no_redirects_to_then_and_fails() {
-        use super::DESCRIPTION;
         let description = "no redirects to then and fails";
         let data = "\"no\"";
         let expected_valid = false;
@@ -989,11 +988,11 @@ mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_invalid_redirects_to_else_and_fails() {
-        use super::DESCRIPTION;
         let description = "invalid redirects to else and fails";
         let data = "\"invalid\"";
         let expected_valid = false;
@@ -1015,6 +1014,7 @@ mod if_appears_at_the_end_when_serialized_keyword_processing_sequence_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

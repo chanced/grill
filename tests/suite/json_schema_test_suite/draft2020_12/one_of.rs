@@ -42,7 +42,6 @@ mod one_of_0 {
     }
     #[test]
     fn test0_first_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "first oneOf valid";
         let data = "1";
         let expected_valid = true;
@@ -64,11 +63,11 @@ mod one_of_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_second_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "second oneOf valid";
         let data = "2.5";
         let expected_valid = true;
@@ -90,11 +89,11 @@ mod one_of_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_both_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "both oneOf valid";
         let data = "3";
         let expected_valid = false;
@@ -116,11 +115,11 @@ mod one_of_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_neither_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "neither oneOf valid";
         let data = "1.5";
         let expected_valid = false;
@@ -142,7 +141,8 @@ mod one_of_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_base_schema_1 {
@@ -182,7 +182,6 @@ mod one_of_with_base_schema_1 {
     }
     #[test]
     fn test0_mismatch_base_schema() {
-        use super::DESCRIPTION;
         let description = "mismatch base schema";
         let data = "3";
         let expected_valid = false;
@@ -204,11 +203,11 @@ mod one_of_with_base_schema_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_one_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "one oneOf valid";
         let data = "\"foobar\"";
         let expected_valid = true;
@@ -230,11 +229,11 @@ mod one_of_with_base_schema_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_both_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "both oneOf valid";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -256,7 +255,8 @@ mod one_of_with_base_schema_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_boolean_schemas_all_true_2 {
@@ -288,7 +288,6 @@ mod one_of_with_boolean_schemas_all_true_2 {
     }
     #[test]
     fn test0_any_value_is_invalid() {
-        use super::DESCRIPTION;
         let description = "any value is invalid";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -310,7 +309,8 @@ mod one_of_with_boolean_schemas_all_true_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_boolean_schemas_one_true_3 {
@@ -342,7 +342,6 @@ mod one_of_with_boolean_schemas_one_true_3 {
     }
     #[test]
     fn test0_any_value_is_valid() {
-        use super::DESCRIPTION;
         let description = "any value is valid";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -364,7 +363,8 @@ mod one_of_with_boolean_schemas_one_true_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_boolean_schemas_more_than_one_true_4 {
@@ -396,7 +396,6 @@ mod one_of_with_boolean_schemas_more_than_one_true_4 {
     }
     #[test]
     fn test0_any_value_is_invalid() {
-        use super::DESCRIPTION;
         let description = "any value is invalid";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -418,7 +417,8 @@ mod one_of_with_boolean_schemas_more_than_one_true_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_boolean_schemas_all_false_5 {
@@ -450,7 +450,6 @@ mod one_of_with_boolean_schemas_all_false_5 {
     }
     #[test]
     fn test0_any_value_is_invalid() {
-        use super::DESCRIPTION;
         let description = "any value is invalid";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -472,7 +471,8 @@ mod one_of_with_boolean_schemas_all_false_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_complex_types_6 {
@@ -517,7 +517,6 @@ mod one_of_complex_types_6 {
     }
     #[test]
     fn test0_first_one_of_valid_complex() {
-        use super::DESCRIPTION;
         let description = "first oneOf valid (complex)";
         let data = "{\"bar\": 2}";
         let expected_valid = true;
@@ -539,11 +538,11 @@ mod one_of_complex_types_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_second_one_of_valid_complex() {
-        use super::DESCRIPTION;
         let description = "second oneOf valid (complex)";
         let data = "{\"foo\": \"baz\"}";
         let expected_valid = true;
@@ -565,11 +564,11 @@ mod one_of_complex_types_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_both_one_of_valid_complex() {
-        use super::DESCRIPTION;
         let description = "both oneOf valid (complex)";
         let data = "{\"foo\": \"baz\", \"bar\": 2}";
         let expected_valid = false;
@@ -591,11 +590,11 @@ mod one_of_complex_types_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_neither_one_of_valid_complex() {
-        use super::DESCRIPTION;
         let description = "neither oneOf valid (complex)";
         let data = "{\"foo\": 2, \"bar\": \"quux\"}";
         let expected_valid = false;
@@ -617,7 +616,8 @@ mod one_of_complex_types_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_empty_schema_7 {
@@ -652,7 +652,6 @@ mod one_of_with_empty_schema_7 {
     }
     #[test]
     fn test0_one_valid_valid() {
-        use super::DESCRIPTION;
         let description = "one valid - valid";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -674,11 +673,11 @@ mod one_of_with_empty_schema_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_both_valid_invalid() {
-        use super::DESCRIPTION;
         let description = "both valid - invalid";
         let data = "123";
         let expected_valid = false;
@@ -700,7 +699,8 @@ mod one_of_with_empty_schema_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_required_8 {
@@ -736,7 +736,6 @@ mod one_of_with_required_8 {
     }
     #[test]
     fn test0_both_invalid_invalid() {
-        use super::DESCRIPTION;
         let description = "both invalid - invalid";
         let data = "{\"bar\": 2}";
         let expected_valid = false;
@@ -758,11 +757,11 @@ mod one_of_with_required_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_first_valid_valid() {
-        use super::DESCRIPTION;
         let description = "first valid - valid";
         let data = "{\"foo\": 1, \"bar\": 2}";
         let expected_valid = true;
@@ -784,11 +783,11 @@ mod one_of_with_required_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_second_valid_valid() {
-        use super::DESCRIPTION;
         let description = "second valid - valid";
         let data = "{\"foo\": 1, \"baz\": 3}";
         let expected_valid = true;
@@ -810,11 +809,11 @@ mod one_of_with_required_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_both_valid_invalid() {
-        use super::DESCRIPTION;
         let description = "both valid - invalid";
         let data = "{\"foo\": 1, \"bar\": 2, \"baz\" : 3}";
         let expected_valid = false;
@@ -836,7 +835,8 @@ mod one_of_with_required_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod one_of_with_missing_optional_property_9 {
@@ -882,7 +882,6 @@ mod one_of_with_missing_optional_property_9 {
     }
     #[test]
     fn test0_first_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "first oneOf valid";
         let data = "{\"bar\": 8}";
         let expected_valid = true;
@@ -904,11 +903,11 @@ mod one_of_with_missing_optional_property_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_second_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "second oneOf valid";
         let data = "{\"foo\": \"foo\"}";
         let expected_valid = true;
@@ -930,11 +929,11 @@ mod one_of_with_missing_optional_property_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_both_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "both oneOf valid";
         let data = "{\"foo\": \"foo\", \"bar\": 8}";
         let expected_valid = false;
@@ -956,11 +955,11 @@ mod one_of_with_missing_optional_property_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_neither_one_of_valid() {
-        use super::DESCRIPTION;
         let description = "neither oneOf valid";
         let data = "{\"baz\": \"quux\"}";
         let expected_valid = false;
@@ -982,7 +981,8 @@ mod one_of_with_missing_optional_property_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod nested_one_of_to_check_validation_semantics_10 {
@@ -1022,7 +1022,6 @@ mod nested_one_of_to_check_validation_semantics_10 {
     }
     #[test]
     fn test0_null_is_valid() {
-        use super::DESCRIPTION;
         let description = "null is valid";
         let data = "null";
         let expected_valid = true;
@@ -1044,11 +1043,11 @@ mod nested_one_of_to_check_validation_semantics_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_anything_non_null_is_invalid() {
-        use super::DESCRIPTION;
         let description = "anything non-null is invalid";
         let data = "123";
         let expected_valid = false;
@@ -1070,6 +1069,7 @@ mod nested_one_of_to_check_validation_semantics_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

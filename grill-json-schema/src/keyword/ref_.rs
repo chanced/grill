@@ -239,10 +239,10 @@ mod tests {
         dbg!(&interrogator);
         dbg!(key);
         let uri = AbsoluteUri::parse("https://example.com/recursive#/properties/foo").unwrap();
-        let schema = interrogator.schema_by_uri(&uri).unwrap();
+        let _schema = interrogator.schema_by_uri(&uri).unwrap();
         // dbg!(schema);
         let value = json!({"foo": {"bar": false}});
-        let output = interrogator
+        let _output = interrogator
             .evaluate(Structure::Verbose, key, &value)
             .unwrap();
     }

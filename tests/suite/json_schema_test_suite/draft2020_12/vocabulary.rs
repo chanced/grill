@@ -42,7 +42,6 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
     }
     #[test]
     fn test0_applicator_vocabulary_still_works() {
-        use super::DESCRIPTION;
         let description = "applicator vocabulary still works";
         let data = "{\n                    \"badProperty\": \"this property should not exist\"\n                }" ;
         let expected_valid = false;
@@ -64,11 +63,11 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_no_validation_valid_number() {
-        use super::DESCRIPTION;
         let description = "no validation: valid number";
         let data = "{\n                    \"numberProperty\": 20\n                }";
         let expected_valid = true;
@@ -90,11 +89,11 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_no_validation_invalid_number_but_it_still_validates() {
-        use super::DESCRIPTION;
         let description = "no validation: invalid number, but it still validates";
         let data = "{\n                    \"numberProperty\": 1\n                }";
         let expected_valid = true;
@@ -116,7 +115,8 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ignore_unrecognized_optional_vocabulary_1 {
@@ -148,7 +148,6 @@ mod ignore_unrecognized_optional_vocabulary_1 {
     }
     #[test]
     fn test0_string_value() {
-        use super::DESCRIPTION;
         let description = "string value";
         let data = "\"foobar\"";
         let expected_valid = false;
@@ -170,11 +169,11 @@ mod ignore_unrecognized_optional_vocabulary_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_number_value() {
-        use super::DESCRIPTION;
         let description = "number value";
         let data = "20";
         let expected_valid = true;
@@ -196,6 +195,7 @@ mod ignore_unrecognized_optional_vocabulary_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

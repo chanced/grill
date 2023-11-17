@@ -1,6 +1,3 @@
-use serde_json::{json, Value};
-use std::collections::HashMap;
-
 use crate::schema::Reference;
 use crate::Schema;
 /// This trait is used to walk a [`Schema`](grill_core::schema::Schema), its

@@ -35,7 +35,6 @@ mod validation_of_date_time_strings_0 {
     }
     #[test]
     fn test0_all_string_formats_ignore_integers() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore integers";
         let data = "12";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_all_string_formats_ignore_floats() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore floats";
         let data = "13.7";
         let expected_valid = true;
@@ -83,11 +82,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_all_string_formats_ignore_objects() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore objects";
         let data = "{}";
         let expected_valid = true;
@@ -109,11 +108,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_all_string_formats_ignore_arrays() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore arrays";
         let data = "[]";
         let expected_valid = true;
@@ -135,11 +134,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_all_string_formats_ignore_booleans() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore booleans";
         let data = "false";
         let expected_valid = true;
@@ -161,11 +160,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_all_string_formats_ignore_nulls() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore nulls";
         let data = "null";
         let expected_valid = true;
@@ -187,11 +186,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test6_a_valid_date_time_string() {
-        use super::DESCRIPTION;
         let description = "a valid date-time string";
         let data = "\"1963-06-19T08:30:06.283185Z\"";
         let expected_valid = true;
@@ -213,11 +212,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test7_a_valid_date_time_string_without_second_fraction() {
-        use super::DESCRIPTION;
         let description = "a valid date-time string without second fraction";
         let data = "\"1963-06-19T08:30:06Z\"";
         let expected_valid = true;
@@ -239,11 +238,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test8_a_valid_date_time_string_with_plus_offset() {
-        use super::DESCRIPTION;
         let description = "a valid date-time string with plus offset";
         let data = "\"1937-01-01T12:00:27.87+00:20\"";
         let expected_valid = true;
@@ -265,11 +264,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test9_a_valid_date_time_string_with_minus_offset() {
-        use super::DESCRIPTION;
         let description = "a valid date-time string with minus offset";
         let data = "\"1990-12-31T15:59:50.123-08:00\"";
         let expected_valid = true;
@@ -291,11 +290,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test10_a_valid_date_time_with_a_leap_second_utc() {
-        use super::DESCRIPTION;
         let description = "a valid date-time with a leap second, UTC";
         let data = "\"1998-12-31T23:59:60Z\"";
         let expected_valid = true;
@@ -317,11 +316,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test11_a_valid_date_time_with_a_leap_second_with_minus_offset() {
-        use super::DESCRIPTION;
         let description = "a valid date-time with a leap second, with minus offset";
         let data = "\"1998-12-31T15:59:60.123-08:00\"";
         let expected_valid = true;
@@ -343,11 +342,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test12_an_invalid_date_time_past_leap_second_utc() {
-        use super::DESCRIPTION;
         let description = "an invalid date-time past leap second, UTC";
         let data = "\"1998-12-31T23:59:61Z\"";
         let expected_valid = false;
@@ -369,11 +368,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test13_an_invalid_date_time_with_leap_second_on_a_wrong_minute_utc() {
-        use super::DESCRIPTION;
         let description = "an invalid date-time with leap second on a wrong minute, UTC";
         let data = "\"1998-12-31T23:58:60Z\"";
         let expected_valid = false;
@@ -395,11 +394,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test14_an_invalid_date_time_with_leap_second_on_a_wrong_hour_utc() {
-        use super::DESCRIPTION;
         let description = "an invalid date-time with leap second on a wrong hour, UTC";
         let data = "\"1998-12-31T22:59:60Z\"";
         let expected_valid = false;
@@ -421,11 +420,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test15_an_invalid_day_in_date_time_string() {
-        use super::DESCRIPTION;
         let description = "an invalid day in date-time string";
         let data = "\"1990-02-31T15:59:59.123-08:00\"";
         let expected_valid = false;
@@ -447,11 +446,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test16_an_invalid_offset_in_date_time_string() {
-        use super::DESCRIPTION;
         let description = "an invalid offset in date-time string";
         let data = "\"1990-12-31T15:59:59-24:00\"";
         let expected_valid = false;
@@ -473,11 +472,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test17_an_invalid_closing_z_after_time_zone_offset() {
-        use super::DESCRIPTION;
         let description = "an invalid closing Z after time-zone offset";
         let data = "\"1963-06-19T08:30:06.28123+01:00Z\"";
         let expected_valid = false;
@@ -499,11 +498,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test18_an_invalid_date_time_string() {
-        use super::DESCRIPTION;
         let description = "an invalid date-time string";
         let data = "\"06/19/1963 08:30:06 PST\"";
         let expected_valid = false;
@@ -525,11 +524,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test19_case_insensitive_t_and_z() {
-        use super::DESCRIPTION;
         let description = "case-insensitive T and Z";
         let data = "\"1963-06-19t08:30:06.283185z\"";
         let expected_valid = true;
@@ -551,11 +550,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test20_only_rfc3339_not_all_of_iso_8601_are_valid() {
-        use super::DESCRIPTION;
         let description = "only RFC3339 not all of ISO 8601 are valid";
         let data = "\"2013-350T01:01:01\"";
         let expected_valid = false;
@@ -577,11 +576,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test21_invalid_non_padded_month_dates() {
-        use super::DESCRIPTION;
         let description = "invalid non-padded month dates";
         let data = "\"1963-6-19T08:30:06.283185Z\"";
         let expected_valid = false;
@@ -603,11 +602,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test22_invalid_non_padded_day_dates() {
-        use super::DESCRIPTION;
         let description = "invalid non-padded day dates";
         let data = "\"1963-06-1T08:30:06.283185Z\"";
         let expected_valid = false;
@@ -629,11 +628,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test23_invalid_non_ascii_৪_a_bengali_4_in_date_portion() {
-        use super::DESCRIPTION;
         let description = "invalid non-ASCII '৪' (a Bengali 4) in date portion";
         let data = "\"1963-06-1৪T00:00:00Z\"";
         let expected_valid = false;
@@ -655,11 +654,11 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test24_invalid_non_ascii_৪_a_bengali_4_in_time_portion() {
-        use super::DESCRIPTION;
         let description = "invalid non-ASCII '৪' (a Bengali 4) in time portion";
         let data = "\"1963-06-11T0৪:00:00Z\"";
         let expected_valid = false;
@@ -681,6 +680,7 @@ mod validation_of_date_time_strings_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

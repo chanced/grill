@@ -1,10 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    convert::AsRef,
-    fs::File,
-    io::Write,
-    iter::once,
-};
+use std::{collections::HashMap, convert::AsRef, fs::File, io::Write};
 
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 use grill::{AbsoluteUri, Uri};
@@ -535,7 +529,7 @@ impl TestCase {
         &self,
         i: usize,
         uri: &AbsoluteUri,
-        suite: &Name,
+        _suite: &Name,
         path: &Path,
         _ancestry: &[&Name],
     ) -> TokenStream {
@@ -616,7 +610,6 @@ impl Test {
         quote! {
             #[test]
             fn #name() {
-                use super::DESCRIPTION;
                 let description = #description;
                 let data = #data;
                 let expected_valid = #valid;
@@ -640,8 +633,9 @@ impl Test {
                         panic!("failed to evaluate schema:\n{}", err);
                     }
                 };
+                let valid_msg = if expected_valid { "valid" } else { "invalid" };
                 assert_eq!(output.valid(), expected_valid,
-                    "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}"
+                    "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}"
                 )
             }
         }

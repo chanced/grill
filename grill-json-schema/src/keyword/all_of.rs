@@ -31,7 +31,6 @@ impl Keyword for AllOf {
         let Some(all_of) = schema.get(ALL_OF) else {
             return Ok(false);
         };
-        let s = schema.to_string();
         let Value::Array(all_of) = all_of else {
             return Err(InvalidTypeError {
                 expected: Expected::Array,

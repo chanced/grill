@@ -35,7 +35,6 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
     }
     #[test]
     fn test0_all_string_formats_ignore_integers() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore integers";
         let data = "12";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_all_string_formats_ignore_floats() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore floats";
         let data = "13.7";
         let expected_valid = true;
@@ -83,11 +82,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_all_string_formats_ignore_objects() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore objects";
         let data = "{}";
         let expected_valid = true;
@@ -109,11 +108,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_all_string_formats_ignore_arrays() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore arrays";
         let data = "[]";
         let expected_valid = true;
@@ -135,11 +134,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_all_string_formats_ignore_booleans() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore booleans";
         let data = "false";
         let expected_valid = true;
@@ -161,11 +160,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_all_string_formats_ignore_nulls() {
-        use super::DESCRIPTION;
         let description = "all string formats ignore nulls";
         let data = "null";
         let expected_valid = true;
@@ -187,11 +186,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test6_a_valid_idn_e_mail_example_example_test_in_hangul() {
-        use super::DESCRIPTION;
         let description = "a valid idn e-mail (example@example.test in Hangul)";
         let data = "\"실례@실례.테스트\"";
         let expected_valid = true;
@@ -213,11 +212,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test7_an_invalid_idn_e_mail_address() {
-        use super::DESCRIPTION;
         let description = "an invalid idn e-mail address";
         let data = "\"2962\"";
         let expected_valid = false;
@@ -239,11 +238,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test8_a_valid_e_mail_address() {
-        use super::DESCRIPTION;
         let description = "a valid e-mail address";
         let data = "\"joe.bloggs@example.com\"";
         let expected_valid = true;
@@ -265,11 +264,11 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test9_an_invalid_e_mail_address() {
-        use super::DESCRIPTION;
         let description = "an invalid e-mail address";
         let data = "\"2962\"";
         let expected_valid = false;
@@ -291,6 +290,7 @@ mod validation_of_an_internationalized_e_mail_addresses_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

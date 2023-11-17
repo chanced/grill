@@ -40,7 +40,6 @@ mod invalid_type_for_default_0 {
     }
     #[test]
     fn test0_valid_when_property_is_specified() {
-        use super::DESCRIPTION;
         let description = "valid when property is specified";
         let data = "{\"foo\": 13}";
         let expected_valid = true;
@@ -62,11 +61,11 @@ mod invalid_type_for_default_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_still_valid_when_the_invalid_default_is_used() {
-        use super::DESCRIPTION;
         let description = "still valid when the invalid default is used";
         let data = "{}";
         let expected_valid = true;
@@ -88,7 +87,8 @@ mod invalid_type_for_default_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod invalid_string_value_for_default_1 {
@@ -126,7 +126,6 @@ mod invalid_string_value_for_default_1 {
     }
     #[test]
     fn test0_valid_when_property_is_specified() {
-        use super::DESCRIPTION;
         let description = "valid when property is specified";
         let data = "{\"bar\": \"good\"}";
         let expected_valid = true;
@@ -148,11 +147,11 @@ mod invalid_string_value_for_default_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_still_valid_when_the_invalid_default_is_used() {
-        use super::DESCRIPTION;
         let description = "still valid when the invalid default is used";
         let data = "{}";
         let expected_valid = true;
@@ -174,7 +173,8 @@ mod invalid_string_value_for_default_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod the_default_keyword_does_not_do_anything_if_the_property_is_missing_2 {
@@ -213,7 +213,6 @@ mod the_default_keyword_does_not_do_anything_if_the_property_is_missing_2 {
     }
     #[test]
     fn test0_an_explicit_property_value_is_checked_against_maximum_passing() {
-        use super::DESCRIPTION;
         let description = "an explicit property value is checked against maximum (passing)";
         let data = "{ \"alpha\": 1 }";
         let expected_valid = true;
@@ -235,11 +234,11 @@ mod the_default_keyword_does_not_do_anything_if_the_property_is_missing_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_explicit_property_value_is_checked_against_maximum_failing() {
-        use super::DESCRIPTION;
         let description = "an explicit property value is checked against maximum (failing)";
         let data = "{ \"alpha\": 5 }";
         let expected_valid = false;
@@ -261,11 +260,11 @@ mod the_default_keyword_does_not_do_anything_if_the_property_is_missing_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_missing_properties_are_not_filled_in_with_the_default() {
-        use super::DESCRIPTION;
         let description = "missing properties are not filled in with the default";
         let data = "{}";
         let expected_valid = true;
@@ -287,6 +286,7 @@ mod the_default_keyword_does_not_do_anything_if_the_property_is_missing_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

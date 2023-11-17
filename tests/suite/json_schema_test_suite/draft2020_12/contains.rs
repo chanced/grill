@@ -35,7 +35,6 @@ mod contains_keyword_validation_0 {
     }
     #[test]
     fn test0_array_with_item_matching_schema_5_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with item matching schema (5) is valid";
         let data = "[3, 4, 5]";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_array_with_item_matching_schema_6_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with item matching schema (6) is valid";
         let data = "[3, 4, 6]";
         let expected_valid = true;
@@ -83,11 +82,11 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_array_with_two_items_matching_schema_5_6_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with two items matching schema (5, 6) is valid";
         let data = "[3, 4, 5, 6]";
         let expected_valid = true;
@@ -109,11 +108,11 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_array_without_items_matching_schema_is_invalid() {
-        use super::DESCRIPTION;
         let description = "array without items matching schema is invalid";
         let data = "[2, 3, 4]";
         let expected_valid = false;
@@ -135,11 +134,11 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_empty_array_is_invalid() {
-        use super::DESCRIPTION;
         let description = "empty array is invalid";
         let data = "[]";
         let expected_valid = false;
@@ -161,11 +160,11 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_not_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "not array is valid";
         let data = "{}";
         let expected_valid = true;
@@ -187,7 +186,8 @@ mod contains_keyword_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod contains_keyword_with_const_keyword_1 {
@@ -219,7 +219,6 @@ mod contains_keyword_with_const_keyword_1 {
     }
     #[test]
     fn test0_array_with_item_5_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with item 5 is valid";
         let data = "[3, 4, 5]";
         let expected_valid = true;
@@ -241,11 +240,11 @@ mod contains_keyword_with_const_keyword_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_array_with_two_items_5_is_valid() {
-        use super::DESCRIPTION;
         let description = "array with two items 5 is valid";
         let data = "[3, 4, 5, 5]";
         let expected_valid = true;
@@ -267,11 +266,11 @@ mod contains_keyword_with_const_keyword_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_array_without_item_5_is_invalid() {
-        use super::DESCRIPTION;
         let description = "array without item 5 is invalid";
         let data = "[1, 2, 3, 4]";
         let expected_valid = false;
@@ -293,7 +292,8 @@ mod contains_keyword_with_const_keyword_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod contains_keyword_with_boolean_schema_true_2 {
@@ -325,7 +325,6 @@ mod contains_keyword_with_boolean_schema_true_2 {
     }
     #[test]
     fn test0_any_non_empty_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "any non-empty array is valid";
         let data = "[\"foo\"]";
         let expected_valid = true;
@@ -347,11 +346,11 @@ mod contains_keyword_with_boolean_schema_true_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_empty_array_is_invalid() {
-        use super::DESCRIPTION;
         let description = "empty array is invalid";
         let data = "[]";
         let expected_valid = false;
@@ -373,7 +372,8 @@ mod contains_keyword_with_boolean_schema_true_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod contains_keyword_with_boolean_schema_false_3 {
@@ -405,7 +405,6 @@ mod contains_keyword_with_boolean_schema_false_3 {
     }
     #[test]
     fn test0_any_non_empty_array_is_invalid() {
-        use super::DESCRIPTION;
         let description = "any non-empty array is invalid";
         let data = "[\"foo\"]";
         let expected_valid = false;
@@ -427,11 +426,11 @@ mod contains_keyword_with_boolean_schema_false_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_empty_array_is_invalid() {
-        use super::DESCRIPTION;
         let description = "empty array is invalid";
         let data = "[]";
         let expected_valid = false;
@@ -453,11 +452,11 @@ mod contains_keyword_with_boolean_schema_false_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_non_arrays_are_valid() {
-        use super::DESCRIPTION;
         let description = "non-arrays are valid";
         let data = "\"contains does not apply to strings\"";
         let expected_valid = true;
@@ -479,7 +478,8 @@ mod contains_keyword_with_boolean_schema_false_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod items_contains_4 {
@@ -512,7 +512,6 @@ mod items_contains_4 {
     }
     #[test]
     fn test0_matches_items_does_not_match_contains() {
-        use super::DESCRIPTION;
         let description = "matches items, does not match contains";
         let data = "[ 2, 4, 8 ]";
         let expected_valid = false;
@@ -534,11 +533,11 @@ mod items_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_does_not_match_items_matches_contains() {
-        use super::DESCRIPTION;
         let description = "does not match items, matches contains";
         let data = "[ 3, 6, 9 ]";
         let expected_valid = false;
@@ -560,11 +559,11 @@ mod items_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_matches_both_items_and_contains() {
-        use super::DESCRIPTION;
         let description = "matches both items and contains";
         let data = "[ 6, 12 ]";
         let expected_valid = true;
@@ -586,11 +585,11 @@ mod items_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_matches_neither_items_nor_contains() {
-        use super::DESCRIPTION;
         let description = "matches neither items nor contains";
         let data = "[ 1, 5 ]";
         let expected_valid = false;
@@ -612,7 +611,8 @@ mod items_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod contains_with_false_if_subschema_5 {
@@ -647,7 +647,6 @@ mod contains_with_false_if_subschema_5 {
     }
     #[test]
     fn test0_any_non_empty_array_is_valid() {
-        use super::DESCRIPTION;
         let description = "any non-empty array is valid";
         let data = "[\"foo\"]";
         let expected_valid = true;
@@ -669,11 +668,11 @@ mod contains_with_false_if_subschema_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_empty_array_is_invalid() {
-        use super::DESCRIPTION;
         let description = "empty array is invalid";
         let data = "[]";
         let expected_valid = false;
@@ -695,7 +694,8 @@ mod contains_with_false_if_subschema_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod contains_with_null_instance_elements_6 {
@@ -729,7 +729,6 @@ mod contains_with_null_instance_elements_6 {
     }
     #[test]
     fn test0_allows_null_items() {
-        use super::DESCRIPTION;
         let description = "allows null items";
         let data = "[ null ]";
         let expected_valid = true;
@@ -751,6 +750,7 @@ mod contains_with_null_instance_elements_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

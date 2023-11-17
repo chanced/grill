@@ -35,7 +35,6 @@ mod by_int_0 {
     }
     #[test]
     fn test0_int_by_int() {
-        use super::DESCRIPTION;
         let description = "int by int";
         let data = "10";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod by_int_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_int_by_int_fail() {
-        use super::DESCRIPTION;
         let description = "int by int fail";
         let data = "7";
         let expected_valid = false;
@@ -83,11 +82,11 @@ mod by_int_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_ignores_non_numbers() {
-        use super::DESCRIPTION;
         let description = "ignores non-numbers";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -109,7 +108,8 @@ mod by_int_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod by_number_1 {
@@ -141,7 +141,6 @@ mod by_number_1 {
     }
     #[test]
     fn test0_zero_is_multiple_of_anything() {
-        use super::DESCRIPTION;
         let description = "zero is multiple of anything";
         let data = "0";
         let expected_valid = true;
@@ -163,11 +162,11 @@ mod by_number_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_4_5_is_multiple_of_1_5() {
-        use super::DESCRIPTION;
         let description = "4.5 is multiple of 1.5";
         let data = "4.5";
         let expected_valid = true;
@@ -189,11 +188,11 @@ mod by_number_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_35_is_not_multiple_of_1_5() {
-        use super::DESCRIPTION;
         let description = "35 is not multiple of 1.5";
         let data = "35";
         let expected_valid = false;
@@ -215,7 +214,8 @@ mod by_number_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod by_small_number_2 {
@@ -247,7 +247,6 @@ mod by_small_number_2 {
     }
     #[test]
     fn test0_0_0075_is_multiple_of_0_0001() {
-        use super::DESCRIPTION;
         let description = "0.0075 is multiple of 0.0001";
         let data = "0.0075";
         let expected_valid = true;
@@ -269,11 +268,11 @@ mod by_small_number_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_0_00751_is_not_multiple_of_0_0001() {
-        use super::DESCRIPTION;
         let description = "0.00751 is not multiple of 0.0001";
         let data = "0.00751";
         let expected_valid = false;
@@ -295,7 +294,8 @@ mod by_small_number_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod float_division_inf_3 {
@@ -327,7 +327,6 @@ mod float_division_inf_3 {
     }
     #[test]
     fn test0_always_invalid_but_naive_implementations_may_raise_an_overflow_error() {
-        use super::DESCRIPTION;
         let description = "always invalid, but naive implementations may raise an overflow error";
         let data = "1e308";
         let expected_valid = false;
@@ -349,7 +348,8 @@ mod float_division_inf_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod small_multiple_of_large_integer_4 {
@@ -381,7 +381,6 @@ mod small_multiple_of_large_integer_4 {
     }
     #[test]
     fn test0_any_integer_is_a_multiple_of_1e_8() {
-        use super::DESCRIPTION;
         let description = "any integer is a multiple of 1e-8";
         let data = "12391239123";
         let expected_valid = true;
@@ -403,6 +402,7 @@ mod small_multiple_of_large_integer_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

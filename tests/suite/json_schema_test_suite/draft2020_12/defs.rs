@@ -35,7 +35,6 @@ mod validate_definition_against_metaschema_0 {
     }
     #[test]
     fn test0_valid_definition_schema() {
-        use super::DESCRIPTION;
         let description = "valid definition schema";
         let data = "{\"$defs\": {\"foo\": {\"type\": \"integer\"}}}";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod validate_definition_against_metaschema_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_definition_schema() {
-        use super::DESCRIPTION;
         let description = "invalid definition schema";
         let data = "{\"$defs\": {\"foo\": {\"type\": 1}}}";
         let expected_valid = false;
@@ -83,6 +82,7 @@ mod validate_definition_against_metaschema_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

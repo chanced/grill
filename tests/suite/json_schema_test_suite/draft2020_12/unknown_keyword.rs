@@ -66,7 +66,6 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
     }
     #[test]
     fn test0_type_matches_second_any_of_which_has_a_real_schema_in_it() {
-        use super::DESCRIPTION;
         let description = "type matches second anyOf, which has a real schema in it";
         let data = "\"a string\"";
         let expected_valid = true;
@@ -88,11 +87,11 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_type_matches_non_schema_in_first_any_of() {
-        use super::DESCRIPTION;
         let description = "type matches non-schema in first anyOf";
         let data = "null";
         let expected_valid = false;
@@ -114,11 +113,11 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_type_matches_non_schema_in_third_any_of() {
-        use super::DESCRIPTION;
         let description = "type matches non-schema in third anyOf";
         let data = "1";
         let expected_valid = false;
@@ -140,6 +139,7 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

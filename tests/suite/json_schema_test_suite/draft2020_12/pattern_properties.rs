@@ -38,7 +38,6 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
     }
     #[test]
     fn test0_a_single_valid_match_is_valid() {
-        use super::DESCRIPTION;
         let description = "a single valid match is valid";
         let data = "{\"foo\": 1}";
         let expected_valid = true;
@@ -60,11 +59,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_multiple_valid_matches_is_valid() {
-        use super::DESCRIPTION;
         let description = "multiple valid matches is valid";
         let data = "{\"foo\": 1, \"foooooo\" : 2}";
         let expected_valid = true;
@@ -86,11 +85,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_a_single_invalid_match_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a single invalid match is invalid";
         let data = "{\"foo\": \"bar\", \"fooooo\": 2}";
         let expected_valid = false;
@@ -112,11 +111,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_multiple_invalid_matches_is_invalid() {
-        use super::DESCRIPTION;
         let description = "multiple invalid matches is invalid";
         let data = "{\"foo\": \"bar\", \"foooooo\" : \"baz\"}";
         let expected_valid = false;
@@ -138,11 +137,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_ignores_arrays() {
-        use super::DESCRIPTION;
         let description = "ignores arrays";
         let data = "[\"foo\"]";
         let expected_valid = true;
@@ -164,11 +163,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_ignores_strings() {
-        use super::DESCRIPTION;
         let description = "ignores strings";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -190,11 +189,11 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test6_ignores_other_non_objects() {
-        use super::DESCRIPTION;
         let description = "ignores other non-objects";
         let data = "12";
         let expected_valid = true;
@@ -216,7 +215,8 @@ mod pattern_properties_validates_properties_matching_a_regex_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod multiple_simultaneous_pattern_properties_are_validated_1 {
@@ -252,7 +252,6 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
     }
     #[test]
     fn test0_a_single_valid_match_is_valid() {
-        use super::DESCRIPTION;
         let description = "a single valid match is valid";
         let data = "{\"a\": 21}";
         let expected_valid = true;
@@ -274,11 +273,11 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_simultaneous_match_is_valid() {
-        use super::DESCRIPTION;
         let description = "a simultaneous match is valid";
         let data = "{\"aaaa\": 18}";
         let expected_valid = true;
@@ -300,11 +299,11 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_multiple_matches_is_valid() {
-        use super::DESCRIPTION;
         let description = "multiple matches is valid";
         let data = "{\"a\": 21, \"aaaa\": 18}";
         let expected_valid = true;
@@ -326,11 +325,11 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_an_invalid_due_to_one_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an invalid due to one is invalid";
         let data = "{\"a\": \"bar\"}";
         let expected_valid = false;
@@ -352,11 +351,11 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_an_invalid_due_to_the_other_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an invalid due to the other is invalid";
         let data = "{\"aaaa\": 31}";
         let expected_valid = false;
@@ -378,11 +377,11 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_an_invalid_due_to_both_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an invalid due to both is invalid";
         let data = "{\"aaa\": \"foo\", \"aaaa\": 31}";
         let expected_valid = false;
@@ -404,7 +403,8 @@ mod multiple_simultaneous_pattern_properties_are_validated_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
@@ -440,7 +440,6 @@ mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
     }
     #[test]
     fn test0_non_recognized_members_are_ignored() {
-        use super::DESCRIPTION;
         let description = "non recognized members are ignored";
         let data = "{ \"answer 1\": \"42\" }";
         let expected_valid = true;
@@ -462,11 +461,11 @@ mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_recognized_members_are_accounted_for() {
-        use super::DESCRIPTION;
         let description = "recognized members are accounted for";
         let data = "{ \"a31b\": null }";
         let expected_valid = false;
@@ -488,11 +487,11 @@ mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_regexes_are_case_sensitive() {
-        use super::DESCRIPTION;
         let description = "regexes are case sensitive";
         let data = "{ \"a_x_3\": 3 }";
         let expected_valid = true;
@@ -514,11 +513,11 @@ mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_regexes_are_case_sensitive_2() {
-        use super::DESCRIPTION;
         let description = "regexes are case sensitive, 2";
         let data = "{ \"a_X_3\": 3 }";
         let expected_valid = false;
@@ -540,7 +539,8 @@ mod regexes_are_not_anchored_by_default_and_are_case_sensitive_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod pattern_properties_with_boolean_schemas_3 {
@@ -576,7 +576,6 @@ mod pattern_properties_with_boolean_schemas_3 {
     }
     #[test]
     fn test0_object_with_property_matching_schema_true_is_valid() {
-        use super::DESCRIPTION;
         let description = "object with property matching schema true is valid";
         let data = "{\"foo\": 1}";
         let expected_valid = true;
@@ -598,11 +597,11 @@ mod pattern_properties_with_boolean_schemas_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_object_with_property_matching_schema_false_is_invalid() {
-        use super::DESCRIPTION;
         let description = "object with property matching schema false is invalid";
         let data = "{\"bar\": 2}";
         let expected_valid = false;
@@ -624,11 +623,11 @@ mod pattern_properties_with_boolean_schemas_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_object_with_both_properties_is_invalid() {
-        use super::DESCRIPTION;
         let description = "object with both properties is invalid";
         let data = "{\"foo\": 1, \"bar\": 2}";
         let expected_valid = false;
@@ -650,11 +649,11 @@ mod pattern_properties_with_boolean_schemas_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_object_with_a_property_matching_both_true_and_false_is_invalid() {
-        use super::DESCRIPTION;
         let description = "object with a property matching both true and false is invalid";
         let data = "{\"foobar\":1}";
         let expected_valid = false;
@@ -676,11 +675,11 @@ mod pattern_properties_with_boolean_schemas_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_empty_object_is_valid() {
-        use super::DESCRIPTION;
         let description = "empty object is valid";
         let data = "{}";
         let expected_valid = true;
@@ -702,7 +701,8 @@ mod pattern_properties_with_boolean_schemas_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod pattern_properties_with_null_valued_instance_properties_4 {
@@ -737,7 +737,6 @@ mod pattern_properties_with_null_valued_instance_properties_4 {
     }
     #[test]
     fn test0_allows_null_values() {
-        use super::DESCRIPTION;
         let description = "allows null values";
         let data = "{\"foobar\": null}";
         let expected_valid = true;
@@ -759,6 +758,7 @@ mod pattern_properties_with_null_valued_instance_properties_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

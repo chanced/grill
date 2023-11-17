@@ -693,7 +693,7 @@ impl AbsoluteUri {
 
     pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, UriError> {
         let mut new = self.clone();
-        new.set_fragment(None);
+        let _ = new.set_fragment(fragment)?;
         Ok(new)
     }
 

@@ -38,7 +38,6 @@ mod root_pointer_ref_0 {
     }
     #[test]
     fn test0_match_() {
-        use super::DESCRIPTION;
         let description = "match";
         let data = "{\"foo\": false}";
         let expected_valid = true;
@@ -60,11 +59,11 @@ mod root_pointer_ref_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_recursive_match() {
-        use super::DESCRIPTION;
         let description = "recursive match";
         let data = "{\"foo\": {\"foo\": false}}";
         let expected_valid = true;
@@ -86,11 +85,11 @@ mod root_pointer_ref_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_mismatch() {
-        use super::DESCRIPTION;
         let description = "mismatch";
         let data = "{\"bar\": false}";
         let expected_valid = false;
@@ -112,11 +111,11 @@ mod root_pointer_ref_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_recursive_mismatch() {
-        use super::DESCRIPTION;
         let description = "recursive mismatch";
         let data = "{\"foo\": {\"bar\": false}}";
         let expected_valid = false;
@@ -138,7 +137,8 @@ mod root_pointer_ref_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod relative_pointer_ref_to_object_1 {
@@ -173,7 +173,6 @@ mod relative_pointer_ref_to_object_1 {
     }
     #[test]
     fn test0_match_() {
-        use super::DESCRIPTION;
         let description = "match";
         let data = "{\"bar\": 3}";
         let expected_valid = true;
@@ -195,11 +194,11 @@ mod relative_pointer_ref_to_object_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_mismatch() {
-        use super::DESCRIPTION;
         let description = "mismatch";
         let data = "{\"bar\": true}";
         let expected_valid = false;
@@ -221,7 +220,8 @@ mod relative_pointer_ref_to_object_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod relative_pointer_ref_to_array_2 {
@@ -256,7 +256,6 @@ mod relative_pointer_ref_to_array_2 {
     }
     #[test]
     fn test0_match_array() {
-        use super::DESCRIPTION;
         let description = "match array";
         let data = "[1, 2]";
         let expected_valid = true;
@@ -278,11 +277,11 @@ mod relative_pointer_ref_to_array_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_mismatch_array() {
-        use super::DESCRIPTION;
         let description = "mismatch array";
         let data = "[1, \"foo\"]";
         let expected_valid = false;
@@ -304,7 +303,8 @@ mod relative_pointer_ref_to_array_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod escaped_pointer_ref_3 {
@@ -345,7 +345,6 @@ mod escaped_pointer_ref_3 {
     }
     #[test]
     fn test0_slash_invalid() {
-        use super::DESCRIPTION;
         let description = "slash invalid";
         let data = "{\"slash\": \"aoeu\"}";
         let expected_valid = false;
@@ -367,11 +366,11 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_tilde_invalid() {
-        use super::DESCRIPTION;
         let description = "tilde invalid";
         let data = "{\"tilde\": \"aoeu\"}";
         let expected_valid = false;
@@ -393,11 +392,11 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_percent_invalid() {
-        use super::DESCRIPTION;
         let description = "percent invalid";
         let data = "{\"percent\": \"aoeu\"}";
         let expected_valid = false;
@@ -419,11 +418,11 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_slash_valid() {
-        use super::DESCRIPTION;
         let description = "slash valid";
         let data = "{\"slash\": 123}";
         let expected_valid = true;
@@ -445,11 +444,11 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_tilde_valid() {
-        use super::DESCRIPTION;
         let description = "tilde valid";
         let data = "{\"tilde\": 123}";
         let expected_valid = true;
@@ -471,11 +470,11 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_percent_valid() {
-        use super::DESCRIPTION;
         let description = "percent valid";
         let data = "{\"percent\": 123}";
         let expected_valid = true;
@@ -497,7 +496,8 @@ mod escaped_pointer_ref_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod nested_refs_4 {
@@ -534,7 +534,6 @@ mod nested_refs_4 {
     }
     #[test]
     fn test0_nested_ref_valid() {
-        use super::DESCRIPTION;
         let description = "nested ref valid";
         let data = "5";
         let expected_valid = true;
@@ -556,11 +555,11 @@ mod nested_refs_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_nested_ref_invalid() {
-        use super::DESCRIPTION;
         let description = "nested ref invalid";
         let data = "\"a\"";
         let expected_valid = false;
@@ -582,7 +581,8 @@ mod nested_refs_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_applies_alongside_sibling_keywords_5 {
@@ -624,7 +624,6 @@ mod ref_applies_alongside_sibling_keywords_5 {
     }
     #[test]
     fn test0_ref_valid_max_items_valid() {
-        use super::DESCRIPTION;
         let description = "ref valid, maxItems valid";
         let data = "{ \"foo\": [] }";
         let expected_valid = true;
@@ -646,11 +645,11 @@ mod ref_applies_alongside_sibling_keywords_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_ref_valid_max_items_invalid() {
-        use super::DESCRIPTION;
         let description = "ref valid, maxItems invalid";
         let data = "{ \"foo\": [1, 2, 3] }";
         let expected_valid = false;
@@ -672,11 +671,11 @@ mod ref_applies_alongside_sibling_keywords_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_ref_invalid() {
-        use super::DESCRIPTION;
         let description = "ref invalid";
         let data = "{ \"foo\": \"string\" }";
         let expected_valid = false;
@@ -698,7 +697,8 @@ mod ref_applies_alongside_sibling_keywords_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod remote_ref_containing_refs_itself_6 {
@@ -730,7 +730,6 @@ mod remote_ref_containing_refs_itself_6 {
     }
     #[test]
     fn test0_remote_ref_valid() {
-        use super::DESCRIPTION;
         let description = "remote ref valid";
         let data = "{\"minLength\": 1}";
         let expected_valid = true;
@@ -752,11 +751,11 @@ mod remote_ref_containing_refs_itself_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_remote_ref_invalid() {
-        use super::DESCRIPTION;
         let description = "remote ref invalid";
         let data = "{\"minLength\": -1}";
         let expected_valid = false;
@@ -778,7 +777,8 @@ mod remote_ref_containing_refs_itself_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod property_named_ref_that_is_not_a_reference_7 {
@@ -812,7 +812,6 @@ mod property_named_ref_that_is_not_a_reference_7 {
     }
     #[test]
     fn test0_property_named_ref_valid() {
-        use super::DESCRIPTION;
         let description = "property named $ref valid";
         let data = "{\"$ref\": \"a\"}";
         let expected_valid = true;
@@ -834,11 +833,11 @@ mod property_named_ref_that_is_not_a_reference_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_property_named_ref_invalid() {
-        use super::DESCRIPTION;
         let description = "property named $ref invalid";
         let data = "{\"$ref\": 2}";
         let expected_valid = false;
@@ -860,7 +859,8 @@ mod property_named_ref_that_is_not_a_reference_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod property_named_ref_containing_an_actual_ref_8 {
@@ -899,7 +899,6 @@ mod property_named_ref_containing_an_actual_ref_8 {
     }
     #[test]
     fn test0_property_named_ref_valid() {
-        use super::DESCRIPTION;
         let description = "property named $ref valid";
         let data = "{\"$ref\": \"a\"}";
         let expected_valid = true;
@@ -921,11 +920,11 @@ mod property_named_ref_containing_an_actual_ref_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_property_named_ref_invalid() {
-        use super::DESCRIPTION;
         let description = "property named $ref invalid";
         let data = "{\"$ref\": 2}";
         let expected_valid = false;
@@ -947,7 +946,8 @@ mod property_named_ref_containing_an_actual_ref_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_to_boolean_schema_true_9 {
@@ -982,7 +982,6 @@ mod ref_to_boolean_schema_true_9 {
     }
     #[test]
     fn test0_any_value_is_valid() {
-        use super::DESCRIPTION;
         let description = "any value is valid";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -1004,7 +1003,8 @@ mod ref_to_boolean_schema_true_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_to_boolean_schema_false_10 {
@@ -1039,7 +1039,6 @@ mod ref_to_boolean_schema_false_10 {
     }
     #[test]
     fn test0_any_value_is_invalid() {
-        use super::DESCRIPTION;
         let description = "any value is invalid";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -1061,7 +1060,8 @@ mod ref_to_boolean_schema_false_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod recursive_references_between_schemas_11 {
@@ -1115,7 +1115,6 @@ mod recursive_references_between_schemas_11 {
     }
     #[test]
     fn test0_valid_tree() {
-        use super::DESCRIPTION;
         let description = "valid tree";
         let data = "{\n                    \"meta\": \"root\",\n                    \"nodes\": [\n                        {\n                            \"value\": 1,\n                            \"subtree\": {\n                                \"meta\": \"child\",\n                                \"nodes\": [\n                                    {\"value\": 1.1},\n                                    {\"value\": 1.2}\n                                ]\n                            }\n                        },\n                        {\n                            \"value\": 2,\n                            \"subtree\": {\n                                \"meta\": \"child\",\n                                \"nodes\": [\n                                    {\"value\": 2.1},\n                                    {\"value\": 2.2}\n                                ]\n                            }\n                        }\n                    ]\n                }" ;
         let expected_valid = true;
@@ -1137,11 +1136,11 @@ mod recursive_references_between_schemas_11 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_tree() {
-        use super::DESCRIPTION;
         let description = "invalid tree";
         let data = "{\n                    \"meta\": \"root\",\n                    \"nodes\": [\n                        {\n                            \"value\": 1,\n                            \"subtree\": {\n                                \"meta\": \"child\",\n                                \"nodes\": [\n                                    {\"value\": \"string is invalid\"},\n                                    {\"value\": 1.2}\n                                ]\n                            }\n                        },\n                        {\n                            \"value\": 2,\n                            \"subtree\": {\n                                \"meta\": \"child\",\n                                \"nodes\": [\n                                    {\"value\": 2.1},\n                                    {\"value\": 2.2}\n                                ]\n                            }\n                        }\n                    ]\n                }" ;
         let expected_valid = false;
@@ -1163,7 +1162,8 @@ mod recursive_references_between_schemas_11 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod refs_with_quote_12 {
@@ -1200,7 +1200,6 @@ mod refs_with_quote_12 {
     }
     #[test]
     fn test0_object_with_numbers_is_valid() {
-        use super::DESCRIPTION;
         let description = "object with numbers is valid";
         let data = "{\n                    \"foo\\\"bar\": 1\n                }";
         let expected_valid = true;
@@ -1222,11 +1221,11 @@ mod refs_with_quote_12 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_object_with_strings_is_invalid() {
-        use super::DESCRIPTION;
         let description = "object with strings is invalid";
         let data = "{\n                    \"foo\\\"bar\": \"1\"\n                }";
         let expected_valid = false;
@@ -1248,7 +1247,8 @@ mod refs_with_quote_12 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_creates_new_scope_when_adjacent_to_keywords_13 {
@@ -1290,7 +1290,6 @@ mod ref_creates_new_scope_when_adjacent_to_keywords_13 {
     }
     #[test]
     fn test0_referenced_subschema_doesn_t_see_annotations_from_properties() {
-        use super::DESCRIPTION;
         let description = "referenced subschema doesn't see annotations from properties";
         let data = "{\n                    \"prop1\": \"match\"\n                }";
         let expected_valid = false;
@@ -1312,7 +1311,8 @@ mod ref_creates_new_scope_when_adjacent_to_keywords_13 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod naive_replacement_of_ref_with_its_destination_is_not_correct_14 {
@@ -1349,7 +1349,6 @@ mod naive_replacement_of_ref_with_its_destination_is_not_correct_14 {
     }
     #[test]
     fn test0_do_not_evaluate_the_ref_inside_the_enum_matching_any_string() {
-        use super::DESCRIPTION;
         let description = "do not evaluate the $ref inside the enum, matching any string";
         let data = "\"this is a string\"";
         let expected_valid = false;
@@ -1371,11 +1370,11 @@ mod naive_replacement_of_ref_with_its_destination_is_not_correct_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_do_not_evaluate_the_ref_inside_the_enum_definition_exact_match() {
-        use super::DESCRIPTION;
         let description = "do not evaluate the $ref inside the enum, definition exact match";
         let data = "{ \"type\": \"string\" }";
         let expected_valid = false;
@@ -1397,11 +1396,11 @@ mod naive_replacement_of_ref_with_its_destination_is_not_correct_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_match_the_enum_exactly() {
-        use super::DESCRIPTION;
         let description = "match the enum exactly";
         let data = "{ \"$ref\": \"#/$defs/a_string\" }";
         let expected_valid = true;
@@ -1423,7 +1422,8 @@ mod naive_replacement_of_ref_with_its_destination_is_not_correct_14 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod refs_with_relative_uris_and_defs_15 {
@@ -1469,7 +1469,6 @@ mod refs_with_relative_uris_and_defs_15 {
     }
     #[test]
     fn test0_invalid_on_inner_field() {
-        use super::DESCRIPTION;
         let description = "invalid on inner field";
         let data = "{\n                    \"foo\": {\n                        \"bar\": 1\n                    },\n                    \"bar\": \"a\"\n                }" ;
         let expected_valid = false;
@@ -1491,11 +1490,11 @@ mod refs_with_relative_uris_and_defs_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_on_outer_field() {
-        use super::DESCRIPTION;
         let description = "invalid on outer field";
         let data = "{\n                    \"foo\": {\n                        \"bar\": \"a\"\n                    },\n                    \"bar\": 1\n                }" ;
         let expected_valid = false;
@@ -1517,11 +1516,11 @@ mod refs_with_relative_uris_and_defs_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_valid_on_both_fields() {
-        use super::DESCRIPTION;
         let description = "valid on both fields";
         let data = "{\n                    \"foo\": {\n                        \"bar\": \"a\"\n                    },\n                    \"bar\": \"a\"\n                }" ;
         let expected_valid = true;
@@ -1543,7 +1542,8 @@ mod refs_with_relative_uris_and_defs_15 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod relative_refs_with_absolute_uris_and_defs_16 {
@@ -1589,7 +1589,6 @@ mod relative_refs_with_absolute_uris_and_defs_16 {
     }
     #[test]
     fn test0_invalid_on_inner_field() {
-        use super::DESCRIPTION;
         let description = "invalid on inner field";
         let data = "{\n                    \"foo\": {\n                        \"bar\": 1\n                    },\n                    \"bar\": \"a\"\n                }" ;
         let expected_valid = false;
@@ -1611,11 +1610,11 @@ mod relative_refs_with_absolute_uris_and_defs_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_on_outer_field() {
-        use super::DESCRIPTION;
         let description = "invalid on outer field";
         let data = "{\n                    \"foo\": {\n                        \"bar\": \"a\"\n                    },\n                    \"bar\": 1\n                }" ;
         let expected_valid = false;
@@ -1637,11 +1636,11 @@ mod relative_refs_with_absolute_uris_and_defs_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_valid_on_both_fields() {
-        use super::DESCRIPTION;
         let description = "valid on both fields";
         let data = "{\n                    \"foo\": {\n                        \"bar\": \"a\"\n                    },\n                    \"bar\": \"a\"\n                }" ;
         let expected_valid = true;
@@ -1663,7 +1662,8 @@ mod relative_refs_with_absolute_uris_and_defs_16 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod id_must_be_resolved_against_nearest_parent_not_just_immediate_parent_17 {
@@ -1714,7 +1714,6 @@ mod id_must_be_resolved_against_nearest_parent_not_just_immediate_parent_17 {
     }
     #[test]
     fn test0_number_is_valid() {
-        use super::DESCRIPTION;
         let description = "number is valid";
         let data = "1";
         let expected_valid = true;
@@ -1736,11 +1735,11 @@ mod id_must_be_resolved_against_nearest_parent_not_just_immediate_parent_17 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_non_number_is_invalid() {
-        use super::DESCRIPTION;
         let description = "non-number is invalid";
         let data = "\"a\"";
         let expected_valid = false;
@@ -1762,7 +1761,8 @@ mod id_must_be_resolved_against_nearest_parent_not_just_immediate_parent_17 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod order_of_evaluation_id_and_ref_18 {
@@ -1808,7 +1808,6 @@ mod order_of_evaluation_id_and_ref_18 {
     }
     #[test]
     fn test0_data_is_valid_against_first_definition() {
-        use super::DESCRIPTION;
         let description = "data is valid against first definition";
         let data = "5";
         let expected_valid = true;
@@ -1830,11 +1829,11 @@ mod order_of_evaluation_id_and_ref_18 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_data_is_invalid_against_first_definition() {
-        use super::DESCRIPTION;
         let description = "data is invalid against first definition";
         let data = "50";
         let expected_valid = false;
@@ -1856,7 +1855,8 @@ mod order_of_evaluation_id_and_ref_18 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod order_of_evaluation_id_and_anchor_and_ref_19 {
@@ -1903,7 +1903,6 @@ mod order_of_evaluation_id_and_anchor_and_ref_19 {
     }
     #[test]
     fn test0_data_is_valid_against_first_definition() {
-        use super::DESCRIPTION;
         let description = "data is valid against first definition";
         let data = "5";
         let expected_valid = true;
@@ -1925,11 +1924,11 @@ mod order_of_evaluation_id_and_anchor_and_ref_19 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_data_is_invalid_against_first_definition() {
-        use super::DESCRIPTION;
         let description = "data is invalid against first definition";
         let data = "50";
         let expected_valid = false;
@@ -1951,7 +1950,8 @@ mod order_of_evaluation_id_and_anchor_and_ref_19 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod simple_urn_base_uri_with_ref_via_the_urn_20 {
@@ -1988,7 +1988,6 @@ mod simple_urn_base_uri_with_ref_via_the_urn_20 {
     }
     #[test]
     fn test0_valid_under_the_urn_i_ded_schema() {
-        use super::DESCRIPTION;
         let description = "valid under the URN IDed schema";
         let data = "{\"foo\": 37}";
         let expected_valid = true;
@@ -2010,11 +2009,11 @@ mod simple_urn_base_uri_with_ref_via_the_urn_20 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_under_the_urn_i_ded_schema() {
-        use super::DESCRIPTION;
         let description = "invalid under the URN IDed schema";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2036,7 +2035,8 @@ mod simple_urn_base_uri_with_ref_via_the_urn_20 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod simple_urn_base_uri_with_json_pointer_21 {
@@ -2075,7 +2075,6 @@ mod simple_urn_base_uri_with_json_pointer_21 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2097,11 +2096,11 @@ mod simple_urn_base_uri_with_json_pointer_21 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2123,7 +2122,8 @@ mod simple_urn_base_uri_with_json_pointer_21 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_nss_22 {
@@ -2162,7 +2162,6 @@ mod urn_base_uri_with_nss_22 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2184,11 +2183,11 @@ mod urn_base_uri_with_nss_22 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2210,7 +2209,8 @@ mod urn_base_uri_with_nss_22 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_r_component_23 {
@@ -2249,7 +2249,6 @@ mod urn_base_uri_with_r_component_23 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2271,11 +2270,11 @@ mod urn_base_uri_with_r_component_23 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2297,7 +2296,8 @@ mod urn_base_uri_with_r_component_23 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_q_component_24 {
@@ -2336,7 +2336,6 @@ mod urn_base_uri_with_q_component_24 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2358,11 +2357,11 @@ mod urn_base_uri_with_q_component_24 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2384,7 +2383,8 @@ mod urn_base_uri_with_q_component_24 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_f_component_25 {
@@ -2417,7 +2417,6 @@ mod urn_base_uri_with_f_component_25 {
     }
     #[test]
     fn test0_is_invalid() {
-        use super::DESCRIPTION;
         let description = "is invalid";
         let data = "{\"$id\": \"urn:example:foo-bar-baz-qux#somepart\"}";
         let expected_valid = false;
@@ -2439,7 +2438,8 @@ mod urn_base_uri_with_f_component_25 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_urn_and_json_pointer_ref_26 {
@@ -2477,7 +2477,6 @@ mod urn_base_uri_with_urn_and_json_pointer_ref_26 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2499,11 +2498,11 @@ mod urn_base_uri_with_urn_and_json_pointer_ref_26 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2525,7 +2524,8 @@ mod urn_base_uri_with_urn_and_json_pointer_ref_26 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_base_uri_with_urn_and_anchor_ref_27 {
@@ -2566,7 +2566,6 @@ mod urn_base_uri_with_urn_and_anchor_ref_27 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "{\"foo\": \"bar\"}";
         let expected_valid = true;
@@ -2588,11 +2587,11 @@ mod urn_base_uri_with_urn_and_anchor_ref_27 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "{\"foo\": 12}";
         let expected_valid = false;
@@ -2614,7 +2613,8 @@ mod urn_base_uri_with_urn_and_anchor_ref_27 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod urn_ref_with_nested_pointer_ref_28 {
@@ -2652,7 +2652,6 @@ mod urn_ref_with_nested_pointer_ref_28 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "\"bar\"";
         let expected_valid = true;
@@ -2674,11 +2673,11 @@ mod urn_ref_with_nested_pointer_ref_28 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_a_non_string_is_invalid() {
-        use super::DESCRIPTION;
         let description = "a non-string is invalid";
         let data = "12";
         let expected_valid = false;
@@ -2700,7 +2699,8 @@ mod urn_ref_with_nested_pointer_ref_28 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_to_if_29 {
@@ -2735,7 +2735,6 @@ mod ref_to_if_29 {
     }
     #[test]
     fn test0_a_non_integer_is_invalid_due_to_the_ref() {
-        use super::DESCRIPTION;
         let description = "a non-integer is invalid due to the $ref";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -2757,11 +2756,11 @@ mod ref_to_if_29 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_integer_is_valid() {
-        use super::DESCRIPTION;
         let description = "an integer is valid";
         let data = "12";
         let expected_valid = true;
@@ -2783,7 +2782,8 @@ mod ref_to_if_29 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_to_then_30 {
@@ -2818,7 +2818,6 @@ mod ref_to_then_30 {
     }
     #[test]
     fn test0_a_non_integer_is_invalid_due_to_the_ref() {
-        use super::DESCRIPTION;
         let description = "a non-integer is invalid due to the $ref";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -2840,11 +2839,11 @@ mod ref_to_then_30 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_integer_is_valid() {
-        use super::DESCRIPTION;
         let description = "an integer is valid";
         let data = "12";
         let expected_valid = true;
@@ -2866,7 +2865,8 @@ mod ref_to_then_30 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_to_else_31 {
@@ -2901,7 +2901,6 @@ mod ref_to_else_31 {
     }
     #[test]
     fn test0_a_non_integer_is_invalid_due_to_the_ref() {
-        use super::DESCRIPTION;
         let description = "a non-integer is invalid due to the $ref";
         let data = "\"foo\"";
         let expected_valid = false;
@@ -2923,11 +2922,11 @@ mod ref_to_else_31 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_integer_is_valid() {
-        use super::DESCRIPTION;
         let description = "an integer is valid";
         let data = "12";
         let expected_valid = true;
@@ -2949,7 +2948,8 @@ mod ref_to_else_31 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod ref_with_absolute_path_reference_32 {
@@ -2991,7 +2991,6 @@ mod ref_with_absolute_path_reference_32 {
     }
     #[test]
     fn test0_a_string_is_valid() {
-        use super::DESCRIPTION;
         let description = "a string is valid";
         let data = "\"foo\"";
         let expected_valid = true;
@@ -3013,11 +3012,11 @@ mod ref_with_absolute_path_reference_32 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_integer_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an integer is invalid";
         let data = "12";
         let expected_valid = false;
@@ -3039,7 +3038,8 @@ mod ref_with_absolute_path_reference_32 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod id_with_file_uri_still_resolves_pointers_nix_33 {
@@ -3076,7 +3076,6 @@ mod id_with_file_uri_still_resolves_pointers_nix_33 {
     }
     #[test]
     fn test0_number_is_valid() {
-        use super::DESCRIPTION;
         let description = "number is valid";
         let data = "1";
         let expected_valid = true;
@@ -3098,11 +3097,11 @@ mod id_with_file_uri_still_resolves_pointers_nix_33 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_non_number_is_invalid() {
-        use super::DESCRIPTION;
         let description = "non-number is invalid";
         let data = "\"a\"";
         let expected_valid = false;
@@ -3124,7 +3123,8 @@ mod id_with_file_uri_still_resolves_pointers_nix_33 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod id_with_file_uri_still_resolves_pointers_windows_34 {
@@ -3161,7 +3161,6 @@ mod id_with_file_uri_still_resolves_pointers_windows_34 {
     }
     #[test]
     fn test0_number_is_valid() {
-        use super::DESCRIPTION;
         let description = "number is valid";
         let data = "1";
         let expected_valid = true;
@@ -3183,11 +3182,11 @@ mod id_with_file_uri_still_resolves_pointers_windows_34 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_non_number_is_invalid() {
-        use super::DESCRIPTION;
         let description = "non-number is invalid";
         let data = "\"a\"";
         let expected_valid = false;
@@ -3209,7 +3208,8 @@ mod id_with_file_uri_still_resolves_pointers_windows_34 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod empty_tokens_in_ref_json_pointer_35 {
@@ -3251,7 +3251,6 @@ mod empty_tokens_in_ref_json_pointer_35 {
     }
     #[test]
     fn test0_number_is_valid() {
-        use super::DESCRIPTION;
         let description = "number is valid";
         let data = "1";
         let expected_valid = true;
@@ -3273,11 +3272,11 @@ mod empty_tokens_in_ref_json_pointer_35 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_non_number_is_invalid() {
-        use super::DESCRIPTION;
         let description = "non-number is invalid";
         let data = "\"a\"";
         let expected_valid = false;
@@ -3299,6 +3298,7 @@ mod empty_tokens_in_ref_json_pointer_35 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

@@ -1,4 +1,4 @@
-use crate::{Error, GlobSnafu, IoSnafu, NotUtf8Snafu};
+use crate::{Error, GlobSnafu, IoSnafu};
 use camino::{Utf8Path, Utf8PathBuf};
 use glob::glob;
 use snafu::prelude::*;
@@ -251,12 +251,12 @@ mod tests {
     #[test]
     fn test_read_files() {
         set_test_current_dir();
-        let cwd = std::env::current_dir().unwrap();
+        let _cwd = std::env::current_dir().unwrap();
         let root = current_dir().unwrap();
         let root = Utf8PathBuf::from_path_buf(root).unwrap();
         let patterns = vec![Utf8PathBuf::from("grill-test-builder/fixtures/*.json")];
         let files = open([&root], patterns);
-        let files = files
+        let _files = files
             .map(|r| {
                 if let Err(err) = r {
                     panic!("{err}")

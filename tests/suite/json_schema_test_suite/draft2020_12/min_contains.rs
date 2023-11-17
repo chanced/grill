@@ -35,7 +35,6 @@ mod min_contains_without_contains_is_ignored_0 {
     }
     #[test]
     fn test0_one_item_valid_against_lone_min_contains() {
-        use super::DESCRIPTION;
         let description = "one item valid against lone minContains";
         let data = "[ 1 ]";
         let expected_valid = true;
@@ -57,11 +56,11 @@ mod min_contains_without_contains_is_ignored_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_zero_items_still_valid_against_lone_min_contains() {
-        use super::DESCRIPTION;
         let description = "zero items still valid against lone minContains";
         let data = "[]";
         let expected_valid = true;
@@ -83,7 +82,8 @@ mod min_contains_without_contains_is_ignored_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod min_contains_1_with_contains_1 {
@@ -116,7 +116,6 @@ mod min_contains_1_with_contains_1 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = false;
@@ -138,11 +137,11 @@ mod min_contains_1_with_contains_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_no_elements_match() {
-        use super::DESCRIPTION;
         let description = "no elements match";
         let data = "[ 2 ]";
         let expected_valid = false;
@@ -164,11 +163,11 @@ mod min_contains_1_with_contains_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_single_element_matches_valid_min_contains() {
-        use super::DESCRIPTION;
         let description = "single element matches, valid minContains";
         let data = "[ 1 ]";
         let expected_valid = true;
@@ -190,11 +189,11 @@ mod min_contains_1_with_contains_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_some_elements_match_valid_min_contains() {
-        use super::DESCRIPTION;
         let description = "some elements match, valid minContains";
         let data = "[ 1, 2 ]";
         let expected_valid = true;
@@ -216,11 +215,11 @@ mod min_contains_1_with_contains_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_all_elements_match_valid_min_contains() {
-        use super::DESCRIPTION;
         let description = "all elements match, valid minContains";
         let data = "[ 1, 1 ]";
         let expected_valid = true;
@@ -242,7 +241,8 @@ mod min_contains_1_with_contains_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod min_contains_2_with_contains_2 {
@@ -275,7 +275,6 @@ mod min_contains_2_with_contains_2 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = false;
@@ -297,11 +296,11 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_all_elements_match_invalid_min_contains() {
-        use super::DESCRIPTION;
         let description = "all elements match, invalid minContains";
         let data = "[ 1 ]";
         let expected_valid = false;
@@ -323,11 +322,11 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_some_elements_match_invalid_min_contains() {
-        use super::DESCRIPTION;
         let description = "some elements match, invalid minContains";
         let data = "[ 1, 2 ]";
         let expected_valid = false;
@@ -349,11 +348,11 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_all_elements_match_valid_min_contains_exactly_as_needed() {
-        use super::DESCRIPTION;
         let description = "all elements match, valid minContains (exactly as needed)";
         let data = "[ 1, 1 ]";
         let expected_valid = true;
@@ -375,11 +374,11 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_all_elements_match_valid_min_contains_more_than_needed() {
-        use super::DESCRIPTION;
         let description = "all elements match, valid minContains (more than needed)";
         let data = "[ 1, 1, 1 ]";
         let expected_valid = true;
@@ -401,11 +400,11 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_some_elements_match_valid_min_contains() {
-        use super::DESCRIPTION;
         let description = "some elements match, valid minContains";
         let data = "[ 1, 2, 1 ]";
         let expected_valid = true;
@@ -427,7 +426,8 @@ mod min_contains_2_with_contains_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod min_contains_2_with_contains_with_a_decimal_value_3 {
@@ -460,7 +460,6 @@ mod min_contains_2_with_contains_with_a_decimal_value_3 {
     }
     #[test]
     fn test0_one_element_matches_invalid_min_contains() {
-        use super::DESCRIPTION;
         let description = "one element matches, invalid minContains";
         let data = "[ 1 ]";
         let expected_valid = false;
@@ -482,11 +481,11 @@ mod min_contains_2_with_contains_with_a_decimal_value_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_both_elements_match_valid_min_contains() {
-        use super::DESCRIPTION;
         let description = "both elements match, valid minContains";
         let data = "[ 1, 1 ]";
         let expected_valid = true;
@@ -508,7 +507,8 @@ mod min_contains_2_with_contains_with_a_decimal_value_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod max_contains_min_contains_4 {
@@ -542,7 +542,6 @@ mod max_contains_min_contains_4 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = false;
@@ -564,11 +563,11 @@ mod max_contains_min_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_all_elements_match_invalid_min_contains() {
-        use super::DESCRIPTION;
         let description = "all elements match, invalid minContains";
         let data = "[ 1 ]";
         let expected_valid = false;
@@ -590,11 +589,11 @@ mod max_contains_min_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_all_elements_match_invalid_max_contains() {
-        use super::DESCRIPTION;
         let description = "all elements match, invalid maxContains";
         let data = "[ 1, 1, 1 ]";
         let expected_valid = false;
@@ -616,11 +615,11 @@ mod max_contains_min_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_all_elements_match_valid_max_contains_and_min_contains() {
-        use super::DESCRIPTION;
         let description = "all elements match, valid maxContains and minContains";
         let data = "[ 1, 1 ]";
         let expected_valid = true;
@@ -642,7 +641,8 @@ mod max_contains_min_contains_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod max_contains_min_contains_5 {
@@ -676,7 +676,6 @@ mod max_contains_min_contains_5 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = false;
@@ -698,11 +697,11 @@ mod max_contains_min_contains_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_invalid_min_contains() {
-        use super::DESCRIPTION;
         let description = "invalid minContains";
         let data = "[ 1 ]";
         let expected_valid = false;
@@ -724,11 +723,11 @@ mod max_contains_min_contains_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_invalid_max_contains() {
-        use super::DESCRIPTION;
         let description = "invalid maxContains";
         let data = "[ 1, 1, 1 ]";
         let expected_valid = false;
@@ -750,11 +749,11 @@ mod max_contains_min_contains_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_invalid_max_contains_and_min_contains() {
-        use super::DESCRIPTION;
         let description = "invalid maxContains and minContains";
         let data = "[ 1, 1 ]";
         let expected_valid = false;
@@ -776,7 +775,8 @@ mod max_contains_min_contains_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod min_contains_0_6 {
@@ -809,7 +809,6 @@ mod min_contains_0_6 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = true;
@@ -831,11 +830,11 @@ mod min_contains_0_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_min_contains_eq_0_makes_contains_always_pass() {
-        use super::DESCRIPTION;
         let description = "minContains eq 0 makes contains always pass";
         let data = "[ 2 ]";
         let expected_valid = true;
@@ -857,7 +856,8 @@ mod min_contains_0_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod min_contains_0_with_max_contains_7 {
@@ -891,7 +891,6 @@ mod min_contains_0_with_max_contains_7 {
     }
     #[test]
     fn test0_empty_data() {
-        use super::DESCRIPTION;
         let description = "empty data";
         let data = "[ ]";
         let expected_valid = true;
@@ -913,11 +912,11 @@ mod min_contains_0_with_max_contains_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_not_more_than_max_contains() {
-        use super::DESCRIPTION;
         let description = "not more than maxContains";
         let data = "[ 1 ]";
         let expected_valid = true;
@@ -939,11 +938,11 @@ mod min_contains_0_with_max_contains_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_too_many() {
-        use super::DESCRIPTION;
         let description = "too many";
         let data = "[ 1, 1 ]";
         let expected_valid = false;
@@ -965,6 +964,7 @@ mod min_contains_0_with_max_contains_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

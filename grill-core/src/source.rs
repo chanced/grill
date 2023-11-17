@@ -19,7 +19,6 @@ use std::{
     convert::AsRef,
     ops::Deref,
 };
-use tracing::{instrument, Level};
 
 const SANDBOX_ERR: &str = "transaction failed: source sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new";
 

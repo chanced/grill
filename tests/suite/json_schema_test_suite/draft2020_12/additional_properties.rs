@@ -39,7 +39,6 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
     }
     #[test]
     fn test0_no_additional_properties_is_valid() {
-        use super::DESCRIPTION;
         let description = "no additional properties is valid";
         let data = "{\"foo\": 1}";
         let expected_valid = true;
@@ -61,11 +60,11 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_additional_property_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an additional property is invalid";
         let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : \"boom\"}";
         let expected_valid = false;
@@ -87,11 +86,11 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_ignores_arrays() {
-        use super::DESCRIPTION;
         let description = "ignores arrays";
         let data = "[1, 2, 3]";
         let expected_valid = true;
@@ -113,11 +112,11 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test3_ignores_strings() {
-        use super::DESCRIPTION;
         let description = "ignores strings";
         let data = "\"foobarbaz\"";
         let expected_valid = true;
@@ -139,11 +138,11 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test4_ignores_other_non_objects() {
-        use super::DESCRIPTION;
         let description = "ignores other non-objects";
         let data = "12";
         let expected_valid = true;
@@ -165,11 +164,11 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test5_pattern_properties_are_not_additional_properties() {
-        use super::DESCRIPTION;
         let description = "patternProperties are not additional properties";
         let data = "{\"foo\":1, \"vroom\": 2}";
         let expected_valid = true;
@@ -191,7 +190,8 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod non_ascii_pattern_with_additional_properties_1 {
@@ -226,7 +226,6 @@ mod non_ascii_pattern_with_additional_properties_1 {
     }
     #[test]
     fn test0_matching_the_pattern_is_valid() {
-        use super::DESCRIPTION;
         let description = "matching the pattern is valid";
         let data = "{\"ármányos\": 2}";
         let expected_valid = true;
@@ -248,11 +247,11 @@ mod non_ascii_pattern_with_additional_properties_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_not_matching_the_pattern_is_invalid() {
-        use super::DESCRIPTION;
         let description = "not matching the pattern is invalid";
         let data = "{\"élmény\": 2}";
         let expected_valid = false;
@@ -274,7 +273,8 @@ mod non_ascii_pattern_with_additional_properties_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_properties_with_schema_2 {
@@ -309,7 +309,6 @@ mod additional_properties_with_schema_2 {
     }
     #[test]
     fn test0_no_additional_properties_is_valid() {
-        use super::DESCRIPTION;
         let description = "no additional properties is valid";
         let data = "{\"foo\": 1}";
         let expected_valid = true;
@@ -331,11 +330,11 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_additional_valid_property_is_valid() {
-        use super::DESCRIPTION;
         let description = "an additional valid property is valid";
         let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : true}";
         let expected_valid = true;
@@ -357,11 +356,11 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test2_an_additional_invalid_property_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an additional invalid property is invalid";
         let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : 12}";
         let expected_valid = false;
@@ -383,7 +382,8 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_properties_can_exist_by_itself_3 {
@@ -417,7 +417,6 @@ mod additional_properties_can_exist_by_itself_3 {
     }
     #[test]
     fn test0_an_additional_valid_property_is_valid() {
-        use super::DESCRIPTION;
         let description = "an additional valid property is valid";
         let data = "{\"foo\" : true}";
         let expected_valid = true;
@@ -439,11 +438,11 @@ mod additional_properties_can_exist_by_itself_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
     #[test]
     fn test1_an_additional_invalid_property_is_invalid() {
-        use super::DESCRIPTION;
         let description = "an additional invalid property is invalid";
         let data = "{\"foo\" : 1}";
         let expected_valid = false;
@@ -465,7 +464,8 @@ mod additional_properties_can_exist_by_itself_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_properties_are_allowed_by_default_4 {
@@ -499,7 +499,6 @@ mod additional_properties_are_allowed_by_default_4 {
     }
     #[test]
     fn test0_additional_properties_are_allowed() {
-        use super::DESCRIPTION;
         let description = "additional properties are allowed";
         let data = "{\"foo\": 1, \"bar\": 2, \"quux\": true}";
         let expected_valid = true;
@@ -521,7 +520,8 @@ mod additional_properties_are_allowed_by_default_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_properties_does_not_look_in_applicators_5 {
@@ -558,7 +558,6 @@ mod additional_properties_does_not_look_in_applicators_5 {
     }
     #[test]
     fn test0_properties_defined_in_all_of_are_not_examined() {
-        use super::DESCRIPTION;
         let description = "properties defined in allOf are not examined";
         let data = "{\"foo\": 1, \"bar\": true}";
         let expected_valid = false;
@@ -580,7 +579,8 @@ mod additional_properties_does_not_look_in_applicators_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }
 mod additional_properties_with_null_valued_instance_properties_6 {
@@ -616,7 +616,6 @@ mod additional_properties_with_null_valued_instance_properties_6 {
     }
     #[test]
     fn test0_allows_null_values() {
-        use super::DESCRIPTION;
         let description = "allows null values";
         let data = "{\"foo\": null}";
         let expected_valid = true;
@@ -638,6 +637,7 @@ mod additional_properties_with_null_valued_instance_properties_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
+        let valid_msg = if expected_valid { "valid" } else { "invalid" };
+        assert_eq ! (output . valid () , expected_valid , "expected the evaluation to be {valid_msg} for: \n  case: {DESCRIPTION}\n  test: {description}\n  schema:{SCHEMA}\n  data: {data}\n  expected: {valid_msg}")
     }
 }

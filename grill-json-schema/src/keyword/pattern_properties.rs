@@ -97,7 +97,7 @@ impl Keyword for PatternProperties {
         for (prop, value) in obj {
             for matched in self.regexes.matches(prop) {
                 let (_, ptr, key) = &self.patterns[matched];
-                output.push(ctx.evaluate(*key, Some(prop), ptr, value)?);
+                output.push(ctx.probe(*key, Some(prop), ptr, value)?);
                 is_valid &= output.is_annotation();
                 if !is_valid && ctx.should_short_circuit() {
                     return Ok(Some(output));
