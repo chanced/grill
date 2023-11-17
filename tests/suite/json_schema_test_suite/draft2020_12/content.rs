@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod validation_of_string_encoded_content_based_on_media_type_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "contentMediaType": "application/json"
+        }"##;
+    const URI: &str = "http://localhost:1234/content.json";
+    const DESCRIPTION: &str = "validation of string-encoded content based on media type";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"contentMediaType\": \"application/json\"\n        }" ;
-        const URI: &str = "http://localhost:1234/content.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -31,14 +35,16 @@ mod validation_of_string_encoded_content_based_on_media_type_0 {
     }
     #[test]
     fn test0_a_valid_json_document() {
+        use super::DESCRIPTION;
         let description = "a valid JSON document";
+        let data = "\"{\\\"foo\\\": \\\"bar\\\"}\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"{\\\"foo\\\": \\\"bar\\\"}\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -51,18 +57,20 @@ mod validation_of_string_encoded_content_based_on_media_type_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_an_invalid_json_document_validates_true() {
+        use super::DESCRIPTION;
         let description = "an invalid JSON document; validates true";
+        let data = "\"{:}\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"{:}\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -75,18 +83,20 @@ mod validation_of_string_encoded_content_based_on_media_type_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_ignores_non_strings() {
+        use super::DESCRIPTION;
         let description = "ignores non-strings";
+        let data = "100";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "100";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -99,16 +109,20 @@ mod validation_of_string_encoded_content_based_on_media_type_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod validation_of_binary_string_encoding_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "contentEncoding": "base64"
+        }"##;
+    const URI: &str = "http://localhost:1234/content.json";
+    const DESCRIPTION: &str = "validation of binary string-encoding";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"contentEncoding\": \"base64\"\n        }" ;
-        const URI: &str = "http://localhost:1234/content.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -127,14 +141,16 @@ mod validation_of_binary_string_encoding_1 {
     }
     #[test]
     fn test0_a_valid_base64_string() {
+        use super::DESCRIPTION;
         let description = "a valid base64 string";
+        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -147,18 +163,20 @@ mod validation_of_binary_string_encoding_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_an_invalid_base64_string_is_not_a_valid_character_validates_true() {
+        use super::DESCRIPTION;
         let description = "an invalid base64 string (% is not a valid character); validates true";
+        let data = "\"eyJmb28iOi%iYmFyIn0K\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJmb28iOi%iYmFyIn0K\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -171,18 +189,20 @@ mod validation_of_binary_string_encoding_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_ignores_non_strings() {
+        use super::DESCRIPTION;
         let description = "ignores non-strings";
+        let data = "100";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "100";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -195,16 +215,21 @@ mod validation_of_binary_string_encoding_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod validation_of_binary_encoded_media_type_documents_2 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "contentMediaType": "application/json",
+            "contentEncoding": "base64"
+        }"##;
+    const URI: &str = "http://localhost:1234/content.json";
+    const DESCRIPTION: &str = "validation of binary-encoded media type documents";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"contentMediaType\": \"application/json\",\n            \"contentEncoding\": \"base64\"\n        }" ;
-        const URI: &str = "http://localhost:1234/content.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -223,14 +248,16 @@ mod validation_of_binary_encoded_media_type_documents_2 {
     }
     #[test]
     fn test0_a_valid_base64_encoded_json_document() {
+        use super::DESCRIPTION;
         let description = "a valid base64-encoded JSON document";
+        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -243,18 +270,20 @@ mod validation_of_binary_encoded_media_type_documents_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_validly_encoded_invalid_json_document_validates_true() {
+        use super::DESCRIPTION;
         let description = "a validly-encoded invalid JSON document; validates true";
+        let data = "\"ezp9Cg==\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"ezp9Cg==\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -267,18 +296,20 @@ mod validation_of_binary_encoded_media_type_documents_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_an_invalid_base64_string_that_is_valid_json_validates_true() {
+        use super::DESCRIPTION;
         let description = "an invalid base64 string that is valid JSON; validates true";
+        let data = "\"{}\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"{}\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -291,18 +322,20 @@ mod validation_of_binary_encoded_media_type_documents_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_ignores_non_strings() {
+        use super::DESCRIPTION;
         let description = "ignores non-strings";
+        let data = "100";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "100";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -315,16 +348,22 @@ mod validation_of_binary_encoded_media_type_documents_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "contentMediaType": "application/json",
+            "contentEncoding": "base64",
+            "contentSchema": { "type": "object", "required": ["foo"], "properties": { "foo": { "type": "string" } } }
+        }"##;
+    const URI: &str = "http://localhost:1234/content.json";
+    const DESCRIPTION: &str = "validation of binary-encoded media type documents with schema";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"contentMediaType\": \"application/json\",\n            \"contentEncoding\": \"base64\",\n            \"contentSchema\": { \"type\": \"object\", \"required\": [\"foo\"], \"properties\": { \"foo\": { \"type\": \"string\" } } }\n        }" ;
-        const URI: &str = "http://localhost:1234/content.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -343,14 +382,16 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
     }
     #[test]
     fn test0_a_valid_base64_encoded_json_document() {
+        use super::DESCRIPTION;
         let description = "a valid base64-encoded JSON document";
+        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJmb28iOiAiYmFyIn0K\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -363,18 +404,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_another_valid_base64_encoded_json_document() {
+        use super::DESCRIPTION;
         let description = "another valid base64-encoded JSON document";
+        let data = "\"eyJib28iOiAyMCwgImZvbyI6ICJiYXoifQ==\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJib28iOiAyMCwgImZvbyI6ICJiYXoifQ==\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -387,18 +430,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_an_invalid_base64_encoded_json_document_validates_true() {
+        use super::DESCRIPTION;
         let description = "an invalid base64-encoded JSON document; validates true";
+        let data = "\"eyJib28iOiAyMH0=\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"eyJib28iOiAyMH0=\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -411,18 +456,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_an_empty_object_as_a_base64_encoded_json_document_validates_true() {
+        use super::DESCRIPTION;
         let description = "an empty object as a base64-encoded JSON document; validates true";
+        let data = "\"e30=\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"e30=\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -435,18 +482,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_empty_array_as_a_base64_encoded_json_document() {
+        use super::DESCRIPTION;
         let description = "an empty array as a base64-encoded JSON document";
+        let data = "\"W10=\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"W10=\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -459,18 +508,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_a_validly_encoded_invalid_json_document_validates_true() {
+        use super::DESCRIPTION;
         let description = "a validly-encoded invalid JSON document; validates true";
+        let data = "\"ezp9Cg==\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"ezp9Cg==\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -483,18 +534,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_invalid_base64_string_that_is_valid_json_validates_true() {
+        use super::DESCRIPTION;
         let description = "an invalid base64 string that is valid JSON; validates true";
+        let data = "\"{}\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"{}\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -507,18 +560,20 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_ignores_non_strings() {
+        use super::DESCRIPTION;
         let description = "ignores non-strings";
+        let data = "100";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "100";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -531,6 +586,6 @@ mod validation_of_binary_encoded_media_type_documents_with_schema_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

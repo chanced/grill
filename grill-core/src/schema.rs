@@ -374,11 +374,11 @@ impl Schemas {
         }
     }
 
-    pub fn print_sources(&self) {
-        for (uri, key) in &self.store.index {
-            println!("{uri}: {key:?}");
-        }
-    }
+    // pub fn print_sources(&self) {
+    //     for (uri, key) in &self.store.index {
+    //         println!("{uri}: {key:?}");
+    //     }
+    // }
 
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn evaluate<'v>(
@@ -396,6 +396,17 @@ impl Schemas {
         eval_numbers: &mut Numbers,
     ) -> Result<Output<'v>, EvaluateError> {
         let schema = self.get(key, sources)?;
+        if schema.absolute_uri().host().unwrap() != "json-schema.org" {
+            // eprintln!(
+            //     "evaluating:\t{}\ndata:\t{}\nschema:\t{}",
+            //     schema.absolute_uri(),
+            //     serde_json::to_string_pretty(&value).unwrap(),
+            //     serde_json::to_string_pretty(&*schema).unwrap()
+            // );
+            // dbg!(schema.absolute_uri());
+            // dbg!(&schema.key);
+            // dbg!(&schema.keywords);
+        }
         let mut ctx = Context {
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
@@ -623,8 +634,8 @@ impl Schemas {
         Ok(())
     }
     ///
-    pub(crate) fn add_dependent(&mut self, referencer: Key, dependent: Key) {
-        self.get_mut(dependent).unwrap().dependents.push(referencer);
+    pub(crate) fn add_dependent(&mut self, referenced: Key, referrer: Key) {
+        self.get_mut(referenced).unwrap().dependents.push(referrer);
     }
 
     #[must_use]

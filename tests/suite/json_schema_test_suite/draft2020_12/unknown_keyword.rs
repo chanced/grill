@@ -9,10 +9,44 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$defs": {
+                "id_in_unknown0": {
+                    "not": {
+                        "array_of_schemas": [
+                            {
+                              "$id": "https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json",
+                              "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "real_id_in_schema": {
+                    "$id": "https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json",
+                    "type": "string"
+                },
+                "id_in_unknown1": {
+                    "not": {
+                        "object_of_schemas": {
+                            "foo": {
+                              "$id": "https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json",
+                              "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "anyOf": [
+                { "$ref": "#/$defs/id_in_unknown0" },
+                { "$ref": "#/$defs/id_in_unknown1" },
+                { "$ref": "https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json" }
+            ]
+        }"##;
+    const URI: &str = "http://localhost:1234/unknownKeyword.json";
+    const DESCRIPTION: &str = "$id inside an unknown keyword is not a real identifier";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"$defs\": {\n                \"id_in_unknown0\": {\n                    \"not\": {\n                        \"array_of_schemas\": [\n                            {\n                              \"$id\": \"https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json\",\n                              \"type\": \"null\"\n                            }\n                        ]\n                    }\n                },\n                \"real_id_in_schema\": {\n                    \"$id\": \"https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json\",\n                    \"type\": \"string\"\n                },\n                \"id_in_unknown1\": {\n                    \"not\": {\n                        \"object_of_schemas\": {\n                            \"foo\": {\n                              \"$id\": \"https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json\",\n                              \"type\": \"integer\"\n                            }\n                        }\n                    }\n                }\n            },\n            \"anyOf\": [\n                { \"$ref\": \"#/$defs/id_in_unknown0\" },\n                { \"$ref\": \"#/$defs/id_in_unknown1\" },\n                { \"$ref\": \"https://localhost:1234/draft2020-12/unknownKeyword/my_identifier.json\" }\n            ]\n        }" ;
-        const URI: &str = "http://localhost:1234/unknownKeyword.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -32,14 +66,16 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
     }
     #[test]
     fn test0_type_matches_second_any_of_which_has_a_real_schema_in_it() {
+        use super::DESCRIPTION;
         let description = "type matches second anyOf, which has a real schema in it";
+        let data = "\"a string\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"a string\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -52,18 +88,20 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_type_matches_non_schema_in_first_any_of() {
+        use super::DESCRIPTION;
         let description = "type matches non-schema in first anyOf";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -76,18 +114,20 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_type_matches_non_schema_in_third_any_of() {
+        use super::DESCRIPTION;
         let description = "type matches non-schema in third anyOf";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -100,6 +140,6 @@ mod id_inside_an_unknown_keyword_is_not_a_real_identifier_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

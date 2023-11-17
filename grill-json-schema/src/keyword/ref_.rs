@@ -44,6 +44,7 @@ impl Ref {
             must_eval,
         }
     }
+
     fn get_ref(&self, schema: &Value) -> Result<Vec<grill_core::schema::Ref>, RefError> {
         let Some(v) = schema.get(self.keyword) else {
             return Ok(Vec::default());
@@ -123,7 +124,7 @@ mod tests {
         draft_2020_12::json_schema_2020_12_uri,
         keyword::{const_, id, schema, ID, REF, SCHEMA},
     };
-    use grill_core::{schema::Dialect, Interrogator, Structure};
+    use grill_core::{schema::Dialect, AbsoluteUri, Interrogator, Structure};
 
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
@@ -200,5 +201,49 @@ mod tests {
             .evaluate(Structure::Basic, key, &value)
             .unwrap();
         println!("++ basic:\n{basic_output}");
+    }
+
+    #[tokio::test]
+    async fn test_recursive() {
+        println!("-----------");
+        let schema = json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {
+                "foo": {"$ref": "#"}
+            },
+            "additionalProperties": false
+        });
+        let dialect = Dialect::build(
+            "https://json-schema.org/draft/2020-12/schema"
+                .try_into()
+                .unwrap(),
+        )
+        .add_keyword(schema::Schema::new(SCHEMA, false))
+        .add_keyword(const_::Const::new(None))
+        .add_keyword(id::Id::new(ID, false))
+        .add_keyword(Ref::new(REF, true))
+        .add_keyword(crate::keyword::properties::Properties::default())
+        .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+        .finish()
+        .unwrap();
+
+        let mut interrogator = Interrogator::build()
+            .dialect(dialect)
+            .source_owned_value("https://example.com/recursive", schema)
+            .await
+            .unwrap();
+        let key = interrogator
+            .compile("https://example.com/recursive")
+            .await
+            .unwrap();
+        dbg!(&interrogator);
+        dbg!(key);
+        let uri = AbsoluteUri::parse("https://example.com/recursive#/properties/foo").unwrap();
+        let schema = interrogator.schema_by_uri(&uri).unwrap();
+        // dbg!(schema);
+        let value = json!({"foo": {"bar": false}});
+        let output = interrogator
+            .evaluate(Structure::Verbose, key, &value)
+            .unwrap();
     }
 }

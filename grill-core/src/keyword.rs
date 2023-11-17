@@ -202,7 +202,7 @@ impl<'i> Compile<'i> {
     /// - `CompileError::UriParsingFailed` if the URI is invalid
     pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
         let uri: Uri = uri.parse()?;
-        let uri = self.absolute_uri.resolve(&uri)?;
+        let uri = self.absolute_uri.with_fragment(None)?.resolve(&uri)?;
         self.schemas
             .get_key(&uri)
             .ok_or(CompileError::SchemaNotFound(uri))
@@ -267,6 +267,10 @@ impl<'s> Context<'s> {
         keyword: &Pointer,
         value: &'v Value,
     ) -> Result<Output<'v>, EvaluateError> {
+        if self.absolute_keyword_location().host().as_deref() != Some("json-schema.org") {
+            // println!("{}", self.absolute_keyword_location());
+            // println!("{}", serde_json::to_string_pretty(&value).unwrap());
+        }
         let mut instance_location = self.instance_location.clone();
         if let Some(instance) = instance {
             instance_location.push_back(instance.into());
@@ -311,6 +315,11 @@ impl<'s> Context<'s> {
         }
         self.eval_numbers.get_or_insert_arc(number)
     }
+    #[must_use]
+    pub fn absolute_keyword_location(&self) -> &AbsoluteUri {
+        self.absolute_keyword_location
+    }
+
     /// Evaluates `value` against the schema with the given `key` but does not
     /// mark the instance as evaluated.
     ///

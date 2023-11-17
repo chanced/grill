@@ -9,10 +9,21 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$id": "https://schema/using/no/validation",
+            "$schema": "http://localhost:1234/draft2020-12/metaschema-no-validation.json",
+            "properties": {
+                "badProperty": false,
+                "numberProperty": {
+                    "minimum": 10
+                }
+            }
+        }"##;
+    const URI: &str = "http://localhost:1234/vocabulary.json";
+    const DESCRIPTION: &str =
+        "schema that uses custom metaschema with with no validation vocabulary";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$id\": \"https://schema/using/no/validation\",\n            \"$schema\": \"http://localhost:1234/draft2020-12/metaschema-no-validation.json\",\n            \"properties\": {\n                \"badProperty\": false,\n                \"numberProperty\": {\n                    \"minimum\": 10\n                }\n            }\n        }" ;
-        const URI: &str = "http://localhost:1234/vocabulary.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -31,14 +42,16 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
     }
     #[test]
     fn test0_applicator_vocabulary_still_works() {
+        use super::DESCRIPTION;
         let description = "applicator vocabulary still works";
+        let data = "{\n                    \"badProperty\": \"this property should not exist\"\n                }" ;
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\n                    \"badProperty\": \"this property should not exist\"\n                }" ;
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -51,18 +64,20 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_no_validation_valid_number() {
+        use super::DESCRIPTION;
         let description = "no validation: valid number";
+        let data = "{\n                    \"numberProperty\": 20\n                }";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\n                    \"numberProperty\": 20\n                }";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -75,18 +90,20 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_no_validation_invalid_number_but_it_still_validates() {
+        use super::DESCRIPTION;
         let description = "no validation: invalid number, but it still validates";
+        let data = "{\n                    \"numberProperty\": 1\n                }";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\n                    \"numberProperty\": 1\n                }";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -99,16 +116,20 @@ mod schema_that_uses_custom_metaschema_with_with_no_validation_vocabulary_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod ignore_unrecognized_optional_vocabulary_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "http://localhost:1234/draft2020-12/metaschema-optional-vocabulary.json",
+            "type": "number"
+        }"##;
+    const URI: &str = "http://localhost:1234/vocabulary.json";
+    const DESCRIPTION: &str = "ignore unrecognized optional vocabulary";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"http://localhost:1234/draft2020-12/metaschema-optional-vocabulary.json\",\n            \"type\": \"number\"\n        }" ;
-        const URI: &str = "http://localhost:1234/vocabulary.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -127,14 +148,16 @@ mod ignore_unrecognized_optional_vocabulary_1 {
     }
     #[test]
     fn test0_string_value() {
+        use super::DESCRIPTION;
         let description = "string value";
+        let data = "\"foobar\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foobar\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -147,18 +170,20 @@ mod ignore_unrecognized_optional_vocabulary_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_number_value() {
+        use super::DESCRIPTION;
         let description = "number value";
+        let data = "20";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "20";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -171,6 +196,6 @@ mod ignore_unrecognized_optional_vocabulary_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

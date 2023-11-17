@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod exclusive_minimum_validation_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "exclusiveMinimum": 1.1
+        }"##;
+    const URI: &str = "http://localhost:1234/exclusiveMinimum.json";
+    const DESCRIPTION: &str = "exclusiveMinimum validation";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"exclusiveMinimum\": 1.1\n        }" ;
-        const URI: &str = "http://localhost:1234/exclusiveMinimum.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -32,14 +36,16 @@ mod exclusive_minimum_validation_0 {
     }
     #[test]
     fn test0_above_the_exclusive_minimum_is_valid() {
+        use super::DESCRIPTION;
         let description = "above the exclusiveMinimum is valid";
+        let data = "1.2";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.2";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -52,18 +58,20 @@ mod exclusive_minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_boundary_point_is_invalid() {
+        use super::DESCRIPTION;
         let description = "boundary point is invalid";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -76,18 +84,20 @@ mod exclusive_minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_below_the_exclusive_minimum_is_invalid() {
+        use super::DESCRIPTION;
         let description = "below the exclusiveMinimum is invalid";
+        let data = "0.6";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "0.6";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -100,18 +110,20 @@ mod exclusive_minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_ignores_non_numbers() {
+        use super::DESCRIPTION;
         let description = "ignores non-numbers";
+        let data = "\"x\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"x\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -124,6 +136,6 @@ mod exclusive_minimum_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

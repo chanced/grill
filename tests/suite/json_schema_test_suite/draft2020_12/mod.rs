@@ -5,7 +5,7 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
     use std::sync::OnceLock;
     static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
     INTERROGATOR
-        .get_or_init(|| block_on(build(Harness.draft2020_12().build())))
+        .get_or_init(|| build(Harness.draft2020_12().build()))
         .as_ref()
         .map(Clone::clone)
 }

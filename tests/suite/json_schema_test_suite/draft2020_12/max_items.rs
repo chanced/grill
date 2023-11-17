@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod max_items_validation_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "maxItems": 2
+        }"##;
+    const URI: &str = "http://localhost:1234/maxItems.json";
+    const DESCRIPTION: &str = "maxItems validation";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"maxItems\": 2\n        }" ;
-        const URI: &str = "http://localhost:1234/maxItems.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -31,14 +35,16 @@ mod max_items_validation_0 {
     }
     #[test]
     fn test0_shorter_is_valid() {
+        use super::DESCRIPTION;
         let description = "shorter is valid";
+        let data = "[1]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -51,18 +57,20 @@ mod max_items_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_exact_length_is_valid() {
+        use super::DESCRIPTION;
         let description = "exact length is valid";
+        let data = "[1, 2]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1, 2]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -75,18 +83,20 @@ mod max_items_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_too_long_is_invalid() {
+        use super::DESCRIPTION;
         let description = "too long is invalid";
+        let data = "[1, 2, 3]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1, 2, 3]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -99,18 +109,20 @@ mod max_items_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_ignores_non_arrays() {
+        use super::DESCRIPTION;
         let description = "ignores non-arrays";
+        let data = "\"foobar\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foobar\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -123,16 +135,20 @@ mod max_items_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod max_items_validation_with_a_decimal_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "maxItems": 2.0
+        }"##;
+    const URI: &str = "http://localhost:1234/maxItems.json";
+    const DESCRIPTION: &str = "maxItems validation with a decimal";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"maxItems\": 2.0\n        }" ;
-        const URI: &str = "http://localhost:1234/maxItems.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -151,14 +167,16 @@ mod max_items_validation_with_a_decimal_1 {
     }
     #[test]
     fn test0_shorter_is_valid() {
+        use super::DESCRIPTION;
         let description = "shorter is valid";
+        let data = "[1]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -171,18 +189,20 @@ mod max_items_validation_with_a_decimal_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_too_long_is_invalid() {
+        use super::DESCRIPTION;
         let description = "too long is invalid";
+        let data = "[1, 2, 3]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1, 2, 3]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -195,6 +215,6 @@ mod max_items_validation_with_a_decimal_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

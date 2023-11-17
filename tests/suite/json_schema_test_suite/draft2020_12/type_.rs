@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod integer_type_matches_integers_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "integer"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "integer type matches integers";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"integer\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -31,14 +35,16 @@ mod integer_type_matches_integers_0 {
     }
     #[test]
     fn test0_an_integer_is_an_integer() {
+        use super::DESCRIPTION;
         let description = "an integer is an integer";
+        let data = "1";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -51,18 +57,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_with_zero_fractional_part_is_an_integer() {
+        use super::DESCRIPTION;
         let description = "a float with zero fractional part is an integer";
+        let data = "1.0";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.0";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -75,18 +83,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_float_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "a float is not an integer";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -99,18 +109,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_a_string_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "a string is not an integer";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -123,18 +135,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_a_string_is_still_not_an_integer_even_if_it_looks_like_one() {
+        use super::DESCRIPTION;
         let description = "a string is still not an integer, even if it looks like one";
+        let data = "\"1\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"1\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -147,18 +161,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_an_object_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "an object is not an integer";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -171,18 +187,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_array_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "an array is not an integer";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -195,18 +213,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_a_boolean_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "a boolean is not an integer";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -219,18 +239,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test8_null_is_not_an_integer() {
+        use super::DESCRIPTION;
         let description = "null is not an integer";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -243,16 +265,20 @@ mod integer_type_matches_integers_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod number_type_matches_numbers_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "number"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "number type matches numbers";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"number\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -271,14 +297,16 @@ mod number_type_matches_numbers_1 {
     }
     #[test]
     fn test0_an_integer_is_a_number() {
+        use super::DESCRIPTION;
         let description = "an integer is a number";
+        let data = "1";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -291,18 +319,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_with_zero_fractional_part_is_a_number_and_an_integer() {
+        use super::DESCRIPTION;
         let description = "a float with zero fractional part is a number (and an integer)";
+        let data = "1.0";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.0";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -315,18 +345,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_float_is_a_number() {
+        use super::DESCRIPTION;
         let description = "a float is a number";
+        let data = "1.1";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -339,18 +371,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_a_string_is_not_a_number() {
+        use super::DESCRIPTION;
         let description = "a string is not a number";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -363,18 +397,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_a_string_is_still_not_a_number_even_if_it_looks_like_one() {
+        use super::DESCRIPTION;
         let description = "a string is still not a number, even if it looks like one";
+        let data = "\"1\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"1\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -387,18 +423,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_an_object_is_not_a_number() {
+        use super::DESCRIPTION;
         let description = "an object is not a number";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -411,18 +449,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_array_is_not_a_number() {
+        use super::DESCRIPTION;
         let description = "an array is not a number";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -435,18 +475,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_a_boolean_is_not_a_number() {
+        use super::DESCRIPTION;
         let description = "a boolean is not a number";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -459,18 +501,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test8_null_is_not_a_number() {
+        use super::DESCRIPTION;
         let description = "null is not a number";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -483,16 +527,20 @@ mod number_type_matches_numbers_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod string_type_matches_strings_2 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "string"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "string type matches strings";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"string\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -511,14 +559,16 @@ mod string_type_matches_strings_2 {
     }
     #[test]
     fn test0_1_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "1 is not a string";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -531,18 +581,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "a float is not a string";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -555,18 +607,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_string_is_a_string() {
+        use super::DESCRIPTION;
         let description = "a string is a string";
+        let data = "\"foo\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -579,18 +633,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_a_string_is_still_a_string_even_if_it_looks_like_a_number() {
+        use super::DESCRIPTION;
         let description = "a string is still a string, even if it looks like a number";
+        let data = "\"1\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"1\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -603,18 +659,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_empty_string_is_still_a_string() {
+        use super::DESCRIPTION;
         let description = "an empty string is still a string";
+        let data = "\"\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -627,18 +685,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_an_object_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "an object is not a string";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -651,18 +711,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_array_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "an array is not a string";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -675,18 +737,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_a_boolean_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "a boolean is not a string";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -699,18 +763,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test8_null_is_not_a_string() {
+        use super::DESCRIPTION;
         let description = "null is not a string";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -723,16 +789,20 @@ mod string_type_matches_strings_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod object_type_matches_objects_3 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "object type matches objects";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"object\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -751,14 +821,16 @@ mod object_type_matches_objects_3 {
     }
     #[test]
     fn test0_an_integer_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "an integer is not an object";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -771,18 +843,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "a float is not an object";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -795,18 +869,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_string_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "a string is not an object";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -819,18 +895,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_an_object_is_an_object() {
+        use super::DESCRIPTION;
         let description = "an object is an object";
+        let data = "{}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -843,18 +921,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_array_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "an array is not an object";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -867,18 +947,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_a_boolean_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "a boolean is not an object";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -891,18 +973,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_null_is_not_an_object() {
+        use super::DESCRIPTION;
         let description = "null is not an object";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -915,16 +999,20 @@ mod object_type_matches_objects_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod array_type_matches_arrays_4 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "array"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "array type matches arrays";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"array\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -943,14 +1031,16 @@ mod array_type_matches_arrays_4 {
     }
     #[test]
     fn test0_an_integer_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "an integer is not an array";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -963,18 +1053,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "a float is not an array";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -987,18 +1079,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_string_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "a string is not an array";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1011,18 +1105,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_an_object_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "an object is not an array";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1035,18 +1131,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_array_is_an_array() {
+        use super::DESCRIPTION;
         let description = "an array is an array";
+        let data = "[]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1059,18 +1157,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_a_boolean_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "a boolean is not an array";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1083,18 +1183,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_null_is_not_an_array() {
+        use super::DESCRIPTION;
         let description = "null is not an array";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1107,16 +1209,20 @@ mod array_type_matches_arrays_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod boolean_type_matches_booleans_5 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "boolean"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "boolean type matches booleans";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"boolean\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -1135,14 +1241,16 @@ mod boolean_type_matches_booleans_5 {
     }
     #[test]
     fn test0_an_integer_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "an integer is not a boolean";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1155,18 +1263,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_zero_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "zero is not a boolean";
+        let data = "0";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "0";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1179,18 +1289,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_float_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "a float is not a boolean";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1203,18 +1315,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_a_string_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "a string is not a boolean";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1227,18 +1341,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_empty_string_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "an empty string is not a boolean";
+        let data = "\"\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1251,18 +1367,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_an_object_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "an object is not a boolean";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1275,18 +1393,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_array_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "an array is not a boolean";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1299,18 +1419,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_true_is_a_boolean() {
+        use super::DESCRIPTION;
         let description = "true is a boolean";
+        let data = "true";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1323,18 +1445,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test8_false_is_a_boolean() {
+        use super::DESCRIPTION;
         let description = "false is a boolean";
+        let data = "false";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "false";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1347,18 +1471,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test9_null_is_not_a_boolean() {
+        use super::DESCRIPTION;
         let description = "null is not a boolean";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1371,16 +1497,20 @@ mod boolean_type_matches_booleans_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod null_type_matches_only_the_null_object_6 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "null"
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "null type matches only the null object";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": \"null\"\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -1399,14 +1529,16 @@ mod null_type_matches_only_the_null_object_6 {
     }
     #[test]
     fn test0_an_integer_is_not_null() {
+        use super::DESCRIPTION;
         let description = "an integer is not null";
+        let data = "1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1419,18 +1551,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_float_is_not_null() {
+        use super::DESCRIPTION;
         let description = "a float is not null";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1443,18 +1577,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_zero_is_not_null() {
+        use super::DESCRIPTION;
         let description = "zero is not null";
+        let data = "0";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "0";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1467,18 +1603,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_a_string_is_not_null() {
+        use super::DESCRIPTION;
         let description = "a string is not null";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1491,18 +1629,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_empty_string_is_not_null() {
+        use super::DESCRIPTION;
         let description = "an empty string is not null";
+        let data = "\"\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1515,18 +1655,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_an_object_is_not_null() {
+        use super::DESCRIPTION;
         let description = "an object is not null";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1539,18 +1681,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_an_array_is_not_null() {
+        use super::DESCRIPTION;
         let description = "an array is not null";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1563,18 +1707,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test7_true_is_not_null() {
+        use super::DESCRIPTION;
         let description = "true is not null";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1587,18 +1733,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test8_false_is_not_null() {
+        use super::DESCRIPTION;
         let description = "false is not null";
+        let data = "false";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "false";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1611,18 +1759,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test9_null_is_null() {
+        use super::DESCRIPTION;
         let description = "null is null";
+        let data = "null";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1635,16 +1785,20 @@ mod null_type_matches_only_the_null_object_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod multiple_types_can_be_specified_in_an_array_7 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": ["integer", "string"]
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "multiple types can be specified in an array";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": [\"integer\", \"string\"]\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -1663,14 +1817,16 @@ mod multiple_types_can_be_specified_in_an_array_7 {
     }
     #[test]
     fn test0_an_integer_is_valid() {
+        use super::DESCRIPTION;
         let description = "an integer is valid";
+        let data = "1";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1683,18 +1839,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_a_string_is_valid() {
+        use super::DESCRIPTION;
         let description = "a string is valid";
+        let data = "\"foo\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1707,18 +1865,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_a_float_is_invalid() {
+        use super::DESCRIPTION;
         let description = "a float is invalid";
+        let data = "1.1";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "1.1";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1731,18 +1891,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_an_object_is_invalid() {
+        use super::DESCRIPTION;
         let description = "an object is invalid";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1755,18 +1917,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_an_array_is_invalid() {
+        use super::DESCRIPTION;
         let description = "an array is invalid";
+        let data = "[]";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1779,18 +1943,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_a_boolean_is_invalid() {
+        use super::DESCRIPTION;
         let description = "a boolean is invalid";
+        let data = "true";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "true";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1803,18 +1969,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test6_null_is_invalid() {
+        use super::DESCRIPTION;
         let description = "null is invalid";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1827,16 +1995,20 @@ mod multiple_types_can_be_specified_in_an_array_7 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod type_as_array_with_one_item_8 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": ["string"]
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "type as array with one item";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": [\"string\"]\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -1855,14 +2027,16 @@ mod type_as_array_with_one_item_8 {
     }
     #[test]
     fn test0_string_is_valid() {
+        use super::DESCRIPTION;
         let description = "string is valid";
+        let data = "\"foo\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1875,18 +2049,20 @@ mod type_as_array_with_one_item_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_number_is_invalid() {
+        use super::DESCRIPTION;
         let description = "number is invalid";
+        let data = "123";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "123";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1899,16 +2075,20 @@ mod type_as_array_with_one_item_8 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod type_array_or_object_9 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": ["array", "object"]
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "type: array or object";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": [\"array\", \"object\"]\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -1927,14 +2107,16 @@ mod type_array_or_object_9 {
     }
     #[test]
     fn test0_array_is_valid() {
+        use super::DESCRIPTION;
         let description = "array is valid";
+        let data = "[1,2,3]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1,2,3]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1947,18 +2129,20 @@ mod type_array_or_object_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_object_is_valid() {
+        use super::DESCRIPTION;
         let description = "object is valid";
+        let data = "{\"foo\": 123}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 123}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1971,18 +2155,20 @@ mod type_array_or_object_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_number_is_invalid() {
+        use super::DESCRIPTION;
         let description = "number is invalid";
+        let data = "123";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "123";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -1995,18 +2181,20 @@ mod type_array_or_object_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_string_is_invalid() {
+        use super::DESCRIPTION;
         let description = "string is invalid";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2019,18 +2207,20 @@ mod type_array_or_object_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_null_is_invalid() {
+        use super::DESCRIPTION;
         let description = "null is invalid";
+        let data = "null";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2043,16 +2233,20 @@ mod type_array_or_object_9 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod type_array_object_or_null_10 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": ["array", "object", "null"]
+        }"##;
+    const URI: &str = "http://localhost:1234/type.json";
+    const DESCRIPTION: &str = "type: array, object or null";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"type\": [\"array\", \"object\", \"null\"]\n        }" ;
-        const URI: &str = "http://localhost:1234/type.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -2071,14 +2265,16 @@ mod type_array_object_or_null_10 {
     }
     #[test]
     fn test0_array_is_valid() {
+        use super::DESCRIPTION;
         let description = "array is valid";
+        let data = "[1,2,3]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1,2,3]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2091,18 +2287,20 @@ mod type_array_object_or_null_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_object_is_valid() {
+        use super::DESCRIPTION;
         let description = "object is valid";
+        let data = "{\"foo\": 123}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 123}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2115,18 +2313,20 @@ mod type_array_object_or_null_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_null_is_valid() {
+        use super::DESCRIPTION;
         let description = "null is valid";
+        let data = "null";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "null";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2139,18 +2339,20 @@ mod type_array_object_or_null_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_number_is_invalid() {
+        use super::DESCRIPTION;
         let description = "number is invalid";
+        let data = "123";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "123";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2163,18 +2365,20 @@ mod type_array_object_or_null_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_string_is_invalid() {
+        use super::DESCRIPTION;
         let description = "string is invalid";
+        let data = "\"foo\"";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foo\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -2187,6 +2391,6 @@ mod type_array_object_or_null_10 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

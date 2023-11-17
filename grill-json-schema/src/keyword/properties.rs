@@ -73,6 +73,10 @@ impl Keyword for Properties {
         let Some(obj) = value.as_object() else {
             return Ok(None);
         };
+        if ctx.absolute_keyword_location().host().as_deref() != Some("json-schema.org") {
+            // println!("{}", ctx.absolute_keyword_location());
+            // dbg!(&self.subschemas);
+        }
         let mut output = ctx.annotate(Some(PROPERTIES), None);
         let mut is_valid = true;
         let mut invalid = Vec::with_capacity(self.subschemas.len());

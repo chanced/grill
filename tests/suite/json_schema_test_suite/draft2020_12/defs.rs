@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod validate_definition_against_metaschema_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": "https://json-schema.org/draft/2020-12/schema"
+        }"##;
+    const URI: &str = "http://localhost:1234/defs.json";
+    const DESCRIPTION: &str = "validate definition against metaschema";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"$ref\": \"https://json-schema.org/draft/2020-12/schema\"\n        }" ;
-        const URI: &str = "http://localhost:1234/defs.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -31,14 +35,16 @@ mod validate_definition_against_metaschema_0 {
     }
     #[test]
     fn test0_valid_definition_schema() {
+        use super::DESCRIPTION;
         let description = "valid definition schema";
+        let data = "{\"$defs\": {\"foo\": {\"type\": \"integer\"}}}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"$defs\": {\"foo\": {\"type\": \"integer\"}}}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -51,18 +57,20 @@ mod validate_definition_against_metaschema_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_invalid_definition_schema() {
+        use super::DESCRIPTION;
         let description = "invalid definition schema";
+        let data = "{\"$defs\": {\"foo\": {\"type\": 1}}}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"$defs\": {\"foo\": {\"type\": 1}}}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -75,6 +83,6 @@ mod validate_definition_against_metaschema_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

@@ -1,0 +1,2579 @@
+warning: unused imports: `Value`, `json`
+ --> grill-core/src/visitor.rs:1:18
+  |
+1 | use serde_json::{json, Value};
+  |                  ^^^^  ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::collections::HashMap`
+ --> grill-core/src/visitor.rs:2:5
+  |
+2 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `fmt::Write`
+ --> grill-core/src/schema/compiler.rs:3:5
+  |
+3 |     fmt::Write,
+  |     ^^^^^^^^^^
+
+warning: unused imports: `Level`, `instrument`
+  --> grill-core/src/source.rs:22:15
+   |
+22 | use tracing::{instrument, Level};
+   |               ^^^^^^^^^^  ^^^^^
+
+warning: method `print_sources` is never used
+   --> grill-core/src/schema.rs:377:12
+    |
+368 | impl Schemas {
+    | ------------ method in this implementation
+...
+377 |     pub fn print_sources(&self) {
+    |            ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `grill-core` (lib) generated 5 warnings (run `cargo fix --lib -p grill-core` to apply 4 suggestions)
+warning: unused variable: `s`
+  --> grill-json-schema/src/keyword/all_of.rs:34:13
+   |
+34 |         let s = schema.to_string();
+   |             ^ help: if this is intentional, prefix it with an underscore: `_s`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `grill-json-schema` (lib) generated 1 warning (run `cargo fix --lib -p grill-json-schema` to apply 1 suggestion)
+warning: unused import: `super::*`
+ --> tests/suite/json_schema_test_suite/draft2020_12/optional/mod.rs:9:5
+  |
+9 | use super::*;
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `super::*`
+ --> tests/suite/json_schema_test_suite/draft2020_12/optional/format/mod.rs:9:5
+  |
+9 | use super::*;
+  |     ^^^^^^^^
+
+warning: `tests` (test "test-suite") generated 2 warnings (run `cargo fix --test "test-suite"` to apply 2 suggestions)
+    Finished test [unoptimized + debuginfo] target(s) in 0.07s
+     Running suite/mod.rs (target/debug/deps/test_suite-03b6566cd53554a4)
+
+running 1 test
+evaluating:	http://localhost:1234/ref.json
+data:	{
+  "foo": {
+    "bar": false
+  }
+}
+schema:	{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "foo": {
+      "$ref": "#"
+    }
+  }
+}
+http://localhost:1234/ref.json
+http://localhost:1234/ref.json
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+evaluating:	http://localhost:1234/ref.json#/properties/foo
+data:	{
+  "bar": false
+}
+schema:	{
+  "$ref": "#"
+}
+http://localhost:1234/ref.json#/properties/foo
+{
+  "bar": false
+}
+
+thread 'json_schema_test_suite::draft2020_12::ref_::root_pointer_ref_0::test3_recursive_mismatch' has overflowed its stack
+fatal runtime error: stack overflow
+error: test failed, to rerun pass `-p tests --test test-suite`
+
+Caused by:
+  process didn't exit successfully: `/Users/chance/dev/grill/target/debug/deps/test_suite-03b6566cd53554a4 'json_schema_test_suite::draft2020_12::ref_::root_pointer_ref_0::test3_recursive_mismatch' --exact --nocapture` (signal: 6, SIGABRT: process abort signal)

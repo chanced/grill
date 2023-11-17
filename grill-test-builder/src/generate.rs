@@ -126,7 +126,7 @@ fn gen_root_mod(suite: &Name, sets: Vec<TestSet>, has_sources: bool) -> (Utf8Pat
 
 fn build_fn() -> TokenStream {
     quote! {
-        async fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
+        fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
             block_on(build.source_static_values(sources::sources()).finish())
         }
     }
@@ -491,7 +491,7 @@ fn gen_tests_mods(ancestry: &[&Name], mods: &[TokenStream]) -> TokenStream {
                 use crate::Harness;
                 static INTERROGATOR: OnceLock<Result<Interrogator, BuildError>> = OnceLock::new();
                 INTERROGATOR
-                    .get_or_init(|| block_on(build(Harness.#method().build())))
+                    .get_or_init(|| build(Harness.#method().build()))
                     .as_ref()
                     .map(Clone::clone)
             }
@@ -543,23 +543,29 @@ impl TestCase {
 
         let name = format_ident!("{}_{i}", Name::snake(description));
         let schema = self.schema.to_string();
+        // this does not work because hashtags are being intercepted as placements
+        let schema = format!(r###"r##"{schema}"##"###)
+            .parse::<proc_macro2::Literal>()
+            .unwrap();
 
+        // println!("{schema}");
         let tests = self
             .tests
             .iter()
             .enumerate()
-            .map(|(i, test)| test.generate(i, &name, suite));
+            .map(|(i, test)| test.generate(i));
         let rel_uri = Uri::parse(path.rel.as_str()).expect("path should parse as a URI");
         let uri = uri.resolve(&rel_uri).unwrap().to_string();
+
         quote! {
             mod #name {
                 use super::*;
                 use grill::{error::CompileError, Key, Structure};
-
+                const SCHEMA: &str = #schema;
+                const URI: &str = #uri;
+                const DESCRIPTION: &str = #description;
                 fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
                     use std::sync::OnceLock;
-                    const SCHEMA: &str = #schema;
-                    const URI: &str = #uri;
                     static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
                     INTERROGATOR
                         .get_or_init(|| {
@@ -590,7 +596,7 @@ struct Test {
 }
 
 impl Test {
-    fn generate(&self, i: usize, _name: &Ident, _suite: &Name) -> TokenStream {
+    fn generate(&self, i: usize) -> TokenStream {
         let Self {
             data,
             description,
@@ -610,7 +616,11 @@ impl Test {
         quote! {
             #[test]
             fn #name() {
+                use super::DESCRIPTION;
                 let description = #description;
+                let data = #data;
+                let expected_valid = #valid;
+
                 let (key, interrogator) = match setup() {
                     Ok((key, interrogator)) => (key, interrogator),
                     Err(err) => {
@@ -618,22 +628,21 @@ impl Test {
                     }
                 };
 
-                let data = #data;
                 let data = match serde_json::from_str(data) {
                     Ok(data) => data,
                     Err(err) => {
                         panic!("failed to parse data as json:\n{}", err);
                     }
                 };
-
                 let output = match interrogator.evaluate(Structure::Flag, key, &data) {
                     Ok(output) => output,
                     Err(err) => {
                         panic!("failed to evaluate schema:\n{}", err);
                     }
                 };
-
-                assert_eq!(output.valid(), #valid, "expected ")
+                assert_eq!(output.valid(), expected_valid,
+                    "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}"
+                )
             }
         }
     }

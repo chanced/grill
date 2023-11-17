@@ -9,10 +9,16 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod additional_properties_being_false_does_not_allow_other_properties_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {"foo": {}, "bar": {}},
+            "patternProperties": { "^v": {} },
+            "additionalProperties": false
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties being false does not allow other properties";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"properties\": {\"foo\": {}, \"bar\": {}},\n            \"patternProperties\": { \"^v\": {} },\n            \"additionalProperties\": false\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -33,14 +39,16 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
     }
     #[test]
     fn test0_no_additional_properties_is_valid() {
+        use super::DESCRIPTION;
         let description = "no additional properties is valid";
+        let data = "{\"foo\": 1}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -53,18 +61,20 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_an_additional_property_is_invalid() {
+        use super::DESCRIPTION;
         let description = "an additional property is invalid";
+        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : \"boom\"}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : \"boom\"}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -77,18 +87,20 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_ignores_arrays() {
+        use super::DESCRIPTION;
         let description = "ignores arrays";
+        let data = "[1, 2, 3]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[1, 2, 3]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -101,18 +113,20 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_ignores_strings() {
+        use super::DESCRIPTION;
         let description = "ignores strings";
+        let data = "\"foobarbaz\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"foobarbaz\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -125,18 +139,20 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_ignores_other_non_objects() {
+        use super::DESCRIPTION;
         let description = "ignores other non-objects";
+        let data = "12";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "12";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -149,18 +165,20 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_pattern_properties_are_not_additional_properties() {
+        use super::DESCRIPTION;
         let description = "patternProperties are not additional properties";
+        let data = "{\"foo\":1, \"vroom\": 2}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\":1, \"vroom\": 2}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -173,16 +191,21 @@ mod additional_properties_being_false_does_not_allow_other_properties_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod non_ascii_pattern_with_additional_properties_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "patternProperties": {"^á": {}},
+            "additionalProperties": false
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "non-ASCII pattern with additionalProperties";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"patternProperties\": {\"^á\": {}},\n            \"additionalProperties\": false\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -203,14 +226,16 @@ mod non_ascii_pattern_with_additional_properties_1 {
     }
     #[test]
     fn test0_matching_the_pattern_is_valid() {
+        use super::DESCRIPTION;
         let description = "matching the pattern is valid";
+        let data = "{\"ármányos\": 2}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"ármányos\": 2}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -223,18 +248,20 @@ mod non_ascii_pattern_with_additional_properties_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_not_matching_the_pattern_is_invalid() {
+        use super::DESCRIPTION;
         let description = "not matching the pattern is invalid";
+        let data = "{\"élmény\": 2}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"élmény\": 2}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -247,16 +274,21 @@ mod non_ascii_pattern_with_additional_properties_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod additional_properties_with_schema_2 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {"foo": {}, "bar": {}},
+            "additionalProperties": {"type": "boolean"}
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties with schema";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"properties\": {\"foo\": {}, \"bar\": {}},\n            \"additionalProperties\": {\"type\": \"boolean\"}\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -277,14 +309,16 @@ mod additional_properties_with_schema_2 {
     }
     #[test]
     fn test0_no_additional_properties_is_valid() {
+        use super::DESCRIPTION;
         let description = "no additional properties is valid";
+        let data = "{\"foo\": 1}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -297,18 +331,20 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_an_additional_valid_property_is_valid() {
+        use super::DESCRIPTION;
         let description = "an additional valid property is valid";
+        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : true}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : true}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -321,18 +357,20 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_an_additional_invalid_property_is_invalid() {
+        use super::DESCRIPTION;
         let description = "an additional invalid property is invalid";
+        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : 12}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\" : 1, \"bar\" : 2, \"quux\" : 12}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -345,16 +383,20 @@ mod additional_properties_with_schema_2 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod additional_properties_can_exist_by_itself_3 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": {"type": "boolean"}
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties can exist by itself";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"additionalProperties\": {\"type\": \"boolean\"}\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -375,14 +417,16 @@ mod additional_properties_can_exist_by_itself_3 {
     }
     #[test]
     fn test0_an_additional_valid_property_is_valid() {
+        use super::DESCRIPTION;
         let description = "an additional valid property is valid";
+        let data = "{\"foo\" : true}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\" : true}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -395,18 +439,20 @@ mod additional_properties_can_exist_by_itself_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_an_additional_invalid_property_is_invalid() {
+        use super::DESCRIPTION;
         let description = "an additional invalid property is invalid";
+        let data = "{\"foo\" : 1}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\" : 1}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -419,16 +465,20 @@ mod additional_properties_can_exist_by_itself_3 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod additional_properties_are_allowed_by_default_4 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {"foo": {}, "bar": {}}
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties are allowed by default";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"properties\": {\"foo\": {}, \"bar\": {}}\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -449,14 +499,16 @@ mod additional_properties_are_allowed_by_default_4 {
     }
     #[test]
     fn test0_additional_properties_are_allowed() {
+        use super::DESCRIPTION;
         let description = "additional properties are allowed";
+        let data = "{\"foo\": 1, \"bar\": 2, \"quux\": true}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1, \"bar\": 2, \"quux\": true}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -469,16 +521,23 @@ mod additional_properties_are_allowed_by_default_4 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod additional_properties_does_not_look_in_applicators_5 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "allOf": [
+                {"properties": {"foo": {}}}
+            ],
+            "additionalProperties": {"type": "boolean"}
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties does not look in applicators";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"allOf\": [\n                {\"properties\": {\"foo\": {}}}\n            ],\n            \"additionalProperties\": {\"type\": \"boolean\"}\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -499,14 +558,16 @@ mod additional_properties_does_not_look_in_applicators_5 {
     }
     #[test]
     fn test0_properties_defined_in_all_of_are_not_examined() {
+        use super::DESCRIPTION;
         let description = "properties defined in allOf are not examined";
+        let data = "{\"foo\": 1, \"bar\": true}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1, \"bar\": true}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -519,16 +580,22 @@ mod additional_properties_does_not_look_in_applicators_5 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod additional_properties_with_null_valued_instance_properties_6 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": {
+                "type": "null"
+            }
+        }"##;
+    const URI: &str = "http://localhost:1234/additionalProperties.json";
+    const DESCRIPTION: &str = "additionalProperties with null valued instance properties";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"additionalProperties\": {\n                \"type\": \"null\"\n            }\n        }" ;
-        const URI: &str = "http://localhost:1234/additionalProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -549,14 +616,16 @@ mod additional_properties_with_null_valued_instance_properties_6 {
     }
     #[test]
     fn test0_allows_null_values() {
+        use super::DESCRIPTION;
         let description = "allows null values";
+        let data = "{\"foo\": null}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": null}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -569,6 +638,6 @@ mod additional_properties_with_null_valued_instance_properties_6 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

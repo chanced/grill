@@ -691,6 +691,12 @@ impl AbsoluteUri {
         }
     }
 
+    pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, UriError> {
+        let mut new = self.clone();
+        new.set_fragment(None);
+        Ok(new)
+    }
+
     /// Returns the authority (`Url`) or namespace (`Urn`)
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {

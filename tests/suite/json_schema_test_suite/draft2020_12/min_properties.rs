@@ -9,10 +9,14 @@ fn interrogator() -> Result<Interrogator, &'static BuildError> {
 mod min_properties_validation_0 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "minProperties": 1
+        }"##;
+    const URI: &str = "http://localhost:1234/minProperties.json";
+    const DESCRIPTION: &str = "minProperties validation";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"minProperties\": 1\n        }" ;
-        const URI: &str = "http://localhost:1234/minProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -32,14 +36,16 @@ mod min_properties_validation_0 {
     }
     #[test]
     fn test0_longer_is_valid() {
+        use super::DESCRIPTION;
         let description = "longer is valid";
+        let data = "{\"foo\": 1, \"bar\": 2}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1, \"bar\": 2}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -52,18 +58,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_exact_length_is_valid() {
+        use super::DESCRIPTION;
         let description = "exact length is valid";
+        let data = "{\"foo\": 1}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -76,18 +84,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test2_too_short_is_invalid() {
+        use super::DESCRIPTION;
         let description = "too short is invalid";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -100,18 +110,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test3_ignores_arrays() {
+        use super::DESCRIPTION;
         let description = "ignores arrays";
+        let data = "[]";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "[]";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -124,18 +136,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test4_ignores_strings() {
+        use super::DESCRIPTION;
         let description = "ignores strings";
+        let data = "\"\"";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "\"\"";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -148,18 +162,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test5_ignores_other_non_objects() {
+        use super::DESCRIPTION;
         let description = "ignores other non-objects";
+        let data = "12";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "12";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -172,16 +188,20 @@ mod min_properties_validation_0 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }
 mod min_properties_validation_with_a_decimal_1 {
     use super::*;
     use grill::{error::CompileError, Key, Structure};
+    const SCHEMA: &str = r##"{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "minProperties": 1.0
+        }"##;
+    const URI: &str = "http://localhost:1234/minProperties.json";
+    const DESCRIPTION: &str = "minProperties validation with a decimal";
     fn setup() -> Result<(Key, Interrogator), &'static CompileError> {
         use std::sync::OnceLock;
-        const SCHEMA : & str = "{\n            \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n            \"minProperties\": 1.0\n        }" ;
-        const URI: &str = "http://localhost:1234/minProperties.json";
         static INTERROGATOR: OnceLock<Result<(Key, Interrogator), CompileError>> = OnceLock::new();
         INTERROGATOR
             .get_or_init(|| {
@@ -201,14 +221,16 @@ mod min_properties_validation_with_a_decimal_1 {
     }
     #[test]
     fn test0_longer_is_valid() {
+        use super::DESCRIPTION;
         let description = "longer is valid";
+        let data = "{\"foo\": 1, \"bar\": 2}";
+        let expected_valid = true;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{\"foo\": 1, \"bar\": 2}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -221,18 +243,20 @@ mod min_properties_validation_with_a_decimal_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), true, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
     #[test]
     fn test1_too_short_is_invalid() {
+        use super::DESCRIPTION;
         let description = "too short is invalid";
+        let data = "{}";
+        let expected_valid = false;
         let (key, interrogator) = match setup() {
             Ok((key, interrogator)) => (key, interrogator),
             Err(err) => {
                 panic!("failed to setup test for {}\n:{}", description, err);
             }
         };
-        let data = "{}";
         let data = match serde_json::from_str(data) {
             Ok(data) => data,
             Err(err) => {
@@ -245,6 +269,6 @@ mod min_properties_validation_with_a_decimal_1 {
                 panic!("failed to evaluate schema:\n{}", err);
             }
         };
-        assert_eq!(output.valid(), false, "expected ")
+        assert_eq ! (output . valid () , expected_valid , "expected {expected_valid} for: \n\tcase: {DESCRIPTION}\n\ttest: {description}\n\tschema:\n{SCHEMA}\n\tdata:\n{data}")
     }
 }

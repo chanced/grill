@@ -80,6 +80,6 @@ pub trait Draft202012 {
     fn setup_optional_format_uri(&self, interrogator: &mut Interrogator) {}
     fn setup_optional_format_uuid(&self, interrogator: &mut Interrogator) {}
 }
-async fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
+fn build(build: grill::Build) -> Result<grill::Interrogator, grill::error::BuildError> {
     block_on(build.source_static_values(sources::sources()).finish())
 }

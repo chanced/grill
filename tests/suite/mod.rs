@@ -1,4 +1,9 @@
-#![allow(clippy::assertions_on_constants, clippy::bool_assert_comparison)]
+#![allow(
+    clippy::needless_raw_string_hashes,
+    clippy::assertions_on_constants,
+    clippy::bool_assert_comparison,
+    unused_imports
+)]
 use grill::{Interrogator, JsonSchema};
 
 mod json_schema_test_suite;

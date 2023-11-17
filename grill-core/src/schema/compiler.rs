@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    fmt::Write,
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
@@ -425,19 +422,30 @@ impl<'i> Compiler<'i> {
         mut base_uri: AbsoluteUri,
     ) -> Result<Vec<SchemaToCompile>, CompileError> {
         let refs = self.refs.get(&base_uri).unwrap().clone();
-        let mut to_queue = Vec::with_capacity(refs.len());
+        // references which cannot be resolved yet due to the referenced
+        // not being resolved yet.
+        let mut queued = Vec::with_capacity(refs.len());
         let mut remaining = Vec::with_capacity(refs.len());
         base_uri.set_fragment(None).unwrap();
         for ref_ in refs.iter().cloned() {
-            let ref_uri = base_uri.resolve(&ref_.uri)?;
-            if self.schemas.contains_uri(&ref_uri) {
-                let ref_key = self.schemas.get_key(&ref_uri).unwrap();
-                self.resolve_ref(key, ref_key, ref_uri, ref_)?;
+            let referenced_uri = base_uri.resolve(&ref_.uri)?;
+            // if the referenced schema has been compiled, resolve it
+            if self.schemas.contains_uri(&referenced_uri) {
+                let referenced_key = self.schemas.get_key(&referenced_uri).unwrap();
+                self.resolve_ref(
+                    referenced_key,
+                    referenced_uri,
+                    RefToResolve {
+                        referrer_key: key,
+                        ref_,
+                    },
+                )?;
             } else {
+                // otherwise, requeue it
                 remaining.push(ref_.clone());
-                to_queue.push(SchemaToCompile {
+                queued.push(SchemaToCompile {
                     key: None,
-                    uri: ref_uri,
+                    uri: referenced_uri,
                     parent: None,
                     continue_on_err: false,
                     ref_: Some(RefToResolve {
@@ -449,7 +457,7 @@ impl<'i> Compiler<'i> {
         }
         let refs = self.refs.get_mut(&base_uri).unwrap();
         *refs = remaining;
-        Ok(to_queue)
+        Ok(queued)
     }
 
     fn maybe_finalize(
@@ -498,7 +506,7 @@ impl<'i> Compiler<'i> {
         }
 
         if let Some(ref_) = ref_ {
-            self.resolve_ref(ref_.referrer_key, key, uri.clone(), ref_.ref_)?;
+            self.resolve_ref(key, uri.clone(), ref_)?;
         }
         self.schemas.set_compiled(key);
         Ok(())
@@ -586,12 +594,13 @@ impl<'i> Compiler<'i> {
 
     fn resolve_ref(
         &mut self,
-        referrer_key: Key,
         referenced_key: Key,
         referenced_uri: AbsoluteUri,
-        ref_: Ref,
+        ref_: RefToResolve,
     ) -> Result<(), CompileError> {
-        self.add_reference(referrer_key, referenced_key, referenced_uri, ref_)?;
+        let referrer_key = ref_.referrer_key;
+        self.add_reference(ref_.referrer_key, referenced_key, referenced_uri, ref_.ref_)?;
+
         self.schemas.add_dependent(referenced_key, referrer_key);
         Ok(())
     }
