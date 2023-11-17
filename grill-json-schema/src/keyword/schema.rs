@@ -6,11 +6,14 @@
 use serde_json::Value;
 
 use grill_core::{
-    error::{CompileError, EvaluateError, IdentifyError},
+    error::{CompileError, EvaluateError, Expected, IdentifyError, InvalidTypeError},
     keyword::{self, Context, Keyword, Kind, Unimplemented},
+    output::Structures,
     uri::AbsoluteUri,
     Output,
 };
+
+use super::{UNEVALUATED_ITEMS, UNEVALUATED_PROPERTIES};
 
 /// [`Keyword`] for `$schema`.
 #[derive(Debug, Clone)]
@@ -20,15 +23,26 @@ pub struct Schema {
     /// Whether the [`Dialect`](grill_core::Dialect) allows for fragmented
     /// metaschema IDs
     pub allow_fragment: bool,
+    /// Whether the schema is a boolean value
+    pub boolean: Option<bool>,
+    /// whether or not the schema can be short-circuited
+    pub can_short_circuit: bool,
 }
 
 impl Schema {
+    pub const ENABLING_STRUCTURES: Structures = Structures::FLAG;
+
+    /// The set of keywords to check that disable short-circuiting
+    pub const DISABLING_KEYWORDS: [&'static str; 2] = [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS];
+
     /// Construct a new `Schema` keyword.
     #[must_use]
     pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
         Self {
             keyword,
             allow_fragment,
+            boolean: None,
+            can_short_circuit: true,
         }
     }
 }
@@ -36,6 +50,56 @@ impl Schema {
 impl Keyword for Schema {
     fn kind(&self) -> Kind {
         self.keyword.into()
+    }
+    fn compile<'i>(
+        &mut self,
+        compile: &mut keyword::Compile<'i>,
+        schema: grill_core::Schema<'i>,
+    ) -> Result<bool, CompileError> {
+        match schema.value() {
+            Value::Bool(bool) => {
+                self.boolean = Some(*bool);
+            }
+            Value::Object(obj) => {
+                for keyword in Self::DISABLING_KEYWORDS {
+                    if obj.contains_key(keyword) {
+                        self.can_short_circuit = false;
+                        return Ok(true);
+                    }
+                }
+            }
+            other => {
+                // there should probably be a variant specifically for invalid schema type
+                return Err(InvalidTypeError {
+                    expected: Expected::AnyOf(&[Expected::Bool, Expected::Object]),
+                    actual: Box::new(other.clone()),
+                }
+                .into());
+            }
+        }
+        Ok(true)
+    }
+
+    fn evaluate<'i, 'v>(
+        &'i self,
+        ctx: &'i mut Context,
+        _value: &'v Value,
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
+        if !self.can_short_circuit {
+            ctx.disable_short_circuiting();
+            return Ok(None);
+        }
+        if Self::ENABLING_STRUCTURES.contains(ctx.structure().into()) {
+            ctx.enable_short_circuiting();
+        }
+        let Some(bool) = self.boolean else {
+            return Ok(None);
+        };
+        if bool {
+            Ok(Some(ctx.annotate(None, None)))
+        } else {
+            Ok(Some(ctx.error(None, None)))
+        }
     }
     fn dialect(
         &self,
@@ -67,21 +131,5 @@ impl Keyword for Schema {
             return Ok(Err(IdentifyError::FragmentedId(uri.into())));
         }
         Ok(Ok(Some(uri)))
-    }
-
-    fn compile<'i>(
-        &mut self,
-        _compile: &mut keyword::Compile<'i>,
-        _schema: grill_core::Schema<'i>,
-    ) -> Result<bool, CompileError> {
-        Ok(false)
-    }
-
-    fn evaluate<'i, 'v>(
-        &'i self,
-        _ctx: &'i mut Context,
-        _value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
-        Ok(None)
     }
 }

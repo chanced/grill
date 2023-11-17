@@ -565,17 +565,6 @@ pub enum Kind {
     /// Depending on the specified `Structure`, the [`Output`] may be expanded
     /// into multiple nodes.
     Composite(&'static [&'static str]),
-
-    /// The [`Keyword`] is responsible for handling `true` or `false` Schemas.
-    BooleanSchema(bool),
-
-    /// A logical keyword which modifies the state of the evaluation without
-    /// producing an [`Output`](`crate::Output`).
-    ///
-    /// For example, the
-    /// [`ShortCircuit`](grill::json_schema::keyword::ShortCircuit) determines
-    /// whether or not the evaluation can short-circuit
-    Middleware(&'static str),
 }
 
 impl PartialEq<&str> for Kind {

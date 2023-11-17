@@ -1,6 +1,6 @@
 use super::{keyword::REF, metaschema};
-use crate::keyword::{self, ID, SCHEMA, UNEVALUATED_ITEMS, UNEVALUATED_PROPERTIES};
-use grill_core::{schema::Dialect, Structure};
+use crate::keyword::{self, ID, SCHEMA};
+use grill_core::schema::Dialect;
 use serde_json::Value;
 use std::borrow::Cow;
 
@@ -74,11 +74,6 @@ pub fn dialect() -> Dialect {
         )
         .add_keyword(keyword::schema::Schema::new(SCHEMA, false))
         .add_keyword(keyword::id::Id::new(ID, false))
-        .add_keyword(keyword::boolean::Boolean::default())
-        .add_keyword(keyword::short_circuit::ShortCircuit::new(
-            [Structure::Flag],
-            [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS],
-        ))
         .add_keyword(keyword::defs::Defs::default())
         .add_keyword(keyword::comment::Comment::default())
         .add_keyword(keyword::const_::Const::new(None))

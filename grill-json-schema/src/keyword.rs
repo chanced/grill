@@ -6,7 +6,6 @@ pub mod additional_properties;
 pub mod all_of;
 pub mod anchor;
 pub mod any_of;
-pub mod boolean;
 pub mod comment;
 pub mod const_;
 pub mod defs;
@@ -23,7 +22,6 @@ pub mod properties;
 pub mod read_only;
 pub mod ref_;
 pub mod schema;
-pub mod short_circuit;
 pub mod type_;
 pub mod write_only;
 
