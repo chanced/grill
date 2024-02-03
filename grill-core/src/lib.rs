@@ -76,46 +76,12 @@ use crate::{
 };
 
 use crate::anymap::AnyMap;
-/// Returns a string literal of the supplied JSON.
-///
-/// # Example
-/// ```rust
-/// # use grill_macros::json_str;
-/// let s = json_str!({"foo": "str", "bar": [34, 72]});
-/// assert_eq!(s, r#"{"foo":"str","bar":[34,72]}"#);
-/// ```
-#[macro_export]
-macro_rules! json_str {
-    ($($json:tt)+) => {
-        grill_macros::json_str($($json)+)
-    };
+
+
+pub trait Lang {
+    type Keyword: keyword::Keyword
 }
 
-/// Returns a pretty-printed string literal of the supplied JSON.
-///
-/// ```rust
-/// # use grill_macros::json_pretty_str;
-/// let s = json_pretty_str!({
-///     "foo": "str",
-///     "bar": [
-///         34,
-///         72
-///     ]
-/// });
-/// assert_eq!(s, r#"{
-///     "foo": "str",
-///     "bar": [
-///         34,
-///         72
-///     ]
-/// }"#);
-/// ```
-#[macro_export]
-macro_rules! json_pretty_str {
-    ($($json:tt)+) => {
-        grill_macros::json_pretty_str($($json)+)
-    };
-}
 
 #[derive(Default)]
 /// Constructs an [`Interrogator`].

@@ -1,6 +1,6 @@
 //! # Json Schema Keywords
 
-use grill_core::error::{AnchorError, AnchorInvalidLeadCharError};
+use grill_core::error::{AnchorError, AnchorInvalidLeadChar};
 
 pub mod additional_properties;
 pub mod all_of;
@@ -35,7 +35,7 @@ pub fn validate_anchor(keyword: &'static str, anchor: &str) -> Result<(), Anchor
     let mut chars = anchor.chars();
     let first = chars.next().unwrap();
     if !first.is_ascii_alphabetic() && first != '_' {
-        return Err(AnchorInvalidLeadCharError {
+        return Err(AnchorInvalidLeadChar {
             char: first,
             value: anchor.to_string(),
             keyword,
@@ -44,7 +44,7 @@ pub fn validate_anchor(keyword: &'static str, anchor: &str) -> Result<(), Anchor
     }
     for c in chars {
         if !c.is_ascii_alphanumeric() && c != '-' && c != '_' && c != '.' {
-            return Err(AnchorInvalidLeadCharError {
+            return Err(AnchorInvalidLeadChar {
                 char: c,
                 value: anchor.to_string(),
                 keyword,

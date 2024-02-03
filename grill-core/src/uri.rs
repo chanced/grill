@@ -1425,7 +1425,7 @@ impl<'a> QueryParameters<'a> {
             return Ok(Self { query: None });
         };
         if query.len() > u32::MAX as usize {
-            return Err(OverflowError(query.len()));
+            return Err(OverflowError{ value: query.len()});
         }
         Ok(Self {
             query: Some(query.split('&')),

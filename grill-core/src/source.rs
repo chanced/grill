@@ -2,7 +2,7 @@
 //!
 use crate::{
     error::{
-        DeserializationError, DeserializeError, LinkConflictError, LinkError, PointerError,
+        DeserializationError, DeserializeError, LinkConflict, LinkError, PointerError,
         ResolveError, ResolveErrors, SourceConflictError, SourceError,
     },
     uri::decode_lossy,
@@ -328,7 +328,7 @@ impl Sources {
         if &link == entry {
             return Ok(entry);
         }
-        Err(LinkConflictError {
+        Err(LinkConflict {
             uri: uri.clone(),
             existing_path: entry.src_path.clone(),
             new_path: link.src_path,
@@ -341,7 +341,7 @@ impl Sources {
             Entry::Occupied(_) => {
                 let existing_link = self.store().get_link(&from).unwrap();
                 if &link != existing_link {
-                    return Err(LinkConflictError {
+                    return Err(LinkConflict {
                         uri: from.clone(),
                         existing_path: existing_link.src_path.clone(),
                         new_path: link.src_path,
@@ -535,7 +535,7 @@ impl Deserializers {
                 }
             }
         }
-        Err(DeserializeError { formats: errs })
+        Err(DeserializeError { sources: errs })
     }
 }
 impl Deref for Deserializers {

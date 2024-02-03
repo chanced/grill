@@ -4,7 +4,7 @@
 use super::{Anchor, Ref};
 use crate::{
     error::{
-        AnchorError, DialectError, DialectsError, DuplicateAnchorError, IdentifyError, RefError,
+        AnchorError, DialectError, DialectsError, DuplicateAnchor, IdentifyError, RefError,
         UriError,
     },
     keyword::{Keyword, Unimplemented},
@@ -210,7 +210,7 @@ impl Dialect {
             for anchor in res? {
                 if names.contains(&anchor.name) {
                     let existing = anchors.iter().find(|a| a.name == anchor.name).unwrap();
-                    return Err(DuplicateAnchorError {
+                    return Err(DuplicateAnchor {
                         existing: existing.clone(),
                         duplicate: anchor,
                     }

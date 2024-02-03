@@ -1,15 +1,18 @@
 //! Logical errors which can occur while interacting this library.
 //!
 //!
-use std::collections::HashMap;
-
+//!
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
+use snafu::Backtrace;
+use snafu::Snafu;
+use std::collections::HashMap;
 #[doc(no_inline)]
 pub use url::ParseError as UrlError;
 pub use urn::Error as UrnError;
 
+use crate::Key;
 use crate::{schema::Anchor, uri::AbsoluteUri, Output, Uri};
 use serde_json::Value;
 use std::{
@@ -19,206 +22,200 @@ use std::{
     ops::Deref,
     string::FromUtf8Error,
 };
-use thiserror::Error;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                          AnchorNotEmptyError                          ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An anchor keyword which does not allow for non-empty values (e.g.
-/// `$recursiveAnchor`) was found with a value.
-#[derive(Debug, Clone, Error)]
-#[error("{keyword} must be an empty string; found {value}")]
-pub struct AnchorNotEmptyError {
-    /// The [`Keyword`] of the anchor.
-    pub keyword: &'static str,
-
-    /// The value of the anchor.
-    pub value: Box<Value>,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                       AnchorInvalidLeadCharError                      ║
-║                       ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                      ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An anchor keyword which requires that the value must start with either a
-/// letter (`([A-Za-z])`) or an underscore (`_`) (e.g. `$anchor` and
-/// `$dynamicAnchor`) was found with an invalid leading character.
-#[derive(Debug, Clone, Error)]
-#[error("{keyword} must start with either a letter (([A-Za-z])) or an underscore (_); found {value} for {char}")]
-pub struct AnchorInvalidLeadCharError {
-    /// The value of the anchor.
-    pub value: String,
-    /// The [`Keyword`] of the anchor.
-    pub keyword: &'static str,
-    /// The character which caused the error.
-    pub char: char,
-}
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                         AnchorInvalidCharError                        ║
-║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                        ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An anchor keyword contained an invalid character.
-#[derive(Debug, Clone, Error)]
-#[error("{keyword} may only contain letters (([A-Za-z])), digits ([0-9]), hyphens ('-'), underscores ('_'), and periods ('.'); found {value} for {char}")]
-pub struct AnchorInvalidCharError {
-    /// The value of the anchor.
-    pub value: String,
-    /// The [`Keyword`] of the anchor.
-    pub keyword: &'static str,
-    /// The character which caused the error.
-    pub char: char,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                         DuplicateAnchorErrror                         ║
-║                        ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                        ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An error occurred while attempting to locate subschemas.
-#[derive(Debug, Error)]
-#[error("duplicate anchor found: \"{}\"", existing.name)]
-pub struct DuplicateAnchorError {
-    pub existing: Anchor,
-    pub duplicate: Anchor,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                              AnchorError                              ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
+║                             InvalidAnchor                             ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯                             ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// An issue with an anchor keyword (e.g. `$anchor`, `$dynamicAnchor`,
 /// `$recursiveAnchor`) occurred
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum AnchorError {
     /// An anchor keyword which does not allow for empty values (e.g. `$anchor`,
     /// `$dynamicAnchor`) was found with an empty string.
-    #[error("{0} must be a non-empty string")]
-    Empty(&'static str),
+    #[snafu(display("{keyword} must be a non-empty string"))]
+    Empty {
+        keyword: &'static str,
+        backtrace: Backtrace,
+    },
 
     /// An anchor keyword which does not allow for non-empty values (e.g.
     /// `$recursiveAnchor`) was found with a value.
-    #[error(transparent)]
-    ValueNotAllowed(#[from] AnchorNotEmptyError),
+    #[snafu(display("{keyword} must be an empty string; found {value}"))]
+    ValueNotAllowed {
+        /// The [`Keyword`] of the anchor.
+        keyword: &'static str,
+        /// The value of the anchor.
+        value: Box<Value>,
+        backtrace: Backtrace,
+    },
 
     /// `$anchor` and `$dynamicAnchor` must start with either a letter
     /// (`([A-Za-z])`) or an underscore (`_`).
-    #[error(transparent)]
-    InvalidLeadingCharacter(#[from] AnchorInvalidLeadCharError),
+    #[snafu(display("{keyword} must start with either a letter (([A-Za-z])) or an underscore (_); found {value} for {char}"))]
+    InvalidLeadingCharacter {
+        /// The value of the anchor.
+        value: String,
+        /// The [`Keyword`] of the anchor.
+        keyword: &'static str,
+        /// The character which caused the error.
+        char: char,
+        backtrace: Backtrace,
+    },
 
+    /// An anchor keyword contained an invalid character.
+    ///
     /// `$anchor` and `$dynamicAnchor` may only contain letters (`([A-Za-z])`),
     /// digits (`[0-9]`), hyphens (`'-'`), underscores (`'_'`), and periods
     /// (`'.'`).
-    #[error(transparent)]
-    InvalidChar(#[from] AnchorInvalidCharError),
+    #[snafu(display("{keyword} may only contain letters (([A-Za-z])), digits ([0-9]), hyphens ('-'), underscores ('_'), and periods ('.'); found {value} for {char}"))]
+    InvalidChar {
+        /// The value of the anchor.
+        value: String,
+        /// The [`Keyword`] of the anchor.
+        keyword: &'static str,
+        /// The character which caused the error.
+        char: char,
+        backtrace: Backtrace,
+    },
 
     /// The anchor value was not of the expected type.
-    #[error(transparent)]
-    InvalidType(#[from] InvalidTypeError),
+    #[snafu(display("invalid anchor: {}", source))]
+    InvalidType {
+        source: InvalidTypeError,
+        backtrace: Backtrace,
+    },
 
-    #[error(transparent)]
-    Duplicate(#[from] DuplicateAnchorError),
+    #[snafu(display("duplicate anchor found: \"{}\"", existing.name))]
+    Duplicate {
+        existing: Anchor,
+        duplicate: Anchor,
+        backtrace: Backtrace,
+    },
 }
+
+// /// An error occurred parsing or resolving a JSON [`Pointer`].
+// #[derive(Debug, snafu)]
+// pub enum PointerError {
+//     #[snafu(transparent)]
+//     /// The JSON [`Pointer`] was malformed.
+//     ParsingFailed{ #[snafu(backtrace)] source: MalformedPointerError },
+
+//     #[snafu(transparent)]
+//     /// The JSON [`Pointer`] could not be resolved.
+//     ResolutionFailed{ #[snafu(backtrace)] source: ResolvePointerError },
+// }
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                             PointerError                              ║
-║                             ¯¯¯¯¯¯¯¯¯¯¯¯                              ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An error occurred parsing or resolving a JSON [`Pointer`].
-#[derive(Debug, Error)]
-pub enum PointerError {
-    #[error(transparent)]
-    /// The JSON [`Pointer`] was malformed.
-    ParsingFailed(#[from] MalformedPointerError),
-
-    #[error(transparent)]
-    /// The JSON [`Pointer`] could not be resolved.
-    ResolutionFailed(#[from] ResolvePointerError),
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                              SourceError                              ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
+║                             FailedToSource                            ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// An error occurred while attempting to add a new a schema source.
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum SourceError {
     /// An error occurred while attempting to deserialize a source.
-    #[error(transparent)]
-    DeserializationFailed(#[from] DeserializationError),
-
-    /// Multiple sources with the same URI but different values were provided.
-    #[error(transparent)]
-    SourceConflict(#[from] SourceConflictError),
+    #[snafu(display("failed to deserialize source \"{uri}\":\n\t{source}"))]
+    DeserializationFailed {
+        /// The [`AbsoluteUri`] of the source.
+        uri: AbsoluteUri,
+        /// The underlying [`DeserializeError`].
+        source: DeserializeError,
+        backtrace: Backtrace,
+    },
 
     /// Resolution of a source failed
-    #[error(transparent)]
-    ResolutionFailed(#[from] ResolveErrors),
+    #[snafu(transparent)]
+    ResolutionFailed {
+        #[snafu(backtrace)]
+        source: ResolveErrors,
+    },
 
     /// The source was not valid UTF-8.
-    #[error(transparent)]
-    InvalidUtf8(#[from] FromUtf8Error),
+    #[snafu(display("source is not valid UTF-8: {source}"))]
+    InvalidUtf8 {
+        source: FromUtf8Error,
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// The source's URI was not able to be parsed
-    #[error(transparent)]
-    UriFailedToParse(#[from] UriError),
+    #[snafu(display("failed to parse source URI: {source}"))]
+    UriFailedToParse {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 
     /// The source URI contains afragment which is not allowed.
-    #[error("source URIs may not contain fragments, found \"{0}\"")]
-    UnexpectedUriFragment(AbsoluteUri),
+    #[snafu(display("source URIs may not contain fragments, found \"{uri}\""))]
+    UnexpectedUriFragment {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// A JSON Pointer failed to parse or resolve.
-    #[error("failed to locate json pointer path:\n{0}")]
-    PointerFailedToParseOrResolve(#[from] PointerError),
+    #[snafu(display("failed to parse json pointer: {source}"))]
+    PointerFailedToParse {
+        source: MalformedPointerError,
+        backtrace: Backtrace,
+    },
 
-    /// Failed to create a source link.
-    #[error(transparent)]
-    FailedToLinkSource(#[from] LinkError),
+    /// A JSON Pointer failed to resolve.
+    #[snafu(display("failed to resolve json pointer: {source}"))]
+    PointerFailedToResolve {
+        source: ResolvePointerError,
+        backtrace: Backtrace,
+    },
+
+    /// A conflict occurred (i.e. a source was linked from multiple locations).
+    #[snafu(display(
+        "source address {:?} @ {:?} already assigned to {:?}",
+        uri,
+        new_path,
+        existing_path
+    ))]
+    SourceConflict {
+        uri: AbsoluteUri,
+        /// The existing schema location.
+        existing_path: Pointer,
+        /// The new schema location.
+        new_path: Pointer,
+    },
+    /// Failed to resolve a path
+    #[snafu(display("failed to resolve link path: {source}"))]
+    PathNotFound {
+        source: jsonptr::Error,
+        backtrace: Backtrace,
+    },
+
+    /// Failed to resolve a URI
+    #[snafu(display("source not found: \"{uri}\""))]
+    SourceNotFound {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// An unknown anchor (non-pointer fragment of a URI) was encountered
-    #[error(transparent)]
-    UnknownAnchor(UnknownAnchorError),
+    #[snafu(display("unknown anchor: \"{anchor}\" in URI \"{uri}\""))]
+    UnknownAnchor {
+        /// The anchor which was not found.
+        anchor: String,
+        /// The URI of the keyword which referenced the anchor.
+        uri: AbsoluteUri,
+    },
 }
 impl From<jsonptr::MalformedPointerError> for SourceError {
     fn from(err: jsonptr::MalformedPointerError) -> Self {
@@ -226,59 +223,12 @@ impl From<jsonptr::MalformedPointerError> for SourceError {
     }
 }
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          SourceConflictError                          ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Multiple sources with the same URI were provided.
-#[derive(Debug, Error)]
-#[error("duplicate source provided: {uri}")]
-pub struct SourceConflictError {
-    /// The URI of the duplicate source.
-    pub uri: AbsoluteUri,
-}
-
 impl From<ResolveError> for SourceError {
     fn from(value: ResolveError) -> Self {
         Self::ResolutionFailed(ResolveErrors {
-            errors: vec![value],
+            sources: vec![value],
+            backtrace: Backtrace::capture(),
         })
-    }
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          DeserializationError                         ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                         ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// An error occurred while attempting to deserialize a source.
-#[derive(Debug, Error)]
-#[error("failed to deserialize source \"{uri}\":\n\t{error}")]
-pub struct DeserializationError {
-    /// The [`AbsoluteUri`] of the source.
-    pub uri: AbsoluteUri,
-
-    /// The underlying [`DeserializeError`].
-    #[source]
-    pub error: DeserializeError,
-}
-
-impl DeserializationError {
-    /// Create a new [`DeserializationError`].
-    #[must_use]
-    pub fn new(uri: AbsoluteUri, error: DeserializeError) -> Self {
-        Self { uri, error }
     }
 }
 
@@ -294,17 +244,23 @@ impl DeserializationError {
 
 /// Possible errors that may occur while creating a
 /// [`Dialects`](crate::dialect::Dialects)
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
 pub enum DialectsError {
     /// No dialects were provided.
-    #[error("no dialects were provided")]
-    Empty,
+    #[snafu(display("no dialects were provided"))]
+    Empty { backtrace: Backtrace },
     /// An error occurred creating a [`Dialect`].
-    #[error(transparent)]
-    Dialect(#[from] DialectError),
+    #[snafu(transparent)]
+    Dialect {
+        #[snafu(backtrace)]
+        source: DialectError,
+    },
     /// Multiple [`Dialect`]s with the same [`AbsoluteUri`] id were provided.
-    #[error("duplicate dialect id provided: {0}")]
-    Duplicate(AbsoluteUri),
+    #[snafu(display("duplicate dialect id provided: {uri}"))]
+    Duplicate {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 }
 
 /*
@@ -319,41 +275,68 @@ pub enum DialectsError {
 
 /// Possible errors that may occur while creating a
 /// [`Dialect`](crate::dialect::Dialect)
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
 pub enum DialectError {
     /// The default [`Dialect`] was not found.
-    #[error("default dialect not found: {0}")]
-    DefaultNotFound(AbsoluteUri),
+    #[snafu(display("default dialect not found: {uri}"))]
+    DefaultNotFound {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// A [`Dialect`] ID contained a non-empty fragment.
-    #[error("dialect ids may not contain fragments; found: \"{0}\"")]
-    FragmentedId(AbsoluteUri),
+    #[snafu(display("dialect ids may not contain fragments; found: \"{uri}\""))]
+    FragmentedId {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// `Dialect` was constructed but a metaschema with the `Dialect`'s `id` was
     /// not present.
-    #[error(
-        "the primary metaschema with id \"{0}\" was not found within the supplied metaschemas"
-    )]
-    PrimaryMetaschemaNotFound(AbsoluteUri),
+    #[snafu(display(
+        "primary metaschema with id \"{uri}\" not found within the supplied metaschemas"
+    ))]
+    PrimaryMetaschemaNotFound {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// Exactly one [`Keyword`](crate::keyword::Keyword) must implement
     /// implement [`is_pertinent_to`](`crate::keyword::Keyword::is_pertinent_to`) but none were provided.
-    #[error("exactly one `Keyword` must implemenet the `is_pertinent_to` method; none were found")]
-    IsPertinentToNotImplemented(AbsoluteUri),
+    #[snafu(display(
+        "exactly one `Keyword` must implemenet the `is_pertinent_to` method; none were found"
+    ))]
+    IsPertinentToNotImplemented {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// Exactly one [`Keyword`](crate::keyword::Keyword) must implement
     /// implement [`dialect`](`crate::keyword::Keyword::dialect`) but none were provided.
-    #[error("at least one `Keyword` must implement the `dialect` method; none were found")]
-    DialectNotImplemented(AbsoluteUri),
+    #[snafu(display(
+        "at least one `Keyword` must implement the `dialect` method; none were found"
+    ))]
+    DialectNotImplemented {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// At least one [`Keyword`](crate::keyword::Keyword) must implement
     /// implement [`identify`](`crate::keyword::Keyword::identify`) but none were provided.
-    #[error("at least one `Keyword` must implement the `identify` method; none were found")]
-    IdentifyNotImplemented(AbsoluteUri),
+    #[snafu(display(
+        "at least one `Keyword` must implement the `identify` method; none were found"
+    ))]
+    IdentifyNotImplemented {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// An [`AbsoluteUri`] failed to parse.
-    #[error(transparent)]
-    UriPFailedToParse(#[from] UriError),
+    #[snafu(transparent)]
+    UriPFailedToParse {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 }
 
 /*
@@ -367,35 +350,36 @@ pub enum DialectError {
 */
 
 /// Failed to associate a schema to a location within a source.
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum LinkError {
     /// A conflict occurred (i.e. a source was linked from multiple locations).
-    #[error(transparent)]
-    Conflict(#[from] LinkConflictError),
-
+    #[snafu(display(
+        "source address {:?} @ {:?} already assigned to {:?}",
+        uri,
+        new_path,
+        existing_path
+    ))]
+    SourceConflict {
+        uri: AbsoluteUri,
+        /// The existing schema location.
+        existing_path: Pointer,
+        /// The new schema location.
+        new_path: Pointer,
+    },
     /// Failed to resolve a path
-    #[error("failed to resolve link path: {0}")]
-    PathNotFound(#[from] jsonptr::Error),
+    #[snafu(display("failed to resolve link path: {source}"))]
+    PathNotFound {
+        source: jsonptr::Error,
+        backtrace: Backtrace,
+    },
 
     /// Failed to resolve a URI
-    #[error("source not found: {0}")]
-    NotFound(AbsoluteUri),
-}
-
-/// Source was linked from multiple schemas.
-#[derive(Debug, Error)]
-#[error(
-    "source address {:?} @ {:?} already assigned to {:?}",
-    uri,
-    new_path,
-    existing_path
-)]
-pub struct LinkConflictError {
-    pub uri: AbsoluteUri,
-    /// The existing schema location.
-    pub existing_path: Pointer,
-    /// The new schema location.
-    pub new_path: Pointer,
+    #[snafu(display("source not found: \"{uri}\""))]
+    SourceNotFound {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 }
 
 /*
@@ -409,24 +393,37 @@ pub struct LinkConflictError {
 */
 
 /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum BuildError {
-    #[error(transparent)]
+    #[snafu(transparent)]
     /// A [`Schema`](crate::schema::Schema) failed to compile.
-    FailedToCompile(#[from] CompileError),
+    FailedToCompile {
+        #[snafu(backtrace)]
+        source: CompileError,
+    },
 
-    #[error(transparent)]
+    #[snafu(transparent)]
     /// An issue with [`Dialect`]s occurred.
-    FailedToCreateDialects(#[from] DialectsError),
+    FailedToCreateDialects {
+        #[snafu(backtrace)]
+        source: DialectsError,
+    },
 
-    #[error(transparent)]
+    #[snafu(transparent)]
     /// An error occurred while adding, resolving, or deserializing a
     /// [`Source`](crate::source::Source).
-    FailedToSource(#[from] SourceError),
+    FailedToSource {
+        #[snafu(backtrace)]
+        source: SourceError,
+    },
 
     /// Failed to parse a number
-    #[error(transparent)]
-    FailedToParseNumber(#[from] NumberError),
+    #[snafu(transparent)]
+    FailedToParseNumber {
+        #[snafu(backtrace)]
+        source: NumberError,
+    },
 }
 
 /*
@@ -440,19 +437,20 @@ pub enum BuildError {
 */
 
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum NumberError {
     /// Failed to parse exponent of a number.
-    #[error("failed to parse exponent of number \"{value}\":\n\t{source}")]
+    #[snafu(display("failed to parse exponent of number \"{value}\":\n\t{source}"))]
     FailedToParseExponent {
         /// the value of the string being parsed
         value: String,
         /// the underlying error
-        #[source]
         source: ParseIntError,
+        backtrace: Backtrace,
     },
     /// Unexpected character found in a number.
-    #[error("failed to parse number \"{value}\":\n\tunexpected character: '{character}' at index {index}")]
+    #[snafu(display("failed to parse number \"{value}\":\n\tunexpected character: '{character}' at index {index}"))]
     UnexpectedChar {
         /// the value of the string being parsed
         value: String,
@@ -460,16 +458,21 @@ pub enum NumberError {
         character: char,
         /// the index of the character which caused the error
         index: usize,
+        backtrace: Backtrace,
     },
     /// The number is not an integer.
-    #[error("failed to parse number \"{value}\":\n\tnot an integer")]
+    #[snafu(display("failed to parse number \"{value}\":\n\tnot an integer"))]
     NotAnInteger {
         /// value of string being parsed
         value: String,
+        backtrace: Backtrace,
     },
     #[cfg(not(target_pointer_width = "64"))]
-    #[error("exponent ({value}) exceeds maximum value for non-64-bit architecture")]
-    ExponentTooLarge(OverflowError<u64, { usize::MAX as u64 }>),
+    #[snafu(display("exponent ({value}) exceeds maximum value for non-64-bit architecture"))]
+    ExponentTooLarge {
+        #[snafu(backtrace)]
+        source: OverflowError<u64, { usize::MAX as u64 }>,
+    },
 }
 
 /*
@@ -483,28 +486,28 @@ pub enum NumberError {
 */
 
 /// An error occurred while evaluating a [`Value`].
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum EvaluateError {
     /// Failed to parse a [`Number`] in a [`].
-    #[error(transparent)]
-    ParseNumber(#[from] NumberError),
+    #[snafu(transparent)]
+    FailedToParseNumber {
+        #[snafu(backtrace)]
+        source: NumberError,
+    },
 
     /// Failed to evaluate a regular expression.
-    #[error(transparent)]
-    Regex(#[from] regex::Error),
+    #[snafu(display("failed to evaluate regular expression: {source}"))]
+    FailedToEvalRegex {
+        source: regex::Error,
+        backtrace: Backtrace,
+    },
 
     /// A [`Key`] was provided that is not known to the `Interrogator`
-    #[error(transparent)]
-    UnknownKey(#[from] UnknownKeyError),
-
-    /// A custom error occurred in a [`Keyword`](crate::keyword::Keyword).
-    #[error("{source}")]
-    Custom {
-        /// `Box<dyn std::error::Error>`
-        #[source]
-        source: Box<anyhow::Error>,
-        /// The [`Value`] which failed to evaluate.
-        value: Option<Box<Value>>,
+    #[snafu(transparent)]
+    UnknownKey {
+        #[snafu(backtrace)]
+        source: UnknownKeyError,
     },
 }
 
@@ -521,22 +524,23 @@ pub enum EvaluateError {
 /// Contains one or more errors that occurred during deserialization.
 #[derive(Debug, Default)]
 pub struct DeserializeError {
-    /// A table of errors keyed by the format which failed to deserialize.
-    pub formats: HashMap<&'static str, erased_serde::Error>,
+    /// A table of errors keyed by the name of the format which failed to
+    /// deserialize.
+    pub sources: HashMap<&'static str, erased_serde::Error>,
 }
 
 impl DeserializeError {
     /// Adds a [`erased_serde::Error`], key'ed by `format` to the table of
     /// deserialization errors.
     pub fn add(&mut self, format: &'static str, err: erased_serde::Error) {
-        self.formats.insert(format, err);
+        self.sources.insert(format, err);
     }
 }
 
 impl Display for DeserializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "failed to deserialize")?;
-        for (format, err) in &self.formats {
+        for (format, err) in &self.sources {
             write!(f, "\n\t{format}: {err}")?;
         }
         Ok(())
@@ -545,7 +549,7 @@ impl Display for DeserializeError {
 
 impl StdError for DeserializeError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.formats.iter().next().map(|(_, err)| err as _)
+        self.sources.iter().next().map(|(_, err)| err as _)
     }
 }
 
@@ -566,13 +570,14 @@ impl StdError for DeserializeError {
 #[derive(Debug, Default)]
 pub struct ResolveErrors {
     /// A list of errors, one per implementation of [`Resolve`].
-    pub errors: Vec<ResolveError>,
+    pub sources: Vec<ResolveError>,
+    pub backtrace: Backtrace,
 }
 impl IntoIterator for ResolveErrors {
     type Item = ResolveError;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
-        self.errors.into_iter()
+        self.sources.into_iter()
     }
 }
 
@@ -580,20 +585,21 @@ impl<'a> IntoIterator for &'a ResolveErrors {
     type Item = &'a ResolveError;
     type IntoIter = std::slice::Iter<'a, ResolveError>;
     fn into_iter(self) -> Self::IntoIter {
-        self.errors.iter()
+        self.sources.iter()
     }
 }
 impl Deref for ResolveErrors {
     type Target = Vec<ResolveError>;
     fn deref(&self) -> &Self::Target {
-        &self.errors
+        &self.sources
     }
 }
 
 impl From<ResolveError> for ResolveErrors {
     fn from(error: ResolveError) -> Self {
         Self {
-            errors: vec![error],
+            sources: vec![error],
+            backtrace: Backtrace::capture(),
         }
     }
 }
@@ -602,22 +608,23 @@ impl ResolveErrors {
     /// Create a new [`ResolveErrors`].
     pub fn new() -> Self {
         Self {
-            errors: Vec::default(),
+            sources: Vec::default(),
+            backtrace: Backtrace::capture(),
         }
     }
     /// Appends a new [`ResolveError`] to the list of errors.
     pub fn push(&mut self, err: ResolveError) {
-        self.errors.push(err);
+        self.sources.push(err);
     }
     /// Appends a new [`NotFoundError`] to the list of errors.
     pub fn push_not_found(&mut self, uri: AbsoluteUri) {
-        self.errors.push(ResolveError::not_found(uri));
+        self.sources.push(ResolveError::not_found(uri));
     }
 
     /// Appends a new [`ResolveError`] from a [`ResolveErrorSource`] to the list
     /// of errors.
     pub fn push_new(&mut self, err: impl Into<ResolveErrorSource>, uri: AbsoluteUri) {
-        self.errors.push(ResolveError {
+        self.sources.push(ResolveError {
             source: err.into(),
             uri,
             referring_location: None,
@@ -626,7 +633,7 @@ impl ResolveErrors {
 
     /// Sets the `referring_location` of each `ResolveError` to `referring_location`.
     pub fn set_referring_location(&mut self, referring_location: AbsoluteUri) {
-        for err in &mut self.errors {
+        for err in &mut self.sources {
             err.referring_location = Some(referring_location.clone());
         }
     }
@@ -635,7 +642,7 @@ impl ResolveErrors {
 impl Display for ResolveErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "failed to resolve schema")?;
-        for err in &self.errors {
+        for err in &self.sources {
             write!(f, "\n\t{err}")?;
         }
         Ok(())
@@ -643,7 +650,7 @@ impl Display for ResolveErrors {
 }
 impl StdError for ResolveErrors {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.errors.first().map(|err| err as _)
+        self.sources.first().map(|err| err as _)
     }
 }
 
@@ -658,11 +665,15 @@ impl StdError for ResolveErrors {
 */
 
 /// An error occurred while attempting to resolve a source within the source.
-#[derive(Debug, Error)]
-#[error("failed to resolve source \"{uri}\"\n\ncaused by:\n\t{source}")]
+#[derive(Debug, Snafu)]
+#[snafu(
+    display("failed to resolve source \"{uri}\"\n\ncaused by:\n\t{source}"),
+    visibility(pub),
+    context(suffix(Ctx)),
+    module
+)]
 pub struct ResolveError {
     /// The source of the error.
-    #[source]
     pub source: ResolveErrorSource,
 
     /// The [`AbsoluteUri`] of the source which was not able to be resolved.
@@ -684,15 +695,7 @@ impl ResolveError {
             referring_location: None,
         }
     }
-    /// Creates a new [`ResolveError`] with a [`ResolveErrorSource::NotFound`]
-    #[must_use]
-    pub fn not_found(uri: AbsoluteUri) -> Self {
-        Self {
-            source: NotFoundError(uri.clone()).into(),
-            uri,
-            referring_location: None,
-        }
-    }
+
     /// Sets the `referring_location` of the `ResolveError` to `referring_location`.
     pub fn set_referring_location(&mut self, referring_location: AbsoluteUri) {
         self.referring_location = Some(referring_location);
@@ -703,46 +706,54 @@ impl ResolveError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                          ResolveErrorSource                           ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
+║                           ResolveErrorSource                          ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// The source of a [`ResolveError`]
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum ResolveErrorSource {
     /// The [`std::io::Error`] which occurred while resolving a source.
-    #[error(transparent)]
-    IoFailed(#[from] std::io::Error),
+    #[snafu(transparent)]
+    Io {
+        source: std::io::Error,
+        backtrace: Backtrace,
+    },
 
     /// The [`reqwest::Error`] which occurred while resolving a source.
-    #[error(transparent)]
-    ReqwestFailed(#[from] reqwest::Error),
+    #[snafu(transparent)]
+    Reqwest {
+        source: reqwest::Error,
+        backtrace: Backtrace,
+    },
 
     /// The path, as a JSON [`Pointer`], failed to resolve.
-    #[error(transparent)]
-    PointerMalformed(#[from] PointerError),
+
+    #[snafu(transparent)]
+    PointerMalformed {
+        source: MalformedPointerError,
+        backtrace: Backtrace,
+    },
 
     /// A source or schema could not be found.
-    #[error(transparent)]
-    NotFound(#[from] NotFoundError),
+
+    #[snafu(display("unable to resolve \"{uri}\" due to not being found"))]
+    NotFound {
+        /// The URI of the source which was not found.
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// Any other error which occurred while resolving a source.
-    #[error(transparent)]
-    Custom(#[from] anyhow::Error),
-}
-
-impl From<MalformedPointerError> for ResolveErrorSource {
-    fn from(err: MalformedPointerError) -> Self {
-        Self::PointerMalformed(err.into())
-    }
-}
-
-impl From<jsonptr::Error> for ResolveErrorSource {
-    fn from(err: jsonptr::Error) -> Self {
-        Self::PointerMalformed(err.into())
-    }
+    #[snafu(whatever, display("{message}"))]
+    Custom {
+        message: String,
+        #[snafu(source(from(Box<dyn 'static + std::error::Error + Send + Sync>, Some)))]
+        source: Box<dyn 'static + std::error::Error + Send + Sync>,
+    },
 }
 
 /*
@@ -756,36 +767,57 @@ impl From<jsonptr::Error> for ResolveErrorSource {
 */
 
 /// An error occurred while compiling a schema.
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum CompileError {
     /// The schema failed evaluation, represented by the failed [`Output`].
-    #[error("schema failed evaluation:\n{0}")]
-    SchemaInvalid(Output<'static>),
+    #[snafu(display("schema failed evaluation: {source}"))]
+    SchemaInvalid {
+        source: Output<'static>,
+        backtrace: Backtrace,
+    },
 
     /// Failed to identify a schema
-    #[error(transparent)]
-    SchemaIdentificationFailed(#[from] IdentifyError),
+    #[snafu(transparent)]
+    SchemaIdentificationFailed {
+        #[snafu(backtrace)]
+        source: IdentifyError,
+    },
 
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
-    #[error(transparent)]
-    DialectNotKnown(#[from] DialectUnknownError),
+    #[snafu(display("metaschema dialect not found: {metaschema_id}"))]
+    DialectNotKnown {
+        #[snafu(backtrace)]
+        /// The schema's [`Dialect`] is not registered with the
+        /// [`Interrogator`](crate::Interrogator).
+        metaschema_id: String,
+    },
 
     /// Failed to parse a [`Uri`] or
     /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
-    #[error(transparent)]
-    FailedToParseUri(#[from] UriError),
+    #[snafu(transparent)]
+    FailedToParseUri {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 
     /// Failed to resolve or deserialize a source
-    #[error(transparent)]
-    FailedToSource(#[from] SourceError),
+    #[snafu(transparent)]
+    FailedToSource {
+        #[snafu(backtrace)]
+        source: SourceError,
+    },
 
-    #[error(transparent)]
-    FailedToEvaluateSchema(#[from] EvaluateError),
+    #[snafu(transparent)]
+    FailedToEvaluateSchema {
+        #[snafu(backtrace)]
+        source: EvaluateError,
+    },
 
     /// If a [`Schema`] does not have an identifier, then the first [`AbsoluteUri`]
     /// returned from [`Dialect::locate`](`crate::schema::Dialect`) must have the
     /// schema's path as a JSON [`Pointer`].
-    #[error("expected schema URI to contain path; found {uri}")]
+    #[snafu(display("expected schema URI to contain path; found {uri}"))]
     LocatedUriMalformed {
         /// The [`MalformedPointerError`] which occurred.
         source: MalformedPointerError,
@@ -793,63 +825,102 @@ pub enum CompileError {
         uri: AbsoluteUri,
     },
 
-    #[error(transparent)]
     /// A [`Schema`] contains a cyclic dependency.
-    CyclicGraph(#[from] CyclicDependencyError),
+    #[snafu(visibility(pub), context(suffix(Ctx)), module)]
+    CyclicGraph {
+        /// The [`AbsoluteUri`] of the schema which, through transitive
+        /// dependencies, creates a cycle.
+        from: AbsoluteUri,
+        /// The [`AbsoluteUri`] of the schema which is the target of the cycle.
+        to: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// Failed to link sources
-    #[error("failed to create source link: {0}")]
-    FailedToLinkSource(#[from] LinkError),
+    #[snafu(display("failed to create source link: {source}"))]
+    FailedToLinkSource {
+        #[snafu(backtrace)]
+        source: LinkError,
+    },
 
     /// Could not locate an anchor referenced in a schema
-    #[error(transparent)]
-    UnknownAnchor(#[from] UnknownAnchorError),
+    /// An unknown anchor (non-pointer fragment of a URI) was encountered
+    #[snafu(display("unknown anchor: \"{anchor}\" in URI \"{uri}\""))]
+    UnknownAnchor {
+        /// The anchor which was not found.
+        anchor: String,
+        /// The URI of the keyword which referenced the anchor.
+        uri: AbsoluteUri,
+    },
 
     /// Failed to parse an anchor field
-    #[error(transparent)]
-    FailedToParseAnchor(#[from] AnchorError),
+    #[snafu(transparent)]
+    FailedToParseAnchor {
+        #[snafu(backtrace)]
+        source: AnchorError,
+    },
 
     /// Failed to find a schema with the given uri
-    #[error("schema not found: \"{0}\"")]
-    SchemaNotFound(AbsoluteUri),
+    #[snafu(display("schema not found: \"{uri}\""))]
+    SchemaNotFound {
+        uri: AbsoluteUri,
+        backtrace: Backtrace,
+    },
 
     /// Failed to parse a number
-    #[error(transparent)]
-    FailedToParseNumber(#[from] NumberError),
+    #[snafu(transparent)]
+    FailedToParseNumber {
+        #[snafu(backtrace)]
+        source: NumberError,
+    },
 
     /// Failed to parse json pointer path
-    #[error(transparent)]
-    FailedToParsePointer(#[from] PointerError),
+    #[snafu(transparent)]
+    FailedToParsePointer {
+        source: MalformedPointerError,
+        backtrace: Backtrace,
+    },
 
     /// A keyword encountered a value type which was not expected
     /// and was not caught by the schema
-    #[error(transparent)]
-    InvalidType(#[from] InvalidTypeError),
+    #[snafu(transparent)]
+    InvalidType {
+        #[snafu(backtrace)]
+        source: InvalidTypeError,
+    },
 
     /// A keyword encountered a value which was not expected
-    #[error(transparent)]
-    UnexpectedValue(#[from] UnexpectedValueError),
+    #[snafu(display("unexpected value; expected {expected} found {value:?}"))]
+    UnexpectedValue {
+        /// A description of the expected value
+        expected: &'static str,
+        /// The actual value.
+        value: Box<Value>,
+        backtrace: Backtrace,
+    },
 
     /// An error occurred while parsing a ref field (e.g. `"$ref"`,
     /// `"$recursiveRef"`, `"$recursiveAnchor"`)
-    #[error(transparent)]
-    RefError(#[from] RefError),
+    #[snafu(transparent)]
+    RefError {
+        #[snafu(backtrace)]
+        source: RefError,
+    },
 
     /// A regular expression failed to parse
-    #[error(transparent)]
-    FailedToEvaluateRegex(#[from] regex::Error),
+    #[snafu(display("failed to parse regular expression: {source}"))]
+    FailedToCompileRegex {
+        source: regex::Error,
+        backtrace: Backtrace,
+        pattern: String,
+    },
 
-    #[error("length of uri exceeds maximum size of 4GB after setting fragment")]
-    UriFragmentOverflow { uri: AbsoluteUri, fragment: String },
-
-    /// Custom errors returned by a [`Keyword`]
-    #[error(transparent)]
-    Custom(#[from] Box<anyhow::Error>),
-}
-impl From<SourceConflictError> for CompileError {
-    fn from(value: SourceConflictError) -> Self {
-        Self::FailedToSource(value.into())
-    }
+    #[snafu(display("length of uri exceeds maximum size of 4GB after setting fragment"))]
+    UriFragmentOverflow {
+        uri: AbsoluteUri,
+        fragment: String,
+        backtrace: Backtrace,
+    },
 }
 impl From<MalformedPointerError> for CompileError {
     fn from(err: MalformedPointerError) -> Self {
@@ -909,106 +980,25 @@ impl Display for Expected {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                           InvalidTypeError                            ║
-║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
+║                              InvalidType                              ║
+║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// A [`Value`] was not of the expected type.
-#[derive(Debug, Error)]
-#[error("expected value with type {expected}, found {actual:?}")]
+#[derive(Debug, Snafu)]
+#[snafu(
+    display("expected value with type {expected}, found {actual:?}"),
+    context(suffix(Ctx)),
+    module
+)]
 pub struct InvalidTypeError {
     /// The expected type of value.
     pub expected: Expected,
     /// The actual value.
     pub actual: Box<Value>,
-}
-
-/// A [`Value`] was .
-#[derive(Debug, Error)]
-#[error("unexpected value; expected {expected} found {value:?}")]
-pub struct UnexpectedValueError {
-    /// A description of the expected value
-    pub expected: &'static str,
-    /// The actual value.
-    pub value: Box<Value>,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          UnknownAnchorError                           ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// A schema referenced an anchor which was not found.
-#[derive(Debug, Error)]
-#[error("unknown anchor: \"{}\" in URI \"{}\"", .anchor, .uri)]
-pub struct UnknownAnchorError {
-    /// The anchor which was not found.
-    pub anchor: String,
-    /// The URI of the keyword which referenced the anchor.
-    pub uri: AbsoluteUri,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                         CyclicDependencyError                         ║
-║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                         ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// A [`Schema`] contains a cyclic dependency.
-#[derive(Debug, Error)]
-#[error("schema \"{}\" contains a cyclic dependency to \"{}\"", .from, .to)]
-pub struct CyclicDependencyError {
-    /// The [`AbsoluteUri`] of the schema which, through transitive
-    /// dependencies, creates a cycle.
-    pub from: AbsoluteUri,
-    /// The [`AbsoluteUri`] of the schema which is the target of the cycle.
-    pub to: AbsoluteUri,
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                             NotFoundError                             ║
-║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯                             ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// A source or schema could not be found.
-#[derive(Debug, Clone, Error)]
-#[error("unable to resolve \"{0}\" due to not being found")]
-pub struct NotFoundError(pub AbsoluteUri);
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          DialectUnknownError                          ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// The schema's [`Dialect`] is not registered with the
-/// [`Interrogator`](crate::Interrogator).
-#[derive(Debug, Clone, Error)]
-#[error("metaschema dialect not found: {}", .metaschema_id)]
-pub struct DialectUnknownError {
-    /// The id of the [`Dialect`] which is not registered with the
-    /// [`Interrogator`](crate::Interrogator).
-    pub metaschema_id: String,
+    pub backtrace: snafu::Backtrace,
 }
 
 /*
@@ -1024,32 +1014,48 @@ pub struct DialectUnknownError {
 /// Errors which can occur when parsing or interacting with
 /// [`Uri`](`crate::uri::Uri`), [`AbsoluteUri`](`crate::uri::AbsoluteUri`), or
 /// [`RelativeUri`](`crate::uri::RelativeUri`).
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Snafu)]
 pub enum UriError {
     /// an issue occurred parsing a [`Url`](`url::Url`)
-    #[error(transparent)]
-    FailedToParseUrl(#[from] UrlError),
+    #[snafu(display("failed to parse url: {source}"))]
+    FailedToParseUrl {
+        source: UrlError,
+        backtrace: Backtrace,
+    },
 
     /// an issue occurred parsing a [`Urn`](`urn::Urn`)
-    #[error(transparent)]
-    FailedToParseUrn(#[from] UrnError),
+    #[snafu(display("failed to parse urn: {source}"))]
+    FailedToParseUrn {
+        source: urn::Error,
+        backtrace: Backtrace,
+    },
 
     /// an issue occurred parsing a [`RelativeUri`](`crate::uri::RelativeUri`)
-    #[error(transparent)]
-    FailedToParseRelativeUri(#[from] RelativeUriError),
+    #[snafu(transparent)]
+    FailedToParseRelativeUri {
+        #[snafu(backtrace)]
+        source: RelativeUriError,
+    },
 
     /// The [`Uri`] is not absolute and cannot be made into an [`AbsoluteUri`].
-    #[error("uri is not absolute: {0}")]
-    NotAbsolute(Uri),
+    #[snafu(display("uri is not absolute: {uri}"))]
+    NotAbsolute { uri: Uri, backtrace: Backtrace },
 
     /// An issue occurred while setting the Authority of a
     /// [`Uri`] or [`RelativeUri`](crate::uri::RelativeUri).
-    #[error(transparent)]
-    MalformedAuthority(#[from] AuthorityError),
+    #[snafu(transparent)]
+    MalformedAuthority {
+        #[snafu(backtrace)]
+        source: AuthorityError,
+    },
 
     /// The scheme of a [`Uri`] or [`AbsoluteUri`] is malformed.
-    #[error("invalid scheme: {0}")]
-    InvalidScheme(String),
+    #[snafu(display("invalid uri scheme: {scheme}"))]
+    InvalidScheme {
+        /// The scheme which was found to be invalid.
+        scheme: String,
+        backtrace: Backtrace,
+    },
 }
 
 impl From<InvalidPortError> for UriError {
@@ -1100,8 +1106,8 @@ impl UriError {
     /// [`UrlError`].
     #[must_use]
     pub fn as_url(&self) -> Option<&UrlError> {
-        if let Self::FailedToParseUrl(err) = self {
-            Some(err)
+        if let Self::FailedToParseUrl { source, backtrace } = self {
+            Some(source)
         } else {
             None
         }
@@ -1111,8 +1117,12 @@ impl UriError {
     /// [`UrnError`].
     #[must_use]
     pub fn as_urn(&self) -> Option<&urn::Error> {
-        if let Self::FailedToParseUrn(err) = self {
-            Some(err)
+        if let Self::FailedToParseUrn {
+            source,
+            backtrace: _,
+        } = self
+        {
+            Some(source)
         } else {
             None
         }
@@ -1133,8 +1143,8 @@ impl UriError {
     /// If the error is [`UriError::NotAbsolute`], returns a reference to the underlying
     /// [`UriNotAbsoluteError`].
     pub fn as_not_absolute(&self) -> Option<&Uri> {
-        if let Self::NotAbsolute(v) = self {
-            Some(v)
+        if let Self::NotAbsolute { uri, backtrace: _ } = self {
+            Some(uri)
         } else {
             None
         }
@@ -1151,25 +1161,51 @@ impl UriError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 /// Returned from `set_authority` on [`Uri`], [`AbsoluteUri`], and [`RelativeUri`]
-#[derive(Debug, Clone, Error)]
-#[error("invalid authority: {0}")]
+#[derive(Debug, Clone, Snafu)]
+#[snafu(context(suffix(Ctx)), module)]
 pub enum AuthorityError {
-    /// The authority contained a path
-    ContainsPath(String),
-    /// The authority contained a query
-    ContainsQuery(String),
-    /// The authority contained a fragment
-    ContainsFragment(String),
-    /// The authority contained a malformed port
-    InvalidPort(#[from] InvalidPortError),
+    /// The authority contains a path
+    #[snafu(display("authority contains path: {value}"))]
+    ContainsPath { value: String, backtrace: Backtrace },
+
+    /// The authority contains a query
+    #[snafu(display("authority contains query: {value}"))]
+    ContainsQuery { value: String, backtrace: Backtrace },
+
+    /// The authority contains a fragment
+    #[snafu(display("authority contains path: {value}"))]
+    ContainsFragment { value: String, backtrace: Backtrace },
+
+    /// The authority contains a malformed port
+    #[snafu(transparent)]
+    InvalidPort {
+        #[snafu(backtrace)]
+        source: InvalidPortError,
+    },
+
+    #[snafu(transparent)]
     /// An error occurred while setting the `authority` of a [`Urn`](urn::Urn)
-    Urn(UrnError),
+    Urn {
+        source: UrnError,
+        backtrace: Backtrace,
+    },
     /// The username cannot be set due to the scheme of the Uri (e.g. `file`)
-    UsernameNotAllowed(String),
+    #[snafu(display("username cannot be set due to scheme: {scheme}"))]
+    UsernameNotAllowed {
+        scheme: String,
+        value: String,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("password cannot be set due to scheme: {scheme}"))]
     /// The password cannot be set due to the scheme of the Uri (e.g. `file`)
-    PasswordNotAllowed(String),
+    PasswordNotAllowed {
+        value: String,
+        scheme: String,
+        backtrace: Backtrace,
+    },
     /// The host cannot be set due to the scheme of the Uri (e.g. `file`)
-    PortNotAllowed(u16),
+    #[snafu(display("host cannot be set due to scheme: {scheme}"))]
+    PortNotAllowed { port: u16, scheme: String },
 }
 
 /*
@@ -1182,25 +1218,42 @@ pub enum AuthorityError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 /// A port of a [`RelativeUri`] exceeded the maximum value of `u16`.
-#[derive(Debug, Clone, Error)]
-#[error("port \"{0}\" is malformed or exceeds maximum value of 65535")]
-pub struct InvalidPortError(pub String);
+#[derive(Debug, Clone, Snafu)]
+#[snafu(
+    display("port \"{value}\" is malformed or exceeds maximum value of 65535"),
+    context(suffix(Ctx)),
+    module
+)]
+pub struct InvalidPortError {
+    pub value: String,
+    pub backtrace: Backtrace,
+}
 
 /// Errors which can occur when parsing or modifying a
 /// [`RelativeUri`](crate::uri::RelativeUri).
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Snafu)]
+#[snafu(context(suffix(Ctx)), module)]
 pub enum RelativeUriError {
     /// The length of the input exceeds `u32::MAX`
-    #[error(transparent)]
-    Overflow(#[from] OverflowError<usize, { u32::MAX as u64 }>),
+    #[snafu(display("length of uri exceeds maximum size of 4GB"))]
+    Overflow {
+        backtrace: Backtrace,
+        source: OverflowError<usize, { u32::MAX as u64 }>,
+    },
 
     /// The decoded string is not valid UTF-8
-    #[error(transparent)]
-    Utf8Encoding(#[from] std::str::Utf8Error),
+    #[snafu(display("uri is not valid utf-8: {source}"))]
+    Utf8Encoding {
+        source: std::str::Utf8Error,
+        backtrace: Backtrace,
+    },
 
     /// The port of a [`RelativeUri`] exceeded the maximum value of 65535.
-    #[error(transparent)]
-    InvalidPort(#[from] InvalidPortError),
+    #[snafu(transparent)]
+    InvalidPort {
+        #[snafu(backtrace)]
+        source: InvalidPortError,
+    },
 }
 
 /*
@@ -1214,23 +1267,24 @@ pub enum RelativeUriError {
 */
 
 /// An error occurred while attempting to identify a schema
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(context(suffix(Ctx)), module)]
 pub enum IdentifyError {
     /// The URI could not be parsed.
-    #[error(transparent)]
-    InvalidUri(#[from] UriError),
+    #[snafu(transparent)]
+    InvalidUri {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 
     /// The URI is not absolute (i.e. contains a non-empty fragment).
-    #[error("the $id of a schema is not absolute: {0}")]
-    FragmentedId(Uri),
-
-    /// Any custom error which a [`Keyword`](crate::keyword::Keyword) may need
-    /// to return.
-    #[error(transparent)]
-    Custom(#[from] anyhow::Error),
+    #[snafu(display("the $id of a schema is not absolute: {uri}"))]
+    FragmentedId { uri: Uri, backtrace: Backtrace },
 
     /// The value of `$id` was not a string
-    #[error("the {keyword} of a schema must be a string in the form of a uri; found {value:?}")]
+    #[snafu(display(
+        "the {keyword} of a schema must be a string in the form of a uri; found {value:?}"
+    ))]
     NotAString {
         /// The keyword which was not a string
         keyword: &'static str,
@@ -1250,19 +1304,23 @@ pub enum IdentifyError {
 */
 
 /// A [`Dialect`] with the [`AbsoluteUri`] was not able to be found.
-#[derive(Clone, Debug, Error)]
-#[error("dialect not found: {id}")]
+#[derive(Clone, Debug, Snafu)]
+#[snafu(display("dialect not found: {id}"), context(suffix(Ctx)), module)]
 pub struct DialectNotFoundError {
     /// The [`AbsoluteUri`] of the [`Dialect`] that was not able
     /// to be found.
     pub id: AbsoluteUri,
+    pub backtrace: Backtrace,
 }
 
 impl DialectNotFoundError {
     #[must_use]
     /// Create a new [`DialectNotFoundError`].
     pub fn new(id: AbsoluteUri) -> Self {
-        Self { id }
+        Self {
+            id,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
@@ -1280,9 +1338,16 @@ impl DialectNotFoundError {
 ///
 /// If this is encountered, odds are it is because you have two
 /// [`Interrogator`](crate::Interrogator)s and mismatched keys.
-#[derive(Debug, Clone, Copy, Error)]
-#[error("the provided key could not be found")]
-pub struct UnknownKeyError;
+#[derive(Debug, Clone, Copy, Snafu)]
+#[snafu(
+    display("the provided key could not be found"),
+    context(suffix(Ctx)),
+    module
+)]
+pub struct UnknownKeyError {
+    pub key: Key,
+    pub backtrace: Backtrace,
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -1295,9 +1360,22 @@ pub struct UnknownKeyError;
 */
 
 /// A slice or string overflowed an allowed length maximum of `M`.
-#[derive(Debug, Clone, Copy, Error)]
-#[error("the length of a string or slice overflows the maximum of {M}, received {0}")]
-pub struct OverflowError<Value, const M: u64 = { u32::MAX as u64 }>(pub Value);
+#[derive(Debug, Clone, Copy)]
+pub struct OverflowError<V, const M: u64 = { u32::MAX as u64 }> {
+    pub value: V,
+    pub backtrace: Backtrace,
+}
+impl<V, M> fmt::Display for OverflowError<V, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "value exceeds maximum size of {}: {}",
+            Self::MAX,
+            self.value
+        )
+    }
+}
+
 impl<V, const M: u64> OverflowError<V, M> {
     /// The maximum allowed size.
     pub const MAX: u64 = M;
@@ -1319,12 +1397,19 @@ impl From<u64> for OverflowError<u64, { usize::MAX as u64 }> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 /// An error occurred while parsing a ref
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
+#[snafu(context(suffix(Ctx)), module)]
 pub enum RefError {
     /// The ref value was not a string.
-    #[error(transparent)]
-    UnexpectedType(#[from] InvalidTypeError),
+    #[snafu(transparent)]
+    UnexpectedType {
+        #[snafu(backtrace)]
+        source: InvalidTypeError,
+    },
     /// The ref value failed to parse as a URI.
-    #[error(transparent)]
-    UriError(#[from] UriError),
+    #[snafu(transparent)]
+    UriError {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 }

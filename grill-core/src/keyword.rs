@@ -32,200 +32,122 @@ pub const FALSE: &Value = &Value::Bool(false);
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                          static_pointer_fn!                           ║
-║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Generates a static function which returns a [`Pointer`] to the given path.
-/// # Example
-/// ```no_run
-/// static_pointer_fn!(pub if "/if");
-/// assert_eq!(if_pointer(), &Pointer::new(["if"]));
-/// ```
-///
-#[macro_export]
-macro_rules! static_pointer_fn {
-    ($vis:vis $ident:ident $path:literal) => {
-        paste::paste! {
-            #[doc = "Returns a static [`Pointer`] to \"" $path "\""]
-            pub fn [< $ident _pointer >]() -> &'static jsonptr::Pointer {
-                use ::once_cell::sync::Lazy;
-                static POINTER: Lazy<jsonptr::Pointer> = Lazy::new(|| jsonptr::Pointer::parse($path).unwrap());
-                &POINTER
-            }
-        }
-    };
-}
-
-pub use static_pointer_fn;
-
-/// Generates an `as_<Keyword>` and `is_<Keyword>` fn for the given `Keyword` type.
-#[macro_export]
-macro_rules! keyword_fns {
-    ($keyword:ident) => {
-        paste::paste! {
-            #[doc= "Attempts to downcast `keyword` as `" $keyword "`"]
-            pub fn [< as_ $keyword:snake >](keyword: &dyn ::std::any::Any) -> Option<&$keyword> {
-                keyword.downcast_ref::<$keyword>()
-            }
-            #[doc= "Returns `true` if `keyword` is an instance of `" $keyword "`"]
-            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::keyword::Keyword) -> bool {
-                ::std::any::TypeId::of::<$keyword>() == keyword.type_id()
-            }
-
-        }
-    };
-}
-
-pub use keyword_fns;
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                           define_translate!                           ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
-/// [`Error`](`crate::output::Error`).
-///
-/// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
-///
-/// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
-#[macro_export]
-macro_rules! define_translate {
-    ($error:ident, $default:ident) => {
-        paste::paste!{
-            /// A function which can translate [`$error`].
-            #[derive(Clone)]
-            pub enum [< Translate $error >]{
-                #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
-                Closure(
-                    ::std::sync::Arc<
-                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
-                    >,
-                ),
-                #[doc = "A `fn` which can translate [`" $error "`]"]
-                FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
-            }
-
-            #[::inherent::inherent]
-            impl grill_core::output::Translate<$error<'_>> for [< Translate $error>]{
-                /// Runs the translation
-                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
-                    match self {
-                        Self::Closure(c) => c(f, v),
-                        Self::FnPtr(p) => p(f, v),
-                    }
-                }
-            }
-            impl ::std::fmt::Debug for [< Translate $error >] {
-                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                    match self {
-                        Self::Closure(_) => f.debug_tuple("Closure").finish(),
-                        Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
-                    }
-                }
-            }
-            impl std::default::Default for [< Translate $error >] {
-                fn default() -> Self {
-                    Self::FnPtr($default)
-                }
-            }
-        }
-    };
-}
-
-pub use define_translate;
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                                Compile                                ║
+║                                Keyword                                ║
 ║                                ¯¯¯¯¯¯¯                                ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// Context for compilation of the [`Keyword`]
-#[derive(Debug)]
-pub struct Compile<'i> {
-    pub(crate) absolute_uri: &'i AbsoluteUri,
-    pub(crate) schemas: &'i Schemas,
-    pub(crate) numbers: &'i mut Numbers,
-    pub(crate) value_cache: &'i mut Values,
-    pub(crate) state: &'i mut AnyMap,
+/// Handles the setup and execution of logic for a given keyword in a JSON Schema.
+#[allow(unused_variables)]
+pub trait Keyword: Any + Send + Sync + Clone + fmt::Debug {
+    /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
+    /// be the name of the keyword or `Composite`, which will be a list of
+    /// keywords.
+    fn kind(&self) -> Kind;
+
+    /// Each `Schema` compiled by the [`Interrogator`](`crate::Interrogator`)
+    /// that has a [`Dialect`](`crate::schema::Dialect`) containing a fresh copy
+    /// of this `Keyword` will call `setup` with the `Schema` and `Compile`
+    /// context.
+    ///
+    /// If the keyword is applicable to the given [`Schema`], it must return
+    /// `true`. A return value of `false` indicates that
+    /// [`evaluate`](`Keyword::evaluate`) should not be called for the given
+    /// [`Schema`].
+    fn compile<'i>(
+        &mut self,
+        compile: &mut Compile<'i>,
+        schema: Schema<'i>,
+    ) -> Result<bool, CompileError>;
+
+    /// Executes the keyword logic for the given [`Schema`] and [`Value`].
+    fn evaluate<'i, 'v>(
+        &'i self,
+        ctx: &'i mut Self::Context,
+        value: &'v Value,
+    ) -> Result<Option<output::Output<'v>>, EvaluateError>;
+
+    /// Sets the default `Translate` if available in the [`Translator`]
+    fn set_translate(&mut self, translator: &Translator) -> Result<(), Unimplemented> {
+        Err(Unimplemented)
+    }
+    /// Returns the paths to subschemas that this `Keyword` is aware of.
+    fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
+        Err(Unimplemented)
+    }
+
+    /// Returns a list of [`Anchor`]s which are handled by this `Keyword`
+    fn anchors(&self, schema: &Value) -> Result<Result<Vec<Anchor>, AnchorError>, Unimplemented> {
+        Err(Unimplemented)
+    }
+
+    /// Attempts to identify the schema based on the [`Dialect`](`crate::schema::Dialect`).
+    ///
+    /// # Convention
+    /// At least `Keyword` must implement the method `identify` for a given
+    /// `Dialect`.
+    ///
+    /// # Example
+    /// ```rust
+    /// use serde_json::json;
+    /// use grill::{ uri::AbsoluteUri, keyword::Keyword, json_schema::keyword::id::Id };
+    ///
+    /// let id_keyword = Id::new("$id", false);
+    /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
+    ///     .unwrap()  // unwraps `Result<Result<Option<Identifier>, IdentifyError>, Unimplemented>`
+    ///     .unwrap()  // unwraps `Result<Option<Identifier>, Identifier>`
+    ///     .unwrap(); // unwraps `Option<Identifier>`
+    /// assert_eq!(&id, &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
+    /// ```
+    ///
+    fn identify(
+        &self,
+        schema: &Value,
+    ) -> Result<Result<Option<Uri>, IdentifyError>, Unimplemented> {
+        Err(Unimplemented)
+    }
+
+    /// Attempts to retrieve the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) of
+    /// the schema.
+    ///
+    /// # Convention
+    /// Exactly one `Keyword` must implement the `dialect` method for a given
+    /// `Dialect`.
+    ///()
+    /// # Example
+    /// ```
+    /// use serde_json::json;
+    /// use grill::keyword::Keyword as _;
+    /// use std::borrow::Cow;
+    ///
+    /// let draft = "https://json-schema.org/draft/2020-12/schema";
+    /// let schema = json!({ "$schema": draft });
+    /// let schema_keyword = grill::json_schema::keyword::schema::Schema::new("$schema", false);
+    /// let dialect = schema_keyword.dialect(&schema).unwrap().unwrap().unwrap();
+    /// assert_eq!(dialect.as_str(), draft);
+    /// ```
+    fn dialect(
+        &self,
+        schema: &Value,
+    ) -> Result<Result<Option<AbsoluteUri>, IdentifyError>, Unimplemented> {
+        Err(Unimplemented)
+    }
+
+    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
+    /// schemas that `schema` depends on.
+    fn refs(&self, schema: &Value) -> Result<Result<Vec<Ref>, RefError>, Unimplemented> {
+        Err(Unimplemented)
+    }
 }
 
-impl<'i> Compile<'i> {
-    #[must_use]
-    /// The [`AbsoluteUri`] of the [`Schema`]
-    pub fn absolute_uri(&self) -> &AbsoluteUri {
-        self.absolute_uri
-    }
-
-    /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
-    /// `Arc` to it.
-    ///
-    /// # Errors
-    /// Returns `NumberError` if the number fails to parse
-    pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
-        self.numbers.get_or_insert_arc(num)
-    }
-    /// Caches a [`Value`] and returns an `Arc` to it.
-    pub fn value(&mut self, value: &Value) -> Arc<Value> {
-        self.value_cache.value(value)
-    }
-
-    /// Returns an immutable reference to the global state [`AnyMap`].
-    #[must_use]
-    pub fn state(&self) -> &AnyMap {
-        self.state
-    }
-
-    /// Returns a mutable reference to the global state [`AnyMap`].
-    #[must_use]
-    pub fn state_mut(&mut self) -> &mut AnyMap {
-        self.state
-    }
-
-    /// Resolves a schema `Key` by URI
-    ///
-    /// # Errors
-    /// - `CompileError::SchemaNotFound` if the schema is not found
-    /// - `CompileError::UriParsingFailed` if the URI is invalid
-    pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
-        let uri: Uri = uri.parse()?;
-        let uri = self.absolute_uri.with_fragment(None)?.resolve(&uri)?;
-        self.schemas
-            .get_key(&uri)
-            .ok_or(CompileError::SchemaNotFound(uri))
-    }
-
-    /// Returns the [`Key`] of a schema at the specified `path` relative to
-    /// the current schema.
-    ///
-    /// # Errors
-    /// Returns a [`CompileError`] if the schema cannot be found.
-    pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
-        let mut uri = self.absolute_uri().clone();
-
-        if let Some(fragment) = uri.fragment_decoded_lossy() {
-            let mut ptr = fragment.parse::<Pointer>()?;
-            ptr.append(path);
-            uri.set_fragment(Some(&ptr))?;
-        } else {
-            uri.set_fragment(Some(path))?;
-        }
-        self.schemas
-            .get_key(&uri)
-            .ok_or(CompileError::SchemaNotFound(uri))
+/// Returns a static reference to [`Value::Bool`] with the given value.
+#[must_use]
+pub const fn boolean(value: bool) -> &'static Value {
+    if value {
+        TRUE
+    } else {
+        FALSE
     }
 }
 
@@ -490,6 +412,206 @@ impl<'s> Context<'s> {
         self.structure
     }
 }
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                          static_pointer_fn!                           ║
+║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// Generates a static function which returns a [`Pointer`] to the given path.
+/// # Example
+/// ```no_run
+/// static_pointer_fn!(pub if "/if");
+/// assert_eq!(if_pointer(), &Pointer::new(["if"]));
+/// ```
+///
+#[macro_export]
+macro_rules! static_pointer_fn {
+    ($vis:vis $ident:ident $path:literal) => {
+        paste::paste! {
+            #[doc = "Returns a static [`Pointer`] to \"" $path "\""]
+            pub fn [< $ident _pointer >]() -> &'static jsonptr::Pointer {
+                use ::once_cell::sync::Lazy;
+                static POINTER: Lazy<jsonptr::Pointer> = Lazy::new(|| jsonptr::Pointer::parse($path).unwrap());
+                &POINTER
+            }
+        }
+    };
+}
+
+pub use static_pointer_fn;
+
+/// Generates an `as_<Keyword>` and `is_<Keyword>` fn for the given `Keyword` type.
+#[macro_export]
+macro_rules! keyword_fns {
+    ($keyword:ident) => {
+        paste::paste! {
+            #[doc= "Attempts to downcast `keyword` as `" $keyword "`"]
+            pub fn [< as_ $keyword:snake >](keyword: &dyn ::std::any::Any) -> Option<&$keyword> {
+                keyword.downcast_ref::<$keyword>()
+            }
+            #[doc= "Returns `true` if `keyword` is an instance of `" $keyword "`"]
+            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::keyword::Keyword) -> bool {
+                ::std::any::TypeId::of::<$keyword>() == keyword.type_id()
+            }
+
+        }
+    };
+}
+
+pub use keyword_fns;
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                           define_translate!                           ║
+║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
+/// [`Error`](`crate::output::Error`).
+///
+/// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
+///
+/// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
+#[macro_export]
+macro_rules! define_translate {
+    ($error:ident, $default:ident) => {
+        paste::paste!{
+            /// A function which can translate [`$error`].
+            #[derive(Clone)]
+            pub enum [< Translate $error >]{
+                #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
+                Closure(
+                    ::std::sync::Arc<
+                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
+                    >,
+                ),
+                #[doc = "A `fn` which can translate [`" $error "`]"]
+                FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
+            }
+
+            #[::inherent::inherent]
+            impl grill_core::output::Translate<$error<'_>> for [< Translate $error>]{
+                /// Runs the translation
+                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
+                    match self {
+                        Self::Closure(c) => c(f, v),
+                        Self::FnPtr(p) => p(f, v),
+                    }
+                }
+            }
+            impl ::std::fmt::Debug for [< Translate $error >] {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                    match self {
+                        Self::Closure(_) => f.debug_tuple("Closure").finish(),
+                        Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
+                    }
+                }
+            }
+            impl std::default::Default for [< Translate $error >] {
+                fn default() -> Self {
+                    Self::FnPtr($default)
+                }
+            }
+        }
+    };
+}
+
+pub use define_translate;
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Compile                                ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// Context for compilation of the [`Keyword`]
+#[derive(Debug)]
+pub struct Compile<'i> {
+    pub(crate) absolute_uri: &'i AbsoluteUri,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) numbers: &'i mut Numbers,
+    pub(crate) value_cache: &'i mut Values,
+    pub(crate) state: &'i mut AnyMap,
+}
+
+impl<'i> Compile<'i> {
+    #[must_use]
+    /// The [`AbsoluteUri`] of the [`Schema`]
+    pub fn absolute_uri(&self) -> &AbsoluteUri {
+        self.absolute_uri
+    }
+
+    /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
+    /// `Arc` to it.
+    ///
+    /// # Errors
+    /// Returns `NumberError` if the number fails to parse
+    pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
+        self.numbers.get_or_insert_arc(num)
+    }
+    /// Caches a [`Value`] and returns an `Arc` to it.
+    pub fn value(&mut self, value: &Value) -> Arc<Value> {
+        self.value_cache.value(value)
+    }
+
+    /// Returns an immutable reference to the global state [`AnyMap`].
+    #[must_use]
+    pub fn state(&self) -> &AnyMap {
+        self.state
+    }
+
+    /// Returns a mutable reference to the global state [`AnyMap`].
+    #[must_use]
+    pub fn state_mut(&mut self) -> &mut AnyMap {
+        self.state
+    }
+
+    /// Resolves a schema `Key` by URI
+    ///
+    /// # Errors
+    /// - `CompileError::SchemaNotFound` if the schema is not found
+    /// - `CompileError::UriParsingFailed` if the URI is invalid
+    pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
+        let uri: Uri = uri.parse()?;
+        let uri = self.absolute_uri.with_fragment(None)?.resolve(&uri)?;
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+
+    /// Returns the [`Key`] of a schema at the specified `path` relative to
+    /// the current schema.
+    ///
+    /// # Errors
+    /// Returns a [`CompileError`] if the schema cannot be found.
+    pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
+        let mut uri = self.absolute_uri().clone();
+
+        if let Some(fragment) = uri.fragment_decoded_lossy() {
+            let mut ptr = fragment.parse::<Pointer>()?;
+            ptr.append(path);
+            uri.set_fragment(Some(&ptr))?;
+        } else {
+            uri.set_fragment(Some(path))?;
+        }
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -585,129 +707,6 @@ impl From<&'static str> for Kind {
 impl From<&'static [&'static str]> for Kind {
     fn from(s: &'static [&'static str]) -> Self {
         Kind::Composite(s)
-    }
-}
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                                Keyword                                ║
-║                                ¯¯¯¯¯¯¯                                ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Handles the setup and execution of logic for a given keyword in a JSON Schema.
-#[allow(unused_variables)]
-pub trait Keyword: Any + Send + Sync + DynClone + fmt::Debug {
-    /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
-    /// be the name of the keyword or `Composite`, which will be a list of
-    /// keywords.
-    fn kind(&self) -> Kind;
-
-    /// Each `Schema` compiled by the [`Interrogator`](`crate::Interrogator`)
-    /// that has a [`Dialect`](`crate::schema::Dialect`) containing a fresh copy
-    /// of this `Keyword` will call `setup` with the `Schema` and `Compile`
-    /// context.
-    ///
-    /// If the keyword is applicable to the given [`Schema`], it must return
-    /// `true`. A return value of `false` indicates that
-    /// [`evaluate`](`Keyword::evaluate`) should not be called for the given
-    /// [`Schema`].
-    fn compile<'i>(
-        &mut self,
-        compile: &mut Compile<'i>,
-        schema: Schema<'i>,
-    ) -> Result<bool, CompileError>;
-
-    /// Executes the keyword logic for the given [`Schema`] and [`Value`].
-    fn evaluate<'i, 'v>(
-        &'i self,
-        ctx: &'i mut Context,
-        value: &'v Value,
-    ) -> Result<Option<output::Output<'v>>, EvaluateError>;
-
-    /// Sets the default `Translate` if available in the [`Translator`]
-    fn set_translate(&mut self, translator: &Translator) -> Result<(), Unimplemented> {
-        Err(Unimplemented)
-    }
-    /// Returns the paths to subschemas that this `Keyword` is aware of.
-    fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
-        Err(Unimplemented)
-    }
-
-    /// Returns a list of [`Anchor`]s which are handled by this `Keyword`
-    fn anchors(&self, schema: &Value) -> Result<Result<Vec<Anchor>, AnchorError>, Unimplemented> {
-        Err(Unimplemented)
-    }
-
-    /// Attempts to identify the schema based on the [`Dialect`](`crate::schema::Dialect`).
-    ///
-    /// # Convention
-    /// At least `Keyword` must implement the method `identify` for a given
-    /// `Dialect`.
-    ///
-    /// # Example
-    /// ```rust
-    /// use serde_json::json;
-    /// use grill::{ uri::AbsoluteUri, keyword::Keyword, json_schema::keyword::id::Id };
-    ///
-    /// let id_keyword = Id::new("$id", false);
-    /// let id = id_keyword.identify(&json!({"$id": "https://example.com/schema.json" }))
-    ///     .unwrap()  // unwraps `Result<Result<Option<Identifier>, IdentifyError>, Unimplemented>`
-    ///     .unwrap()  // unwraps `Result<Option<Identifier>, Identifier>`
-    ///     .unwrap(); // unwraps `Option<Identifier>`
-    /// assert_eq!(&id, &AbsoluteUri::parse("https://example.com/schema.json").unwrap());
-    /// ```
-    ///
-    fn identify(
-        &self,
-        schema: &Value,
-    ) -> Result<Result<Option<Uri>, IdentifyError>, Unimplemented> {
-        Err(Unimplemented)
-    }
-
-    /// Attempts to retrieve the [`AbsoluteUri`](`crate::uri::AbsoluteUri`) of
-    /// the schema.
-    ///
-    /// # Convention
-    /// Exactly one `Keyword` must implement the `dialect` method for a given
-    /// `Dialect`.
-    ///()
-    /// # Example
-    /// ```
-    /// use serde_json::json;
-    /// use grill::keyword::Keyword as _;
-    /// use std::borrow::Cow;
-    ///
-    /// let draft = "https://json-schema.org/draft/2020-12/schema";
-    /// let schema = json!({ "$schema": draft });
-    /// let schema_keyword = grill::json_schema::keyword::schema::Schema::new("$schema", false);
-    /// let dialect = schema_keyword.dialect(&schema).unwrap().unwrap().unwrap();
-    /// assert_eq!(dialect.as_str(), draft);
-    /// ```
-    fn dialect(
-        &self,
-        schema: &Value,
-    ) -> Result<Result<Option<AbsoluteUri>, IdentifyError>, Unimplemented> {
-        Err(Unimplemented)
-    }
-
-    /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
-    /// schemas that `schema` depends on.
-    fn refs(&self, schema: &Value) -> Result<Result<Vec<Ref>, RefError>, Unimplemented> {
-        Err(Unimplemented)
-    }
-}
-
-clone_trait_object!(Keyword);
-/// Returns a static reference to [`Value::Bool`] with the given value.
-#[must_use]
-pub const fn get_bool_value(value: bool) -> &'static Value {
-    if value {
-        TRUE
-    } else {
-        FALSE
     }
 }
 
