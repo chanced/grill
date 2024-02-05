@@ -191,7 +191,7 @@ impl Store {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Sources {
+pub struct Sources {
     store: Store,
     pub(crate) sandbox: Option<Store>,
 }
@@ -484,11 +484,11 @@ impl Sources {
 ///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
 /// }
 /// ```
-pub trait Deserializer: DynClone + Send + Sync + 'static {
+pub trait Deserializer: Send + Sync + 'static {
     /// Deserializes the given data into a [`Value`].
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
-clone_trait_object!(Deserializer);
+
 impl<F> Deserializer for F
 where
     F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,
@@ -587,12 +587,10 @@ impl Link {
 
 /// A trait which is capable of resolving a [`Source`] at the given [`AbsoluteUri`].
 #[async_trait]
-pub trait Resolve: DynClone + Send + Sync + 'static {
+pub trait Resolve: Send + Sync + 'static {
     /// Attempts to resolve a [`Source`] at the given `uri`
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
 }
-
-clone_trait_object!(Resolve);
 
 ///
 #[cfg(feature = "http")]

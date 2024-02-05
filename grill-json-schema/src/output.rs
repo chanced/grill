@@ -1,8 +1,7 @@
 //! Output data structures and types.
 //!
-use crate::{anymap::AnyMap, AbsoluteUri, Uri};
+use crate::{AbsoluteUri, Uri};
 use bitflags::bitflags;
-use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::Pointer;
 use serde::{
     de::{self, Unexpected},
@@ -71,7 +70,7 @@ pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
 ///
 ///
 /// - <https://json-schema.org/draft/2020-12/json-schema-core.html#name-output-formatting>
-pub trait Error<'v>: DynClone + fmt::Debug + Send + Sync {
+pub trait Error<'v>: Clone + Send + Sync + fmt::Debug {
     /// Makes this error owned.
     fn into_owned(self: Box<Self>) -> BoxedError<'static>;
     /// Translates this error
@@ -79,6 +78,7 @@ pub trait Error<'v>: DynClone + fmt::Debug + Send + Sync {
     /// Sets the translator for this error
     fn set_translate(&mut self, translator: &Translator);
 }
+
 impl<'v> fmt::Display for dyn Error<'v> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.translate(f, &Translator::new())
@@ -89,8 +89,6 @@ impl<'v> fmt::Display for Box<dyn 'v + Send + Sync + Error<'v>> {
         self.translate(f, &Translator::new())
     }
 }
-
-clone_trait_object!(<'v> Error<'v>);
 
 impl<'v> Serialize for Box<dyn 'v + Send + Sync + Error<'v>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

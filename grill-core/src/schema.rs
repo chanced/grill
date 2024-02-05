@@ -360,7 +360,7 @@ impl Store {
 */
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Schemas {
+pub struct Schemas {
     store: Store,
     sandbox: Option<Store>,
 }
@@ -374,14 +374,8 @@ impl Schemas {
         }
     }
 
-    // pub fn print_sources(&self) {
-    //     for (uri, key) in &self.store.index {
-    //         println!("{uri}: {key:?}");
-    //     }
-    // }
-
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn evaluate<'v>(
+    pub fn evaluate<'v>(
         &self,
         structure: Structure,
         key: Key,
@@ -414,12 +408,8 @@ impl Schemas {
             structure,
             schemas: self,
             sources,
-            global_state,
-            eval_state,
             global_numbers,
             eval_numbers,
-            evaluated,
-            should_short_circuit: None,
         };
         let schema = self.get(key, ctx.sources)?;
         let mut output = Output::new(

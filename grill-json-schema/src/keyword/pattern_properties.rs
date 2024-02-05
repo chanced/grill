@@ -2,7 +2,7 @@
 //!
 //! - [Learn JSON Schema - `patternProperties`](https://www.learnjsonschema.com/2020-12/applicator/patternproperties/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-10.3.2.2)
-use std::borrow::Cow;
+use std::{backtrace::Backtrace, borrow::Cow};
 
 use super::PATTERN_PROPERTIES;
 
@@ -64,6 +64,7 @@ impl Keyword for PatternProperties {
             return Err(InvalidTypeError {
                 expected: Expected::Object,
                 actual: Box::new(value.clone()),
+                backtrace: Backtrace::capture(),
             }
             .into());
         };

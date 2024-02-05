@@ -18,11 +18,12 @@
 )]
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
+pub mod lang;
+pub use lang::Lang;
+
 pub mod error;
 
-pub mod output;
 pub mod visitor;
-pub use output::{Output, Structure};
 
 /// Keywords
 pub mod keyword;
@@ -37,8 +38,6 @@ pub mod source;
 pub(crate) use source::Src;
 
 pub mod big;
-
-pub mod anymap;
 
 #[cfg(test)]
 pub mod test;
@@ -75,14 +74,6 @@ use crate::{
     uri::TryIntoAbsoluteUri,
 };
 
-use crate::anymap::AnyMap;
-
-
-pub trait Lang {
-    type Keyword: keyword::Keyword
-}
-
-
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
 pub struct Build {
@@ -92,7 +83,6 @@ pub struct Build {
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
-    state: AnyMap,
     numbers: Vec<Number>,
 }
 

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
+use snafu::Backtrace;
 use tracing::{instrument, Level};
 
 use crate::{
@@ -582,7 +583,6 @@ impl<'i> Compiler<'i> {
                 schemas: self.schemas,
                 numbers: self.numbers,
                 value_cache: self.values,
-                state: self.global_state,
             };
             if keyword.compile(&mut compile, schema.clone())? {
                 keywords.push(keyword);
@@ -796,6 +796,7 @@ fn append_anchor_uris<'i>(
             .map_err(|_| CompileError::UriFragmentOverflow {
                 uri: uri.clone(),
                 fragment: anchor.name.clone(),
+                backtrace: Backtrace::capture(),
             })?;
         uris.push(uri);
     }

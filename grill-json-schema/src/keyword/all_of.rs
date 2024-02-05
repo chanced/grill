@@ -35,6 +35,7 @@ impl Keyword for AllOf {
             return Err(InvalidTypeError {
                 expected: Expected::Array,
                 actual: Box::new(all_of.clone()),
+                backtrace: snafu::Backtrace::capture(),
             }
             .into());
         };

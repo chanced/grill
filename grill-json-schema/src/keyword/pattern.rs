@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{backtrace::Backtrace, borrow::Cow, sync::Arc};
 
 use grill_core::{
     define_translate,
@@ -57,6 +57,7 @@ impl Keyword for Pattern {
             return Err(grill_core::error::InvalidTypeError {
                 expected: Expected::String,
                 actual: Box::new(value.clone()),
+                backtrace: Backtrace::capture(),
             }
             .into());
         };

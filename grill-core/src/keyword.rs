@@ -13,7 +13,6 @@ use crate::{
     source::Sources,
     AbsoluteUri, Key, Output, Schema, Structure, Uri,
 };
-use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Token};
 use serde_json::{Number, Value};
 use std::{
@@ -40,7 +39,10 @@ pub const FALSE: &Value = &Value::Bool(false);
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-pub trait Keyword: Any + Send + Sync + Clone + fmt::Debug {
+pub trait Keyword: Send + Sync + Clone + fmt::Debug {
+    type Context;
+    type Output;
+
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
     /// be the name of the keyword or `Composite`, which will be a list of
     /// keywords.
@@ -169,12 +171,8 @@ pub struct Context<'i> {
     pub(crate) keyword_location: Pointer,
     pub(crate) instance_location: Pointer,
     pub(crate) structure: Structure,
-    pub(crate) global_state: &'i AnyMap,
-    pub(crate) eval_state: &'i mut AnyMap,
     pub(crate) schemas: &'i Schemas,
     pub(crate) sources: &'i Sources,
-    pub(crate) evaluated: &'i mut HashSet<String>,
-    pub(crate) should_short_circuit: Option<bool>,
     pub(crate) global_numbers: &'i Numbers,
     pub(crate) eval_numbers: &'i mut Numbers,
 }
@@ -539,15 +537,14 @@ pub use define_translate;
 
 /// Context for compilation of the [`Keyword`]
 #[derive(Debug)]
-pub struct Compile<'i> {
+pub struct Compile<'i, GlobalState> {
     pub(crate) absolute_uri: &'i AbsoluteUri,
     pub(crate) schemas: &'i Schemas,
     pub(crate) numbers: &'i mut Numbers,
     pub(crate) value_cache: &'i mut Values,
-    pub(crate) state: &'i mut AnyMap,
 }
 
-impl<'i> Compile<'i> {
+impl<'i> Compile<'i, GlobalState> {
     #[must_use]
     /// The [`AbsoluteUri`] of the [`Schema`]
     pub fn absolute_uri(&self) -> &AbsoluteUri {
@@ -567,16 +564,10 @@ impl<'i> Compile<'i> {
         self.value_cache.value(value)
     }
 
-    /// Returns an immutable reference to the global state [`AnyMap`].
-    #[must_use]
-    pub fn state(&self) -> &AnyMap {
-        self.state
-    }
-
     /// Returns a mutable reference to the global state [`AnyMap`].
     #[must_use]
-    pub fn state_mut(&mut self) -> &mut AnyMap {
-        self.state
+    pub fn global_state_mut(&mut self) -> &mut GlobalState {
+        self.global_state
     }
 
     /// Resolves a schema `Key` by URI

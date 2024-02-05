@@ -25,6 +25,104 @@ pub mod schema;
 pub mod type_;
 pub mod write_only;
 
+pub enum Keyword {
+    Schema(schema::Schema),
+    Id(id::Id),
+    Ref(ref_::Ref),
+    Defs(defs::Defs),
+    Comment(comment::Comment),
+    DynamicRef(dynamic_ref::DynamicRef),
+    DynamicAnchor(dynamic_anchor::DynamicAnchor),
+    Anchor(anchor::Anchor),
+    AdditionalProperties(additional_properties::AdditionalProperties),
+    AllOf(all_of::AllOf),
+    AnyOf(any_of::AnyOf),
+    OneOf(one_of::OneOf),
+    Then(if_then_else::Then),
+    If(if_then_else::If),
+    Else(if_then_else::Else),
+    Not(not::Not),
+    Properties(properties::Properties),
+    Type(type_::Type),
+    Enum(enum_::Enum),
+    Const(const_::Const),
+    Pattern(pattern::Pattern),
+    PatternProperties(pattern_properties::PatternProperties),
+    WriteOnly(write_only::WriteOnly),
+    ReadOnly(read_only::ReadOnly),
+}
+
+impl grill_core::keyword::Keyword for Keyword {
+    fn kind(&self) -> grill_core::keyword::Kind {
+        todo!()
+    }
+
+    fn compile<'i>(
+        &mut self,
+        compile: &mut grill_core::keyword::Compile<'i>,
+        schema: grill_core::Schema<'i>,
+    ) -> Result<bool, grill_core::error::CompileError> {
+        todo!()
+    }
+
+    fn evaluate<'i, 'v>(
+        &'i self,
+        ctx: &'i mut Self::Context,
+        value: &'v serde_json::Value,
+    ) -> Result<Option<grill_core::output::Output<'v>>, grill_core::error::EvaluateError> {
+        todo!()
+    }
+}
+
+// AllOf
+// AnyOf
+// OneOf
+// Then
+// If
+// Else
+// Not
+// Properties
+// Type
+// Enum
+// Const
+// Pattern
+// PatternProperties
+// WriteOnly
+// ReadOnly
+// AdditionalProperties
+// DependentSchemas
+// PropertyNames
+// Items
+// PrefixItems
+// Contains
+// MinLength
+// MaxLength
+// ExclusiveMaximum
+// MultipleOf
+// ExclusiveMinimum
+// Maximum
+// Minimum
+// DependentRequired
+// MaxProperties
+// MinProperties
+// Required
+// MaxItems
+// MinItems
+// MaxContains
+// MinContains
+// UniqueItems
+// Title
+// Description
+// Default
+// Examples
+// Deprecated
+// UnevaluatedProperties
+// UnevaluatedItems
+// ContentSchema
+// ContentMediaType
+// ContentEncoding
+// Format
+
 /// Validates the value of `anchor` by ensuring that it start with a letter
 /// (`[A-Za-z]`) or underscore (`'_'`), followed by any number of letters, digits
 /// (`[0-9]`), hyphens (`"-"`), underscores (`'_'`), and periods (`'.'`)
