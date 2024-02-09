@@ -384,8 +384,6 @@ impl Schemas {
         keyword_location: Pointer,
         sources: &Sources,
         evaluated: &mut HashSet<String>,
-        global_state: &AnyMap,
-        eval_state: &mut AnyMap,
         global_numbers: &Numbers,
         eval_numbers: &mut Numbers,
     ) -> Result<Output<'v>, EvaluateError> {

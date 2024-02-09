@@ -6,16 +6,12 @@ use snafu::Backtrace;
 use tracing::{instrument, Level};
 
 use crate::{
-    anymap::AnyMap,
-    error::{CompileError, UnknownAnchorError},
-    keyword::{
-        cache::{Numbers, Values},
-        Compile, Keyword,
-    },
+    cache::{Numbers, Values},
+    error::CompileError,
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Structure,
+    AbsoluteUri, Interrogator, Key,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
@@ -55,10 +51,9 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i> {
+pub(crate) struct Compiler<'i, K> {
     schemas: &'i mut Schemas,
     sources: &'i mut Sources,
-    global_state: &'i mut AnyMap,
     dialects: &'i Dialects,
     deserializers: &'i Deserializers,
     resolvers: &'i Resolvers,
@@ -74,16 +69,15 @@ pub(crate) struct Compiler<'i> {
     primary_uris: HashMap<AbsoluteUri, AbsoluteUri>,
     paths: HashMap<AbsoluteUri, Pointer>,
     refs: HashMap<AbsoluteUri, Vec<Ref>>,
-    keywords: HashMap<AbsoluteUri, &'i [Box<dyn Keyword>]>,
+    keywords: HashMap<AbsoluteUri, &'i [K]>,
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<'i> Compiler<'i> {
+impl<'i, K> Compiler<'i, K> {
     pub(crate) fn new(interrogator: &'i mut Interrogator, validate: bool) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
-            global_state: &mut interrogator.state,
             dialects: &interrogator.dialects,
             deserializers: &interrogator.deserializers,
             resolvers: &interrogator.resolvers,
@@ -513,7 +507,6 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_pathed(
         &mut self,
         s: SchemaToCompile,
@@ -528,7 +521,6 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_anchored(
         &mut self,
         s: SchemaToCompile,
@@ -573,8 +565,8 @@ impl<'i> Compiler<'i> {
     fn keywords_for(
         &mut self,
         key: Key,
-        possible: &[Box<dyn Keyword>],
-    ) -> Result<Box<[Box<dyn Keyword>]>, CompileError> {
+        possible: &[Box<dyn K>],
+    ) -> Result<Box<[Box<dyn K>]>, CompileError> {
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
@@ -629,8 +621,6 @@ impl<'i> Compiler<'i> {
         self.dialects.pertinent_to_idx(src).unwrap_or(default)
     }
 
-    #[instrument(skip(self, q), level = Level::TRACE)]
-    #[instrument(skip(self,q), level = Level::TRACE)]
     fn queue_ancestors(
         &mut self,
         target_uri: &AbsoluteUri,
@@ -695,7 +685,6 @@ impl<'i> Compiler<'i> {
         Ok(())
     }
 
-    #[instrument(skip(self), level = Level::TRACE)]
     fn find_anchors(
         &mut self,
         dialect_idx: usize,
@@ -708,12 +697,10 @@ impl<'i> Compiler<'i> {
             .anchors(src)?)
     }
 
-    #[instrument(skip(self), level = Level::TRACE)]
     fn validate(&mut self, dialect_idx: usize, src: &Value) -> Result<(), CompileError> {
         if !self.validate {
             return Ok(());
         }
-        let mut eval_state = AnyMap::new();
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
@@ -727,7 +714,6 @@ impl<'i> Compiler<'i> {
             self.sources,
             &mut evaluated,
             self.global_state,
-            &mut eval_state,
             self.numbers,
             &mut eval_numbers,
         )?;

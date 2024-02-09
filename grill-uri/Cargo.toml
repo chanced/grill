@@ -1,0 +1,31 @@
+[package]
+authors     = ["chance dinkins"]
+description = "Data structures to represent Uniform Resource Identifiers(URIs) [RFC 3986](https://tools.ietf.org/html/rfc3986)."
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+name        = "grill-uri"
+repository  = "https://github.com/chanced/grill"
+version     = "0.1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+percent-encoding = { workspace = true }
+serde            = { workspace = true, optional = true }
+snafu            = { workspace = true }
+url              = { workspace = true }
+urn              = { workspace = true }
+
+bitflags     = { workspace = true }
+either       = { workspace = true }
+grill-macros = { workspace = true }
+strum        = { workspace = true }
+
+[dev-dependencies]
+grill   = { workspace = true }
+mockall = { workspace = true }
+similar = { workspace = true }
+
+[features]

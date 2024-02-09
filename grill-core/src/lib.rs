@@ -21,6 +21,8 @@
 pub mod lang;
 pub use lang::Lang;
 
+pub mod cache;
+
 pub mod error;
 
 pub mod visitor;

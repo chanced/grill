@@ -30,7 +30,9 @@ pub mod draft_2019_09;
 /// [Draft 2020-12](https://json-schema.org/specification-links#2020-12) implementation.
 pub mod draft_2020_12;
 pub mod keyword;
+pub mod output;
 
+pub mod error;
 /// A trait for adding JSON Schema dialect methods to a [`Build`](grill_core::Build).
 pub trait JsonSchema: Sized {
     /// Adds the JSON Schema Draft 2020-12 [`Dialect`](grill_core::schema::Dialect).

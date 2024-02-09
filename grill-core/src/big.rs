@@ -6,6 +6,7 @@ pub use num::{BigInt, BigRational};
 
 use num::FromPrimitive;
 use once_cell::sync::Lazy;
+use snafu::Backtrace;
 
 mod rational;
 
@@ -37,7 +38,10 @@ use crate::error::{NumberError, OverflowError};
 /// `u32::MAX` (`4294967295`)
 #[inline]
 pub(crate) fn usize_to_u32(value: usize) -> Result<u32, OverflowError<usize, { u32::MAX as u64 }>> {
-    value.try_into().map_err(|_| OverflowError { value })
+    value.try_into().map_err(|_| OverflowError {
+        value,
+        backtrace: Backtrace::capture(),
+    })
 }
 
 /// Attempts to convert a `u64` to `usize`
@@ -47,5 +51,8 @@ pub(crate) fn usize_to_u32(value: usize) -> Result<u32, OverflowError<usize, { u
 /// 64-bit and the value is too large
 #[inline]
 pub(crate) fn u64_to_usize(value: u64) -> Result<usize, OverflowError<u64, { usize::MAX as u64 }>> {
-    value.try_into().map_err(|_| OverflowError { value })
+    value.try_into().map_err(|_| OverflowError {
+        value,
+        backtrace: Backtrace::capture(),
+    })
 }

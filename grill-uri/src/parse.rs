@@ -1,9 +1,10 @@
 use std::{ops::Range, str::FromStr};
 
-use crate::big::usize_to_u32;
+use crate::usize_to_u32;
 
 use super::{encode, write, RelativeUri, Uri};
 use crate::error::{AuthorityError, InvalidPortError, UriError};
+use snafu::Backtrace;
 use url::Url;
 use urn::Urn;
 
@@ -169,7 +170,10 @@ impl<'a> Parse<'a> {
     fn port(&self) -> Option<Result<u16, InvalidPortError>> {
         let port = self.port_str()?;
         port.parse::<u16>()
-            .map_err(|_| InvalidPortError(port.into()))
+            .map_err(|_| InvalidPortError {
+                value: port.into(),
+                backtrace: Backtrace::capture(),
+            })
             .into()
     }
 

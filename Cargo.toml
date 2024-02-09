@@ -3,6 +3,7 @@ members = [
 	"grill",
 	"grill-core",
 	"grill-macros",
+	"grill-uri",
 	"grill-json-schema",
 	"grill-test-builder",
 	"tests",
@@ -14,6 +15,7 @@ grill             = { version = "0.1.0", path = "grill" }
 grill-core        = { version = "0.1.0", path = "grill-core" }
 grill-json-schema = { workspace = "0.1.0", path = "grill-json-schema" }
 grill-macros      = { version = "=0.1.0", path = "grill-macros" }
+grill-uri         = { version = "0.1.0", path = "grill-uri" }
 
 async-trait        = { version = "0.1" }
 bitflags           = { version = "2.4.1" }

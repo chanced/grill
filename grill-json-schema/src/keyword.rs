@@ -1,6 +1,9 @@
 //! # Json Schema Keywords
 
-use grill_core::error::{AnchorError, AnchorInvalidLeadChar};
+use grill_core::{
+    error::{AnchorError, AnchorInvalidLeadChar},
+    keyword::Context,
+};
 
 pub mod additional_properties;
 pub mod all_of;
@@ -50,9 +53,74 @@ pub enum Keyword {
     PatternProperties(pattern_properties::PatternProperties),
     WriteOnly(write_only::WriteOnly),
     ReadOnly(read_only::ReadOnly),
+    // AnyOf
+    // OneOf
+    // Then
+    // If
+    // Else
+    // Not
+    // Properties
+    // Type
+    // Enum
+    // Const
+    // Pattern
+    // PatternProperties
+    // WriteOnly
+    // ReadOnly
+    // AdditionalProperties
+    // DependentSchemas
+    // PropertyNames
+    // Items
+    // PrefixItems
+    // Contains
+    // MinLength
+    // MaxLength
+    // ExclusiveMaximum
+    // MultipleOf
+    // ExclusiveMinimum
+    // Maximum
+    // Minimum
+    // DependentRequired
+    // MaxProperties
+    // MinProperties
+    // Required
+    // MaxItems
+    // MinItems
+    // MaxContains
+    // MinContains
+    // UniqueItems
+    // Title
+    // Description
+    // Default
+    // Examples
+    // Deprecated
+    // UnevaluatedProperties
+    // UnevaluatedItems
+    // ContentSchema
+    // ContentMediaType
+    // ContentEncoding
+    // Format
+}
+
+impl Keyword {
+    #[must_use]
+    pub fn as_schema(&self) -> Option<&schema::Schema> {
+        if let Self::Schema(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 impl grill_core::keyword::Keyword for Keyword {
+    type Context = Context;
+    type Compile;
+    type Output;
+    type ValidationError;
+    type CompileError;
+    type EvaluateError;
+
     fn kind(&self) -> grill_core::keyword::Kind {
         todo!()
     }
@@ -73,55 +141,6 @@ impl grill_core::keyword::Keyword for Keyword {
         todo!()
     }
 }
-
-// AllOf
-// AnyOf
-// OneOf
-// Then
-// If
-// Else
-// Not
-// Properties
-// Type
-// Enum
-// Const
-// Pattern
-// PatternProperties
-// WriteOnly
-// ReadOnly
-// AdditionalProperties
-// DependentSchemas
-// PropertyNames
-// Items
-// PrefixItems
-// Contains
-// MinLength
-// MaxLength
-// ExclusiveMaximum
-// MultipleOf
-// ExclusiveMinimum
-// Maximum
-// Minimum
-// DependentRequired
-// MaxProperties
-// MinProperties
-// Required
-// MaxItems
-// MinItems
-// MaxContains
-// MinContains
-// UniqueItems
-// Title
-// Description
-// Default
-// Examples
-// Deprecated
-// UnevaluatedProperties
-// UnevaluatedItems
-// ContentSchema
-// ContentMediaType
-// ContentEncoding
-// Format
 
 /// Validates the value of `anchor` by ensuring that it start with a letter
 /// (`[A-Za-z]`) or underscore (`'_'`), followed by any number of letters, digits
@@ -151,6 +170,315 @@ pub fn validate_anchor(keyword: &'static str, anchor: &str) -> Result<(), Anchor
         }
     }
     Ok(())
+}
+
+/// Context for compilation of the [`Keyword`]
+#[derive(Debug)]
+pub struct Compile<'i> {
+    pub(crate) absolute_uri: &'i AbsoluteUri,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) numbers: &'i mut Numbers,
+    pub(crate) value_cache: &'i mut Values,
+}
+
+impl<'i> Compile<'i> {
+    #[must_use]
+    /// The [`AbsoluteUri`] of the [`Schema`]
+    pub fn absolute_uri(&self) -> &AbsoluteUri {
+        self.absolute_uri
+    }
+
+    /// Parses a [`Number`] into a [`BigRational`], stores it and returns an
+    /// `Arc` to it.
+    ///
+    /// # Errors
+    /// Returns `NumberError` if the number fails to parse
+    pub fn number(&mut self, num: &Number) -> Result<Arc<BigRational>, NumberError> {
+        self.numbers.get_or_insert_arc(num)
+    }
+    /// Caches a [`Value`] and returns an `Arc` to it.
+    pub fn value(&mut self, value: &Value) -> Arc<Value> {
+        self.value_cache.value(value)
+    }
+
+    /// Resolves a schema `Key` by URI
+    ///
+    /// # Errors
+    /// - `CompileError::SchemaNotFound` if the schema is not found
+    /// - `CompileError::UriParsingFailed` if the URI is invalid
+    pub fn schema(&self, uri: &str) -> Result<Key, CompileError> {
+        let uri: Uri = uri.parse()?;
+        let uri = self.absolute_uri.with_fragment(None)?.resolve(&uri)?;
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+
+    /// Returns the [`Key`] of a schema at the specified `path` relative to
+    /// the current schema.
+    ///
+    /// # Errors
+    /// Returns a [`CompileError`] if the schema cannot be found.
+    pub fn subschema(&self, path: &Pointer) -> Result<Key, CompileError> {
+        let mut uri = self.absolute_uri().clone();
+
+        if let Some(fragment) = uri.fragment_decoded_lossy() {
+            let mut ptr = fragment.parse::<Pointer>()?;
+            ptr.append(path);
+            uri.set_fragment(Some(&ptr))?;
+        } else {
+            uri.set_fragment(Some(path))?;
+        }
+        self.schemas
+            .get_key(&uri)
+            .ok_or(CompileError::SchemaNotFound(uri))
+    }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Context                                ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// Contains global state, evaluation level state, schemas, and location
+/// information needed to [`evaluate`](`crate::Interrogator::evaluate`) a
+/// schema.
+pub struct Context<'i> {
+    pub(crate) absolute_keyword_location: &'i AbsoluteUri,
+    pub(crate) keyword_location: Pointer,
+    pub(crate) instance_location: Pointer,
+    pub(crate) structure: Structure,
+    pub(crate) schemas: &'i Schemas,
+    pub(crate) sources: &'i Sources,
+    pub(crate) global_numbers: &'i Numbers,
+    pub(crate) eval_numbers: &'i mut Numbers,
+}
+
+impl<'s> Context<'s> {
+    /// Evaluates `value` against the schema with the given `key` for the
+    /// `keyword` and produces an [`Output`]
+    pub fn evaluate<'v>(
+        &mut self,
+        key: Key,
+        instance: Option<&str>,
+        keyword: &Pointer,
+        value: &'v Value,
+    ) -> Result<Output<'v>, EvaluateError> {
+        if self.absolute_keyword_location().host().as_deref() != Some("json-schema.org") {
+            // println!("{}", self.absolute_keyword_location());
+            // println!("{}", serde_json::to_string_pretty(&value).unwrap());
+        }
+        let mut instance_location = self.instance_location.clone();
+        if let Some(instance) = instance {
+            instance_location.push_back(instance.into());
+        }
+        self.evaluated.insert(instance_location.to_string());
+        let mut keyword_location = self.keyword_location.clone();
+        keyword_location.append(keyword);
+        self.schemas.evaluate(
+            self.structure,
+            key,
+            value,
+            instance_location,
+            keyword_location,
+            self.sources,
+            self.evaluated,
+            self.global_state,
+            self.eval_state,
+            self.global_numbers,
+            self.eval_numbers,
+        )
+    }
+    /// Either returns a reference to a previously parsed [`BigRational`] or
+    /// parses, stores the [`BigRational`] as an [`Arc`] (per eval) and returns
+    /// a reference to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn number_ref(&mut self, number: &Number) -> Result<&BigRational, NumberError> {
+        if let Some(n) = self.global_numbers.get_ref(number) {
+            return Ok(n);
+        }
+        self.eval_numbers.get_or_insert_ref(number)
+    }
+    /// Either returns a [`Arc`] to a previously parsed [`BigRational`] or
+    /// parses, stores (per eval) and returns an [`Arc`] to the [`BigRational`].
+    ///
+    /// # Errors
+    /// Returns [`NumberError`] if the number fails to parse
+    pub fn number_arc(&mut self, number: &Number) -> Result<Arc<BigRational>, NumberError> {
+        if let Some(n) = self.global_numbers.get_arc(number) {
+            return Ok(n);
+        }
+        self.eval_numbers.get_or_insert_arc(number)
+    }
+    #[must_use]
+    pub fn absolute_keyword_location(&self) -> &AbsoluteUri {
+        self.absolute_keyword_location
+    }
+
+    /// Evaluates `value` against the schema with the given `key` but does not
+    /// mark the instance as evaluated.
+    ///
+    /// This is intended for use with `if` but may be used
+    /// in other cases.
+    pub fn probe<'v>(
+        &mut self,
+        key: Key,
+        instance: Option<&str>,
+        keyword: &Pointer,
+        value: &'v Value,
+    ) -> Result<Output<'v>, EvaluateError> {
+        let mut instance_location = self.instance_location.clone();
+        if let Some(instance) = instance {
+            instance_location.push_back(instance.into());
+        }
+        let mut keyword_location = self.keyword_location.clone();
+        keyword_location.append(keyword);
+        self.schemas.evaluate(
+            self.structure,
+            key,
+            value,
+            instance_location,
+            keyword_location,
+            self.sources,
+            self.evaluated,
+            self.global_state,
+            self.eval_state,
+            self.global_numbers,
+            self.eval_numbers,
+        )
+    }
+
+    /// Mutable reference to the eval local state [`AnyMap`].
+    ///
+    /// This does not include the [`global_state`](`Context::global_state`).
+    #[must_use]
+    pub fn global_state(&self) -> &AnyMap {
+        self.global_state
+    }
+
+    /// Mutable reference to the eval local state [`AnyMap`].
+    ///
+    /// This does not include the [`global_state`](`Context::global_state`).
+    pub fn eval_state(&mut self) -> &mut AnyMap {
+        self.eval_state
+    }
+
+    /// creates a valid [`Output`] with the given `keyword` and `annotation`
+    #[must_use]
+    pub fn annotate<'v>(
+        &mut self,
+        keyword: Option<&'static str>,
+        annotation: Option<Annotation<'v>>,
+    ) -> Output<'v> {
+        self.create_output(keyword, Ok(annotation), false)
+    }
+
+    /// Creates an invalid [`Output`] with the given `keyword` and `error`
+    pub fn error<'v>(
+        &mut self,
+        keyword: Option<&'static str>,
+        error: Option<BoxedError<'v>>,
+    ) -> Output<'v> {
+        self.create_output(keyword, Err(error), false)
+    }
+
+    /// Creates a transient [`Output`] with the given `keyword` and `nodes`
+    ///
+    /// A transient `Output` is one which is not included in the final output
+    /// but accumulates errors and annotations, which are then flattened into a
+    /// series of `Output`s which are included in the final output without
+    /// having their conjunction considered.
+    ///
+    /// Essentially, a transient `Output` is a pseudo node which has its state
+    /// determined by the `Keyword` rather than the result of it's children.
+    ///
+    /// The transient `Output` is removed from the final output, promoting the
+    /// `nodes` to the same level as the transient `Output`.
+    pub fn transient<'v>(
+        &mut self,
+        is_valid: bool,
+        nodes: impl IntoIterator<Item = Output<'v>>,
+    ) -> Output<'v> {
+        let op = if is_valid { Ok(None) } else { Err(None) };
+        let mut output = self.create_output(None, op, true);
+        output.append(nodes.into_iter());
+        output.set_valid(is_valid);
+        output
+    }
+
+    fn create_output<'v>(
+        &mut self,
+        keyword: Option<&'static str>,
+        annotation_or_error: AnnotationOrError<'v>,
+        is_transient: bool,
+    ) -> Output<'v> {
+        let mut keyword_location = self.keyword_location.clone();
+        let mut absolute_keyword_location = self.absolute_keyword_location.clone();
+
+        if let Some(keyword) = keyword {
+            let tok: Token = keyword.into();
+            keyword_location.push_back(tok.clone());
+            if let Ok(mut ptr) = absolute_keyword_location
+                .fragment_decoded_lossy()
+                .unwrap_or_default()
+                .parse::<Pointer>()
+            {
+                ptr.push_back(tok);
+                absolute_keyword_location.set_fragment(Some(&ptr)).unwrap();
+            }
+        }
+        Output::new(
+            self.structure,
+            absolute_keyword_location,
+            keyword_location,
+            self.instance_location.clone(),
+            annotation_or_error,
+            is_transient,
+        )
+    }
+
+    /// Returns `true` if the instance location has been evaluated.
+    #[must_use]
+    pub fn has_evaluated(&self, instance: &str) -> bool {
+        let mut instance_location = self.instance_location.clone();
+        instance_location.push_back(instance.into());
+        self.evaluated.contains(&self.instance_location.to_string())
+    }
+
+    /// Returns `true` if enabling short-circuiting was successful or if it
+    /// was previously set to `true`.
+    pub fn enable_short_circuiting(&mut self) -> bool {
+        if let Some(should_short_circuit) = self.should_short_circuit {
+            should_short_circuit
+        } else {
+            self.should_short_circuit = Some(true);
+            true
+        }
+    }
+    /// Disables short-circuiting
+    pub fn disable_short_circuiting(&mut self) {
+        self.should_short_circuit = Some(false);
+    }
+
+    /// Returns `true` if the evaluation should short-circuit, as determined
+    /// by the [`ShortCircuit`](grill_json_schema::keyword::short_circuit::ShortCircuit) keyword handler
+    #[must_use]
+    pub fn should_short_circuit(&self) -> bool {
+        self.should_short_circuit.unwrap_or(false)
+    }
+
+    /// Returns the desired [`Structure`] of the evaluation
+    #[must_use]
+    pub fn structure(&self) -> Structure {
+        self.structure
+    }
 }
 
 /// ## `$id`

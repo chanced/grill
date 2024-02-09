@@ -46,7 +46,7 @@ pub(crate) mod url {
     }
 
     pub(crate) fn authority(u: &mut Url, authority: &str) -> Result<Option<String>, UriError> {
-        let prev_authority = crate::uri::get::url::authority(u);
+        let prev_authority = crate::get::url::authority(u);
         let authority = parse::authority(authority)?;
         if u.set_username(authority.username().unwrap_or_default())
             .is_err()
