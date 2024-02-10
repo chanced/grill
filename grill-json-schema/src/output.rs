@@ -47,19 +47,6 @@ const KEYS: [&str; 7] = [
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                              BoxedError                               ║
-║                             ¯¯¯¯¯¯¯¯¯¯¯¯                              ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// A boxed error.
-pub type BoxedError<'v> = Box<dyn 'v + Send + Sync + Error<'v>>;
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
 ║                                 Error                                 ║
 ║                                ¯¯¯¯¯¯¯                                ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -564,22 +551,11 @@ impl<'v> Output<'v> {
             .into(),
         }
     }
-    pub(crate) fn append(&mut self, nodes: impl Iterator<Item = Output<'v>>) {
+    pub fn append(&mut self, nodes: impl Iterator<Item = Self>) {
         for node in nodes {
             self.push(node);
         }
     }
-    /// Returns `true` if this `Output` is an annotation, (i.e. valid).
-    #[must_use]
-    pub fn is_annotation(&self) -> bool {
-        match self {
-            Output::Flag(flag) => flag.valid,
-            Output::Basic(basic) => basic.valid,
-            Output::Detailed(detailed) => detailed.valid,
-            Output::Verbose(verbose) => verbose.valid,
-        }
-    }
-
     /// Returns `true` if this `Output` is valid.
     #[must_use]
     pub fn is_valid(&self) -> bool {
@@ -608,7 +584,7 @@ impl<'v> Output<'v> {
     ///
     /// # Panics
     /// Panics if `output` does not match the variant of `self`.
-    pub fn push(&mut self, output: Output<'v>) {
+    pub fn push(&mut self, output: Self) {
         let structure = output.structure();
         match self {
             Output::Flag(flag) => flag.push(output.try_into_flag().unwrap_or_else(|_| {

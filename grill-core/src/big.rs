@@ -31,28 +31,15 @@ pub fn parse_rational(value: &str) -> Result<BigRational, NumberError> {
 
 use crate::error::{NumberError, OverflowError};
 
-/// Attempts to convert a `usize` to `u32`
-///
-/// # Errors
-/// Returns `OverflowError<usize, { u32::MAX as u64 }>` if `v` exceeds
-/// `u32::MAX` (`4294967295`)
-#[inline]
-pub(crate) fn usize_to_u32(value: usize) -> Result<u32, OverflowError<usize, { u32::MAX as u64 }>> {
-    value.try_into().map_err(|_| OverflowError {
-        value,
-        backtrace: Backtrace::capture(),
-    })
-}
-
 /// Attempts to convert a `u64` to `usize`
 ///
 /// # Errors
 /// Returns `OverflowError<u64, { usize::MAX as u64 }>` if the architure is not
 /// 64-bit and the value is too large
 #[inline]
-pub(crate) fn u64_to_usize(value: u64) -> Result<usize, OverflowError<u64, { usize::MAX as u64 }>> {
+pub(crate) fn u64_to_usize(value: u64) -> Result<usize, OverflowError> {
     value.try_into().map_err(|_| OverflowError {
-        value,
+        size: value,
         backtrace: Backtrace::capture(),
     })
 }

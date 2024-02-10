@@ -360,12 +360,15 @@ impl Store {
 */
 
 #[derive(Clone, Debug, Default)]
-pub struct Schemas {
+pub struct Schemas<Keyword> {
     store: Store,
     sandbox: Option<Store>,
 }
 
-impl Schemas {
+impl<Keyword> Schemas<Keyword>
+where
+    Keyword: crate::Keyword,
+{
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -386,7 +389,7 @@ impl Schemas {
         evaluated: &mut HashSet<String>,
         global_numbers: &Numbers,
         eval_numbers: &mut Numbers,
-    ) -> Result<Output<'v>, EvaluateError> {
+    ) -> Result<Keyword::Output, EvaluateError> {
         let schema = self.get(key, sources)?;
         if schema.absolute_uri().host().unwrap() != "json-schema.org" {
             // eprintln!(

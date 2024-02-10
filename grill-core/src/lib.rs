@@ -18,25 +18,20 @@
 )]
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
-pub mod lang;
-pub use lang::Lang;
-
 pub mod cache;
-
 pub mod error;
-
-pub mod visitor;
-
 /// Keywords
 pub mod keyword;
-
+pub mod visitor;
 pub use grill_uri as uri;
+pub use keyword::Keyword;
 
 pub mod schema;
 pub use schema::{Key, Schema};
 
 pub mod source;
 pub(crate) use source::Src;
+use uri::{error::UriError, AbsoluteUri};
 
 pub mod big;
 
@@ -50,7 +45,6 @@ use std::{
     fmt::Debug,
     future::{Future, IntoFuture},
     ops::Deref,
-    pin::Pin,
 };
 
 use jsonptr::Pointer;
@@ -72,9 +66,55 @@ use crate::{
     uri::TryIntoAbsoluteUri,
 };
 
+pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
+    type Error: serde::Serialize + serde::de::DeserializeOwned;
+
+    fn append(&mut self, nodes: impl Iterator<Item = Self>);
+    fn push(&mut self, output: Self);
+}
+
+pub trait Lang {
+    type Keyword: keyword::Keyword<Context = Self::Context>;
+    type Output;
+    type Context;
+    type Compile;
+    type CompileError;
+    type BuildError;
+    type Translator;
+    type Structure;
+
+    /// Creates a new context for the given `params`.
+    fn new_context(&mut self, params: NewContext<Self::Structure>) -> Self::Context;
+    /// Creates a new `Self::Compile`.
+    fn new_compile(&mut self, params: NewCompile) -> Self::Compile;
+}
+
+#[derive(Debug)]
+pub struct NewContext<'i, Structure> {
+    pub structure: Structure,
+    pub eval_numbers: &'i mut Numbers,
+    pub global_numbers: &'i Numbers,
+    pub schemas: &'i mut Schemas,
+    pub sources: &'i Sources,
+    pub absolute_keyword_location: &'i AbsoluteUri,
+    pub keyword_location: Pointer,
+    pub instance_location: Pointer,
+}
+
+#[derive(Debug)]
+pub struct NewCompile<'i> {
+    pub absolute_uri: &'i AbsoluteUri,
+    pub global_numbers: &'i mut Numbers,
+    pub schemas: &'i mut Schemas,
+    pub sources: &'i mut Sources,
+    pub dialects: &'i Dialects,
+    pub resolvers: &'i Resolvers,
+    pub deserializers: &'i Deserializers,
+}
+
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
-pub struct Build {
+pub struct Build<Lang> {
     dialects: Vec<Dialect>,
     precompile: Vec<Result<AbsoluteUri, UriError>>,
     pending_srcs: Vec<PendingSrc>,
@@ -82,24 +122,32 @@ pub struct Build {
     resolvers: Vec<Box<dyn Resolve>>,
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     numbers: Vec<Number>,
+    lang: Lang,
 }
 
-impl IntoFuture for Build {
-    type Output = Result<Interrogator, BuildError>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'static>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move { self.finish().await })
-    }
-}
+// impl IntoFuture for Build {
+//     type Output = Result<Interrogator, BuildError>;
+//     type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'static>>;
+//     fn into_future(self) -> Self::IntoFuture {
+//         Box::pin(async move { self.finish().await })
+//     }
+// }
 
-impl Build {
+impl<Lang> Build<Lang>
+where
+    Lang: crate::Lang,
+{
     /// Constructs a new `Build`
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(lang: Lang) -> Self {
         Self::default()
     }
 }
-impl Build {
+
+impl<Lang> Build<Lang>
+where
+    Lang: crate::Lang,
+{
     /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
     pub fn dialect(mut self, dialect: Dialect) -> Self {
@@ -491,14 +539,14 @@ impl Build {
     /// Finishes building the [`Interrogator`]. Alternatively, you can simply
     /// `await` any method as `Build` implements [`IntoFuture`].
     ///
-    pub async fn finish(self) -> Result<Interrogator, BuildError> {
+    pub async fn finish(self) -> Result<Interrogator, Lang::BuildError> {
         let Self {
+            lang,
             dialects,
             pending_srcs,
             resolvers,
             deserializers,
             default_dialect_idx,
-            state,
             precompile,
             numbers,
         } = self;
@@ -569,7 +617,7 @@ impl Build {
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
-pub struct Interrogator {
+pub struct Interrogator<Lang: crate::Lang> {
     pub(crate) dialects: Dialects,
     pub(crate) sources: Sources,
     pub(crate) resolvers: Resolvers,
@@ -577,7 +625,6 @@ pub struct Interrogator {
     pub(crate) deserializers: Deserializers,
     pub(crate) numbers: Numbers,
     pub(crate) values: Values,
-    pub(crate) state: AnyMap,
 }
 
 impl Debug for Interrogator {

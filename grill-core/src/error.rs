@@ -2,6 +2,7 @@
 //!
 //!
 //!
+use grill_uri::error::UriError;
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
@@ -10,7 +11,7 @@ use snafu::Snafu;
 use std::collections::HashMap;
 
 use crate::Key;
-use crate::{schema::Anchor, uri::AbsoluteUri, Uri};
+use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
 use serde_json::Value;
 use std::{
     error::Error as StdError,
@@ -930,28 +931,26 @@ pub struct UnknownKeyError {
 */
 
 /// A slice or string overflowed an allowed length maximum of `M`.
-#[derive(Debug, Clone, Copy)]
-pub struct OverflowError<V, const M: u64 = { u32::MAX as u64 }> {
-    pub value: V,
+#[derive(Debug, Clone, Copy, Snafu)]
+#[snafu(
+    display("The value {value} overflowed {}", Self::MAX),
+    context(suffix(Ctx)),
+    module
+)]
+pub struct OverflowError {
+    pub value: u64,
     pub backtrace: Backtrace,
 }
-impl<V, M> fmt::Display for OverflowError<V, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "value exceeds maximum size of {}: {}",
-            Self::MAX,
-            self.value
-        )
-    }
+impl OverflowError {
+    pub const MAX: u64 = usize::MAX as u64;
 }
 
-impl<V, const M: u64> OverflowError<V, M> {
+impl OverflowError {
     /// The maximum allowed size.
-    pub const MAX: u64 = M;
+    pub const MAX: u64 = usize::MAX as u64;
 }
 
-impl From<u64> for OverflowError<u64, { usize::MAX as u64 }> {
+impl From<u64> for OverflowError {
     fn from(value: u64) -> Self {
         Self(value)
     }
