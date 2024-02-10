@@ -1,7 +1,8 @@
 use crate::{
-    error::{AnchorError, CompileError, IdentifyError, RefError},
+    error::{AnchorError, IdentifyError, RefError},
     schema::{Anchor, Ref},
-    AbsoluteUri, Schema, Uri,
+    uri::{AbsoluteUri, Uri},
+    Schema,
 };
 use jsonptr::{Pointer, Token};
 use serde_json::Value;
@@ -14,6 +15,14 @@ use std::{
 pub const TRUE: &Value = &Value::Bool(true);
 /// A static reference to [`Value::Bool`] with the value `false`
 pub const FALSE: &Value = &Value::Bool(false);
+
+pub type Context<Keyword> = <Keyword as crate::Keyword>::Context;
+pub type Compile<Keyword> = <Keyword as crate::Keyword>::Compile;
+pub type Output<Keyword> = <Keyword as crate::Keyword>::Output;
+pub type Structure<Keyword> = <Keyword as crate::Keyword>::Structure;
+pub type ValidationError<Keyword> = <Keyword as crate::Keyword>::ValidationError;
+pub type CompileError<Keyword> = <Keyword as crate::Keyword>::CompileError;
+pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -31,6 +40,7 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
     type Context;
     type Compile;
     type Output;
+    type Structure;
     type ValidationError;
     type CompileError: std::error::Error;
     type EvaluateError: std::error::Error;
@@ -53,7 +63,7 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
         &mut self,
         compile: &mut Self::Compile,
         schema: Schema<'i>,
-    ) -> Result<bool, CompileError>;
+    ) -> Result<bool, Self::CompileError>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'v>(

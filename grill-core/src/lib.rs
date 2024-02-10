@@ -52,7 +52,7 @@ use serde_json::{Number, Value};
 
 use crate::{
     cache::{Numbers, Values},
-    error::{BuildError, DeserializeError, EvaluateError, SourceError, UnknownKeyError},
+    error::{DeserializeError, EvaluateError, SourceError, UnknownKeyError},
     schema::{
         compiler::Compiler,
         iter::{Iter, IterUnchecked},
@@ -74,27 +74,26 @@ pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
 }
 
 pub trait Lang {
-    type Keyword: keyword::Keyword<Context = Self::Context>;
-    type Output;
-    type Context;
-    type Compile;
-    type CompileError;
+    type Keyword: crate::Keyword;
     type BuildError;
     type Translator;
-    type Structure;
 
     /// Creates a new context for the given `params`.
-    fn new_context(&mut self, params: NewContext<Self::Structure>) -> Self::Context;
-    /// Creates a new `Self::Compile`.
-    fn new_compile(&mut self, params: NewCompile) -> Self::Compile;
+    fn new_context(&mut self, params: NewContext<Self::Keyword>) -> keyword::Context<Self>;
+
+    /// Creates a new `Self::Compile`
+    fn new_compile(&mut self, params: NewCompile<Self::Keyword>) -> keyword::Compile<Self>;
 }
 
 #[derive(Debug)]
-pub struct NewContext<'i, Structure> {
-    pub structure: Structure,
+pub struct NewContext<'i, Keyword>
+where
+    Keyword: crate::Keyword,
+{
+    pub structure: Keyword::Structure,
     pub eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
-    pub schemas: &'i mut Schemas,
+    pub schemas: &'i mut Schemas<Keyword>,
     pub sources: &'i Sources,
     pub absolute_keyword_location: &'i AbsoluteUri,
     pub keyword_location: Pointer,
@@ -102,10 +101,13 @@ pub struct NewContext<'i, Structure> {
 }
 
 #[derive(Debug)]
-pub struct NewCompile<'i> {
+pub struct NewCompile<'i, Keyword>
+where
+    Keyword: crate::Keyword,
+{
     pub absolute_uri: &'i AbsoluteUri,
     pub global_numbers: &'i mut Numbers,
-    pub schemas: &'i mut Schemas,
+    pub schemas: &'i mut Schemas<Keyword>,
     pub sources: &'i mut Sources,
     pub dialects: &'i Dialects,
     pub resolvers: &'i Resolvers,
@@ -539,7 +541,7 @@ where
     /// Finishes building the [`Interrogator`]. Alternatively, you can simply
     /// `await` any method as `Build` implements [`IntoFuture`].
     ///
-    pub async fn finish(self) -> Result<Interrogator, Lang::BuildError> {
+    pub async fn finish(self) -> Result<Interrogator<Lang>, Lang::BuildError> {
         let Self {
             lang,
             dialects,
@@ -571,7 +573,6 @@ where
             resolvers,
             schemas,
             deserializers,
-            state,
             numbers: Numbers::new(numbers.iter())?,
             values: Values::default(),
         };
@@ -621,13 +622,16 @@ pub struct Interrogator<Lang: crate::Lang> {
     pub(crate) dialects: Dialects,
     pub(crate) sources: Sources,
     pub(crate) resolvers: Resolvers,
-    pub(crate) schemas: Schemas,
+    pub(crate) schemas: Schemas<Lang::Keyword>,
     pub(crate) deserializers: Deserializers,
     pub(crate) numbers: Numbers,
     pub(crate) values: Values,
 }
 
-impl Debug for Interrogator {
+impl<Lang> Debug for Interrogator<Lang>
+where
+    Lang: crate::Lang,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
@@ -638,7 +642,10 @@ impl Debug for Interrogator {
     }
 }
 
-impl Interrogator {
+impl<Lang> Interrogator<Lang>
+where
+    Lang: crate::Lang,
+{
     pub fn print_source_index(&self) {
         self.sources.print_index();
     }
@@ -852,7 +859,10 @@ impl Interrogator {
     /// ```
     ///
     #[allow(clippy::unused_async)]
-    pub async fn compile_all<I>(&mut self, uris: I) -> Result<Vec<(AbsoluteUri, Key)>, CompileError>
+    pub async fn compile_all<I>(
+        &mut self,
+        uris: I,
+    ) -> Result<Vec<(AbsoluteUri, Key)>, <Lang::Keyword as crate::Keyword>::CompileError>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
@@ -881,7 +891,10 @@ impl Interrogator {
     ///   - the uri fails to convert to an [`AbsoluteUri`].
     ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     #[allow(clippy::unused_async)]
-    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<Key, CompileError> {
+    pub async fn compile(
+        &mut self,
+        uri: impl TryIntoAbsoluteUri,
+    ) -> Result<Key, keyword::CompileError<Lang::Keyword>> {
         // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
         let uri = uri.try_into_absolute_uri()?;
         self.start_txn();
@@ -900,7 +913,7 @@ impl Interrogator {
     async fn compile_dialects_schemas(
         &mut self,
         uris: Vec<AbsoluteUri>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Lang::Keyword>> {
         let uris = uris.into_iter();
         self.start_txn();
         match Compiler::new(self, false).compile_all(uris).await {
@@ -944,7 +957,7 @@ impl Interrogator {
         &mut self,
         uri: AbsoluteUri,
         validate: bool,
-    ) -> Result<Key, CompileError> {
+    ) -> Result<Key, keyword::CompileError<Lang::Keyword>> {
         Compiler::new(self, validate).compile(uri).await
     }
 
@@ -965,11 +978,10 @@ impl Interrogator {
     /// [`Structure`].
     pub fn evaluate<'v>(
         &self,
-        structure: Structure,
+        structure: keyword::Structure<Lang::Keyword>,
         key: Key,
         value: &'v Value,
-    ) -> Result<Output<'v>, EvaluateError> {
-        let mut eval_state = AnyMap::new();
+    ) -> Result<keyword::Output<Lang::Keyword>, EvaluateError> {
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(
@@ -981,7 +993,6 @@ impl Interrogator {
             &self.sources,
             &mut evaluated,
             &self.state,
-            &mut eval_state,
             &self.numbers,
             &mut eval_numbers,
         )

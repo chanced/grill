@@ -12,17 +12,14 @@ use serde::{Serialize, Serializer};
 pub(crate) mod compiler;
 
 use crate::{
-    anymap::AnyMap,
-    error::{
-        CompileError, CyclicDependencyError, EvaluateError, SourceConflictError, UnknownKeyError,
-    },
-    keyword::{cache::Numbers, Context, Keyword},
+    error::{EvaluateError, UnknownKeyError},
+    keyword::{Context, Keyword},
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
     },
     source::{Link, Source, Sources},
-    AbsoluteUri, Output, Structure, Uri,
+    AbsoluteUri, Output,
 };
 
 use jsonptr::Pointer;

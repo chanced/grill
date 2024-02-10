@@ -39,7 +39,7 @@ use crate::error::{NumberError, OverflowError};
 #[inline]
 pub(crate) fn u64_to_usize(value: u64) -> Result<usize, OverflowError> {
     value.try_into().map_err(|_| OverflowError {
-        size: value,
+        value,
         backtrace: Backtrace::capture(),
     })
 }
