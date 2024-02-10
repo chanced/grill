@@ -954,7 +954,10 @@ impl AbsoluteUri {
         let scheme = scheme.trim_end_matches('/').trim_end_matches(':');
 
         let prev = self.scheme().to_string();
-        let to_uri_err = |()| UriError::InvalidScheme(scheme.to_string());
+        let to_uri_err = |()| UriError::InvalidScheme {
+            scheme: scheme.to_string(),
+            backtrace: Backtrace::capture(),
+        };
         match self {
             AbsoluteUri::Url(url) => {
                 if scheme == "urn" {
@@ -1241,7 +1244,10 @@ impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
         match self {
             UriRef::Uri(uri) => uri.try_into_absolute_uri(),
             UriRef::AbsoluteUri(uri) => Ok(uri.clone()),
-            UriRef::RelativeUri(rel) => Err(UriError::NotAbsolute(Uri::Relative(rel.clone()))),
+            UriRef::RelativeUri(rel) => Err(UriError::NotAbsolute {
+                uri: Uri::Relative(rel.clone()),
+                backtrace: Backtrace::capture(),
+            }),
         }
     }
 }
@@ -1257,9 +1263,9 @@ impl TryIntoAbsoluteUri for &str {
         AbsoluteUri::parse(self)
     }
 }
-#[inherent]
+
 impl TryIntoAbsoluteUri for AbsoluteUri {
-    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         Ok(self)
     }
 }
@@ -1299,9 +1305,8 @@ impl TryIntoAbsoluteUri for &Uri {
     }
 }
 
-#[inherent]
 impl TryIntoAbsoluteUri for Uri {
-    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
@@ -1430,7 +1435,7 @@ impl<'a> QueryParameters<'a> {
         };
         if query.len() > u32::MAX as usize {
             return Err(OverflowError {
-                value: query.len(),
+                value: query.len() as u64,
                 backtrace: Backtrace::capture(),
             });
         }
@@ -2268,10 +2273,9 @@ pub trait AsUriRef {
     fn as_uri_ref(&self) -> UriRef<'_>;
 }
 
-#[inherent]
 impl AsUriRef for AbsoluteUri {
     #[must_use]
-    pub fn as_uri_ref(&self) -> UriRef<'_> {
+    fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::AbsoluteUri(self)
     }
 }
@@ -2282,10 +2286,9 @@ impl AsUriRef for &AbsoluteUri {
     }
 }
 
-#[inherent]
 impl AsUriRef for Uri {
     #[must_use]
-    pub fn as_uri_ref(&self) -> UriRef<'_> {
+    fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::Uri(self)
     }
 }
@@ -2301,10 +2304,9 @@ impl AsUriRef for &RelativeUri {
     }
 }
 
-#[inherent]
 impl AsUriRef for RelativeUri {
     #[must_use]
-    pub fn as_uri_ref(&self) -> UriRef<'_> {
+    fn as_uri_ref(&self) -> UriRef<'_> {
         UriRef::RelativeUri(self)
     }
 }
@@ -2568,8 +2570,9 @@ impl<'a> Iterator for Components<'a> {
 
 /// A relative or absolute URI in the form of a [`Url`], [`Urn`], or
 /// [`RelativeUri`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
 pub enum Uri {
     /// Uniform Resource Locator (URL)
     Url(Url),
@@ -3392,7 +3395,7 @@ pub fn decode_lossy(fragment: &str) -> String {
 #[inline]
 pub(crate) fn usize_to_u32(value: usize) -> Result<u32, OverflowError> {
     value.try_into().map_err(|_| OverflowError {
-        value,
+        value: value as u64,
         backtrace: Backtrace::capture(),
     })
 }

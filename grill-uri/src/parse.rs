@@ -60,15 +60,24 @@ impl<'a> Parse<'a> {
         }
 
         if !parser.path().is_empty() {
-            return Err(AuthorityError::ContainsPath(parser.path().to_string()));
+            return Err(AuthorityError::ContainsPath {
+                backtrace: Backtrace::capture(),
+                value: parser.path().into(),
+            });
         }
         let query = parser.query().unwrap_or_default();
         if !query.is_empty() {
-            return Err(AuthorityError::ContainsQuery(query.to_string()));
+            return Err(AuthorityError::ContainsQuery {
+                value: query.to_string(),
+                backtrace: Backtrace::capture(),
+            });
         }
         let fragment = parser.fragment().unwrap_or_default();
         if !fragment.is_empty() {
-            return Err(AuthorityError::ContainsFragment(fragment.to_string()));
+            return Err(AuthorityError::ContainsFragment {
+                value: fragment.to_string(),
+                backtrace: Backtrace::capture(),
+            });
         }
 
         Ok(super::Authority {
@@ -146,14 +155,20 @@ impl<'a> Parse<'a> {
     fn parse_url(&mut self) -> Option<Result<Uri, UriError>> {
         Url::parse(self.input)
             .map(Uri::Url)
-            .map_err(UriError::FailedToParseUrl)
+            .map_err(|source| UriError::FailedToParseUrl {
+                source,
+                backtrace: Backtrace::capture(),
+            })
             .into()
     }
 
     fn parse_urn(&mut self) -> Option<Result<Uri, UriError>> {
         Urn::from_str(self.input)
             .map(Uri::Urn)
-            .map_err(UriError::FailedToParseUrn)
+            .map_err(|source| UriError::FailedToParseUrn {
+                source,
+                backtrace: Backtrace::capture(),
+            })
             .into()
     }
 

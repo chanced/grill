@@ -22,21 +22,21 @@ use crate::Uri;
 #[derive(Debug, Snafu)]
 pub enum UriError {
     /// an issue occurred parsing a [`Url`](`url::Url`)
-    #[snafu(display("failed to parse url: {source}"))]
+    #[snafu(display("failed to parse url: {source}"), context(false))]
     FailedToParseUrl {
         source: UrlError,
         backtrace: Backtrace,
     },
 
     /// an issue occurred parsing a [`Urn`](`urn::Urn`)
-    #[snafu(display("failed to parse urn: {source}"))]
+    #[snafu(display("failed to parse urn: {source}"), context(false))]
     FailedToParseUrn {
         source: urn::Error,
         backtrace: Backtrace,
     },
 
     /// an issue occurred parsing a [`RelativeUri`](`crate::uri::RelativeUri`)
-    #[snafu(transparent)]
+    #[snafu(transparent, context(false))]
     FailedToParseRelativeUri {
         #[snafu(backtrace)]
         source: RelativeUriError,

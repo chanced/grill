@@ -33,6 +33,7 @@ pub(crate) mod url {
     use crate::error::{AuthorityError, UriError};
 
     use super::parse;
+    use snafu::Backtrace;
     use url::Url;
     pub(crate) fn fragment(url: &mut Url, fragment: Option<&str>) -> Option<String> {
         let existing = url.fragment().map(ToString::to_string);
@@ -55,7 +56,12 @@ pub(crate) mod url {
             // https://github.com/servo/rust-url/issues/844
             let username = authority.username().unwrap_or_default();
             if !username.is_empty() {
-                return Err(AuthorityError::UsernameNotAllowed(username.to_string()).into());
+                return Err(AuthorityError::UsernameNotAllowed {
+                    value: username.to_string().into(),
+                    scheme: u.scheme().to_string(),
+                    backtrace: Backtrace::capture(),
+                }
+                .into());
             }
         }
         if u.set_password(authority.password()).is_err() {
@@ -63,7 +69,12 @@ pub(crate) mod url {
             // https://github.com/servo/rust-url/issues/844
             let password = authority.password().unwrap_or_default();
             if !password.is_empty() {
-                return Err(AuthorityError::PasswordNotAllowed(password.to_string()).into());
+                return Err(AuthorityError::PasswordNotAllowed {
+                    scheme: u.scheme().to_string(),
+                    value: password.to_string(),
+                    backtrace: Backtrace::capture(),
+                }
+                .into());
             }
         }
         u.set_host(authority.host())?;
@@ -71,7 +82,11 @@ pub(crate) mod url {
             // the url crate doesn't check for empty values before returning `Err(())`
             // https://github.com/servo/rust-url/issues/844
             if let Some(port) = authority.port() {
-                return Err(AuthorityError::PortNotAllowed(port).into());
+                return Err(AuthorityError::PortNotAllowed {
+                    port,
+                    scheme: u.scheme().to_string(),
+                }
+                .into());
             }
         }
         Ok(prev_authority)

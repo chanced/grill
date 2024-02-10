@@ -30,8 +30,7 @@ pub mod visitor;
 /// Keywords
 pub mod keyword;
 
-pub mod uri;
-pub use uri::{AbsoluteUri, RelativeUri, Uri};
+pub use grill_uri as uri;
 
 pub mod schema;
 pub use schema::{Key, Schema};
@@ -58,11 +57,8 @@ use jsonptr::Pointer;
 use serde_json::{Number, Value};
 
 use crate::{
-    error::{
-        BuildError, CompileError, DeserializeError, EvaluateError, SourceError, UnknownKeyError,
-        UriError,
-    },
-    keyword::cache::{Numbers, Values},
+    cache::{Numbers, Values},
+    error::{BuildError, DeserializeError, EvaluateError, SourceError, UnknownKeyError},
     schema::{
         compiler::Compiler,
         iter::{Iter, IterUnchecked},
