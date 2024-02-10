@@ -21,6 +21,11 @@ use std::{
     string::FromUtf8Error,
 };
 
+pub trait CompileError:
+    From<CyclicDependencyError> + std::error::Error + Send + Sync + 'static
+{
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -981,4 +986,25 @@ pub enum RefError {
         #[snafu(backtrace)]
         source: UriError,
     },
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                         CyclicDependencyError                         ║
+║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                         ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// A [`Schema`] contains a cyclic dependency.
+#[derive(Debug, Snafu)]
+#[snafu(display("schema \"{from}\" contains a cyclic dependency to \"{to}\""))]
+pub struct CyclicDependencyError {
+    /// The [`AbsoluteUri`] of the schema which, through transitive
+    /// dependencies, creates a cycle.
+    pub from: AbsoluteUri,
+    /// The [`AbsoluteUri`] of the schema which is the target of the cycle.
+    pub to: AbsoluteUri,
 }

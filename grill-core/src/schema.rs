@@ -328,12 +328,19 @@ impl Store {
     /// # Errors
     /// Returns the URI of the existing schema if it is not equal to the new
     /// schema.
-    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
+    pub(crate) fn insert(
+        &mut self,
+        schema: CompiledSchema,
+    ) -> Result<Key, crate::error::SourceError> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.index.get(id) {
             let existing = self.table.get(*key).unwrap();
             if existing != &schema {
-                return Err(SourceConflictError { uri: id.clone() });
+                return Err(crate::error::SourceError::SourceConflict {
+                    uri: id.clone(),
+                    existing_path: existing.path.clone(),
+                    new_path: schema.path.clone(),
+                });
             }
             return Ok(*key);
         }
@@ -377,15 +384,15 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn evaluate<'v>(
         &self,
-        structure: Structure,
+        structure: Keyword::Structure,
         key: Key,
         value: &'v Value,
         instance_location: Pointer,
         keyword_location: Pointer,
         sources: &Sources,
         evaluated: &mut HashSet<String>,
-        global_numbers: &Numbers,
-        eval_numbers: &mut Numbers,
+        global_numbers: &crate::cache::Numbers,
+        eval_numbers: &mut crate::cache::Numbers,
     ) -> Result<Keyword::Output, EvaluateError> {
         let schema = self.get(key, sources)?;
         if schema.absolute_uri().host().unwrap() != "json-schema.org" {
@@ -447,14 +454,14 @@ where
         uri: &AbsoluteUri,
         references: &[Reference],
         sources: &Sources,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), crate::keyword::CompileError<Keyword>> {
         for reference in references {
             if key == reference.key
                 || self
                     .transitive_dependencies(reference.key, sources)
                     .any(|schema| schema.key == key)
             {
-                return Err(CyclicDependencyError {
+                return Err(crate::error::CyclicDependencyError {
                     from: uri.clone(),
                     to: reference.absolute_uri.clone(),
                 }
@@ -474,7 +481,7 @@ where
     pub(crate) fn has_keywords(&self, key: Key) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
-    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[Box<dyn Keyword>]>) {
+    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[Keyword]>) {
         self.sandbox().table.get_mut(key).unwrap().keywords = keywords;
     }
     pub(crate) fn has_keywords_by_uri(&self, uri: &AbsoluteUri) -> bool {
@@ -507,7 +514,10 @@ where
     // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
     //     self.sandbox().index_entry(id)
     // }
-    pub(crate) fn insert(&mut self, schema: CompiledSchema) -> Result<Key, SourceConflictError> {
+    pub(crate) fn insert(
+        &mut self,
+        schema: CompiledSchema,
+    ) -> Result<Key, crate::error::SourceError> {
         self.sandbox().insert(schema)
     }
 

@@ -42,7 +42,7 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
     type Output;
     type Structure;
     type ValidationError;
-    type CompileError: std::error::Error;
+    type CompileError: crate::error::CompileError;
     type EvaluateError: std::error::Error;
 
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will

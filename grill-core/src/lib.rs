@@ -1326,7 +1326,7 @@ where
     /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn build() -> Build {
+    pub fn build(lang: Lang) -> Build {
         Build::new()
     }
 
