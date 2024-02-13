@@ -9,6 +9,7 @@ pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 use snafu::Backtrace;
 use snafu::Snafu;
 use std::collections::HashMap;
+use std::error;
 
 use crate::Key;
 use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
@@ -22,7 +23,7 @@ use std::{
 };
 
 pub trait CompileError:
-    From<CyclicDependencyError> + std::error::Error + Send + Sync + 'static
+    From<CyclicDependencyError> + From<UnknownAnchorError> + error::Error + Send + Sync + 'static
 {
 }
 
@@ -755,7 +756,7 @@ pub enum ResolveErrorSource {
     Custom {
         message: String,
         #[snafu(source(from(Box<dyn 'static + std::error::Error + Send + Sync>, Some)))]
-        source: Box<dyn 'static + std::error::Error + Send + Sync>,
+        source: Box<dyn 'static + error::Error + Send + Sync>,
     },
 }
 
@@ -1007,4 +1008,17 @@ pub struct CyclicDependencyError {
     pub from: AbsoluteUri,
     /// The [`AbsoluteUri`] of the schema which is the target of the cycle.
     pub to: AbsoluteUri,
+}
+
+#[derive(Snafu, Debug)]
+#[snafu(
+    context(suffix(Ctx)),
+    module,
+    display("unknown anchor: \"{anchor}\" in URI \"{uri}\"")
+)]
+pub struct UnknownAnchorError {
+    /// The anchor which was not found.
+    pub anchor: String,
+    /// The URI of the keyword which referenced the anchor.
+    pub uri: AbsoluteUri,
 }

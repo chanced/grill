@@ -120,7 +120,6 @@ impl grill_core::keyword::Keyword for Keyword {
     type ValidationError;
     type CompileError;
     type EvaluateError;
-
     fn kind(&self) -> grill_core::keyword::Kind {
         todo!()
     }

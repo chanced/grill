@@ -66,8 +66,13 @@ use crate::{
     uri::TryIntoAbsoluteUri,
 };
 
+pub trait Structure: Copy + Clone + Debug + serde::Serialize + serde::de::DeserializeOwned {
+    fn verbose() -> Self;
+}
+
 pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
     type Error: serde::Serialize + serde::de::DeserializeOwned;
+    type Structure: crate::Structure;
 
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
@@ -90,7 +95,7 @@ pub struct NewContext<'i, Keyword>
 where
     Keyword: crate::Keyword,
 {
-    pub structure: Keyword::Structure,
+    pub structure: keyword::Structure<Keyword>,
     pub eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
     pub schemas: &'i mut Schemas<Keyword>,
@@ -112,6 +117,7 @@ where
     pub dialects: &'i Dialects,
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
+    pub values: &'i mut Values,
 }
 
 #[derive(Default)]
@@ -1326,15 +1332,15 @@ where
     /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn build(lang: Lang) -> Build {
-        Build::new()
+    pub fn build(lang: Lang) -> Build<Lang> {
+        Build::new(lang)
     }
 
     /// Returns a new [`Build`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_2019_09() -> Build {
+    pub fn json_schema_2019_09() -> Build<Lang> {
         // Builder::default()
         //     .with_json_schema_2019_09()
         //     .with_default_dialect(
@@ -1347,7 +1353,7 @@ where
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_07() -> Build {
+    pub fn json_schema_07() -> Build<Lang> {
         // Builder::default()
         //     .with_json_schema_07()
         //     .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
@@ -1359,7 +1365,7 @@ where
     /// set as the default dialect.
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn json_schema_04() -> Build {
+    pub fn json_schema_04() -> Build<Lang> {
         // Builder::default()
         //     .with_json_schema_04()
         //     .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())

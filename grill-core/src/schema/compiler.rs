@@ -7,11 +7,12 @@ use tracing::{instrument, Level};
 
 use crate::{
     cache::{Numbers, Values},
-    error::CompileError,
+    error::{CompileError, UnknownAnchorError},
+    keyword,
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key,
+    AbsoluteUri, Interrogator, Key, Keyword, Lang, Structure,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
@@ -51,8 +52,8 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, K> {
-    schemas: &'i mut Schemas,
+pub(crate) struct Compiler<'i, Lang: crate::Lang> {
+    schemas: &'i mut Schemas<Lang::Keyword>,
     sources: &'i mut Sources,
     dialects: &'i Dialects,
     deserializers: &'i Deserializers,
@@ -69,12 +70,19 @@ pub(crate) struct Compiler<'i, K> {
     primary_uris: HashMap<AbsoluteUri, AbsoluteUri>,
     paths: HashMap<AbsoluteUri, Pointer>,
     refs: HashMap<AbsoluteUri, Vec<Ref>>,
-    keywords: HashMap<AbsoluteUri, &'i [K]>,
+    keywords: HashMap<AbsoluteUri, &'i [Lang::Keyword]>,
+    lang: &'i mut Lang,
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<'i, K> Compiler<'i, K> {
-    pub(crate) fn new(interrogator: &'i mut Interrogator, validate: bool) -> Self {
+impl<'i, Keyword> Compiler<'i, Keyword> {
+    pub(crate) fn new<Lang>(
+        interrogator: &'i mut Interrogator<Lang>,
+        validate: bool,
+    ) -> Compiler<'i, Lang::Keyword>
+    where
+        Lang: crate::Lang,
+    {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -83,6 +91,7 @@ impl<'i, K> Compiler<'i, K> {
             resolvers: &interrogator.resolvers,
             numbers: &mut interrogator.numbers,
             values: &mut interrogator.values,
+            lang: &mut interrogator.lang,
             validate,
             ids: HashMap::default(),
             indexed: HashSet::default(),
@@ -97,7 +106,10 @@ impl<'i, K> Compiler<'i, K> {
         }
     }
 
-    pub(crate) async fn compile(mut self, uri: AbsoluteUri) -> Result<Key, CompileError> {
+    pub(crate) async fn compile(
+        mut self,
+        uri: AbsoluteUri,
+    ) -> Result<Key, keyword::CompileError<Keyword>> {
         let mut q = VecDeque::with_capacity(32);
 
         q.push_front(SchemaToCompile {
@@ -114,7 +126,7 @@ impl<'i, K> Compiler<'i, K> {
     pub(crate) async fn compile_all<I>(
         mut self,
         uris: I,
-    ) -> Result<Vec<(AbsoluteUri, Key)>, CompileError>
+    ) -> Result<Vec<(AbsoluteUri, Key)>, keyword::CompileError<Keyword>>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
@@ -142,7 +154,10 @@ impl<'i, K> Compiler<'i, K> {
         (uri, key)
     }
 
-    async fn run(&mut self, mut q: VecDeque<SchemaToCompile>) -> Result<(), CompileError> {
+    async fn run(
+        &mut self,
+        mut q: VecDeque<SchemaToCompile>,
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         while !q.is_empty() {
             let schema_to_compile = q.pop_front().unwrap();
             let result = self.compile_schema(schema_to_compile, &mut q).await;
@@ -158,7 +173,7 @@ impl<'i, K> Compiler<'i, K> {
     async fn precompile(
         &mut self,
         uri: &AbsoluteUri,
-    ) -> Result<Option<(Link, Value)>, CompileError> {
+    ) -> Result<Option<(Link, Value)>, keyword::CompileError<Keyword>> {
         let mut indexed = self
             .indexed
             .iter()
@@ -175,7 +190,10 @@ impl<'i, K> Compiler<'i, K> {
         self.index_all(uri.clone()).await
     }
 
-    async fn index_all(&mut self, uri: AbsoluteUri) -> Result<Option<(Link, Value)>, CompileError> {
+    async fn index_all(
+        &mut self,
+        uri: AbsoluteUri,
+    ) -> Result<Option<(Link, Value)>, keyword::CompileError<Keyword>> {
         let mut base_uri = uri.clone();
         base_uri.set_fragment(None).unwrap();
         if self.indexed.contains(&base_uri) {
@@ -218,7 +236,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         loc: Location<'v>,
         q: &mut Vec<Location<'v>>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         let Location {
             uri,
             ancestry_uris,
@@ -298,7 +316,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         schema_to_compile: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, CompileError)> {
+    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
         let SchemaToCompile {
             key,
             uri,
@@ -379,10 +397,10 @@ impl<'i, K> Compiler<'i, K> {
 
     fn handle_err(
         &mut self,
-        err: CompileError,
+        err: keyword::CompileError<Keyword>,
         continue_on_err: bool,
         uri: &AbsoluteUri,
-    ) -> (bool, CompileError) {
+    ) -> (bool, keyword::CompileError<Keyword>) {
         if !continue_on_err {
             return (false, err);
         }
@@ -404,7 +422,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         key: Key,
         uri: &AbsoluteUri,
-    ) -> Result<Vec<SchemaToCompile>, CompileError> {
+    ) -> Result<Vec<SchemaToCompile>, keyword::CompileError<Keyword>> {
         let existing = self.subschemas.get_mut(uri).unwrap();
         let (remaining, subschemas) = subschemas(key, uri, existing.iter(), self.schemas)?;
         *existing = remaining;
@@ -415,7 +433,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         key: Key,
         mut base_uri: AbsoluteUri,
-    ) -> Result<Vec<SchemaToCompile>, CompileError> {
+    ) -> Result<Vec<SchemaToCompile>, keyword::CompileError<Keyword>> {
         let refs = self.refs.get(&base_uri).unwrap().clone();
         // references which cannot be resolved yet due to the referenced
         // not being resolved yet.
@@ -463,7 +481,7 @@ impl<'i, K> Compiler<'i, K> {
         ref_: Option<RefToResolve>,
         continue_on_err: bool,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         if self.schemas.is_compiled(key) {
             return Ok(());
         }
@@ -511,7 +529,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         s: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, CompileError)> {
+    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
         // if parent is None and this schema is not a document root (does
         // not have an $id/id) then find the most relevant ancestor and
         // compile it. Doing so will also compile this schema.
@@ -525,7 +543,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         s: SchemaToCompile,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, CompileError)> {
+    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
         let mut root_uri = s.uri.clone();
         root_uri.set_fragment(None).unwrap();
         let anchor = s.uri.fragment_decoded_lossy().unwrap_or_default();
@@ -562,20 +580,25 @@ impl<'i, K> Compiler<'i, K> {
         Ok(())
     }
 
-    fn keywords_for(
+    fn keywords_for<Lang: crate::Lang>(
         &mut self,
         key: Key,
-        possible: &[Box<dyn K>],
-    ) -> Result<Box<[Box<dyn K>]>, CompileError> {
+        lang: &Lang,
+        possible: &[Keyword],
+    ) -> Result<Box<[Keyword]>, keyword::CompileError<Keyword>> {
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
-            let mut compile = Compile {
+            let mut compile = lang.new_compile(crate::NewCompile {
                 absolute_uri: schema.absolute_uri(),
                 schemas: self.schemas,
-                numbers: self.numbers,
-                value_cache: self.values,
-            };
+                global_numbers: self.numbers,
+                deserializers: self.deserializers,
+                sources: self.sources,
+                dialects: self.dialects,
+                resolvers: self.resolvers,
+                values: self.values,
+            });
             if keyword.compile(&mut compile, schema.clone())? {
                 keywords.push(keyword);
             }
@@ -589,7 +612,7 @@ impl<'i, K> Compiler<'i, K> {
         referenced_key: Key,
         referenced_uri: AbsoluteUri,
         ref_: RefToResolve,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         let referrer_key = ref_.referrer_key;
         self.add_reference(ref_.referrer_key, referenced_key, referenced_uri, ref_.ref_)?;
 
@@ -603,7 +626,7 @@ impl<'i, K> Compiler<'i, K> {
         referenced_key: Key,
         referenced_uri: AbsoluteUri,
         ref_: Ref,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         self.schemas.add_reference(
             referrer_key,
             Reference {
@@ -625,7 +648,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         target_uri: &AbsoluteUri,
         q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         let mut path = Pointer::parse(&target_uri.fragment_decoded_lossy().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
 
@@ -689,7 +712,7 @@ impl<'i, K> Compiler<'i, K> {
         &mut self,
         dialect_idx: usize,
         src: &Value,
-    ) -> Result<Vec<Anchor>, CompileError> {
+    ) -> Result<Vec<Anchor>, keyword::CompileError<Keyword>> {
         Ok(self
             .dialects
             .get_by_index(dialect_idx)
@@ -697,16 +720,19 @@ impl<'i, K> Compiler<'i, K> {
             .anchors(src)?)
     }
 
-    fn validate(&mut self, dialect_idx: usize, src: &Value) -> Result<(), CompileError> {
+    fn validate<Lang: crate::Lang>(
+        &mut self,
+        dialect_idx: usize,
+        src: &Value,
+    ) -> Result<(), keyword::CompileError<Keyword>> {
         if !self.validate {
             return Ok(());
         }
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
-
+        let structure = <keyword::Structure<Lang::Keyword> as Structure>::verbose();
         let output = self.schemas.evaluate(
-            Structure::Verbose,
             key,
             src,
             Pointer::default(),
@@ -729,7 +755,7 @@ fn subschemas<'c>(
     uri: &AbsoluteUri,
     subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
     schemas: &Schemas,
-) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile>), CompileError> {
+) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile>), keyword::CompileError<Keyword>> {
     let mut q = Vec::with_capacity(subschemas.len());
     let mut r = HashSet::with_capacity(subschemas.len());
     for path in subschemas {
@@ -775,7 +801,7 @@ fn append_anchor_uris<'i>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'i AbsoluteUri,
     anchors: &'i [Anchor],
-) -> Result<(), CompileError> {
+) -> Result<(), keyword::CompileError<Keyword>> {
     for anchor in anchors {
         let mut uri = base_uri.clone();
         uri.set_fragment(Some(&anchor.name))
@@ -793,7 +819,7 @@ fn append_ancestry_uris<'a>(
     uris: &mut Vec<AbsoluteUri>,
     path: &'a Pointer,
     parent_uris: &'a [AbsoluteUri],
-) -> Result<(), CompileError> {
+) -> Result<(), keyword::CompileError<Keyword>> {
     if path.is_empty() {
         return Ok(());
     }
@@ -810,7 +836,7 @@ fn append_uri_path(
     path: &Pointer,
     uri: &AbsoluteUri,
     fragment: &str,
-) -> Result<AbsoluteUri, CompileError> {
+) -> Result<AbsoluteUri, keyword::CompileError<Keyword>> {
     let mut uri = uri.clone();
     let mut uri_path = Pointer::parse(fragment)?;
     uri_path.append(path);
@@ -834,7 +860,7 @@ fn identify(
     uri: &AbsoluteUri,
     source: &Value,
     dialect: &Dialect,
-) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError> {
+) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), keyword::CompileError<Keyword>> {
     let (id, uris) = dialect.identify(uri.clone(), source)?;
     // if identify did not find a primary id, use the uri + pointer fragment
     // as the lookup which will be at the first position in the uris list

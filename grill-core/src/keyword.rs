@@ -19,7 +19,7 @@ pub const FALSE: &Value = &Value::Bool(false);
 pub type Context<Keyword> = <Keyword as crate::Keyword>::Context;
 pub type Compile<Keyword> = <Keyword as crate::Keyword>::Compile;
 pub type Output<Keyword> = <Keyword as crate::Keyword>::Output;
-pub type Structure<Keyword> = <Keyword as crate::Keyword>::Structure;
+pub type Structure<Keyword> = <Output<Keyword> as crate::Output>::Structure;
 pub type ValidationError<Keyword> = <Keyword as crate::Keyword>::ValidationError;
 pub type CompileError<Keyword> = <Keyword as crate::Keyword>::CompileError;
 pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
@@ -39,8 +39,7 @@ pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
 pub trait Keyword: Send + Sync + Clone + fmt::Debug {
     type Context;
     type Compile;
-    type Output;
-    type Structure;
+    type Output: crate::Output;
     type ValidationError;
     type CompileError: crate::error::CompileError;
     type EvaluateError: std::error::Error;

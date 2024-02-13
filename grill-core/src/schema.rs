@@ -6,9 +6,11 @@ pub mod traverse;
 
 pub mod dialect;
 
+use crate::keyword;
 pub use dialect::{Dialect, Dialects};
 use serde::{Serialize, Serializer};
 
+use crate::uri::Uri;
 pub(crate) mod compiler;
 
 use crate::{
@@ -31,6 +33,18 @@ use std::{
     hash::Hash,
     ops::Deref,
 };
+
+pub struct Evaluate<'v, Keyword: keyword::Keyword> {
+    structure: keyword::Structure<Keyword>,
+    key: Key,
+    value: &'v Value,
+    instance_location: Pointer,
+    keyword_location: Pointer,
+    sources: &'v Sources,
+    evaluated: &'v mut HashSet<String>,
+    global_numbers: &'v crate::cache::Numbers,
+    eval_numbers: &'v mut crate::cache::Numbers,
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -136,6 +150,7 @@ impl CompiledSchema {
         }
     }
 }
+
 impl CompiledSchema {
     /// Returns most relevant URI for the schema, either using the `$id` or the
     /// most relevant as determined by the schema's ancestory or source.
@@ -369,9 +384,9 @@ pub struct Schemas<Keyword> {
     sandbox: Option<Store>,
 }
 
-impl<Keyword> Schemas<Keyword>
+impl<Lang> Schemas<Lang>
 where
-    Keyword: crate::Keyword,
+    Lang: crate::Lang,
 {
     #[must_use]
     pub fn new() -> Self {
@@ -384,28 +399,19 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn evaluate<'v>(
         &self,
-        structure: Keyword::Structure,
-        key: Key,
-        value: &'v Value,
-        instance_location: Pointer,
-        keyword_location: Pointer,
-        sources: &Sources,
-        evaluated: &mut HashSet<String>,
-        global_numbers: &crate::cache::Numbers,
-        eval_numbers: &mut crate::cache::Numbers,
-    ) -> Result<Keyword::Output, EvaluateError> {
+        eval: Evaluate<'v, Lang::Keyword>,
+    ) -> Result<keyword::Output<Lang::Keyword>, EvaluateError> {
+        let Evaluate {
+            key,
+            sources,
+            keyword_location,
+            instance_location,
+            structure,
+            global_numbers,
+            eval_numbers,
+            value,
+        } = eval;
         let schema = self.get(key, sources)?;
-        if schema.absolute_uri().host().unwrap() != "json-schema.org" {
-            // eprintln!(
-            //     "evaluating:\t{}\ndata:\t{}\nschema:\t{}",
-            //     schema.absolute_uri(),
-            //     serde_json::to_string_pretty(&value).unwrap(),
-            //     serde_json::to_string_pretty(&*schema).unwrap()
-            // );
-            // dbg!(schema.absolute_uri());
-            // dbg!(&schema.key);
-            // dbg!(&schema.keywords);
-        }
         let mut ctx = Context {
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
@@ -454,7 +460,7 @@ where
         uri: &AbsoluteUri,
         references: &[Reference],
         sources: &Sources,
-    ) -> Result<(), crate::keyword::CompileError<Keyword>> {
+    ) -> Result<(), crate::keyword::CompileError<Lang::Keyword>> {
         for reference in references {
             if key == reference.key
                 || self
@@ -481,7 +487,7 @@ where
     pub(crate) fn has_keywords(&self, key: Key) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
-    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[Keyword]>) {
+    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[Lang::Keyword]>) {
         self.sandbox().table.get_mut(key).unwrap().keywords = keywords;
     }
     pub(crate) fn has_keywords_by_uri(&self, uri: &AbsoluteUri) -> bool {
@@ -540,7 +546,10 @@ where
         if self.store().contains_key(key) {
             Ok(f())
         } else {
-            Err(UnknownKeyError)
+            Err(UnknownKeyError {
+                key,
+                backtrace: snafu::Backtrace::capture(),
+            })
         }
     }
 
@@ -594,7 +603,10 @@ where
         key: Key,
         sources: &'i Sources,
     ) -> Result<Schema<'i>, UnknownKeyError> {
-        let schema = self.store().get(key).ok_or(UnknownKeyError)?;
+        let schema = self.store().get(key).ok_or(UnknownKeyError {
+            key,
+            backtrace: snafu::Backtrace::capture(),
+        })?;
 
         Ok(Schema {
             key,
@@ -625,7 +637,7 @@ where
         key: Key,
         ref_: Reference,
         sources: &Sources,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), keyword::CompileError<Lang::Keyword>> {
         let references = self.get_compiled(ref_.key).unwrap().references.clone();
         self.ensure_not_cyclic(key, &ref_.absolute_uri, &references, sources)?;
         self.get_mut(key).unwrap().references.push(ref_);
