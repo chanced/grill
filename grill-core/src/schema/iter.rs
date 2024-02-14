@@ -12,14 +12,18 @@ use crate::{error::UnknownKeyError, source::Sources, Key, Schema};
 /// [`Interrogator`](`crate::Interrogator`). If this is not a concern, use
 /// [`unchecked`](`Iter::unchecked`) which unwraps all `Result`s.
 ///
-pub struct Iter<'i> {
+pub struct Iter<'i, Keyword> {
     sources: &'i Sources,
-    schemas: &'i Schemas,
+    schemas: &'i Schemas<Keyword>,
     inner: Either<std::slice::Iter<'i, Key>, std::vec::IntoIter<Key>>,
 }
 
-impl<'i> Iter<'i> {
-    pub(crate) fn new(keys: &'i [Key], schemas: &'i Schemas, sources: &'i Sources) -> Self {
+impl<'i, Keyword> Iter<'i, Keyword> {
+    pub(crate) fn new(
+        keys: &'i [Key],
+        schemas: &'i Schemas<Keyword>,
+        sources: &'i Sources,
+    ) -> Self {
         Self {
             sources,
             schemas,
@@ -33,7 +37,7 @@ impl<'i> Iter<'i> {
     /// Do not use this unless you are certain all `Key`s are associated with
     /// the [`Interrogator`] from which this is originated.
     #[must_use]
-    pub fn unchecked(self) -> IterUnchecked<'i> {
+    pub fn unchecked(self) -> IterUnchecked<'i, Keyword> {
         IterUnchecked { inner: self }
     }
 
@@ -45,8 +49,8 @@ impl<'i> Iter<'i> {
     //     }
     // }
 }
-impl<'i> Iterator for Iter<'i> {
-    type Item = Result<Schema<'i>, UnknownKeyError>;
+impl<'i, K> Iterator for Iter<'i, K> {
+    type Item = Result<Schema<'i, K>, UnknownKeyError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let key = match self.inner.as_mut() {
@@ -61,12 +65,12 @@ impl<'i> Iterator for Iter<'i> {
 /// # Panics
 /// This will panic if any of the [`Key`]s are not associated with the same
 /// [`Interrogator`](`crate::Interrogator`).
-pub struct IterUnchecked<'i> {
-    inner: Iter<'i>,
+pub struct IterUnchecked<'i, Keyword> {
+    inner: Iter<'i, Keyword>,
 }
 
-impl<'i> Iterator for IterUnchecked<'i> {
-    type Item = Schema<'i>;
+impl<'i, K> Iterator for IterUnchecked<'i, K> {
+    type Item = Schema<'i, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(std::result::Result::unwrap)

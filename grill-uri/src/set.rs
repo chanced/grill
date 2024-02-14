@@ -2,13 +2,10 @@ use super::{encode, parse};
 
 pub(crate) mod urn {
     use super::encode;
-    use crate::error::UriError;
+    use crate::error::Error;
     use urn::Urn;
 
-    pub(crate) fn fragment(
-        urn: &mut Urn,
-        fragment: Option<&str>,
-    ) -> Result<Option<String>, UriError> {
+    pub(crate) fn fragment(urn: &mut Urn, fragment: Option<&str>) -> Result<Option<String>, Error> {
         let existing = urn.f_component().map(ToString::to_string);
         // safety: encode_f_component does not currently return an error.
         let fragment = fragment.map(encode::f_component).map(Result::unwrap);
@@ -16,13 +13,13 @@ pub(crate) mod urn {
         Ok(existing)
     }
 
-    pub(crate) fn nss(urn: &mut Urn, nss: &str) -> Result<String, UriError> {
+    pub(crate) fn nss(urn: &mut Urn, nss: &str) -> Result<String, Error> {
         let existing = urn.nss().to_string();
         urn.set_nss(&encode::nss(nss)?)?;
         Ok(existing)
     }
 
-    pub(crate) fn namespace(u: &mut Urn, namespace: &str) -> Result<Option<String>, UriError> {
+    pub(crate) fn namespace(u: &mut Urn, namespace: &str) -> Result<Option<String>, Error> {
         let prev_namespace = u.nid().to_string();
         u.set_nid(namespace)?;
         Ok(Some(prev_namespace))
@@ -30,7 +27,7 @@ pub(crate) mod urn {
 }
 
 pub(crate) mod url {
-    use crate::error::{AuthorityError, UriError};
+    use crate::error::{AuthorityError, Error};
 
     use super::parse;
     use snafu::Backtrace;
@@ -46,7 +43,7 @@ pub(crate) mod url {
         existing
     }
 
-    pub(crate) fn authority(u: &mut Url, authority: &str) -> Result<Option<String>, UriError> {
+    pub(crate) fn authority(u: &mut Url, authority: &str) -> Result<Option<String>, Error> {
         let prev_authority = crate::get::url::authority(u);
         let authority = parse::authority(authority)?;
         if u.set_username(authority.username().unwrap_or_default())

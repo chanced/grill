@@ -20,7 +20,7 @@ snafu        = { workspace = true }
 tracing      = { workspace = true }
 
 [dev-dependencies]
-grill              = { workspace = true }
+# grill              = { workspace = true }
 mockall            = { workspace = true }
 similar            = { workspace = true }
 tokio              = { version = "1.28", features = ["full"] }

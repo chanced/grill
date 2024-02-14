@@ -39,7 +39,7 @@ toml             = { workspace = true, optional = true }
 tracing          = { workspace = true }
 
 [dev-dependencies]
-grill              = { workspace = true }
+# grill              = { workspace = true }
 mockall            = { workspace = true }
 similar            = { workspace = true }
 tokio              = { workspace = true, features = ["full"] }

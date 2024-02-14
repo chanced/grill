@@ -6,7 +6,7 @@ members = [
 	"grill-uri",
 	"grill-json-schema",
 	"grill-test-builder",
-	"tests",
+	# "tests",
 ]
 resolver = "2"
 

@@ -31,7 +31,7 @@ pub use schema::{Key, Schema};
 
 pub mod source;
 pub(crate) use source::Src;
-use uri::{error::UriError, AbsoluteUri};
+use uri::{error::Error, AbsoluteUri};
 
 pub mod big;
 
@@ -124,7 +124,7 @@ where
 /// Constructs an [`Interrogator`].
 pub struct Build<Lang> {
     dialects: Vec<Dialect>,
-    precompile: Vec<Result<AbsoluteUri, UriError>>,
+    precompile: Vec<Result<AbsoluteUri, Error>>,
     pending_srcs: Vec<PendingSrc>,
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
@@ -568,7 +568,7 @@ where
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
 
-        let precompile: Result<Vec<AbsoluteUri>, UriError> = precompile.into_iter().collect();
+        let precompile: Result<Vec<AbsoluteUri>, Error> = precompile.into_iter().collect();
         let precompile = precompile.map_err(SourceError::UriFailedToParse)?;
 
         let dialect_ids: Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
@@ -660,7 +660,7 @@ where
     ///
     /// # Errors
     /// Returns [`UnknownKeyError`] if the `key` does not belong to this `Interrgator`.
-    pub fn schema(&self, key: Key) -> Result<Schema<'_>, UnknownKeyError> {
+    pub fn schema(&self, key: Key) -> Result<Schema<'_, Lang::Keyword>, UnknownKeyError> {
         self.schemas.get(key, &self.sources)
     }
 
@@ -669,13 +669,13 @@ where
     ///
     /// # Panics
     /// Panics if the `key` does not belong to this `Interrgator`.
-    pub fn schema_unchecked(&self, key: Key) -> Schema<'_> {
+    pub fn schema_unchecked(&self, key: Key) -> Schema<'_, Lang::Keyword> {
         self.schemas.get_unchecked(key, &self.sources)
     }
 
     /// Returns the [`Schema`] with the given `id` if it exists.
     #[must_use]
-    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_>> {
+    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_, Lang::Keyword>> {
         self.schemas.get_by_uri(id, &self.sources)
     }
 
@@ -753,7 +753,10 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn direct_dependencies(&self, key: Key) -> Result<DirectDependencies<'_>, UnknownKeyError> {
+    pub fn direct_dependencies(
+        &self,
+        key: Key,
+    ) -> Result<DirectDependencies<'_, Lang::Keyword>, UnknownKeyError> {
         self.schemas
             .ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
     }
@@ -764,7 +767,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_> {
+    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_, Lang::Keyword> {
         self.schemas.direct_dependencies(key, &self.sources)
     }
 
@@ -778,7 +781,7 @@ where
     pub fn transitive_dependencies(
         &self,
         key: Key,
-    ) -> Result<TransitiveDependencies<'_>, UnknownKeyError> {
+    ) -> Result<TransitiveDependencies<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || {
             self.schemas.transitive_dependencies(key, &self.sources)
         })
@@ -792,7 +795,10 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn transitive_dependencies_unchecked(&self, key: Key) -> TransitiveDependencies<'_> {
+    pub fn transitive_dependencies_unchecked(
+        &self,
+        key: Key,
+    ) -> TransitiveDependencies<'_, Lang::Keyword> {
         self.schemas.transitive_dependencies(key, &self.sources)
     }
 
@@ -802,7 +808,10 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn direct_dependents(&self, key: Key) -> Result<DirectDependents<'_>, UnknownKeyError> {
+    pub fn direct_dependents(
+        &self,
+        key: Key,
+    ) -> Result<DirectDependents<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
@@ -815,13 +824,16 @@ where
     pub fn direct_dependents_unchecked(
         &self,
         key: Key,
-    ) -> Result<DirectDependents<'_>, UnknownKeyError> {
+    ) -> Result<DirectDependents<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
     /// Returns [`AllDependents`] which is an [`Iterator`] over [`Schema`]s which
     /// depend on a specified [`Schema`](crate::schema::Schema)
-    pub fn all_dependents(&self, key: Key) -> Result<AllDependents<'_>, UnknownKeyError> {
+    pub fn all_dependents(
+        &self,
+        key: Key,
+    ) -> Result<AllDependents<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.all_dependents(key, &self.sources))
     }
 
@@ -840,10 +852,7 @@ where
     /// Compiles all schemas at the given URIs if not already compiled, returning
     /// a [`Vec`] of either the freshly or previously compiled [`Schema`]s
     ///
-    /// # Errors
-    /// Returns [`CompileError`] if any of the schemas fail to compile.
-    ///
-    /// # Example
+    /// ## Example
     /// ```
     /// use grill::{ Interrogator, json_schema::Build as _ };
     ///
@@ -864,6 +873,9 @@ where
     /// # }
     /// ```
     ///
+    /// ## Errors
+    /// Returns [`CompileError`] if any of the schemas fail to compile.
+    //
     #[allow(clippy::unused_async)]
     pub async fn compile_all<I>(
         &mut self,
@@ -943,7 +955,7 @@ where
     /// If you know that all of the keys belong to this `Interrogator`, you can use
     /// [`iter_unchecked`](`Interrogator::iter_unchecked`) instead.
     #[must_use]
-    pub fn iter<'i>(&'i self, keys: &'i [Key]) -> Iter<'i> {
+    pub fn iter<'i, Keyword>(&'i self, keys: &'i [Key]) -> Iter<'i, Keyword> {
         Iter::new(keys, &self.schemas, &self.sources)
     }
 
@@ -955,7 +967,7 @@ where
     /// have multiple `Interrogator` instances where mixing up keys could occur,
     /// use [`iter`](`Interrogator::iter`) instead.
     #[must_use]
-    pub fn iter_unchecked<'i>(&'i self, keys: &'i [Key]) -> IterUnchecked<'i> {
+    pub fn iter_unchecked<'i, Keyword>(&'i self, keys: &'i [Key]) -> IterUnchecked<'i, Keyword> {
         self.iter(keys).unchecked()
     }
 
@@ -1392,9 +1404,9 @@ where
 }
 
 enum PendingSrc {
-    Bytes(Result<AbsoluteUri, UriError>, Vec<u8>),
-    String(Result<AbsoluteUri, UriError>, String),
-    Value(Result<AbsoluteUri, UriError>, Cow<'static, Value>),
+    Bytes(Result<AbsoluteUri, Error>, Vec<u8>),
+    String(Result<AbsoluteUri, Error>, String),
+    Value(Result<AbsoluteUri, Error>, Cow<'static, Value>),
 }
 impl TryFrom<PendingSrc> for Src {
     type Error = SourceError;

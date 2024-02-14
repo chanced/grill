@@ -3,12 +3,12 @@ use std::{ops::Range, str::FromStr};
 use crate::usize_to_u32;
 
 use super::{encode, write, RelativeUri, Uri};
-use crate::error::{AuthorityError, InvalidPortError, UriError};
+use crate::error::{AuthorityError, Error, InvalidPortError};
 use snafu::Backtrace;
 use url::Url;
 use urn::Urn;
 
-pub(super) fn uri(value: &str) -> Result<Uri, UriError> {
+pub(super) fn uri(value: &str) -> Result<Uri, Error> {
     Parse::uri(value)
 }
 
@@ -30,7 +30,7 @@ struct Parse<'a> {
 }
 
 impl<'a> Parse<'a> {
-    fn uri(input: &'a str) -> Result<Uri, UriError> {
+    fn uri(input: &'a str) -> Result<Uri, Error> {
         let mut parser = Self {
             state: State::Head,
             input,
@@ -90,7 +90,7 @@ impl<'a> Parse<'a> {
         })
     }
 
-    fn next(&mut self, index: usize, next: char) -> Option<Result<Uri, UriError>> {
+    fn next(&mut self, index: usize, next: char) -> Option<Result<Uri, Error>> {
         use AuthorityState::*;
         use State::*;
         let index = match usize_to_u32(index) {
@@ -115,7 +115,7 @@ impl<'a> Parse<'a> {
         None
     }
 
-    fn finalize_uri(mut self) -> Result<Uri, UriError> {
+    fn finalize_uri(mut self) -> Result<Uri, Error> {
         if self.username_index.is_some() && self.host().is_none() {
             self.host_index = self.username_index.take();
             self.port_index = self.password_index.take();
@@ -152,20 +152,20 @@ impl<'a> Parse<'a> {
         }
         .into())
     }
-    fn parse_url(&mut self) -> Option<Result<Uri, UriError>> {
+    fn parse_url(&mut self) -> Option<Result<Uri, Error>> {
         Url::parse(self.input)
             .map(Uri::Url)
-            .map_err(|source| UriError::FailedToParseUrl {
+            .map_err(|source| Error::FailedToParseUrl {
                 source,
                 backtrace: Backtrace::capture(),
             })
             .into()
     }
 
-    fn parse_urn(&mut self) -> Option<Result<Uri, UriError>> {
+    fn parse_urn(&mut self) -> Option<Result<Uri, Error>> {
         Urn::from_str(self.input)
             .map(Uri::Urn)
-            .map_err(|source| UriError::FailedToParseUrn {
+            .map_err(|source| Error::FailedToParseUrn {
                 source,
                 backtrace: Backtrace::capture(),
             })

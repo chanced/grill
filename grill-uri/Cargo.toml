@@ -24,7 +24,7 @@ grill-macros = { workspace = true }
 strum        = { workspace = true }
 
 [dev-dependencies]
-grill   = { workspace = true }
+# grill   = { workspace = true }
 mockall = { workspace = true }
 similar = { workspace = true }
 

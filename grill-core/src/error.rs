@@ -2,7 +2,7 @@
 //!
 //!
 //!
-use grill_uri::error::UriError;
+use grill_uri::error::Error;
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
@@ -96,26 +96,20 @@ pub enum AnchorError {
         source: InvalidTypeError,
         backtrace: Backtrace,
     },
-
-    #[snafu(display("duplicate anchor found: \"{}\"", existing.name))]
+    #[snafu(transparent, context(false))]
     Duplicate {
-        existing: Anchor,
-        duplicate: Anchor,
-        backtrace: Backtrace,
+        #[snafu(backtrace)]
+        source: DuplicateAnchorError,
     },
 }
 
-// /// An error occurred parsing or resolving a JSON [`Pointer`].
-// #[derive(Debug, snafu)]
-// pub enum PointerError {
-//     #[snafu(transparent)]
-//     /// The JSON [`Pointer`] was malformed.
-//     ParsingFailed{ #[snafu(backtrace)] source: MalformedPointerError },
-
-//     #[snafu(transparent)]
-//     /// The JSON [`Pointer`] could not be resolved.
-//     ResolutionFailed{ #[snafu(backtrace)] source: ResolvePointerError },
-// }
+#[derive(Debug, Snafu)]
+#[snafu(module, display("duplicate anchor found: \"{}\"", existing.name))]
+pub struct DuplicateAnchorError {
+    pub existing: Anchor,
+    pub duplicate: Anchor,
+    pub backtrace: Backtrace,
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -160,7 +154,7 @@ pub enum SourceError {
     #[snafu(display("failed to parse source URI: {source}"))]
     UriFailedToParse {
         #[snafu(backtrace)]
-        source: UriError,
+        source: Error,
     },
 
     /// The source URI contains afragment which is not allowed.
@@ -191,13 +185,20 @@ pub enum SourceError {
         new_path,
         existing_path
     ))]
-    SourceConflict {
+    SchemaConflict {
         uri: AbsoluteUri,
         /// The existing schema location.
         existing_path: Pointer,
         /// The new schema location.
         new_path: Pointer,
+        backtrace: Backtrace,
     },
+
+    SourceConflict {
+        uri: AbsoluteUri,
+        backtrace: snafu::Backtrace,
+    },
+
     /// Failed to resolve a path
     #[snafu(display("failed to resolve link path: {source}"))]
     PathNotFound {
@@ -339,7 +340,7 @@ pub enum DialectError {
     #[snafu(transparent)]
     UriPFailedToParse {
         #[snafu(backtrace)]
-        source: UriError,
+        source: Error,
     },
 }
 
@@ -851,7 +852,7 @@ pub enum IdentifyError {
     #[snafu(transparent)]
     InvalidUri {
         #[snafu(backtrace)]
-        source: UriError,
+        source: Error,
     },
 
     /// The URI is not absolute (i.e. contains a non-empty fragment).
@@ -985,7 +986,7 @@ pub enum RefError {
     #[snafu(transparent)]
     UriError {
         #[snafu(backtrace)]
-        source: UriError,
+        source: Error,
     },
 }
 

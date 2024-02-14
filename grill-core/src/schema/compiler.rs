@@ -583,13 +583,12 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     fn keywords_for<Lang: crate::Lang>(
         &mut self,
         key: Key,
-        lang: &Lang,
         possible: &[Keyword],
     ) -> Result<Box<[Keyword]>, keyword::CompileError<Keyword>> {
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
-            let mut compile = lang.new_compile(crate::NewCompile {
+            let mut compile = self.lang.new_compile(crate::NewCompile {
                 absolute_uri: schema.absolute_uri(),
                 schemas: self.schemas,
                 global_numbers: self.numbers,
@@ -750,11 +749,11 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     }
 }
 
-fn subschemas<'c>(
+fn subschemas<'c, Keyword>(
     key: Key,
     uri: &AbsoluteUri,
     subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
-    schemas: &Schemas,
+    schemas: &Schemas<Keyword>,
 ) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile>), keyword::CompileError<Keyword>> {
     let mut q = Vec::with_capacity(subschemas.len());
     let mut r = HashSet::with_capacity(subschemas.len());
@@ -797,7 +796,7 @@ fn append_all_front(q: &mut VecDeque<SchemaToCompile>, other: Vec<SchemaToCompil
     true
 }
 
-fn append_anchor_uris<'i>(
+fn append_anchor_uris<'i, Keyword>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'i AbsoluteUri,
     anchors: &'i [Anchor],
@@ -815,7 +814,7 @@ fn append_anchor_uris<'i>(
     Ok(())
 }
 
-fn append_ancestry_uris<'a>(
+fn append_ancestry_uris<'a, Keyword>(
     uris: &mut Vec<AbsoluteUri>,
     path: &'a Pointer,
     parent_uris: &'a [AbsoluteUri],
@@ -832,7 +831,7 @@ fn append_ancestry_uris<'a>(
     Ok(())
 }
 
-fn append_uri_path(
+fn append_uri_path<Keyword>(
     path: &Pointer,
     uri: &AbsoluteUri,
     fragment: &str,
@@ -855,8 +854,7 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-#[instrument(level = Level::TRACE)]
-fn identify(
+fn identify<Keyword>(
     uri: &AbsoluteUri,
     source: &Value,
     dialect: &Dialect,

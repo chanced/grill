@@ -167,13 +167,15 @@ mod parse;
 mod set;
 mod write;
 
+pub use error::Error;
+
 use crate::error::UrnError;
 #[doc(no_inline)]
 pub use url::Url;
 #[doc(no_inline)]
 pub use urn::Urn;
 
-use crate::error::{OverflowError, RelativeUriError, UriError};
+use crate::error::{OverflowError, RelativeUriError};
 
 use std::{
     borrow::{Borrow, Cow},
@@ -573,7 +575,7 @@ impl AbsoluteUri {
     /// # Errors
     /// Returns [`UriError`] if `value` can not be parsed as a
     /// [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
-    pub fn parse(value: &str) -> Result<Self, UriError> {
+    pub fn parse(value: &str) -> Result<Self, Error> {
         if value.starts_with("urn:") {
             Ok(Urn::from_str(value)?.into())
         } else {
@@ -691,14 +693,14 @@ impl AbsoluteUri {
     /// # Errors
     /// Returns [`UriError::FailedToParseUrn`] if the [`AbsoluteUri`] is a [`Urn`] and
     /// the fragment is not a valid [`Urn`] fragment.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<Option<String>, UriError> {
+    pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<Option<String>, Error> {
         match self {
             Self::Url(url) => Ok(set::url::fragment(url, fragment)),
             Self::Urn(urn) => set::urn::fragment(urn, fragment),
         }
     }
 
-    pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, UriError> {
+    pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, Error> {
         let mut new = self.clone();
         let _ = new.set_fragment(fragment)?;
         Ok(new)
@@ -724,7 +726,7 @@ impl AbsoluteUri {
     }
 
     /// Sets the path (`Url`) or Name Specific String (`Urn`)
-    pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, UriError> {
+    pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, Error> {
         match self {
             Self::Url(url) => Ok(set::url::path(url, path_or_nss)),
             Self::Urn(urn) => set::urn::nss(urn, path_or_nss),
@@ -735,7 +737,7 @@ impl AbsoluteUri {
     pub fn set_authority_or_namespace(
         &mut self,
         authority_or_namespace: &str,
-    ) -> Result<Option<String>, UriError> {
+    ) -> Result<Option<String>, Error> {
         match self {
             Self::Url(u) => set::url::authority(u, authority_or_namespace),
             Self::Urn(u) => set::urn::namespace(u, authority_or_namespace),
@@ -871,7 +873,7 @@ impl AbsoluteUri {
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
-    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<AbsoluteUri, UriError> {
+    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<AbsoluteUri, Error> {
         let reference = reference.as_uri_ref();
 
         // if the reference has a scheme, normalize the path and return
@@ -950,11 +952,11 @@ impl AbsoluteUri {
     ///  as a URL.
     /// - the `AbsoluteUri` is currently an [`Url`], the value of
     ///   `scheme` is `"urn"`, and the URL cannot be parsed as a URN.
-    pub fn set_scheme(&mut self, scheme: &str) -> Result<String, UriError> {
+    pub fn set_scheme(&mut self, scheme: &str) -> Result<String, Error> {
         let scheme = scheme.trim_end_matches('/').trim_end_matches(':');
 
         let prev = self.scheme().to_string();
-        let to_uri_err = |()| UriError::InvalidScheme {
+        let to_uri_err = |()| Error::InvalidScheme {
             scheme: scheme.to_string(),
             backtrace: Backtrace::capture(),
         };
@@ -1059,7 +1061,7 @@ impl From<&AbsoluteUri> for String {
     }
 }
 impl TryFrom<Uri> for AbsoluteUri {
-    type Error = UriError;
+    type Error = Error;
 
     fn try_from(value: Uri) -> Result<Self, Self::Error> {
         match value {
@@ -1070,7 +1072,7 @@ impl TryFrom<Uri> for AbsoluteUri {
     }
 }
 impl TryFrom<&Uri> for AbsoluteUri {
-    type Error = UriError;
+    type Error = Error;
 
     fn try_from(value: &Uri) -> Result<Self, Self::Error> {
         match value {
@@ -1180,28 +1182,28 @@ impl From<&Urn> for AbsoluteUri {
 }
 
 impl TryFrom<&str> for AbsoluteUri {
-    type Error = UriError;
+    type Error = Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
 impl TryFrom<&String> for AbsoluteUri {
-    type Error = UriError;
+    type Error = Error;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
 impl TryFrom<String> for AbsoluteUri {
-    type Error = UriError;
+    type Error = Error;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::parse(&value)
     }
 }
 
 impl FromStr for AbsoluteUri {
-    type Err = UriError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
     }
@@ -1240,11 +1242,11 @@ impl PartialEq<&UriRef<'_>> for AbsoluteUri {
 }
 
 impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         match self {
             UriRef::Uri(uri) => uri.try_into_absolute_uri(),
             UriRef::AbsoluteUri(uri) => Ok(uri.clone()),
-            UriRef::RelativeUri(rel) => Err(UriError::NotAbsolute {
+            UriRef::RelativeUri(rel) => Err(Error::NotAbsolute {
                 uri: Uri::Relative(rel.clone()),
                 backtrace: Backtrace::capture(),
             }),
@@ -1253,50 +1255,50 @@ impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
 }
 
 impl TryIntoAbsoluteUri for String {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         AbsoluteUri::parse(&self)
     }
 }
 
 impl TryIntoAbsoluteUri for &str {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         AbsoluteUri::parse(self)
     }
 }
 
 impl TryIntoAbsoluteUri for AbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(self)
     }
 }
 
 impl TryIntoAbsoluteUri for &Url {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(AbsoluteUri::Url(self.clone()))
     }
 }
 impl TryIntoAbsoluteUri for &Urn {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(AbsoluteUri::Urn(self.clone()))
     }
 }
 impl TryIntoAbsoluteUri for Url {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(AbsoluteUri::Url(self))
     }
 }
 impl TryIntoAbsoluteUri for Urn {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(AbsoluteUri::Urn(self))
     }
 }
 impl TryIntoAbsoluteUri for &String {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         AbsoluteUri::parse(self)
     }
 }
 impl TryIntoAbsoluteUri for &Uri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url.clone())),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn.clone())),
@@ -1306,7 +1308,7 @@ impl TryIntoAbsoluteUri for &Uri {
 }
 
 impl TryIntoAbsoluteUri for Uri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         match self {
             Uri::Url(url) => Ok(AbsoluteUri::Url(url)),
             Uri::Urn(urn) => Ok(AbsoluteUri::Urn(urn)),
@@ -1316,7 +1318,7 @@ impl TryIntoAbsoluteUri for Uri {
 }
 
 impl TryIntoAbsoluteUri for &AbsoluteUri {
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         Ok(self.clone())
     }
 }
@@ -1340,7 +1342,7 @@ pub trait TryIntoAbsoluteUri {
     /// Returns an error if the conversion fails due to the value not being an
     /// absolute in the sense of having a scheme and an authority (URL) or a namespace
     /// (URN).
-    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError>;
+    fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error>;
 }
 
 /*
@@ -1541,7 +1543,7 @@ impl RelativeUri {
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
-    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, UriError> {
+    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, Error> {
         let reference = reference.as_uri_ref();
 
         // if the reference has a scheme, normalize the path and return
@@ -1840,7 +1842,7 @@ impl RelativeUri {
     pub fn set_authority<'a>(
         &'a mut self,
         authority: Option<&str>,
-    ) -> Result<Option<Authority<'a>>, UriError> {
+    ) -> Result<Option<Authority<'a>>, Error> {
         let existing_authority = self.authority().map(Authority::into_owned);
         let new = authority
             .map(parse::authority)
@@ -2089,7 +2091,7 @@ impl<'a> UriRef<'a> {
     /// Returns a [`UriError`] if the conversion fails due to the value not
     /// being an absolute in the sense of having a scheme and an authority (URL)
     /// or a namespace (URN).
-    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, UriError> {
+    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         TryIntoAbsoluteUri::try_into_absolute_uri(self)
     }
 
@@ -2603,7 +2605,7 @@ impl Uri {
     ///
     /// # Errors
     /// Returns `UriParseError` if `value` fails to parse as a `Uri`
-    pub fn parse(value: &str) -> Result<Self, UriError> {
+    pub fn parse(value: &str) -> Result<Self, Error> {
         parse::uri(value)
     }
 
@@ -2612,7 +2614,7 @@ impl Uri {
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
-    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, UriError> {
+    pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, Error> {
         let reference = reference.as_uri_ref();
 
         // if the reference has a scheme, normalize the path and return
@@ -2763,7 +2765,7 @@ impl Uri {
     /// # Errors
     /// Returns [`urn::Error`](`urn::Error`) if the `AbsoluteUri` is a
     /// [`Urn`](`urn::Urn`) and the fragment and the fragment fails validation.
-    pub fn set_fragment(&mut self, mut fragment: Option<&str>) -> Result<Option<String>, UriError> {
+    pub fn set_fragment(&mut self, mut fragment: Option<&str>) -> Result<Option<String>, Error> {
         if let Some(frag) = &fragment {
             if frag.is_empty() {
                 fragment = None;
@@ -2784,7 +2786,7 @@ impl Uri {
 
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
-    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UriError> {
+    pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, Error> {
         let prev = self.query().map(ToString::to_string);
         match self {
             Self::Url(url) => {
@@ -2877,7 +2879,7 @@ impl Uri {
     pub fn set_authority_or_namespace(
         &mut self,
         authority_or_namespace: &str,
-    ) -> Result<Option<String>, UriError> {
+    ) -> Result<Option<String>, Error> {
         match self {
             Uri::Url(url) => set::url::authority(url, authority_or_namespace),
             Uri::Urn(urn) => set::urn::namespace(urn, authority_or_namespace),
@@ -2932,7 +2934,7 @@ impl Uri {
     /// Sets the path for a `Uri` in the shame of a [`Url`] or [`RelativeUri`])
     /// or the namespace specific string for a [`Urn`]
     /// # Errors
-    pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, UriError> {
+    pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, Error> {
         match self {
             Self::Url(url) => Ok(set::url::path(url, path_or_nss)),
             Self::Urn(urn) => set::urn::nss(urn, path_or_nss),
@@ -3144,20 +3146,20 @@ impl PartialEq<Uri> for String {
 }
 
 impl FromStr for Uri {
-    type Err = UriError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
     }
 }
 
 impl TryFrom<String> for Uri {
-    type Error = UriError;
+    type Error = Error;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::parse(&value)
     }
 }
 impl TryFrom<&String> for Uri {
-    type Error = UriError;
+    type Error = Error;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::parse(value)
     }

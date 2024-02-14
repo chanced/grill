@@ -61,7 +61,7 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
     fn compile<'i>(
         &mut self,
         compile: &mut Self::Compile,
-        schema: Schema<'i>,
+        schema: Schema<'i, Self>,
     ) -> Result<bool, Self::CompileError>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].

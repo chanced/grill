@@ -1,15 +1,11 @@
 //! Schema source store, resolvers, and deserializers.
 //!
 use crate::{
-    error::{
-        DeserializationError, DeserializeError, LinkConflict, LinkError, PointerError,
-        ResolveError, ResolveErrors, SourceConflictError, SourceError,
-    },
+    error::{DeserializeError, LinkError, ResolveError, ResolveErrors, SourceError},
     uri::decode_lossy,
     AbsoluteUri,
 };
 use async_trait::async_trait;
-use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
@@ -112,7 +108,11 @@ impl Store {
         let key = self.index.get(&uri).unwrap().src_key;
         let existing_src = self.table.get(key).unwrap().clone();
         if src != existing_src {
-            return Err(SourceConflictError { uri: uri.clone() }.into());
+            return Err(SourceError::SourceConflict {
+                uri: uri.clone(),
+                backtrace: snafu::Backtrace::capture(),
+            }
+            .into());
         }
         let link = self.index.get(&uri).unwrap().clone();
         Ok((key, link, existing_src))

@@ -20,7 +20,7 @@ use crate::Uri;
 /// [`Uri`](`crate::uri::Uri`), [`AbsoluteUri`](`crate::uri::AbsoluteUri`), or
 /// [`RelativeUri`](`crate::uri::RelativeUri`).
 #[derive(Debug, Snafu)]
-pub enum UriError {
+pub enum Error {
     /// an issue occurred parsing a [`Url`](`url::Url`)
     #[snafu(display("failed to parse url: {source}"), context(false))]
     FailedToParseUrl {
@@ -63,18 +63,18 @@ pub enum UriError {
     },
 }
 
-impl From<InvalidPortError> for UriError {
+impl From<InvalidPortError> for Error {
     fn from(err: InvalidPortError) -> Self {
         Self::FailedToParseRelativeUri { source: err.into() }
     }
 }
-impl From<OverflowError> for UriError {
+impl From<OverflowError> for Error {
     fn from(err: OverflowError) -> Self {
         Self::FailedToParseRelativeUri { source: err.into() }
     }
 }
 
-impl UriError {
+impl Error {
     /// Returns `true` if the uri parse error is [`Url`].
     ///
     /// [`Url`]: UriParseError::Url
