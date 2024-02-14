@@ -6,10 +6,7 @@ use crate::{
 };
 use jsonptr::{Pointer, Token};
 use serde_json::Value;
-use std::{
-    any::Any,
-    fmt::{self, Display},
-};
+use std::fmt::{self, Display};
 
 /// A static reference to [`Value::Bool`] with the value `true`
 pub const TRUE: &Value = &Value::Bool(true);
@@ -20,7 +17,8 @@ pub type Context<Keyword> = <Keyword as crate::Keyword>::Context;
 pub type Compile<Keyword> = <Keyword as crate::Keyword>::Compile;
 pub type Output<Keyword> = <Keyword as crate::Keyword>::Output;
 pub type Structure<Keyword> = <Output<Keyword> as crate::Output>::Structure;
-pub type ValidationError<Keyword> = <Keyword as crate::Keyword>::ValidationError;
+pub type ValidationError<Keyword> = <Output<Keyword> as crate::Output>::Error;
+pub type BuildError<Keyword> = <Keyword as crate::Keyword>::BuildError;
 pub type CompileError<Keyword> = <Keyword as crate::Keyword>::CompileError;
 pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
 
@@ -40,8 +38,8 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
     type Context;
     type Compile;
     type Output: crate::Output;
-    type ValidationError;
     type CompileError: crate::error::CompileError;
+    type BuildError: crate::error::BuildError<Self::CompileError>;
     type EvaluateError: std::error::Error;
 
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will

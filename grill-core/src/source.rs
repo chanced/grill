@@ -1,7 +1,7 @@
 //! Schema source store, resolvers, and deserializers.
 //!
 use crate::{
-    error::{DeserializeError, LinkError, ResolveError, ResolveErrors, SourceError},
+    error::{DeserializeError, LinkError, PointerError, ResolveError, ResolveErrors, SourceError},
     uri::decode_lossy,
     AbsoluteUri,
 };
@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
+use snafu::Backtrace;
 use std::{
     borrow::Cow,
     collections::hash_map::{Entry, HashMap},
@@ -222,9 +223,10 @@ impl Sources {
             let uri = src.uri().clone(); // need the uri below for the error context
             let src = src
                 .deserialize_or_take_value(deserializers)
-                .map_err(|error| DeserializationError {
+                .map_err(|source| SourceError::DeserializationFailed {
                     uri: uri.clone(),
-                    error,
+                    source,
+                    backtrace: Backtrace::capture(),
                 })?;
 
             store.insert(uri, src)?;
@@ -317,9 +319,13 @@ impl Sources {
         source: String,
         deserializers: &Deserializers,
     ) -> Result<(SourceKey, Link, Cow<'static, Value>), SourceError> {
-        let src = deserializers
-            .deserialize(&source)
-            .map_err(|e| DeserializationError::new(uri.clone(), e))?;
+        let src = deserializers.deserialize(&source).map_err(|source| {
+            SourceError::DeserializationFailed {
+                uri: uri.clone(),
+                source,
+                backtrace: Backtrace::capture(),
+            }
+        })?;
         self.insert_value(uri, Cow::Owned(src))
     }
 
@@ -328,10 +334,11 @@ impl Sources {
         if &link == entry {
             return Ok(entry);
         }
-        Err(LinkConflict {
+        Err(SourceError::SchemaConflict {
             uri: uri.clone(),
             existing_path: entry.src_path.clone(),
             new_path: link.src_path,
+            backtrace: Backtrace::capture(),
         }
         .into())
     }
@@ -341,10 +348,11 @@ impl Sources {
             Entry::Occupied(_) => {
                 let existing_link = self.store().get_link(&from).unwrap();
                 if &link != existing_link {
-                    return Err(LinkConflict {
+                    return Err(SourceError::SchemaConflict {
                         uri: from.clone(),
                         existing_path: existing_link.src_path.clone(),
                         new_path: link.src_path,
+                        backtrace: Backtrace::capture(),
                     }
                     .into());
                 }
@@ -427,9 +435,13 @@ impl Sources {
     ) -> Result<(&Link, &Value), SourceError> {
         let resolved = resolvers.resolve(base_uri).await?;
 
-        let src = deserializers
-            .deserialize(&resolved)
-            .map_err(|e| DeserializationError::new(base_uri.clone(), e))?;
+        let src = deserializers.deserialize(&resolved).map_err(|source| {
+            SourceError::DeserializationFailed {
+                uri: uri.clone(),
+                source,
+                backtrace: Backtrace::capture(),
+            }
+        })?;
 
         self.store_mut()
             .insert_vacant(base_uri.clone(), Cow::Owned(src))?;

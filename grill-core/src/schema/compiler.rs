@@ -52,10 +52,13 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, Lang: crate::Lang> {
+pub(crate) struct Compiler<'i, Lang>
+where
+    Lang: crate::Lang,
+{
     schemas: &'i mut Schemas<Lang::Keyword>,
     sources: &'i mut Sources,
-    dialects: &'i Dialects,
+    dialects: &'i Dialects<Lang::Keyword>,
     deserializers: &'i Deserializers,
     resolvers: &'i Resolvers,
     numbers: &'i mut Numbers,
@@ -857,7 +860,7 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
 fn identify<Keyword>(
     uri: &AbsoluteUri,
     source: &Value,
-    dialect: &Dialect,
+    dialect: &Dialect<Keyword>,
 ) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), keyword::CompileError<Keyword>> {
     let (id, uris) = dialect.identify(uri.clone(), source)?;
     // if identify did not find a primary id, use the uri + pointer fragment

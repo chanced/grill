@@ -80,14 +80,15 @@ pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
 
 pub trait Lang {
     type Keyword: crate::Keyword;
-    type BuildError;
     type Translator;
 
     /// Creates a new context for the given `params`.
-    fn new_context(&mut self, params: NewContext<Self::Keyword>) -> keyword::Context<Self>;
+    fn new_context(&mut self, params: NewContext<Self::Keyword>)
+        -> keyword::Context<Self::Keyword>;
 
     /// Creates a new `Self::Compile`
-    fn new_compile(&mut self, params: NewCompile<Self::Keyword>) -> keyword::Compile<Self>;
+    fn new_compile(&mut self, params: NewCompile<Self::Keyword>)
+        -> keyword::Compile<Self::Keyword>;
 }
 
 #[derive(Debug)]
@@ -114,7 +115,7 @@ where
     pub global_numbers: &'i mut Numbers,
     pub schemas: &'i mut Schemas<Keyword>,
     pub sources: &'i mut Sources,
-    pub dialects: &'i Dialects,
+    pub dialects: &'i Dialects<Keyword>,
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
     pub values: &'i mut Values,
@@ -122,8 +123,8 @@ where
 
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
-pub struct Build<Lang> {
-    dialects: Vec<Dialect>,
+pub struct Build<Lang: crate::Lang> {
+    dialects: Vec<Dialect<Lang::Keyword>>,
     precompile: Vec<Result<AbsoluteUri, Error>>,
     pending_srcs: Vec<PendingSrc>,
     default_dialect_idx: Option<usize>,
@@ -158,7 +159,7 @@ where
 {
     /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
-    pub fn dialect(mut self, dialect: Dialect) -> Self {
+    pub fn dialect(mut self, dialect: Dialect<Lang::Keyword>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         if self.default_dialect_idx.is_none() {
@@ -170,7 +171,7 @@ where
     /// Sets the default [`Dialect`] for the [`Interrogator`] constructed by
     /// [`Build`].
     #[must_use]
-    pub fn default_dialect(mut self, dialect: Dialect) -> Self {
+    pub fn default_dialect(mut self, dialect: Dialect<Lang::Keyword>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         self.default_dialect_idx = Some(idx);
@@ -547,7 +548,7 @@ where
     /// Finishes building the [`Interrogator`]. Alternatively, you can simply
     /// `await` any method as `Build` implements [`IntoFuture`].
     ///
-    pub async fn finish(self) -> Result<Interrogator<Lang>, Lang::BuildError> {
+    pub async fn finish(self) -> Result<Interrogator<Lang>, keyword::BuildError<Lang::Keyword>> {
         let Self {
             lang,
             dialects,
@@ -568,8 +569,7 @@ where
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
 
-        let precompile: Result<Vec<AbsoluteUri>, Error> = precompile.into_iter().collect();
-        let precompile = precompile.map_err(SourceError::UriFailedToParse)?;
+        let precompile: Result<Vec<AbsoluteUri>, Error> = precompile.into_iter().collect()?;
 
         let dialect_ids: Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
 
@@ -625,7 +625,7 @@ where
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
 pub struct Interrogator<Lang: crate::Lang> {
-    pub(crate) dialects: Dialects,
+    pub(crate) dialects: Dialects<Lang::Keyword>,
     pub(crate) sources: Sources,
     pub(crate) resolvers: Resolvers,
     pub(crate) schemas: Schemas<Lang::Keyword>,
@@ -698,7 +698,7 @@ where
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this
     /// `Interrogator`
-    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_>, UnknownKeyError> {
+    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
     }
     /// Returns [`Ancestors`] which is an [`Iterator`] over the [`Schema`]s
@@ -714,7 +714,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_> {
+    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_, Lang::Keyword> {
         self.schemas.ancestors(key, &self.sources)
     }
 
@@ -729,7 +729,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn descendants(&self, key: Key) -> Result<Descendants<'_>, UnknownKeyError> {
+    pub fn descendants(&self, key: Key) -> Result<Descendants<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -744,7 +744,10 @@ where
     ///
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
-    pub fn descendants_unchecked(&self, key: Key) -> Result<Descendants<'_>, UnknownKeyError> {
+    pub fn descendants_unchecked(
+        &self,
+        key: Key,
+    ) -> Result<Descendants<'_, Lang::Keyword>, UnknownKeyError> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -981,13 +984,13 @@ where
 
     /// Returns the [`Dialects`] for this `Interrogator`
     #[must_use]
-    pub fn dialects(&self) -> &Dialects {
+    pub fn dialects(&self) -> &Dialects<Lang::Keyword> {
         &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect {
+    pub fn default_dialect(&self) -> &Dialect<Lang::Keyword> {
         self.dialects.primary()
     }
 

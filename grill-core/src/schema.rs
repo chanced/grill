@@ -527,11 +527,11 @@ where
     //     self.store().iter()
     // }
 
-    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i> {
+    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i, K> {
         Ancestors::new(key, self, sources)
     }
 
-    pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i> {
+    pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i, K> {
         Descendants::new(key, self, sources)
     }
 

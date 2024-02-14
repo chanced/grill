@@ -22,8 +22,19 @@ use std::{
     string::FromUtf8Error,
 };
 
+pub trait BuildError<C: CompileError>:
+    From<C> + From<DialectsError> + error::Error + Send + Sync + 'static
+{
+}
 pub trait CompileError:
-    From<CyclicDependencyError> + From<UnknownAnchorError> + error::Error + Send + Sync + 'static
+    From<CyclicDependencyError>
+    + From<UnknownAnchorError>
+    + From<SourceError>
+    + From<crate::uri::Error>
+    + error::Error
+    + Send
+    + Sync
+    + 'static
 {
 }
 
@@ -237,6 +248,23 @@ impl From<ResolveError> for SourceError {
     }
 }
 
+/// An error occurred parsing or resolving a JSON [`Pointer`].
+#[derive(Debug, Snafu)]
+pub enum PointerError {
+    #[snafu(transparent)]
+    /// The JSON [`Pointer`] was malformed.
+    ParsingFailed {
+        source: MalformedPointerError,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(transparent)]
+    /// The JSON [`Pointer`] could not be resolved.
+    ResolutionFailed {
+        source: ResolvePointerError,
+        backtrace: Backtrace,
+    },
+}
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -384,50 +412,6 @@ pub enum LinkError {
     SourceNotFound {
         uri: AbsoluteUri,
         backtrace: Backtrace,
-    },
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                               BuildError                              ║
-║                               ¯¯¯¯¯¯¯¯¯¯                              ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub), context(suffix(Ctx)), module)]
-pub enum BuildError<CompileError> {
-    #[snafu(transparent)]
-    /// A [`Schema`](crate::schema::Schema) failed to compile.
-    FailedToCompile {
-        #[snafu(backtrace)]
-        source: CompileError,
-    },
-
-    #[snafu(transparent)]
-    /// An issue with [`Dialect`]s occurred.
-    FailedToCreateDialects {
-        #[snafu(backtrace)]
-        source: DialectsError,
-    },
-
-    #[snafu(transparent)]
-    /// An error occurred while adding, resolving, or deserializing a
-    /// [`Source`](crate::source::Source).
-    FailedToSource {
-        #[snafu(backtrace)]
-        source: SourceError,
-    },
-
-    /// Failed to parse a number
-    #[snafu(transparent)]
-    FailedToParseNumber {
-        #[snafu(backtrace)]
-        source: NumberError,
     },
 }
 
@@ -916,7 +900,7 @@ impl DialectNotFoundError {
 ///
 /// If this is encountered, odds are it is because you have two
 /// [`Interrogator`](crate::Interrogator)s and mismatched keys.
-#[derive(Debug, Clone, Copy, Snafu)]
+#[derive(Debug, Clone, Snafu)]
 #[snafu(
     display("the provided key could not be found"),
     context(suffix(Ctx)),
@@ -938,7 +922,7 @@ pub struct UnknownKeyError {
 */
 
 /// A slice or string overflowed an allowed length maximum of `M`.
-#[derive(Debug, Clone, Copy, Snafu)]
+#[derive(Debug, Clone, Snafu)]
 #[snafu(
     display("The value {value} overflowed {}", Self::MAX),
     context(suffix(Ctx)),
@@ -948,10 +932,6 @@ pub struct OverflowError {
     pub value: u64,
     pub backtrace: Backtrace,
 }
-impl OverflowError {
-    pub const MAX: u64 = usize::MAX as u64;
-}
-
 impl OverflowError {
     /// The maximum allowed size.
     pub const MAX: u64 = usize::MAX as u64;

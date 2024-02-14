@@ -169,3 +169,47 @@ impl From<MalformedPointerError> for CompileError {
         Self::FailedToParsePointer(err.into())
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                               BuildError                              ║
+║                               ¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
+pub enum BuildError<C: CompileError> {
+    #[snafu(transparent)]
+    /// A [`Schema`](crate::schema::Schema) failed to compile.
+    FailedToCompile {
+        #[snafu(backtrace)]
+        source: C,
+    },
+
+    #[snafu(transparent)]
+    /// An issue with [`Dialect`]s occurred.
+    FailedToCreateDialects {
+        #[snafu(backtrace)]
+        source: DialectsError,
+    },
+
+    #[snafu(transparent)]
+    /// An error occurred while adding, resolving, or deserializing a
+    /// [`Source`](crate::source::Source).
+    FailedToSource {
+        #[snafu(backtrace)]
+        source: SourceError,
+    },
+
+    /// Failed to parse a number
+    #[snafu(transparent)]
+    FailedToParseNumber {
+        #[snafu(backtrace)]
+        source: NumberError,
+    },
+}
