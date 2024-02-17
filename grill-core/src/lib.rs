@@ -69,7 +69,7 @@ pub trait Structure: Copy + Clone + Debug + serde::Serialize + serde::de::Deseri
     fn verbose() -> Self;
 }
 
-pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
+pub trait Output: std::error::Error + serde::Serialize + serde::de::DeserializeOwned {
     type Error: serde::Serialize + serde::de::DeserializeOwned;
     type Structure: crate::Structure;
 
@@ -136,7 +136,11 @@ pub struct Build<L: Language<K>, K: Key> {
 //     }
 // }
 
-impl<L: Language<K>, K: Key> Build<L, K> {
+impl<L, K> Build<L, K>
+where
+    L: Language<K>,
+    K: Key,
+{
     /// Constructs a new `Build`
     #[must_use]
     pub fn new(lang: L) -> Self {
@@ -144,7 +148,11 @@ impl<L: Language<K>, K: Key> Build<L, K> {
     }
 }
 
-impl<L: Language<K>, K: Key> Build<L, K> {
+impl<L, K> Build<L, K>
+where
+    L: Language<K>,
+    K: Key,
+{
     /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
     pub fn dialect(mut self, dialect: Dialect<L, K>) -> Self {
@@ -625,7 +633,11 @@ pub struct Interrogator<L: Language<K>, K: Key> {
     pub(crate) language: L,
 }
 
-impl<L: Language<K>, K: Key> Debug for Interrogator<L, K> {
+impl<L, K> Debug for Interrogator<L, K>
+where
+    L: Language<K>,
+    K: Key,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
@@ -660,7 +672,7 @@ where
     ///
     /// # Panics
     /// Panics if the `key` does not belong to this `Interrgator`.
-    pub fn schema_unchecked(&self, key: K) -> Schema<'_, L> {
+    pub fn schema_unchecked(&self, key: K) -> Schema<'_, L, K> {
         self.schemas.get_unchecked(key, &self.sources)
     }
 

@@ -1,7 +1,10 @@
 //! Schema source store, resolvers, and deserializers.
 //!
 use crate::{
-    error::{DeserializeError, LinkError, PointerError, ResolveError, ResolveErrors, SourceError},
+    error::{
+        source_error::{PointerFailedToParseCtx, PointerFailedToResolveCtx},
+        DeserializeError, LinkError, PointerError, ResolveError, ResolveErrors, SourceError,
+    },
     uri::decode_lossy,
     AbsoluteUri,
 };
@@ -9,7 +12,7 @@ use async_trait::async_trait;
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use snafu::Backtrace;
+use snafu::{Backtrace, ResultExt};
 use std::{
     borrow::Cow,
     collections::hash_map::{Entry, HashMap},
@@ -137,11 +140,14 @@ impl Store {
             return Ok((src_key, link, src));
         }
         if fragment.starts_with('/') {
-            let ptr = Pointer::parse(&fragment).map_err(PointerError::from)?;
+            let ptr = Pointer::parse(&fragment).with_context(|_| PointerFailedToParseCtx {})?;
             let link = Link::new(src_key, ptr.clone());
             self.index.insert(uri.clone(), link.clone());
             let key = self.index.get(&uri).unwrap().src_key;
-            let src = src.resolve(&ptr).map_err(PointerError::from)?.clone();
+            let src = src
+                .resolve(&ptr)
+                .with_context(|_| PointerFailedToResolveCtx {})?
+                .clone();
             return Ok((key, link, Cow::Owned(src)));
         }
         Ok((src_key, link, src))
@@ -155,7 +161,10 @@ impl Store {
         let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
 
         if !fragment.is_empty() {
-            return Err(SourceError::UnexpectedUriFragment(uri.clone()));
+            return Err(SourceError::UnexpectedUriFragment {
+                uri: uri.clone(),
+                backtrace: Backtrace::capture(),
+            });
         }
         match self.index.entry(uri.clone()) {
             Entry::Occupied(_) => self.check_and_get_occupied(uri, src),

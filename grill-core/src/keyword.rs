@@ -2,10 +2,11 @@ use crate::{
     error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError},
     schema::{Anchor, Ref},
     uri::{AbsoluteUri, Uri},
-    Schema,
+    Language, Schema,
 };
 use jsonptr::{Pointer, Token};
 use serde_json::Value;
+use slotmap::Key;
 use std::fmt::{self, Display};
 
 /// A static reference to [`Value::Bool`] with the value `true`
@@ -25,10 +26,10 @@ pub const FALSE: &Value = &Value::Bool(false);
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-pub trait Keyword<L, Key>: Send + Sync + Clone + fmt::Debug
+pub trait Keyword<L, K>: Send + Sync + Clone + fmt::Debug
 where
-    L: crate::Language<Key>,
-    Key: crate::Key,
+    L: Language<K>,
+    K: Key,
 {
     type Context;
     type Compile;
@@ -51,15 +52,15 @@ where
     fn compile<'i>(
         &mut self,
         compile: &mut Self::Compile,
-        schema: Schema<'i, Self>,
-    ) -> Result<bool, CompileError<L, Key>>;
+        schema: Schema<'i, L, K>,
+    ) -> Result<bool, CompileError<L, K>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Self::Context,
         value: &'v Value,
-    ) -> Result<Option<Self::Output>, EvaluateError<Key>>;
+    ) -> Result<Option<Self::Output>, EvaluateError<K>>;
 
     /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {

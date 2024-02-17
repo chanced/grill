@@ -2,6 +2,7 @@ use super::{ten, u64_to_usize};
 use std::str::FromStr;
 
 use num::{pow, BigInt, BigRational, One, Zero};
+use snafu::Backtrace;
 
 use crate::error::NumberError;
 
@@ -92,6 +93,7 @@ impl<'a> Parser<'a> {
                     value: self.value.to_string(),
                     character: c,
                     index: i,
+                    backtrace: Backtrace::capture(),
                 })
             }
             _ => {}
@@ -129,6 +131,7 @@ impl<'a> Parser<'a> {
             .map_err(|err| NumberError::FailedToParseExponent {
                 value: value.to_string(),
                 source: err,
+                backtrace: Backtrace::capture(),
             })?;
 
         if let Some(exp) = exponent {

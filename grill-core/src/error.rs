@@ -8,6 +8,7 @@ use jsonptr::Pointer;
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 use slotmap::Key;
 use snafu::Backtrace;
+use snafu::GenerateImplicitData;
 use snafu::Snafu;
 use std::collections::HashMap;
 use std::error;
@@ -40,9 +41,9 @@ use std::{
 #[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum CompileError<L: Language<K>, K: Key> {
     /// The schema failed evaluation, represented by the failed [`Output`].
-    #[snafu(display("schema failed evaluation: {source}"))]
+    #[snafu(display("schema failed evaluation: {output}"))]
     SchemaInvalid {
-        source: lang::Output<L, K>,
+        output: lang::Output<L, K>,
         backtrace: Backtrace,
     },
 
@@ -56,10 +57,10 @@ pub enum CompileError<L: Language<K>, K: Key> {
     /// The `$schema` is not known to the [`Interrogator`](crate::Interrogator).
     #[snafu(display("metaschema dialect not found: {metaschema_id}"))]
     DialectNotKnown {
-        #[snafu(backtrace)]
         /// The schema's [`Dialect`] is not registered with the
         /// [`Interrogator`](crate::Interrogator).
         metaschema_id: String,
+        backtrace: Backtrace,
     },
 
     /// Failed to parse a [`Uri`] or
@@ -106,7 +107,7 @@ pub enum CompileError<L: Language<K>, K: Key> {
     },
 
     /// Failed to link sources
-    #[snafu(display("failed to create source link: {source}"))]
+    #[snafu(display("failed to create source link: {source}"), context(false))]
     FailedToLinkSource {
         #[snafu(backtrace)]
         source: LinkError,
@@ -249,7 +250,7 @@ pub enum BuildError<L: crate::Language<K>, K: Key> {
 /// An error occurred while evaluating a [`Value`].
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(Ctx)), module)]
-pub enum EvaluateError<Key> {
+pub enum EvaluateError<K: crate::Key> {
     /// Failed to parse a [`Number`] in a [`].
     #[snafu(transparent)]
     FailedToParseNumber {
@@ -268,7 +269,7 @@ pub enum EvaluateError<Key> {
     #[snafu(transparent)]
     UnknownKey {
         #[snafu(backtrace)]
-        source: UnknownKeyError<Key>,
+        source: UnknownKeyError<K>,
     },
 }
 
@@ -382,10 +383,7 @@ pub enum SourceError {
 
     /// Resolution of a source failed
     #[snafu(transparent)]
-    ResolutionFailed {
-        #[snafu(backtrace)]
-        source: ResolveErrors,
-    },
+    ResolutionFailed { source: ResolveErrors },
 
     /// The source was not valid UTF-8.
     #[snafu(display("source is not valid UTF-8: {source}"))]
@@ -468,22 +466,27 @@ pub enum SourceError {
     },
 }
 impl From<jsonptr::MalformedPointerError> for SourceError {
-    fn from(err: jsonptr::MalformedPointerError) -> Self {
-        Self::PointerFailedToParseOrResolve(err.into())
+    fn from(source: jsonptr::MalformedPointerError) -> Self {
+        Self::PointerFailedToParse {
+            source,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
 impl From<ResolveError> for SourceError {
     fn from(value: ResolveError) -> Self {
-        Self::ResolutionFailed(ResolveErrors {
-            sources: vec![value],
-            backtrace: Backtrace::capture(),
-        })
+        Self::ResolutionFailed {
+            source: ResolveErrors {
+                sources: vec![value],
+            },
+        }
     }
 }
 
 /// An error occurred parsing or resolving a JSON [`Pointer`].
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum PointerError {
     #[snafu(transparent)]
     /// The JSON [`Pointer`] was malformed.
@@ -660,7 +663,7 @@ pub enum LinkError {
 */
 
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
-#[derive(Debug, PartialEq, Eq, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub), context(suffix(Ctx)), module)]
 pub enum NumberError {
     /// Failed to parse exponent of a number.
@@ -758,7 +761,6 @@ impl StdError for DeserializeError {
 pub struct ResolveErrors {
     /// A list of errors, one per implementation of [`Resolve`].
     pub sources: Vec<ResolveError>,
-    pub backtrace: Backtrace,
 }
 impl IntoIterator for ResolveErrors {
     type Item = ResolveError;
@@ -786,7 +788,6 @@ impl From<ResolveError> for ResolveErrors {
     fn from(error: ResolveError) -> Self {
         Self {
             sources: vec![error],
-            backtrace: Backtrace::capture(),
         }
     }
 }
@@ -796,7 +797,6 @@ impl ResolveErrors {
     pub fn new() -> Self {
         Self {
             sources: Vec::default(),
-            backtrace: Backtrace::capture(),
         }
     }
     /// Appends a new [`ResolveError`] to the list of errors.
@@ -815,6 +815,7 @@ impl ResolveErrors {
             source: err.into(),
             uri,
             referring_location: None,
+            backtrace: Backtrace::capture(),
         });
     }
 
@@ -871,6 +872,8 @@ pub struct ResolveError {
     ///
     /// The path of the keyword can be found as a fragment of the URI.
     pub referring_location: Option<AbsoluteUri>,
+
+    pub backtrace: Backtrace,
 }
 
 impl ResolveError {
@@ -880,12 +883,25 @@ impl ResolveError {
             source: err.into(),
             uri,
             referring_location: None,
+            backtrace: Backtrace::capture(),
         }
     }
 
     /// Sets the `referring_location` of the `ResolveError` to `referring_location`.
     pub fn set_referring_location(&mut self, referring_location: AbsoluteUri) {
         self.referring_location = Some(referring_location);
+    }
+
+    fn not_found(uri: AbsoluteUri) -> ResolveError {
+        ResolveError {
+            source: ResolveErrorSource::NotFound {
+                uri,
+                backtrace: Backtrace::capture(),
+            },
+            uri,
+            referring_location: None,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
@@ -938,8 +954,8 @@ pub enum ResolveErrorSource {
     #[snafu(whatever, display("{message}"))]
     Custom {
         message: String,
-        #[snafu(source(from(Box<dyn 'static + std::error::Error + Send + Sync>, Some)))]
-        source: Box<dyn 'static + error::Error + Send + Sync>,
+        #[snafu(source(from(Box<dyn std::error::Error>, Some)))]
+        source: Option<Box<dyn std::error::Error>>,
     },
 }
 
@@ -1064,7 +1080,7 @@ pub enum IdentifyError {
 */
 
 /// A [`Dialect`] with the [`AbsoluteUri`] was not able to be found.
-#[derive(Clone, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(display("dialect not found: {id}"), context(suffix(Ctx)), module)]
 pub struct DialectNotFoundError {
     /// The [`AbsoluteUri`] of the [`Dialect`] that was not able
@@ -1098,7 +1114,7 @@ impl DialectNotFoundError {
 ///
 /// If this is encountered, odds are it is because you have two
 /// [`Interrogator`](crate::Interrogator)s and mismatched keys.
-#[derive(Debug, Clone, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(
     display("the provided key could not be found"),
     context(suffix(Ctx)),
@@ -1120,7 +1136,7 @@ pub struct UnknownKeyError<Key> {
 */
 
 /// A slice or string overflowed an allowed length maximum of `M`.
-#[derive(Debug, Clone, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(
     display("The value {value} overflowed {}", Self::MAX),
     context(suffix(Ctx)),
@@ -1137,7 +1153,10 @@ impl OverflowError {
 
 impl From<u64> for OverflowError {
     fn from(value: u64) -> Self {
-        Self(value)
+        Self {
+            value,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
