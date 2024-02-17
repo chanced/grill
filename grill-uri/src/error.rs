@@ -111,7 +111,7 @@ impl Error {
     /// [`UrlError`].
     #[must_use]
     pub fn as_url(&self) -> Option<&UrlError> {
-        if let Self::FailedToParseUrl { source, backtrace } = self {
+        if let Self::FailedToParseUrl { source, .. } = self {
             Some(source)
         } else {
             None

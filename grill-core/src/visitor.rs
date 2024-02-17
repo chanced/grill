@@ -4,7 +4,7 @@ use crate::Schema;
 /// [`Reference`]s, [`Anchor`]s, and [`Keyword`]s.
 #[allow(unused_variables)]
 #[allow(clippy::needless_lifetimes)]
-pub trait Visitor<'i, Keyword> {
+pub trait Visitor<'i, L, Key> {
     /// Error type returned by the `Visitor`
     type Error;
 
@@ -14,7 +14,7 @@ pub trait Visitor<'i, Keyword> {
     /// traverse the `Schema`.
     fn visit_schema(
         &mut self,
-        schema: Schema<'i, Keyword>,
+        schema: Schema<'i, L, Key>,
     ) -> Result<Option<&mut Self>, Self::Error> {
         Ok(Some(self))
     }
@@ -24,7 +24,7 @@ pub trait Visitor<'i, Keyword> {
     /// the reference
     fn visit_reference(
         &mut self,
-        reference: &'i Reference,
+        reference: &'i Reference<Key>,
     ) -> Result<Option<&mut Self>, Self::Error> {
         Ok(Some(self))
     }

@@ -6,7 +6,8 @@ pub mod traverse;
 
 pub mod dialect;
 
-use crate::keyword;
+use crate::error::CompileError;
+use crate::{cache, lang, Language, NewContext};
 pub use dialect::{Dialect, Dialects};
 use serde::{Serialize, Serializer};
 
@@ -15,7 +16,7 @@ pub(crate) mod compiler;
 
 use crate::{
     error::{EvaluateError, UnknownKeyError},
-    keyword::{Context, Keyword},
+    keyword::Keyword,
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
         TransitiveDependencies,
@@ -26,7 +27,7 @@ use crate::{
 
 use jsonptr::Pointer;
 use serde_json::Value;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, Key, SlotMap};
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -34,16 +35,16 @@ use std::{
     ops::Deref,
 };
 
-pub struct Evaluate<'v, Keyword: keyword::Keyword> {
-    structure: keyword::Structure<Keyword>,
-    key: Key,
-    value: &'v Value,
-    instance_location: Pointer,
-    keyword_location: Pointer,
-    sources: &'v Sources,
-    evaluated: &'v mut HashSet<String>,
-    global_numbers: &'v crate::cache::Numbers,
-    eval_numbers: &'v mut crate::cache::Numbers,
+pub struct Evaluate<'v, L: Language<K>, K: Key> {
+    pub structure: lang::Structure<L, K>,
+    pub key: K,
+    pub value: &'v Value,
+    pub instance_location: Pointer,
+    pub keyword_location: Pointer,
+    pub sources: &'v Sources,
+    pub evaluated: &'v mut HashSet<String>,
+    pub global_numbers: &'v cache::Numbers,
+    pub eval_numbers: &'v mut cache::Numbers,
 }
 
 /*
@@ -58,7 +59,7 @@ pub struct Evaluate<'v, Keyword: keyword::Keyword> {
 
 new_key_type! {
     /// A unique identifier for a schema.
-    pub struct Key;
+    pub struct DefaultKey;
 }
 
 /// An anchored location within a schema document
@@ -83,7 +84,7 @@ pub struct Anchor {
 */
 
 #[derive(Clone, Debug)]
-pub(crate) struct CompiledSchema<Keyword> {
+pub(crate) struct CompiledSchema<L: crate::Language<Key>, Key: crate::Key> {
     /// Abs URI of the schema.
     pub(crate) id: Option<AbsoluteUri>,
 
@@ -103,7 +104,7 @@ pub(crate) struct CompiledSchema<Keyword> {
     pub(crate) dependents: Vec<Key>,
 
     ///  Referenced dependencies of this `Schema`.
-    pub(crate) references: Vec<Reference>,
+    pub(crate) references: Vec<Reference<Key>>,
 
     /// All anchors defined in this schema and embedded schemas which do not
     /// have `id`s.
@@ -116,7 +117,7 @@ pub(crate) struct CompiledSchema<Keyword> {
     pub(crate) metaschema: AbsoluteUri,
 
     // Compiled keywords.
-    pub(crate) keywords: Box<[Keyword]>,
+    pub(crate) keywords: Box<[L::Keyword]>,
 
     /// Absolute URI of the source and path to this schema.
     pub(crate) link: Link,
@@ -124,16 +125,16 @@ pub(crate) struct CompiledSchema<Keyword> {
     pub(crate) compiled: bool,
 }
 
-impl<X> CompiledSchema<X> {
-    pub(crate) fn new<Keyword>(
+impl<L: Language<K>, K: Key> CompiledSchema<L, K> {
+    pub(crate) fn new(
         id: Option<AbsoluteUri>,
         path: Pointer,
         uris: Vec<AbsoluteUri>,
         link: Link,
         anchors: Vec<Anchor>,
-        parent: Option<Key>,
+        parent: Option<K>,
         metaschema: AbsoluteUri,
-    ) -> CompiledSchema<Keyword> {
+    ) -> CompiledSchema<L, K> {
         Self {
             id,
             path,
@@ -150,7 +151,7 @@ impl<X> CompiledSchema<X> {
         }
     }
 }
-impl<Keyword> CompiledSchema<Keyword> {
+impl<L: Language<K>, K: Key> CompiledSchema<L, K> {
     /// Returns most relevant URI for the schema, either using the `$id` or the
     /// most relevant as determined by the schema's ancestory or source.
     #[must_use]
@@ -159,13 +160,13 @@ impl<Keyword> CompiledSchema<Keyword> {
     }
 }
 
-impl<Keyword> PartialEq for CompiledSchema<Keyword> {
+impl<L: Language<K>, K: Key> PartialEq for CompiledSchema<L, K> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema && self.link == other.link
     }
 }
 
-impl<Keyword> Eq for CompiledSchema<Keyword> {}
+impl<L: Language<K>, K: Key> Eq for CompiledSchema<L, K> {}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -179,9 +180,9 @@ impl<Keyword> Eq for CompiledSchema<Keyword> {}
 
 /// A compiled schema.
 #[derive(Clone, Debug)]
-pub struct Schema<'i, Keyword> {
+pub struct Schema<'i, L: Language<K>, K: Key> {
     /// Key of the `Schema`
-    pub key: Key,
+    pub key: K,
 
     /// The `$id` or `id` of the schema, if any
     pub id: Option<Cow<'i, AbsoluteUri>>,
@@ -199,34 +200,34 @@ pub struct Schema<'i, Keyword> {
     ///
     /// Note that if this `Schema` has an `id`, then `parent` will be `None`
     /// regardless of whether or not this schema is embedded.
-    pub parent: Option<Key>,
+    pub parent: Option<K>,
 
     /// `Schema`s that are directly embedded within this `Schema`
     ///
     /// Note that if any embedded `Schema` has an `id`, then it will not be
     /// be present in this list as per the specification, `Schema`s which are
     /// identified are to be treated as root schemas.
-    pub subschemas: Cow<'i, [Key]>,
+    pub subschemas: Cow<'i, [K]>,
 
     /// Anchors within this `Schema`
     pub anchors: Cow<'i, [Anchor]>,
 
     /// Dependents of this `Schema`.
-    pub dependents: Cow<'i, [Key]>,
+    pub dependents: Cow<'i, [K]>,
 
     ///  Dependencies of this `Schema`.
-    pub references: Cow<'i, [Reference]>,
+    pub references: Cow<'i, [Reference<K>]>,
 
     /// Compiled [`Keyword`]s.
-    pub keywords: Cow<'i, [Keyword]>,
+    pub keywords: Cow<'i, [L::Keyword]>,
 
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]
     pub source: Source<'i>,
 }
 
-impl<Keyword> PartialEq<Schema<'_, Keyword>> for Value {
-    fn eq(&self, other: &Schema<'_, Keyword>) -> bool {
+impl<L: Language<K>, K: Key> PartialEq<Schema<'_, L, K>> for Value {
+    fn eq(&self, other: &Schema<'_, L, K>) -> bool {
         self == other.value()
     }
 }
@@ -311,17 +312,17 @@ impl<'i, K> Eq for Schema<'i, K> {}
 */
 
 #[derive(Debug, Clone, Default)]
-struct Store<K> {
-    table: SlotMap<Key, CompiledSchema<K>>,
+struct Store<L, Key: crate::Key> {
+    table: SlotMap<Key, CompiledSchema<L, Key>>,
     index: HashMap<AbsoluteUri, Key>,
 }
 
 #[allow(clippy::unnecessary_box_returns)]
-impl<K> Store<K> {
-    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<K>> {
+impl<L: crate::Language<Key>, Key: crate::Key> Store<L, Key> {
+    fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<L, Key>> {
         self.table.get_mut(key)
     }
-    fn get(&self, key: Key) -> Option<&CompiledSchema<K>> {
+    fn get(&self, key: Key) -> Option<&CompiledSchema<L, Key>> {
         self.table.get(key)
     }
     pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<Key> {
@@ -344,7 +345,7 @@ impl<K> Store<K> {
     /// schema.
     pub(crate) fn insert(
         &mut self,
-        schema: CompiledSchema<K>,
+        schema: CompiledSchema<L, Key>,
     ) -> Result<Key, crate::error::SourceError> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.index.get(id) {
@@ -354,6 +355,7 @@ impl<K> Store<K> {
                     uri: id.clone(),
                     existing_path: existing.path.clone(),
                     new_path: schema.path.clone(),
+                    backtrace: snafu::Backtrace::capture(),
                 });
             }
             return Ok(*key);
@@ -378,14 +380,14 @@ impl<K> Store<K> {
 */
 
 #[derive(Clone, Debug, Default)]
-pub struct Schemas<Keyword> {
-    store: Store<Keyword>,
-    sandbox: Option<Store<Keyword>>,
+pub struct Schemas<L, Key = DefaultKey> {
+    store: Store<L, Key>,
+    sandbox: Option<Store<L, Key>>,
 }
 
-impl<K> Schemas<K>
+impl<L, Key> Schemas<L, Key>
 where
-    K: crate::Keyword,
+    L: crate::Language<Key>,
 {
     #[must_use]
     pub fn new() -> Self {
@@ -396,7 +398,10 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn evaluate<'v>(&self, eval: Evaluate<'v, K>) -> Result<keyword::Output<K>, EvaluateError> {
+    pub fn evaluate<'v>(
+        &self,
+        eval: Evaluate<'v, L, Key>,
+    ) -> Result<lang::Output<L, Key>, EvaluateError<Key>> {
         let Evaluate {
             key,
             sources,
@@ -406,9 +411,10 @@ where
             global_numbers,
             eval_numbers,
             value,
+            evaluated,
         } = eval;
         let schema = self.get(key, sources)?;
-        let mut ctx = Context {
+        let mut ctx = NewContext {
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
@@ -454,9 +460,9 @@ where
         &mut self,
         key: Key,
         uri: &AbsoluteUri,
-        references: &[Reference],
+        references: &[Reference<Key>],
         sources: &Sources,
-    ) -> Result<(), crate::keyword::CompileError<K>> {
+    ) -> Result<(), crate::error::CompileError<L, Key>> {
         for reference in references {
             if key == reference.key
                 || self
@@ -483,7 +489,7 @@ where
     pub(crate) fn has_keywords(&self, key: Key) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
-    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[K]>) {
+    pub(crate) fn set_keywords(&mut self, key: Key, keywords: Box<[L]>) {
         self.sandbox().table.get_mut(key).unwrap().keywords = keywords;
     }
     pub(crate) fn has_keywords_by_uri(&self, uri: &AbsoluteUri) -> bool {
@@ -498,13 +504,13 @@ where
             .map(|(k, _)| k)
     }
 
-    fn sandbox(&mut self) -> &mut Store<K> {
+    fn sandbox(&mut self) -> &mut Store<L, Key> {
         self.sandbox
             .as_mut()
             .expect("transaction failed: schema sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new")
     }
 
-    fn store(&self) -> &Store<K> {
+    fn store(&self) -> &Store<L, Key> {
         if let Some(sandbox) = self.sandbox.as_ref() {
             return sandbox;
         }
@@ -518,7 +524,7 @@ where
     // }
     pub(crate) fn insert(
         &mut self,
-        schema: CompiledSchema<K>,
+        schema: CompiledSchema<L, Key>,
     ) -> Result<Key, crate::error::SourceError> {
         self.sandbox().insert(schema)
     }
@@ -527,15 +533,19 @@ where
     //     self.store().iter()
     // }
 
-    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i, K> {
+    pub(crate) fn ancestors<'i>(&'i self, key: Key, sources: &'i Sources) -> Ancestors<'i, L, Key> {
         Ancestors::new(key, self, sources)
     }
 
-    pub(crate) fn descendants<'i>(&'i self, key: Key, sources: &'i Sources) -> Descendants<'i, K> {
+    pub(crate) fn descendants<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> Descendants<'i, L, Key> {
         Descendants::new(key, self, sources)
     }
 
-    pub(crate) fn ensure_key_exists<T, F>(&self, key: Key, f: F) -> Result<T, UnknownKeyError>
+    pub(crate) fn ensure_key_exists<T, F>(&self, key: Key, f: F) -> Result<T, UnknownKeyError<Key>>
     where
         F: FnOnce() -> T,
     {
@@ -553,7 +563,7 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> DirectDependents<'i, K> {
+    ) -> DirectDependents<'i, L, Key> {
         DirectDependents::new(key, self, sources)
     }
 
@@ -561,7 +571,7 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> AllDependents<'i, K> {
+    ) -> AllDependents<'i, L, Key> {
         AllDependents::new(key, self, sources)
     }
 
@@ -569,7 +579,7 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> TransitiveDependencies<'i, K> {
+    ) -> TransitiveDependencies<'i, L, Key> {
         TransitiveDependencies::new(key, self, sources)
     }
 
@@ -577,15 +587,19 @@ where
         &'i self,
         key: Key,
         sources: &'i Sources,
-    ) -> DirectDependencies<'i, K> {
+    ) -> DirectDependencies<'i, L, Key> {
         DirectDependencies::new(key, self, sources)
     }
 
-    pub(crate) fn get_unchecked<'i>(&'i self, key: Key, sources: &'i Sources) -> Schema<'i, K> {
+    pub(crate) fn get_unchecked<'i>(
+        &'i self,
+        key: Key,
+        sources: &'i Sources,
+    ) -> Schema<'i, L, Key> {
         self.get(key, sources).unwrap()
     }
 
-    pub(crate) fn get_compiled(&self, key: Key) -> Option<CompiledSchema<K>> {
+    pub(crate) fn get_compiled(&self, key: Key) -> Option<CompiledSchema<L, Key>> {
         self.store().get(key).cloned()
     }
 
@@ -594,11 +608,11 @@ where
     // }
 
     /// Returns the [`Schema`] with the given `Key` if it exists.
-    pub(crate) fn get<'i>(
+    pub(crate) fn get<'i, 's>(
         &'i self,
         key: Key,
-        sources: &'i Sources,
-    ) -> Result<Schema<'i, K>, UnknownKeyError> {
+        sources: &'s Sources,
+    ) -> Result<Schema<'i, L, Key>, UnknownKeyError<Key>> {
         let schema = self.store().get(key).ok_or(UnknownKeyError {
             key,
             backtrace: snafu::Backtrace::capture(),
@@ -624,16 +638,16 @@ where
     ///
     /// # Panics
     /// Panics if a transaction has not been started.
-    pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<K>> {
+    pub(crate) fn get_mut(&mut self, key: Key) -> Option<&mut CompiledSchema<L, Key>> {
         self.sandbox().get_mut(key)
     }
 
     pub(crate) fn add_reference(
         &mut self,
         key: Key,
-        ref_: Reference,
+        ref_: Reference<Key>,
         sources: &Sources,
-    ) -> Result<(), keyword::CompileError<K>> {
+    ) -> Result<(), CompileError<L, Key>> {
         let references = self.get_compiled(ref_.key).unwrap().references.clone();
         self.ensure_not_cyclic(key, &ref_.absolute_uri, &references, sources)?;
         self.get_mut(key).unwrap().references.push(ref_);
@@ -649,7 +663,7 @@ where
         &'i self,
         uri: &AbsoluteUri,
         sources: &'i Sources,
-    ) -> Option<Schema<'i, K>> {
+    ) -> Option<Schema<'i, L, Key>> {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
@@ -696,7 +710,7 @@ pub struct Ref {
 
 /// A reference to a schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference {
+pub struct Reference<Key> {
     /// Key to the referenced [`Schema`]
     pub key: Key,
     /// The referenced URI
@@ -706,8 +720,6 @@ pub struct Reference {
     /// The keyword of the reference (e.g. $ref, $dynamicRef, $recursiveRef, etc)
     pub keyword: &'static str,
 }
-
-impl Reference {}
 
 #[cfg(test)]
 mod tests {}

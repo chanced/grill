@@ -23,11 +23,13 @@ pub mod error;
 /// Keywords
 pub mod keyword;
 pub mod visitor;
+use error::{BuildError, CompileError, DeserializeError, EvaluateError};
 pub use grill_uri as uri;
 pub use keyword::Keyword;
 
 pub mod schema;
-pub use schema::{Key, Schema};
+pub use schema::{iter::Iter, DefaultKey, Schema};
+use schema::{iter::IterUnchecked, Evaluate};
 
 pub mod source;
 pub(crate) use source::Src;
@@ -35,27 +37,21 @@ use uri::{error::Error, AbsoluteUri};
 
 pub mod big;
 
+pub mod lang;
+
 #[cfg(test)]
 pub mod test;
 
-use std::{
-    any,
-    borrow::Cow,
-    collections::HashSet,
-    fmt::Debug,
-    future::{Future, IntoFuture},
-    ops::Deref,
-};
+use std::{any, borrow::Cow, collections::HashSet, fmt::Debug, ops::Deref};
 
 use jsonptr::Pointer;
 use serde_json::{Number, Value};
 
 use crate::{
     cache::{Numbers, Values},
-    error::{DeserializeError, EvaluateError, SourceError, UnknownKeyError},
+    error::{SourceError, UnknownKeyError},
     schema::{
         compiler::Compiler,
-        iter::{Iter, IterUnchecked},
         traverse::{
             AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
             TransitiveDependencies,
@@ -65,6 +61,9 @@ use crate::{
     source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources},
     uri::TryIntoAbsoluteUri,
 };
+
+/// See [`slotmap`](`slotmap`) for more information.
+pub use slotmap::{new_key_type, Key};
 
 pub trait Structure: Copy + Clone + Debug + serde::Serialize + serde::de::DeserializeOwned {
     fn verbose() -> Self;
@@ -78,28 +77,23 @@ pub trait Output: serde::Serialize + serde::de::DeserializeOwned {
     fn push(&mut self, output: Self);
 }
 
-pub trait Lang {
-    type Keyword: crate::Keyword;
+pub trait Language<K: Key>: Sized + Debug {
+    type Keyword: crate::Keyword<Self, K>;
     type Translator;
 
     /// Creates a new context for the given `params`.
-    fn new_context(&mut self, params: NewContext<Self::Keyword>)
-        -> keyword::Context<Self::Keyword>;
+    fn new_context(&mut self, params: NewContext<Self, K>) -> lang::Context<Self, K>;
 
     /// Creates a new `Self::Compile`
-    fn new_compile(&mut self, params: NewCompile<Self::Keyword>)
-        -> keyword::Compile<Self::Keyword>;
+    fn new_compile(&mut self, params: NewCompile<Self, K>) -> lang::Compile<Self, K>;
 }
 
 #[derive(Debug)]
-pub struct NewContext<'i, Keyword>
-where
-    Keyword: crate::Keyword,
-{
-    pub structure: keyword::Structure<Keyword>,
-    pub eval_numbers: &'i mut Numbers,
+pub struct NewContext<'i, L: Language<K>, K: Key> {
+    pub structure: lang::Structure<L, K>,
+    eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
-    pub schemas: &'i mut Schemas<Keyword>,
+    pub schemas: &'i Schemas<L, K>,
     pub sources: &'i Sources,
     pub absolute_keyword_location: &'i AbsoluteUri,
     pub keyword_location: Pointer,
@@ -107,15 +101,12 @@ where
 }
 
 #[derive(Debug)]
-pub struct NewCompile<'i, Keyword>
-where
-    Keyword: crate::Keyword,
-{
+pub struct NewCompile<'i, L: Language<K>, K: Key> {
     pub absolute_uri: &'i AbsoluteUri,
     pub global_numbers: &'i mut Numbers,
-    pub schemas: &'i mut Schemas<Keyword>,
+    pub schemas: &'i mut Schemas<L, K>,
     pub sources: &'i mut Sources,
-    pub dialects: &'i Dialects<Keyword>,
+    pub dialects: &'i Dialects<L, K>,
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
     pub values: &'i mut Values,
@@ -123,15 +114,18 @@ where
 
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
-pub struct Build<Lang: crate::Lang> {
-    dialects: Vec<Dialect<Lang::Keyword>>,
-    precompile: Vec<Result<AbsoluteUri, Error>>,
+pub struct Build<L: Language<K>, K: Key> {
+    dialects: Vec<Dialect<L, K>>,
+    precompile: Vec<Result<AbsoluteUri, CompileError<L, K>>>,
     pending_srcs: Vec<PendingSrc>,
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
+    // TODO: something needs to be done about deserializers.
+    // they are the only thing holding up being able to
+    // serialize and deserialize interrogator
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     numbers: Vec<Number>,
-    lang: Lang,
+    language: L,
 }
 
 // impl IntoFuture for Build {
@@ -142,24 +136,18 @@ pub struct Build<Lang: crate::Lang> {
 //     }
 // }
 
-impl<Lang> Build<Lang>
-where
-    Lang: crate::Lang,
-{
+impl<L: Language<K>, K: Key> Build<L, K> {
     /// Constructs a new `Build`
     #[must_use]
-    pub fn new(lang: Lang) -> Self {
+    pub fn new(lang: L) -> Self {
         Self::default()
     }
 }
 
-impl<Lang> Build<Lang>
-where
-    Lang: crate::Lang,
-{
+impl<L: Language<K>, K: Key> Build<L, K> {
     /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
-    pub fn dialect(mut self, dialect: Dialect<Lang::Keyword>) -> Self {
+    pub fn dialect(mut self, dialect: Dialect<L, K>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         if self.default_dialect_idx.is_none() {
@@ -171,7 +159,7 @@ where
     /// Sets the default [`Dialect`] for the [`Interrogator`] constructed by
     /// [`Build`].
     #[must_use]
-    pub fn default_dialect(mut self, dialect: Dialect<Lang::Keyword>) -> Self {
+    pub fn default_dialect(mut self, dialect: Dialect<L, K>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         self.default_dialect_idx = Some(idx);
@@ -337,11 +325,11 @@ where
     /// # }
     /// ```
     #[must_use]
-    pub fn source_strs<I, K, V>(mut self, sources: I) -> Self
+    pub fn source_strs<I, U, S>(mut self, sources: I) -> Self
     where
-        K: TryIntoAbsoluteUri,
-        V: std::ops::Deref<Target = str>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (U, S)>,
+        U: TryIntoAbsoluteUri,
+        S: ToString,
     {
         for (k, v) in sources {
             self.pending_srcs
@@ -372,11 +360,11 @@ where
     /// # }
     /// ```
     #[must_use]
-    pub fn source_slices<I, K, V>(mut self, sources: I) -> Self
+    pub fn source_slices<I, U, V>(mut self, sources: I) -> Self
     where
-        K: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (U, V)>,
+        U: TryIntoAbsoluteUri,
         V: AsRef<[u8]>,
-        I: IntoIterator<Item = (K, V)>,
     {
         for (k, v) in sources {
             self.pending_srcs.push(PendingSrc::Bytes(
@@ -411,10 +399,10 @@ where
     /// # }
     /// ```
     #[must_use]
-    pub fn source_values<I, K>(mut self, sources: I) -> Self
+    pub fn source_values<I, U>(mut self, sources: I) -> Self
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Cow<'static, Value>)>,
+        I: IntoIterator<Item = (U, Cow<'static, Value>)>,
+        U: TryIntoAbsoluteUri,
     {
         for (k, v) in sources {
             self.pending_srcs
@@ -448,10 +436,10 @@ where
     /// # }
     /// ```
     #[must_use]
-    pub fn source_owned_values<I, K>(self, sources: I) -> Self
+    pub fn source_owned_values<I, U>(self, sources: I) -> Self
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Value)>,
+        I: IntoIterator<Item = (U, Value)>,
+        U: TryIntoAbsoluteUri,
     {
         self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
     }
@@ -482,10 +470,10 @@ where
     /// # }
     /// ```
     #[must_use]
-    pub fn source_static_values<I, K>(self, sources: I) -> Self
+    pub fn source_static_values<I, U>(self, sources: I) -> Self
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, &'static Value)>,
+        U: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (U, &'static Value)>,
     {
         self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Borrowed(v))))
     }
@@ -548,9 +536,9 @@ where
     /// Finishes building the [`Interrogator`]. Alternatively, you can simply
     /// `await` any method as `Build` implements [`IntoFuture`].
     ///
-    pub async fn finish(self) -> Result<Interrogator<Lang>, keyword::BuildError<Lang::Keyword>> {
+    pub async fn finish(self) -> Result<Interrogator<L, K>, BuildError<L, K>> {
         let Self {
-            lang,
+            language,
             dialects,
             pending_srcs,
             resolvers,
@@ -569,18 +557,20 @@ where
         let resolvers = Resolvers::new(resolvers);
         let schemas = Schemas::new();
 
-        let precompile: Result<Vec<AbsoluteUri>, Error> = precompile.into_iter().collect()?;
-
+        let precompile: Result<Vec<_>, _> = precompile.into_iter().collect();
+        let precompile = precompile?;
         let dialect_ids: Vec<AbsoluteUri> = dialects.iter().map(Dialect::id).cloned().collect();
-
+        let numbers = Numbers::new(numbers.iter())?;
+        let values = Values::default();
         let mut interrogator = Interrogator {
             dialects,
             sources,
             resolvers,
             schemas,
             deserializers,
-            numbers: Numbers::new(numbers.iter())?,
-            values: Values::default(),
+            language,
+            numbers,
+            values,
         };
         interrogator.compile_dialects_schemas(dialect_ids).await?;
         interrogator.compile_all(precompile).await?;
@@ -624,33 +614,34 @@ where
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
-pub struct Interrogator<Lang: crate::Lang> {
-    pub(crate) dialects: Dialects<Lang::Keyword>,
+pub struct Interrogator<L: Language<K>, K: Key> {
+    pub(crate) dialects: Dialects<L, K>,
     pub(crate) sources: Sources,
     pub(crate) resolvers: Resolvers,
-    pub(crate) schemas: Schemas<Lang::Keyword>,
+    pub(crate) schemas: Schemas<L, K>,
     pub(crate) deserializers: Deserializers,
     pub(crate) numbers: Numbers,
     pub(crate) values: Values,
+    pub(crate) language: L,
 }
 
-impl<Lang> Debug for Interrogator<Lang>
-where
-    Lang: crate::Lang,
-{
+impl<L: Language<K>, K: Key> Debug for Interrogator<L, K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Interrogator")
             .field("dialects", &self.dialects)
             .field("sources", &self.sources)
             .field("schemas", &self.schemas)
             .field("deserializers", &self.deserializers)
+            .field("numbers", &self.numbers)
+            .field("values", &self.values)
             .finish_non_exhaustive()
     }
 }
 
-impl<Lang> Interrogator<Lang>
+impl<L, K> Interrogator<L, K>
 where
-    Lang: crate::Lang,
+    L: Language<K>,
+    K: Key,
 {
     pub fn print_source_index(&self) {
         self.sources.print_index();
@@ -660,7 +651,7 @@ where
     ///
     /// # Errors
     /// Returns [`UnknownKeyError`] if the `key` does not belong to this `Interrgator`.
-    pub fn schema(&self, key: Key) -> Result<Schema<'_, Lang::Keyword>, UnknownKeyError> {
+    pub fn schema(&self, key: K) -> Result<Schema<'_, L, K>, UnknownKeyError<K>> {
         self.schemas.get(key, &self.sources)
     }
 
@@ -669,19 +660,19 @@ where
     ///
     /// # Panics
     /// Panics if the `key` does not belong to this `Interrgator`.
-    pub fn schema_unchecked(&self, key: Key) -> Schema<'_, Lang::Keyword> {
+    pub fn schema_unchecked(&self, key: K) -> Schema<'_, L> {
         self.schemas.get_unchecked(key, &self.sources)
     }
 
     /// Returns the [`Schema`] with the given `id` if it exists.
     #[must_use]
-    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_, Lang::Keyword>> {
+    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_, L, K>> {
         self.schemas.get_by_uri(id, &self.sources)
     }
 
     /// Returns `true` if `key` belongs to this `Interrogator`
     #[must_use]
-    pub fn contains_key(&self, key: Key) -> bool {
+    pub fn contains_key(&self, key: K) -> bool {
         self.schemas.contains_key(key)
     }
 
@@ -698,7 +689,7 @@ where
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this
     /// `Interrogator`
-    pub fn ancestors(&self, key: Key) -> Result<Ancestors<'_, Lang::Keyword>, UnknownKeyError> {
+    pub fn ancestors(&self, key: K) -> Result<Ancestors<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
     }
     /// Returns [`Ancestors`] which is an [`Iterator`] over the [`Schema`]s
@@ -714,7 +705,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn ancestors_unchecked(&self, key: Key) -> Ancestors<'_, Lang::Keyword> {
+    pub fn ancestors_unchecked(&self, key: K) -> Ancestors<'_, L, K> {
         self.schemas.ancestors(key, &self.sources)
     }
 
@@ -729,7 +720,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn descendants(&self, key: Key) -> Result<Descendants<'_, Lang::Keyword>, UnknownKeyError> {
+    pub fn descendants(&self, key: K) -> Result<Descendants<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -746,8 +737,8 @@ where
     /// Panics if `key` does not belong to this `Interrogator`
     pub fn descendants_unchecked(
         &self,
-        key: Key,
-    ) -> Result<Descendants<'_, Lang::Keyword>, UnknownKeyError> {
+        key: K,
+    ) -> Result<Descendants<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -758,8 +749,8 @@ where
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
     pub fn direct_dependencies(
         &self,
-        key: Key,
-    ) -> Result<DirectDependencies<'_, Lang::Keyword>, UnknownKeyError> {
+        key: K,
+    ) -> Result<DirectDependencies<'_, L, K>, UnknownKeyError<K>> {
         self.schemas
             .ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
     }
@@ -770,7 +761,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn direct_dependencies_unchecked(&self, key: Key) -> DirectDependencies<'_, Lang::Keyword> {
+    pub fn direct_dependencies_unchecked(&self, key: K) -> DirectDependencies<'_, L, K> {
         self.schemas.direct_dependencies(key, &self.sources)
     }
 
@@ -783,8 +774,8 @@ where
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
     pub fn transitive_dependencies(
         &self,
-        key: Key,
-    ) -> Result<TransitiveDependencies<'_, Lang::Keyword>, UnknownKeyError> {
+        key: K,
+    ) -> Result<TransitiveDependencies<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || {
             self.schemas.transitive_dependencies(key, &self.sources)
         })
@@ -798,10 +789,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn transitive_dependencies_unchecked(
-        &self,
-        key: Key,
-    ) -> TransitiveDependencies<'_, Lang::Keyword> {
+    pub fn transitive_dependencies_unchecked(&self, key: K) -> TransitiveDependencies<'_, L, K> {
         self.schemas.transitive_dependencies(key, &self.sources)
     }
 
@@ -813,8 +801,8 @@ where
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
     pub fn direct_dependents(
         &self,
-        key: Key,
-    ) -> Result<DirectDependents<'_, Lang::Keyword>, UnknownKeyError> {
+        key: K,
+    ) -> Result<DirectDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
@@ -826,17 +814,14 @@ where
     /// Panics if `key` does not belong to this `Interrogator`
     pub fn direct_dependents_unchecked(
         &self,
-        key: Key,
-    ) -> Result<DirectDependents<'_, Lang::Keyword>, UnknownKeyError> {
+        key: K,
+    ) -> Result<DirectDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
     /// Returns [`AllDependents`] which is an [`Iterator`] over [`Schema`]s which
     /// depend on a specified [`Schema`](crate::schema::Schema)
-    pub fn all_dependents(
-        &self,
-        key: Key,
-    ) -> Result<AllDependents<'_, Lang::Keyword>, UnknownKeyError> {
+    pub fn all_dependents(&self, key: K) -> Result<AllDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.all_dependents(key, &self.sources))
     }
 
@@ -845,7 +830,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn ensure_key_exists<T, F>(&self, key: Key, f: F) -> Result<T, UnknownKeyError>
+    pub fn ensure_key_exists<T, F>(&self, key: K, f: F) -> Result<T, UnknownKeyError<K>>
     where
         F: FnOnce() -> T,
     {
@@ -883,7 +868,7 @@ where
     pub async fn compile_all<I>(
         &mut self,
         uris: I,
-    ) -> Result<Vec<(AbsoluteUri, Key)>, <Lang::Keyword as crate::Keyword>::CompileError>
+    ) -> Result<Vec<(AbsoluteUri, K)>, CompileError<L, K>>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
@@ -912,10 +897,7 @@ where
     ///   - the uri fails to convert to an [`AbsoluteUri`].
     ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     #[allow(clippy::unused_async)]
-    pub async fn compile(
-        &mut self,
-        uri: impl TryIntoAbsoluteUri,
-    ) -> Result<Key, keyword::CompileError<Lang::Keyword>> {
+    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<K, CompileError<L, K>> {
         // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
         let uri = uri.try_into_absolute_uri()?;
         self.start_txn();
@@ -934,7 +916,7 @@ where
     async fn compile_dialects_schemas(
         &mut self,
         uris: Vec<AbsoluteUri>,
-    ) -> Result<(), keyword::CompileError<Lang::Keyword>> {
+    ) -> Result<(), CompileError<L, K>> {
         let uris = uris.into_iter();
         self.start_txn();
         match Compiler::new(self, false).compile_all(uris).await {
@@ -950,7 +932,7 @@ where
         }
     }
 
-    /// Returns an [`Iter`] of `Result<Schema, UnknownKeyError>`s for the given [`Key`]s.
+    /// Returns an [`Iter`] of `Result<Schema, UnknownKeyError<Key>>`s for the given [`Key`]s.
     ///
     /// Each item in the iterator is a [`Result`] because it is possible a [`Key`] may not
     /// belong to this `Interrogator`.
@@ -958,7 +940,7 @@ where
     /// If you know that all of the keys belong to this `Interrogator`, you can use
     /// [`iter_unchecked`](`Interrogator::iter_unchecked`) instead.
     #[must_use]
-    pub fn iter<'i, Keyword>(&'i self, keys: &'i [Key]) -> Iter<'i, Keyword> {
+    pub fn iter<'i>(&'i self, keys: &'i [K]) -> Iter<'i, L, K> {
         Iter::new(keys, &self.schemas, &self.sources)
     }
 
@@ -970,7 +952,7 @@ where
     /// have multiple `Interrogator` instances where mixing up keys could occur,
     /// use [`iter`](`Interrogator::iter`) instead.
     #[must_use]
-    pub fn iter_unchecked<'i, Keyword>(&'i self, keys: &'i [Key]) -> IterUnchecked<'i, Keyword> {
+    pub fn iter_unchecked<'i>(&'i self, keys: &'i [K]) -> IterUnchecked<'i, L, K> {
         self.iter(keys).unchecked()
     }
 
@@ -978,19 +960,19 @@ where
         &mut self,
         uri: AbsoluteUri,
         validate: bool,
-    ) -> Result<Key, keyword::CompileError<Lang::Keyword>> {
+    ) -> Result<K, CompileError<L, K>> {
         Compiler::new(self, validate).compile(uri).await
     }
 
     /// Returns the [`Dialects`] for this `Interrogator`
     #[must_use]
-    pub fn dialects(&self) -> &Dialects<Lang::Keyword> {
+    pub fn dialects(&self) -> &Dialects<L, K> {
         &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect<Lang::Keyword> {
+    pub fn default_dialect(&self) -> &Dialect<L, K> {
         self.dialects.primary()
     }
 
@@ -999,29 +981,28 @@ where
     /// [`Structure`].
     pub fn evaluate<'v>(
         &self,
-        structure: keyword::Structure<Lang::Keyword>,
-        key: Key,
+        structure: lang::Structure<L, K>,
+        key: K,
         value: &'v Value,
-    ) -> Result<keyword::Output<Lang::Keyword>, EvaluateError> {
+    ) -> Result<lang::Output<L, K>, EvaluateError<K>> {
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
-        self.schemas.evaluate(
+        self.schemas.evaluate(Evaluate {
             structure,
             key,
             value,
-            Pointer::default(),
-            Pointer::default(),
-            &self.sources,
-            &mut evaluated,
-            &self.state,
-            &self.numbers,
-            &mut eval_numbers,
-        )
+            instance_location: Pointer::default(),
+            keyword_location: Pointer::default(),
+            sources: &self.sources,
+            evaluated: &mut evaluated,
+            global_numbers: &self.numbers,
+            eval_numbers: &mut eval_numbers,
+        })
     }
 
     /// Returns the schema's `Key` if it exists
     #[must_use]
-    pub fn schema_key_by_uri(&self, id: &AbsoluteUri) -> Option<Key> {
+    pub fn schema_key_by_uri(&self, id: &AbsoluteUri) -> Option<K> {
         self.schemas.get_by_uri(id, &self.sources)?.key.into()
     }
     /// Returns the attached `Deserializers`.
@@ -1188,11 +1169,11 @@ where
     /// # Errors
     /// Returns [`UriError`] if a URI fails to convert to an
     /// [`AbsoluteUri`]
-    pub fn source_strs<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_strs<I, U, V>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: TryIntoAbsoluteUri,
+        U: TryIntoAbsoluteUri,
         V: Deref<Target = str>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (U, V)>,
     {
         for (k, v) in sources {
             self.source(Src::String(k.try_into_absolute_uri()?, v.to_string()))?;
@@ -1225,11 +1206,11 @@ where
     /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
     ///
-    pub fn source_slices<I, K, V>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_slices<I, U, V>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: TryIntoAbsoluteUri,
+        U: TryIntoAbsoluteUri,
         V: AsRef<[u8]>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (U, V)>,
     {
         for (k, v) in sources {
             self.source(Src::String(
@@ -1267,10 +1248,10 @@ where
     /// - an Absolute URI fails to convert to an [`AbsoluteUri`]
     /// - a source is not valid UTF-8
     ///
-    pub fn source_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_values<I, U>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Cow<'static, Value>)>,
+        U: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (U, Cow<'static, Value>)>,
     {
         for (k, v) in sources {
             self.source(Src::Value(k.try_into_absolute_uri()?, v))?;
@@ -1303,10 +1284,10 @@ where
     ///  interrogator.source_owned_values(sources).unwrap();
     /// # }
     /// ```
-    pub fn source_owned_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_owned_values<I, U>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Value)>,
+        U: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (U, Value)>,
     {
         self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
     }
@@ -1336,10 +1317,10 @@ where
     /// interrogator.source_owned_values(SOURCES.get().unwrap())
     /// # }
     /// ```
-    pub fn source_static_values<I, K>(&mut self, sources: I) -> Result<(), SourceError>
+    pub fn source_static_values<I, U>(&mut self, sources: I) -> Result<(), SourceError>
     where
-        K: TryIntoAbsoluteUri,
-        I: IntoIterator<Item = (K, Value)>,
+        U: TryIntoAbsoluteUri,
+        I: IntoIterator<Item = (U, Value)>,
     {
         self.source_values(sources.into_iter().map(|(k, v)| (k, Cow::Owned(v))))
     }
@@ -1347,46 +1328,10 @@ where
     /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn build(lang: Lang) -> Build<Lang> {
+    pub fn build(lang: L) -> Build<L, K> {
         Build::new(lang)
     }
 
-    /// Returns a new [`Build`] with the JSON Schema Draft 2019-09 [`Dialect`] that is
-    /// set as the default dialect.
-    #[must_use]
-    #[allow(unused_must_use)]
-    pub fn json_schema_2019_09() -> Build<Lang> {
-        // Builder::default()
-        //     .with_json_schema_2019_09()
-        //     .with_default_dialect(
-        //         json_schema::draft_2019_09::JSON_SCHEMA_2019_09_ABSOLUTE_URI.clone(),
-        //     )
-        todo!()
-    }
-
-    /// Returns a new [`Build`] with the JSON Schema Draft 07 [`Dialect`] that is
-    /// set as the default dialect.
-    #[must_use]
-    #[allow(unused_must_use)]
-    pub fn json_schema_07() -> Build<Lang> {
-        // Builder::default()
-        //     .with_json_schema_07()
-        //     .with_default_dialect(json_schema::draft_07::JSON_SCHEMA_07_ABSOLUTE_URI.clone())
-        //     .unwrap()
-        todo!()
-    }
-
-    /// Returns a new [`Build`] with the JSON Schema Draft 04 [`Dialect`] that is
-    /// set as the default dialect.
-    #[must_use]
-    #[allow(unused_must_use)]
-    pub fn json_schema_04() -> Build<Lang> {
-        // Builder::default()
-        //     .with_json_schema_04()
-        //     .with_default_dialect(json_schema::draft_04::JSON_SCHEMA_04_ABSOLUTE_URI.clone())
-        //     .unwrap()
-        todo!()
-    }
     /// Starts a new transaction.
     fn start_txn(&mut self) {
         self.schemas.start_txn();

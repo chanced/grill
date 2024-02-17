@@ -3,7 +3,7 @@
 use either::Either;
 
 use super::Schemas;
-use crate::{error::UnknownKeyError, source::Sources, Key, Schema};
+use crate::{error::UnknownKeyError, source::Sources, Schema};
 
 /// An [`Iterator`] over [`Schema`]s from an `Iterator` of [`Key`]s.
 ///
@@ -12,18 +12,14 @@ use crate::{error::UnknownKeyError, source::Sources, Key, Schema};
 /// [`Interrogator`](`crate::Interrogator`). If this is not a concern, use
 /// [`unchecked`](`Iter::unchecked`) which unwraps all `Result`s.
 ///
-pub struct Iter<'i, Keyword> {
+pub struct Iter<'i, L, Key> {
     sources: &'i Sources,
-    schemas: &'i Schemas<Keyword>,
+    schemas: &'i Schemas<L, Key>,
     inner: Either<std::slice::Iter<'i, Key>, std::vec::IntoIter<Key>>,
 }
 
-impl<'i, Keyword> Iter<'i, Keyword> {
-    pub(crate) fn new(
-        keys: &'i [Key],
-        schemas: &'i Schemas<Keyword>,
-        sources: &'i Sources,
-    ) -> Self {
+impl<'i, L, Key> Iter<'i, L, Key> {
+    pub(crate) fn new(keys: &'i [Key], schemas: &'i Schemas<L, Key>, sources: &'i Sources) -> Self {
         Self {
             sources,
             schemas,
@@ -37,7 +33,7 @@ impl<'i, Keyword> Iter<'i, Keyword> {
     /// Do not use this unless you are certain all `Key`s are associated with
     /// the [`Interrogator`] from which this is originated.
     #[must_use]
-    pub fn unchecked(self) -> IterUnchecked<'i, Keyword> {
+    pub fn unchecked(self) -> IterUnchecked<'i, L, Key> {
         IterUnchecked { inner: self }
     }
 
@@ -49,8 +45,8 @@ impl<'i, Keyword> Iter<'i, Keyword> {
     //     }
     // }
 }
-impl<'i, K> Iterator for Iter<'i, K> {
-    type Item = Result<Schema<'i, K>, UnknownKeyError>;
+impl<'i, L, Key> Iterator for Iter<'i, L, Key> {
+    type Item = Result<Schema<'i, L, Key>, UnknownKeyError<Key>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let key = match self.inner.as_mut() {
@@ -65,12 +61,12 @@ impl<'i, K> Iterator for Iter<'i, K> {
 /// # Panics
 /// This will panic if any of the [`Key`]s are not associated with the same
 /// [`Interrogator`](`crate::Interrogator`).
-pub struct IterUnchecked<'i, Keyword> {
-    inner: Iter<'i, Keyword>,
+pub struct IterUnchecked<'i, L, Key> {
+    inner: Iter<'i, L, Key>,
 }
 
-impl<'i, K> Iterator for IterUnchecked<'i, K> {
-    type Item = Schema<'i, K>;
+impl<'i, L, Key> Iterator for IterUnchecked<'i, L, Key> {
+    type Item = Schema<'i, L, Key>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(std::result::Result::unwrap)

@@ -3,38 +3,37 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use snafu::Backtrace;
-use tracing::{instrument, Level};
 
 use crate::{
     cache::{Numbers, Values},
     error::{CompileError, UnknownAnchorError},
-    keyword,
+    lang,
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Keyword, Lang, Structure,
+    AbsoluteUri, Interrogator, Key, Keyword, Language, Structure,
 };
 
-use super::{Anchor, CompiledSchema, Dialect, Ref, Reference};
+use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};
 
 // TODO: insert a link for the uri + an empty fragment if None (http://example/path/ -> http://example/path/#)
 // TODO: handle 07 style $ids (hashtagged)
 
 #[derive(Clone, Debug)]
-struct RefToResolve {
-    referrer_key: Key,
+struct RefToResolve<K> {
+    referrer_key: K,
     ref_: Ref,
 }
 
 #[derive(Debug)]
 /// A pending schema to compile
-struct SchemaToCompile {
-    key: Option<Key>,
+struct SchemaToCompile<K: Key> {
+    key: Option<K>,
     uri: AbsoluteUri,
-    parent: Option<Key>,
+    parent: Option<K>,
     /// Errors are to be disregarded.
     continue_on_err: bool,
-    ref_: Option<RefToResolve>,
+    ref_: Option<RefToResolve<K>>,
 }
 
 #[derive(Debug)]
@@ -52,13 +51,10 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, Lang>
-where
-    Lang: crate::Lang,
-{
-    schemas: &'i mut Schemas<Lang::Keyword>,
+pub(crate) struct Compiler<'i, L: Language<K>, K: Key> {
+    schemas: &'i mut Schemas<L, K>,
     sources: &'i mut Sources,
-    dialects: &'i Dialects<Lang::Keyword>,
+    dialects: &'i Dialects<L, K>,
     deserializers: &'i Deserializers,
     resolvers: &'i Resolvers,
     numbers: &'i mut Numbers,
@@ -73,19 +69,17 @@ where
     primary_uris: HashMap<AbsoluteUri, AbsoluteUri>,
     paths: HashMap<AbsoluteUri, Pointer>,
     refs: HashMap<AbsoluteUri, Vec<Ref>>,
-    keywords: HashMap<AbsoluteUri, &'i [Lang::Keyword]>,
-    lang: &'i mut Lang,
+    keywords: HashMap<AbsoluteUri, &'i [L::Keyword]>,
+    lang: &'i mut L,
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<'i, Keyword> Compiler<'i, Keyword> {
-    pub(crate) fn new<Lang>(
-        interrogator: &'i mut Interrogator<Lang>,
-        validate: bool,
-    ) -> Compiler<'i, Lang::Keyword>
-    where
-        Lang: crate::Lang,
-    {
+impl<'i, L, K> Compiler<'i, L, K>
+where
+    L: crate::Language<K>,
+    K: crate::Key,
+{
+    pub(crate) fn new(interrogator: &'i mut Interrogator<L, K>, validate: bool) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -94,7 +88,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
             resolvers: &interrogator.resolvers,
             numbers: &mut interrogator.numbers,
             values: &mut interrogator.values,
-            lang: &mut interrogator.lang,
+            lang: &mut interrogator.language,
             validate,
             ids: HashMap::default(),
             indexed: HashSet::default(),
@@ -109,10 +103,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
         }
     }
 
-    pub(crate) async fn compile(
-        mut self,
-        uri: AbsoluteUri,
-    ) -> Result<Key, keyword::CompileError<Keyword>> {
+    pub(crate) async fn compile(mut self, uri: AbsoluteUri) -> Result<K, CompileError<L, K>> {
         let mut q = VecDeque::with_capacity(32);
 
         q.push_front(SchemaToCompile {
@@ -129,7 +120,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     pub(crate) async fn compile_all<I>(
         mut self,
         uris: I,
-    ) -> Result<Vec<(AbsoluteUri, Key)>, keyword::CompileError<Keyword>>
+    ) -> Result<Vec<(AbsoluteUri, K)>, CompileError<L, K>>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
@@ -152,15 +143,12 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
         Ok(uris.into_iter().map(|uri| self.compiled(uri)).collect())
     }
 
-    fn compiled(&self, uri: AbsoluteUri) -> (AbsoluteUri, Key) {
+    fn compiled(&self, uri: AbsoluteUri) -> (AbsoluteUri, K) {
         let key = self.schemas.get_key(&uri).unwrap();
         (uri, key)
     }
 
-    async fn run(
-        &mut self,
-        mut q: VecDeque<SchemaToCompile>,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+    async fn run(&mut self, mut q: VecDeque<SchemaToCompile<K>>) -> Result<(), CompileError<L, K>> {
         while !q.is_empty() {
             let schema_to_compile = q.pop_front().unwrap();
             let result = self.compile_schema(schema_to_compile, &mut q).await;
@@ -176,7 +164,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     async fn precompile(
         &mut self,
         uri: &AbsoluteUri,
-    ) -> Result<Option<(Link, Value)>, keyword::CompileError<Keyword>> {
+    ) -> Result<Option<(Link, Value)>, CompileError<L, K>> {
         let mut indexed = self
             .indexed
             .iter()
@@ -196,7 +184,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     async fn index_all(
         &mut self,
         uri: AbsoluteUri,
-    ) -> Result<Option<(Link, Value)>, keyword::CompileError<Keyword>> {
+    ) -> Result<Option<(Link, Value)>, CompileError<L, K>> {
         let mut base_uri = uri.clone();
         base_uri.set_fragment(None).unwrap();
         if self.indexed.contains(&base_uri) {
@@ -239,7 +227,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
         &mut self,
         loc: Location<'v>,
         q: &mut Vec<Location<'v>>,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+    ) -> Result<(), CompileError<L, K>> {
         let Location {
             uri,
             ancestry_uris,
@@ -317,9 +305,9 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     #[allow(clippy::too_many_lines)]
     async fn compile_schema(
         &mut self,
-        schema_to_compile: SchemaToCompile,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
+        schema_to_compile: SchemaToCompile<K>,
+        q: &mut VecDeque<SchemaToCompile<K>>,
+    ) -> Result<(), (bool, CompileError<L, K>)> {
         let SchemaToCompile {
             key,
             uri,
@@ -332,8 +320,11 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
             .await
             .map_err(|err| self.handle_err(err, continue_on_err, &uri))?
         else {
-            return Err(CompileError::SchemaNotFound(uri.clone()))
-                .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
+            return Err(CompileError::SchemaNotFound {
+                uri: uri.clone(),
+                backtrace: Backtrace::capture(),
+            })
+            .map_err(|err| self.handle_err(err, continue_on_err, &uri))?;
         };
 
         let uri = self.primary_uris.get(&uri).unwrap().clone();
@@ -400,10 +391,10 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn handle_err(
         &mut self,
-        err: keyword::CompileError<Keyword>,
+        err: CompileError<L, K>,
         continue_on_err: bool,
         uri: &AbsoluteUri,
-    ) -> (bool, keyword::CompileError<Keyword>) {
+    ) -> (bool, CompileError<L, K>) {
         if !continue_on_err {
             return (false, err);
         }
@@ -423,9 +414,9 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn remaining_subschemas(
         &mut self,
-        key: Key,
+        key: K,
         uri: &AbsoluteUri,
-    ) -> Result<Vec<SchemaToCompile>, keyword::CompileError<Keyword>> {
+    ) -> Result<Vec<SchemaToCompile<K>>, CompileError<L, K>> {
         let existing = self.subschemas.get_mut(uri).unwrap();
         let (remaining, subschemas) = subschemas(key, uri, existing.iter(), self.schemas)?;
         *existing = remaining;
@@ -434,9 +425,9 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn remaining_refs(
         &mut self,
-        key: Key,
+        key: K,
         mut base_uri: AbsoluteUri,
-    ) -> Result<Vec<SchemaToCompile>, keyword::CompileError<Keyword>> {
+    ) -> Result<Vec<SchemaToCompile<K>>, CompileError<L, K>> {
         let refs = self.refs.get(&base_uri).unwrap().clone();
         // references which cannot be resolved yet due to the referenced
         // not being resolved yet.
@@ -478,29 +469,26 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn maybe_finalize(
         &mut self,
-        key: Key,
+        key: K,
         uri: &AbsoluteUri,
-        parent: Option<Key>,
-        ref_: Option<RefToResolve>,
+        parent: Option<K>,
+        ref_: Option<RefToResolve<K>>,
         continue_on_err: bool,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+        q: &mut VecDeque<SchemaToCompile<K>>,
+    ) -> Result<(), CompileError<L, K>> {
         if self.schemas.is_compiled(key) {
             return Ok(());
         }
-        let kickback = |q: &mut VecDeque<SchemaToCompile>| {
+        let kickback = |q: &mut VecDeque<SchemaToCompile<K>>| {
             // kicking resolve_ref and setup_keywords down the road until all
             // subschemas are compiled and refs are resolved
-            push_back(
-                q,
-                SchemaToCompile {
-                    key: Some(key),
-                    uri: uri.clone(),
-                    parent,
-                    continue_on_err,
-                    ref_: ref_.clone(),
-                },
-            );
+            q.push_back(SchemaToCompile {
+                key: Some(key),
+                uri: uri.clone(),
+                parent,
+                continue_on_err,
+                ref_: ref_.clone(),
+            });
             Ok(())
         };
 
@@ -530,23 +518,23 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn queue_pathed(
         &mut self,
-        s: SchemaToCompile,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
+        s: SchemaToCompile<K>,
+        q: &mut VecDeque<SchemaToCompile<K>>,
+    ) -> Result<(), (bool, CompileError<L, K>)> {
         // if parent is None and this schema is not a document root (does
         // not have an $id/id) then find the most relevant ancestor and
         // compile it. Doing so will also compile this schema.
         self.queue_ancestors(&s.uri, q)
             .map_err(|err| self.handle_err(err, s.continue_on_err, &s.uri))?;
-        push_back(q, s);
+        q.push_back(s);
         Ok(())
     }
 
     fn queue_anchored(
         &mut self,
-        s: SchemaToCompile,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), (bool, keyword::CompileError<Keyword>)> {
+        s: SchemaToCompile<K>,
+        q: &mut VecDeque<SchemaToCompile<K>>,
+    ) -> Result<(), (bool, CompileError<L, K>)> {
         let mut root_uri = s.uri.clone();
         root_uri.set_fragment(None).unwrap();
         let anchor = s.uri.fragment_decoded_lossy().unwrap_or_default();
@@ -566,28 +554,25 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
         // need to compile the root schema first in order to locate the anchor
         //
         // adding this schema to the front of the queue
-        push_front(q, s);
+        q.push_front(s);
         // putting the root ahead of it
         //
         // if the anchor is not found then an error should be raised.
-        push_front(
-            q,
-            SchemaToCompile {
-                key: None,
-                uri: root_uri,
-                parent: None,
-                continue_on_err: false,
-                ref_: None,
-            },
-        );
+        q.push_front(SchemaToCompile {
+            key: None,
+            uri: root_uri,
+            parent: None,
+            continue_on_err: false,
+            ref_: None,
+        });
         Ok(())
     }
 
-    fn keywords_for<Lang: crate::Lang>(
+    fn keywords_for(
         &mut self,
-        key: Key,
-        possible: &[Keyword],
-    ) -> Result<Box<[Keyword]>, keyword::CompileError<Keyword>> {
+        key: K,
+        possible: &[L::Keyword],
+    ) -> Result<Box<[L::Keyword]>, CompileError<L, K>> {
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
@@ -611,10 +596,10 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn resolve_ref(
         &mut self,
-        referenced_key: Key,
+        referenced_key: K,
         referenced_uri: AbsoluteUri,
-        ref_: RefToResolve,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+        ref_: RefToResolve<K>,
+    ) -> Result<(), CompileError<L, K>> {
         let referrer_key = ref_.referrer_key;
         self.add_reference(ref_.referrer_key, referenced_key, referenced_uri, ref_.ref_)?;
 
@@ -624,11 +609,11 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
 
     fn add_reference(
         &mut self,
-        referrer_key: Key,
-        referenced_key: Key,
+        referrer_key: K,
+        referenced_key: K,
         referenced_uri: AbsoluteUri,
         ref_: Ref,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+    ) -> Result<(), CompileError<L, K>> {
         self.schemas.add_reference(
             referrer_key,
             Reference {
@@ -649,21 +634,18 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     fn queue_ancestors(
         &mut self,
         target_uri: &AbsoluteUri,
-        q: &mut VecDeque<SchemaToCompile>,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+        q: &mut VecDeque<SchemaToCompile<K>>,
+    ) -> Result<(), CompileError<L, K>> {
         let mut path = Pointer::parse(&target_uri.fragment_decoded_lossy().unwrap())
             .map_err(|err| CompileError::FailedToParsePointer(err.into()))?;
 
-        push_front(
-            q,
-            SchemaToCompile {
-                key: None,
-                uri: target_uri.clone(),
-                parent: None,
-                continue_on_err: true,
-                ref_: None,
-            },
-        );
+        q.push_front(SchemaToCompile {
+            key: None,
+            uri: target_uri.clone(),
+            parent: None,
+            continue_on_err: true,
+            ref_: None,
+        });
         while !path.is_root() {
             path.pop_back();
             let mut uri = target_uri.clone();
@@ -679,16 +661,13 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
                 continue;
             }
 
-            push_front(
-                q,
-                SchemaToCompile {
-                    key: None,
-                    uri,
-                    parent: None,
-                    continue_on_err: true,
-                    ref_: None,
-                },
-            );
+            q.push_front(SchemaToCompile {
+                key: None,
+                uri,
+                parent: None,
+                continue_on_err: true,
+                ref_: None,
+            });
         }
         let mut uri = target_uri.clone();
         uri.set_fragment(None).unwrap();
@@ -697,16 +676,13 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
             return Err(CompileError::SchemaNotFound(target_uri.clone()));
         }
 
-        push_front(
-            q,
-            SchemaToCompile {
-                uri,
-                key: None,
-                parent: None,
-                continue_on_err: true,
-                ref_: None,
-            },
-        );
+        q.push_front(SchemaToCompile {
+            uri,
+            key: None,
+            parent: None,
+            continue_on_err: true,
+            ref_: None,
+        });
         Ok(())
     }
 
@@ -714,7 +690,7 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
         &mut self,
         dialect_idx: usize,
         src: &Value,
-    ) -> Result<Vec<Anchor>, keyword::CompileError<Keyword>> {
+    ) -> Result<Vec<Anchor>, CompileError<L, K>> {
         Ok(self
             .dialects
             .get_by_index(dialect_idx)
@@ -722,29 +698,24 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
             .anchors(src)?)
     }
 
-    fn validate<Lang: crate::Lang>(
-        &mut self,
-        dialect_idx: usize,
-        src: &Value,
-    ) -> Result<(), keyword::CompileError<Keyword>> {
+    fn validate(&mut self, dialect_idx: usize, value: &Value) -> Result<(), CompileError<L, K>> {
         if !self.validate {
             return Ok(());
         }
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
-        let structure = <keyword::Structure<Lang::Keyword> as Structure>::verbose();
-        let output = self.schemas.evaluate(
+        let output = self.schemas.evaluate(Evaluate {
             key,
-            src,
-            Pointer::default(),
-            Pointer::default(),
-            self.sources,
-            &mut evaluated,
-            self.global_state,
-            self.numbers,
-            &mut eval_numbers,
-        )?;
+            value,
+            structure: <lang::Structure<L>>::verbose(),
+            instance_location: Pointer::default(),
+            keyword_location: Pointer::default(),
+            sources: self.sources,
+            evaluated: &mut evaluated,
+            global_numbers: self.numbers,
+            eval_numbers: &mut eval_numbers,
+        })?;
         if output.is_invalid() {
             return Err(CompileError::SchemaInvalid(output.into_owned()));
         }
@@ -752,12 +723,12 @@ impl<'i, Keyword> Compiler<'i, Keyword> {
     }
 }
 
-fn subschemas<'c, Keyword>(
-    key: Key,
+fn subschemas<'c, L: Language<K>, K: Key>(
+    key: K,
     uri: &AbsoluteUri,
     subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
-    schemas: &Schemas<Keyword>,
-) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile>), keyword::CompileError<Keyword>> {
+    schemas: &Schemas<L, K>,
+) -> Result<(HashSet<Pointer>, Vec<SchemaToCompile<K>>), CompileError<L, K>> {
     let mut q = Vec::with_capacity(subschemas.len());
     let mut r = HashSet::with_capacity(subschemas.len());
     for path in subschemas {
@@ -781,29 +752,26 @@ fn subschemas<'c, Keyword>(
     }
     Ok((r, q))
 }
-fn push_front(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
-    q.push_front(new);
-}
-fn push_back(q: &mut VecDeque<SchemaToCompile>, new: SchemaToCompile) {
-    q.push_back(new);
-}
 
-fn append_all_front(q: &mut VecDeque<SchemaToCompile>, other: Vec<SchemaToCompile>) -> bool {
+fn append_all_front<K: Key>(
+    q: &mut VecDeque<SchemaToCompile<K>>,
+    other: Vec<SchemaToCompile<K>>,
+) -> bool {
     if other.is_empty() {
         return false;
     }
     q.reserve(other.len());
     for s in other.into_iter().rev() {
-        push_front(q, s);
+        q.push_front(s);
     }
     true
 }
 
-fn append_anchor_uris<'i, Keyword>(
+fn append_anchor_uris<'i, L: Language<K>, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'i AbsoluteUri,
     anchors: &'i [Anchor],
-) -> Result<(), keyword::CompileError<Keyword>> {
+) -> Result<(), CompileError<L, K>> {
     for anchor in anchors {
         let mut uri = base_uri.clone();
         uri.set_fragment(Some(&anchor.name))
@@ -817,11 +785,11 @@ fn append_anchor_uris<'i, Keyword>(
     Ok(())
 }
 
-fn append_ancestry_uris<'a, Keyword>(
+fn append_ancestry_uris<'a, L: Language<K>, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     path: &'a Pointer,
     parent_uris: &'a [AbsoluteUri],
-) -> Result<(), keyword::CompileError<Keyword>> {
+) -> Result<(), CompileError<L, K>> {
     if path.is_empty() {
         return Ok(());
     }
@@ -834,11 +802,11 @@ fn append_ancestry_uris<'a, Keyword>(
     Ok(())
 }
 
-fn append_uri_path<Keyword>(
+fn append_uri_path<L: Language<K>, K: Key>(
     path: &Pointer,
     uri: &AbsoluteUri,
     fragment: &str,
-) -> Result<AbsoluteUri, keyword::CompileError<Keyword>> {
+) -> Result<AbsoluteUri, CompileError<L, K>> {
     let mut uri = uri.clone();
     let mut uri_path = Pointer::parse(fragment)?;
     uri_path.append(path);
@@ -857,11 +825,11 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-fn identify<Keyword>(
+fn identify<L: Language<K>, K: Key>(
     uri: &AbsoluteUri,
     source: &Value,
-    dialect: &Dialect<Keyword>,
-) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), keyword::CompileError<Keyword>> {
+    dialect: &Dialect<L, K>,
+) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError<L, K>> {
     let (id, uris) = dialect.identify(uri.clone(), source)?;
     // if identify did not find a primary id, use the uri + pointer fragment
     // as the lookup which will be at the first position in the uris list

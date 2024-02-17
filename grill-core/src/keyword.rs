@@ -1,5 +1,5 @@
 use crate::{
-    error::{AnchorError, IdentifyError, RefError},
+    error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError},
     schema::{Anchor, Ref},
     uri::{AbsoluteUri, Uri},
     Schema,
@@ -13,15 +13,6 @@ pub const TRUE: &Value = &Value::Bool(true);
 /// A static reference to [`Value::Bool`] with the value `false`
 pub const FALSE: &Value = &Value::Bool(false);
 
-pub type Context<Keyword> = <Keyword as crate::Keyword>::Context;
-pub type Compile<Keyword> = <Keyword as crate::Keyword>::Compile;
-pub type Output<Keyword> = <Keyword as crate::Keyword>::Output;
-pub type Structure<Keyword> = <Output<Keyword> as crate::Output>::Structure;
-pub type ValidationError<Keyword> = <Output<Keyword> as crate::Output>::Error;
-pub type BuildError<Keyword> = <Keyword as crate::Keyword>::BuildError;
-pub type CompileError<Keyword> = <Keyword as crate::Keyword>::CompileError;
-pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
-
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -34,13 +25,14 @@ pub type EvaluateError<Keyword> = <Keyword as crate::Keyword>::EvaluateError;
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-pub trait Keyword: Send + Sync + Clone + fmt::Debug {
+pub trait Keyword<L, Key>: Send + Sync + Clone + fmt::Debug
+where
+    L: crate::Language<Key>,
+    Key: crate::Key,
+{
     type Context;
     type Compile;
     type Output: crate::Output;
-    type CompileError: crate::error::CompileError;
-    type BuildError: crate::error::BuildError<Self::CompileError>;
-    type EvaluateError: std::error::Error;
 
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
     /// be the name of the keyword or `Composite`, which will be a list of
@@ -60,14 +52,14 @@ pub trait Keyword: Send + Sync + Clone + fmt::Debug {
         &mut self,
         compile: &mut Self::Compile,
         schema: Schema<'i, Self>,
-    ) -> Result<bool, Self::CompileError>;
+    ) -> Result<bool, CompileError<L, Key>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut Self::Context,
         value: &'v Value,
-    ) -> Result<Option<Self::Output>, Self::EvaluateError>;
+    ) -> Result<Option<Self::Output>, EvaluateError<Key>>;
 
     /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
