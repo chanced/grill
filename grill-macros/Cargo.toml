@@ -1,0 +1,13 @@
+[package]
+edition = "2021"
+name    = "grill-macros"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+json       = "*"
+quote      = { version = "1.0.33" }
+serde      = { workspace = true }
+serde_json = { workspace = true }

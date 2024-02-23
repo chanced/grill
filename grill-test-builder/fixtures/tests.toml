@@ -1,0 +1,7 @@
+[json-schema-test-suite]
+base-uri = "http://localhost:1234"
+sources  = { strip-prefix = "remotes", paths = ["./remotes/**/*.json"] }
+
+[json-schema-test-suite.tests]
+draft2020-12 = ["*.json", "optional/format/*.json"]
+# draft7       = ["*.json", "optional/format/*.json"]
