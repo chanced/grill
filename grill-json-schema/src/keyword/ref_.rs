@@ -11,7 +11,7 @@ use serde_json::Value;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
-    Key, Output, Schema, Uri,
+    Evaluation, Key, Schema, Uri,
 };
 
 /// A reference to another schema.
@@ -93,7 +93,7 @@ impl keyword::Keyword for Ref {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
         if !self.must_eval {
             return ctx
                 .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))
@@ -124,7 +124,7 @@ mod tests {
         draft_2020_12::json_schema_2020_12_uri,
         keyword::{const_, id, schema, ID, REF, SCHEMA},
     };
-    use grill_core::{schema::Dialect, AbsoluteUri, Interrogator, Structure};
+    use grill_core::{schema::Dialect, AbsoluteUri, Interrogator, Output};
 
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
@@ -193,13 +193,9 @@ mod tests {
             .await
             .unwrap();
         let value = json!(34.34);
-        let output = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         println!("++ verbose:\n{output}");
-        let basic_output = interrogator
-            .evaluate(Structure::Basic, key, &value)
-            .unwrap();
+        let basic_output = interrogator.evaluate(Output::Basic, key, &value).unwrap();
         println!("++ basic:\n{basic_output}");
     }
 
@@ -242,8 +238,6 @@ mod tests {
         let _schema = interrogator.schema_by_uri(&uri).unwrap();
         // dbg!(schema);
         let value = json!({"foo": {"bar": false}});
-        let _output = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let _output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
     }
 }

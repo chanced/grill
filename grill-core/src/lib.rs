@@ -32,6 +32,7 @@ pub use schema::{iter::Iter, DefaultKey, Schema};
 use schema::{iter::IterUnchecked, Evaluate};
 
 pub mod source;
+use snafu::ResultExt;
 pub(crate) use source::Src;
 use uri::{error::Error, AbsoluteUri};
 
@@ -49,7 +50,7 @@ use serde_json::{Number, Value};
 
 use crate::{
     cache::{Numbers, Values},
-    error::{SourceError, UnknownKeyError},
+    error::{source_error, SourceError, UnknownKeyError},
     schema::{
         compiler::Compiler,
         traverse::{
@@ -65,31 +66,41 @@ use crate::{
 /// See [`slotmap`](`slotmap`) for more information.
 pub use slotmap::{new_key_type, Key};
 
-pub trait Structure: Copy + Clone + Debug + serde::Serialize + serde::de::DeserializeOwned {
+pub trait Output: Copy + Clone + Debug + serde::Serialize + serde::de::DeserializeOwned {
     fn verbose() -> Self;
 }
 
-pub trait Output: std::error::Error + serde::Serialize + serde::de::DeserializeOwned {
-    type Error: serde::Serialize + serde::de::DeserializeOwned;
-    type Structure: crate::Structure;
+pub trait Node<S>: std::error::Error + serde::Serialize + serde::de::DeserializeOwned {}
 
+pub trait Evaluation: std::error::Error + serde::Serialize + serde::de::DeserializeOwned {
+    type Error: serde::Serialize + serde::de::DeserializeOwned;
+    type Annotation: serde::Serialize + serde::de::DeserializeOwned;
+    type Output: crate::Output;
+    type Node<S>: Node<Self::Output>;
+    fn new(
+        structure: Self::Output,
+        absolute_keyword_location: AbsoluteUri,
+        keyword_location: Pointer,
+        instance_location: Pointer,
+        node: Self::Node<Self::Output>,
+        is_transient: bool,
+    ) -> Self;
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
 }
 
 pub trait Language<K: Key>: Sized + Debug {
     type Keyword: crate::Keyword<Self, K>;
-    type Translator;
 
     /// Creates a new context for the given `params`.
-    fn new_context(&mut self, params: NewContext<Self, K>) -> lang::Context<Self, K>;
+    fn create_context(&self, params: CreateContext<Self, K>) -> lang::Context<Self, K>;
 
     /// Creates a new `Self::Compile`
-    fn new_compile(&mut self, params: NewCompile<Self, K>) -> lang::Compile<Self, K>;
+    fn create_compile(&mut self, params: CreateCompile<Self, K>) -> lang::Compile<Self, K>;
 }
 
 #[derive(Debug)]
-pub struct NewContext<'i, L: Language<K>, K: Key> {
+pub struct CreateContext<'i, L: Language<K>, K: Key> {
     pub structure: lang::Structure<L, K>,
     eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
@@ -100,8 +111,7 @@ pub struct NewContext<'i, L: Language<K>, K: Key> {
     pub instance_location: Pointer,
 }
 
-#[derive(Debug)]
-pub struct NewCompile<'i, L: Language<K>, K: Key> {
+pub struct CreateCompile<'i, L: Language<K>, K: Key> {
     pub absolute_uri: &'i AbsoluteUri,
     pub global_numbers: &'i mut Numbers,
     pub schemas: &'i mut Schemas<L, K>,
@@ -110,6 +120,20 @@ pub struct NewCompile<'i, L: Language<K>, K: Key> {
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
     pub values: &'i mut Values,
+}
+impl<L: Language<K>, K: Key> Debug for CreateCompile<'_, L, K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NewCompile")
+            .field("absolute_uri", &self.absolute_uri)
+            .field("global_numbers", &self.global_numbers)
+            .field("schemas", &self.schemas)
+            .field("sources", &self.sources)
+            .field("dialects", &self.dialects)
+            // .field("resolvers", &self.resolvers)
+            .field("deserializers", &self.deserializers)
+            .field("values", &self.values)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Default)]
@@ -143,8 +167,17 @@ where
 {
     /// Constructs a new `Build`
     #[must_use]
-    pub fn new(lang: L) -> Self {
-        Self::default()
+    pub fn new(language: L) -> Self {
+        Self {
+            language,
+            dialects: Vec::new(),
+            precompile: Vec::new(),
+            pending_srcs: Vec::new(),
+            default_dialect_idx: None,
+            resolvers: Vec::new(),
+            deserializers: Vec::new(),
+            numbers: Vec::new(),
+        }
     }
 }
 
@@ -614,7 +647,11 @@ where
         V: TryIntoAbsoluteUri,
     {
         for schema in schemas {
-            self.precompile.push(schema.try_into_absolute_uri());
+            self.precompile.push(
+                schema
+                    .try_into_absolute_uri()
+                    .map_err(|source| CompileError::FailedToParseUri { source }),
+            );
         }
         self
     }
@@ -1009,6 +1046,7 @@ where
             evaluated: &mut evaluated,
             global_numbers: &self.numbers,
             eval_numbers: &mut eval_numbers,
+            lang: &self.language,
         })
     }
 
@@ -1056,10 +1094,10 @@ where
         uri: impl TryIntoAbsoluteUri,
         source: &[u8],
     ) -> Result<&Value, SourceError> {
-        let source = Src::String(
-            uri.try_into_absolute_uri()?,
-            String::from_utf8(source.to_vec())?,
-        );
+        let uri = uri.try_into_absolute_uri()?;
+        let src = String::from_utf8(source.to_vec())
+            .with_context(|_| source_error::InvalidUtf8Ctx { uri })?;
+        let source = Src::String(uri, src);
 
         self.source(source)
     }
@@ -1225,10 +1263,10 @@ where
         I: IntoIterator<Item = (U, V)>,
     {
         for (k, v) in sources {
-            self.source(Src::String(
-                k.try_into_absolute_uri()?,
-                String::from_utf8(v.as_ref().to_vec())?,
-            ))?;
+            let uri = k.try_into_absolute_uri()?;
+            let content = String::from_utf8(v.as_ref().to_vec())
+                .with_context(|_| source_error::InvalidUtf8Ctx { uri })?;
+            self.source(Src::String(uri, content))?;
         }
         Ok(())
     }
@@ -1373,7 +1411,12 @@ impl TryFrom<PendingSrc> for Src {
 
     fn try_from(src: PendingSrc) -> Result<Self, Self::Error> {
         Ok(match src {
-            PendingSrc::Bytes(uri, bytes) => Src::String(uri?, String::from_utf8(bytes)?),
+            PendingSrc::Bytes(uri, bytes) => {
+                let uri = uri?;
+                let content = String::from_utf8(bytes)
+                    .with_context(|_| source_error::InvalidUtf8Ctx { uri })?;
+                Src::String(uri, content)
+            }
             PendingSrc::String(uri, string) => Src::String(uri?, string),
             PendingSrc::Value(uri, value) => Src::Value(uri?, value),
         })

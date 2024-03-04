@@ -10,7 +10,7 @@ use grill_core::{
     keyword::{self, Context, Keyword, Kind, Unimplemented},
     output::Structures,
     uri::AbsoluteUri,
-    Output,
+    Eval,
 };
 
 use super::{UNEVALUATED_ITEMS, UNEVALUATED_PROPERTIES};
@@ -84,7 +84,7 @@ impl Keyword for Schema {
         &'i self,
         ctx: &'i mut Context,
         _value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Eval<'v>>, EvaluateError> {
         if !self.can_short_circuit {
             ctx.disable_short_circuiting();
             return Ok(None);

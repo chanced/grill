@@ -8,7 +8,7 @@ use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, boolean, Compile},
     output::Annotation,
-    Output, Schema,
+    Eval, Schema,
 };
 use serde_json::Value;
 
@@ -44,7 +44,7 @@ impl keyword::Keyword for WriteOnly {
         &'i self,
         ctx: &'i mut keyword::Context,
         _value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Eval<'v>>, EvaluateError> {
         Ok(Some(ctx.annotate(
             Some(WRITE_ONLY),
             Some(Annotation::StaticRef(boolean(self.value))),

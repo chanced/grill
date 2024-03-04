@@ -187,7 +187,7 @@ mod tests {
         draft_2020_12::json_schema_2020_12_uri,
         keyword::{id, schema, type_, ID, SCHEMA},
     };
-    use grill_core::{schema::Dialect, Interrogator, Structure};
+    use grill_core::{schema::Dialect, Interrogator, Output};
 
     use super::*;
 
@@ -263,9 +263,7 @@ mod tests {
             (json!({ "I_0": "This is a string" }), false),
             (json!({ "S_25": "This is a string", "I_0": 34 }), true),
         ] {
-            let output = interrogator
-                .evaluate(Structure::Verbose, key, &data)
-                .unwrap();
+            let output = interrogator.evaluate(Output::Verbose, key, &data).unwrap();
             assert_eq!(
                 output.is_annotation(),
                 expected_valid,

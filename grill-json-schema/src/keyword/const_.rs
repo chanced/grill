@@ -16,7 +16,7 @@ use serde_json::Value;
 use grill_core::{
     error::EvaluateError,
     keyword::{Compile, Context},
-    Output, Schema,
+    Evaluation, Schema,
 };
 
 use crate::keyword::CONST;
@@ -75,7 +75,7 @@ impl Keyword for Const {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
         if let Value::Number(n) = value {
             if let Some(expected_number) = self.expected_number.as_deref() {
                 let actual_number = ctx.number_ref(n)?;
@@ -175,7 +175,7 @@ impl<'v> Error<'v> for ConstInvalid<'v> {
 
 #[cfg(test)]
 mod tests {
-    use grill_core::{schema::Dialect, Interrogator, Structure};
+    use grill_core::{schema::Dialect, Interrogator, Output};
     use serde_json::json;
 
     use super::{Const, *};
@@ -238,14 +238,10 @@ mod tests {
             .await
             .unwrap();
         let value = json!(34.34);
-        let output = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         assert!(output.is_annotation());
         let value = json!(34.3434);
-        let output = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         assert!(!output.is_annotation());
     }
     #[test]

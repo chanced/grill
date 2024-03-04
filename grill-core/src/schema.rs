@@ -7,7 +7,7 @@ pub mod traverse;
 pub mod dialect;
 
 use crate::error::CompileError;
-use crate::{cache, lang, Language, NewContext};
+use crate::{cache, lang, CreateContext, Language};
 pub use dialect::{Dialect, Dialects};
 use serde::{Serialize, Serializer};
 
@@ -22,7 +22,7 @@ use crate::{
         TransitiveDependencies,
     },
     source::{Link, Source, Sources},
-    AbsoluteUri, Output,
+    AbsoluteUri, Evaluation,
 };
 
 use jsonptr::Pointer;
@@ -45,6 +45,7 @@ pub struct Evaluate<'v, L: Language<K>, K: Key> {
     pub evaluated: &'v mut HashSet<String>,
     pub global_numbers: &'v cache::Numbers,
     pub eval_numbers: &'v mut cache::Numbers,
+    pub lang: &'v L,
 }
 
 /*
@@ -339,12 +340,23 @@ impl<'i, L: Language<K>, K: Key> Eq for Schema<'i, L, K> {}
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct Store<L: Language<K>, K: Key> {
     table: SlotMap<K, CompiledSchema<L, K>>,
     index: HashMap<AbsoluteUri, K>,
 }
-
+impl<L, K> Default for Store<L, K>
+where
+    L: Language<K>,
+    K: Key,
+{
+    fn default() -> Self {
+        Self {
+            table: Default::default(),
+            index: Default::default(),
+        }
+    }
+}
 #[allow(clippy::unnecessary_box_returns)]
 impl<L, K> Store<L, K>
 where
@@ -445,9 +457,10 @@ where
             eval_numbers,
             value,
             evaluated,
+            lang,
         } = eval;
         let schema = self.get(key, sources)?;
-        let mut ctx = NewContext {
+        let mut ctx = lang.create_context(CreateContext {
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
@@ -456,9 +469,10 @@ where
             sources,
             global_numbers,
             eval_numbers,
-        };
-        let schema = self.get(key, ctx.sources)?;
-        let mut output = Output::new(
+        });
+
+        let schema = self.get(key, sources)?;
+        let mut output: lang::Output<L, K> = Evaluation::new(
             structure,
             schema.absolute_uri().clone(),
             keyword_location,
@@ -519,6 +533,7 @@ where
             self.sandbox().index.remove(&uri);
         }
     }
+
     pub(crate) fn has_keywords(&self, key: K) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }

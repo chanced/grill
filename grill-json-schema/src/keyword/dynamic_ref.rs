@@ -10,7 +10,7 @@ use serde_json::Value;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
-    static_pointer_fn, AbsoluteUri, Key, Output, Schema, Uri,
+    static_pointer_fn, AbsoluteUri, Evaluation, Key, Schema, Uri,
 };
 
 use super::{dynamic_anchor::DynamicAnchors, DYNAMIC_REF};
@@ -71,7 +71,7 @@ impl keyword::Keyword for DynamicRef {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
         let key = ctx
             .eval_state()
             .get::<DynamicAnchors>()
@@ -119,7 +119,7 @@ mod tests {
         draft_2020_12::json_schema_2020_12_uri,
         keyword::{const_, id, schema, ID, REF, SCHEMA},
     };
-    use grill_core::{schema::Dialect, Interrogator, Structure};
+    use grill_core::{schema::Dialect, Interrogator, Output};
 
     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
@@ -188,13 +188,9 @@ mod tests {
             .await
             .unwrap();
         let value = json!(34.34);
-        let output = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         println!("++ verbose:\n{output}");
-        let basic_output = interrogator
-            .evaluate(Structure::Basic, key, &value)
-            .unwrap();
+        let basic_output = interrogator.evaluate(Output::Basic, key, &value).unwrap();
         println!("++ basic:\n{basic_output}");
     }
 }

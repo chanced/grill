@@ -8,10 +8,8 @@ use jsonptr::Pointer;
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
 use slotmap::Key;
 use snafu::Backtrace;
-use snafu::GenerateImplicitData;
 use snafu::Snafu;
 use std::collections::HashMap;
-use std::error;
 
 use crate::lang;
 use crate::uri::Error as UriError;
@@ -384,6 +382,12 @@ pub enum SourceError {
     /// Resolution of a source failed
     #[snafu(transparent)]
     ResolutionFailed { source: ResolveErrors },
+
+    #[snafu(transparent, context(false))]
+    InvalidUri {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
 
     /// The source was not valid UTF-8.
     #[snafu(display("source is not valid UTF-8: {source}"))]

@@ -100,7 +100,7 @@ mod tests {
     use crate::JsonSchema;
 
     use super::*;
-    use grill_core::{Interrogator, Structure};
+    use grill_core::{Interrogator, Output};
     use serde_json::json;
 
     #[tokio::test]
@@ -165,10 +165,10 @@ mod tests {
             .unwrap();
 
         let value = json!(34);
-        let o = interrogator.evaluate(Structure::Flag, key, &value).unwrap();
+        let o = interrogator.evaluate(Output::Flag, key, &value).unwrap();
         assert!(!o.is_annotation());
         let value = json!(34.34);
-        let o = interrogator.evaluate(Structure::Flag, key, &value).unwrap();
+        let o = interrogator.evaluate(Output::Flag, key, &value).unwrap();
         assert!(o.is_annotation());
 
         let schema = json!({
@@ -192,14 +192,10 @@ mod tests {
             .unwrap();
 
         let value = json!(34.34);
-        let o = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let o = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         assert!(!o.is_annotation());
         let value = json!(34);
-        let o = interrogator
-            .evaluate(Structure::Verbose, key, &value)
-            .unwrap();
+        let o = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
         assert!(o.is_annotation());
     }
 }

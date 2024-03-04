@@ -168,7 +168,7 @@ mod tests {
         draft_2020_12::json_schema_2020_12_uri,
         keyword::{const_, id, schema, ID, PROPERTIES, SCHEMA},
     };
-    use grill_core::{schema::Dialect, Interrogator, Structure};
+    use grill_core::{schema::Dialect, Interrogator, Output};
 
     use super::*;
 
@@ -236,7 +236,7 @@ mod tests {
             "foo": 32
         });
         let output = interrogator
-            .evaluate(Structure::Verbose, key, &invalid)
+            .evaluate(Output::Verbose, key, &invalid)
             .unwrap();
         assert!(!output.is_annotation());
     }

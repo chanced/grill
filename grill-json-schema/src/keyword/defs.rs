@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError},
     keyword::{self, paths_of_object, Compile, Keyword, Kind},
-    keyword_fns, Key, Output, Schema,
+    keyword_fns, Eval, Key, Schema,
 };
 use serde_json::Value;
 
@@ -53,7 +53,7 @@ impl Keyword for Defs {
         &'i self,
         _ctx: &'i mut keyword::Context,
         _value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<Option<Eval<'v>>, EvaluateError> {
         Ok(None)
     }
 

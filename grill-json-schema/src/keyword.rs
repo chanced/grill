@@ -116,7 +116,7 @@ impl Keyword {
 impl grill_core::keyword::Keyword for Keyword {
     type Context = Context;
     type Compile;
-    type Output;
+    type Evaluation;
     type ValidationError;
     type CompileError;
     type EvaluateError;

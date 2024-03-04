@@ -11,7 +11,7 @@ use crate::{
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     uri::TryIntoAbsoluteUri,
-    AbsoluteUri, Interrogator, Key, Keyword, Language, Structure,
+    AbsoluteUri, Interrogator, Key, Keyword, Language, Output,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};
@@ -576,7 +576,7 @@ where
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
-            let mut compile = self.lang.new_compile(crate::NewCompile {
+            let mut compile = self.lang.create_compile(crate::CreateCompile {
                 absolute_uri: schema.absolute_uri(),
                 schemas: self.schemas,
                 global_numbers: self.numbers,

@@ -33,7 +33,7 @@ where
 {
     type Context;
     type Compile;
-    type Output: crate::Output;
+    type Evaluation: crate::Evaluation;
 
     /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
     /// be the name of the keyword or `Composite`, which will be a list of
@@ -60,7 +60,7 @@ where
         &'i self,
         ctx: &'i mut Self::Context,
         value: &'v Value,
-    ) -> Result<Option<Self::Output>, EvaluateError<K>>;
+    ) -> Result<Option<Self::Evaluation>, EvaluateError<K>>;
 
     /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> Result<Vec<Pointer>, Unimplemented> {
