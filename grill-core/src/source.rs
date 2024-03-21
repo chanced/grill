@@ -2,17 +2,17 @@
 //!
 use crate::{
     error::{
-        source_error::{PointerFailedToParseCtx, PointerFailedToResolveCtx},
-        DeserializeError, LinkError, PointerError, ResolveError, ResolveErrors, SourceError,
+        link_error::SourceConflictSnafu, DeserializeError, LinkError, PointerError, ResolveError,
+        ResolveErrors, SourceError,
     },
-    uri::decode_lossy,
-    AbsoluteUri,
+    uri::{decode_lossy, AbsoluteUri},
 };
 use async_trait::async_trait;
+use dyn_clone::{clone_trait_object, DynClone};
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
-use snafu::{Backtrace, ResultExt};
+use snafu::{ensure, Backtrace};
 use std::{
     borrow::Cow,
     collections::hash_map::{Entry, HashMap},
@@ -27,12 +27,12 @@ new_key_type! {
     pub struct SourceKey;
 }
 
-pub(crate) enum Src {
+pub(crate) enum Input {
     String(AbsoluteUri, String),
     Value(AbsoluteUri, Cow<'static, Value>),
 }
 
-impl Src {
+impl Input {
     pub(crate) fn deserialize_or_take_value(
         self,
         deserializers: &Deserializers,
@@ -140,14 +140,11 @@ impl Store {
             return Ok((src_key, link, src));
         }
         if fragment.starts_with('/') {
-            let ptr = Pointer::parse(&fragment).with_context(|_| PointerFailedToParseCtx {})?;
+            let ptr = Pointer::parse(&fragment)?;
             let link = Link::new(src_key, ptr.clone());
             self.index.insert(uri.clone(), link.clone());
             let key = self.index.get(&uri).unwrap().src_key;
-            let src = src
-                .resolve(&ptr)
-                .with_context(|_| PointerFailedToResolveCtx {})?
-                .clone();
+            let src = src.resolve(&ptr)?.clone();
             return Ok((key, link, Cow::Owned(src)));
         }
         Ok((src_key, link, src))
@@ -222,7 +219,7 @@ impl Sources {
     /// - duplicate [`Source`]s are provided with the same [`AbsoluteUri`].
     /// - all [`Deserializer`]s in `deserializers` fail to deserialize a [`Source`].
     pub(crate) fn new(
-        sources: Vec<Src>,
+        sources: Vec<Input>,
         deserializers: &Deserializers,
     ) -> Result<Self, SourceError> {
         let mut store = Store::default();
@@ -340,31 +337,29 @@ impl Sources {
 
     fn check_existing_link(&mut self, uri: &AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         let entry = self.store().get_link(uri).unwrap();
-        if &link == entry {
-            return Ok(entry);
-        }
-        Err(SourceError::SchemaConflict {
-            uri: uri.clone(),
-            existing_path: entry.src_path.clone(),
-            new_path: link.src_path,
-            backtrace: Backtrace::capture(),
-        }
-        .into())
+        ensure!(
+            entry == &link,
+            SourceConflictSnafu {
+                uri: uri.clone(),
+                existing_path: entry.src_path.clone(),
+                new_path: link.src_path,
+            }
+        );
+        Ok(entry)
     }
 
     fn create_link(&mut self, from: AbsoluteUri, link: Link) -> Result<&Link, LinkError> {
         match self.store_mut().link_entry(from.clone()) {
             Entry::Occupied(_) => {
                 let existing_link = self.store().get_link(&from).unwrap();
-                if &link != existing_link {
-                    return Err(SourceError::SchemaConflict {
+                ensure!(
+                    &link == existing_link,
+                    SourceConflictSnafu {
                         uri: from.clone(),
                         existing_path: existing_link.src_path.clone(),
                         new_path: link.src_path,
-                        backtrace: Backtrace::capture(),
                     }
-                    .into());
-                }
+                );
                 Ok(existing_link)
             }
             Entry::Vacant(_) => {
@@ -505,11 +500,12 @@ impl Sources {
 ///     erased_serde::deserialize(&mut <dyn Deserializer>::erase(yaml))
 /// }
 /// ```
-pub trait Deserializer: Send + Sync + 'static {
+pub trait Deserializer: DynClone + Send + Sync + 'static {
     /// Deserializes the given data into a [`Value`].
     fn deserialize(&self, data: &str) -> Result<Value, erased_serde::Error>;
 }
 
+clone_trait_object!(Deserializer);
 impl<F> Deserializer for F
 where
     F: Fn(&str) -> Result<Value, erased_serde::Error> + Clone + Send + Sync + 'static,
@@ -524,6 +520,7 @@ where
 pub struct Deserializers {
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
 }
+
 impl std::fmt::Debug for Deserializers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_list()
@@ -608,10 +605,12 @@ impl Link {
 
 /// A trait which is capable of resolving a [`Source`] at the given [`AbsoluteUri`].
 #[async_trait]
-pub trait Resolve: Send + Sync + 'static {
+pub trait Resolve: DynClone + Send + Sync + 'static {
     /// Attempts to resolve a [`Source`] at the given `uri`
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Option<String>, ResolveError>;
 }
+
+clone_trait_object!(Resolve);
 
 ///
 #[cfg(feature = "http")]

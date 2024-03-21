@@ -7,7 +7,7 @@ use super::NOT;
 use grill_core::{
     error::{CompileError, EvaluateError},
     keyword::{self, Compile, Keyword},
-    Eval, Key, Schema,
+    Key, Output, Schema,
 };
 use jsonptr::Pointer;
 use once_cell::sync::Lazy;
@@ -40,7 +40,7 @@ impl Keyword for Not {
         &'i self,
         ctx: &'i mut keyword::Context,
         value: &'v Value,
-    ) -> Result<Option<Eval<'v>>, EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         let mut output = ctx.evaluate(self.key, None, not_path(), value)?;
         output.set_valid(output.is_error());
         Ok(Some(output))

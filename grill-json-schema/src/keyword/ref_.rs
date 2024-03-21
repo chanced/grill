@@ -11,7 +11,7 @@ use serde_json::Value;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
-    Evaluation, Key, Schema, Uri,
+    Key, Output, Schema, Uri,
 };
 
 /// A reference to another schema.
@@ -93,7 +93,7 @@ impl keyword::Keyword for Ref {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         if !self.must_eval {
             return ctx
                 .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))

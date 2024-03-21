@@ -3,13 +3,15 @@
 //! - [Learn JSON Schema - `readOnly`](https://www.learnjsonschema.com/2020-12/meta-data/readonly/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-9.4)
 use super::READ_ONLY;
+use grill_core::error::invalid_type_error::InvalidTypeSnafu;
 use grill_core::{
-    error::{CompileError, EvaluateError, Expected, InvalidTypeError},
+    error::{EvaluateError, Expected, InvalidTypeError},
     keyword::{self, boolean, Compile},
     output::Annotation,
-    Eval, Schema,
+    Output, Schema,
 };
 use serde_json::Value;
+use snafu::ensure;
 
 /// [`Keyword`] for `"readOnly"`
 #[derive(Debug, Clone, Default)]
@@ -30,20 +32,20 @@ impl keyword::Keyword for ReadOnly {
         let Some(value) = schema.get(READ_ONLY) else {
             return Ok(false);
         };
-        if !matches!(value, Value::Bool(_)) {
-            return Err(InvalidTypeError {
+        ensure!(
+            matches!(value, Value::Bool(_)),
+            InvalidTypeSnafu {
                 expected: Expected::Bool,
-                actual: Box::new(value.clone()),
+                actual: Box::new(value.clone())
             }
-            .into());
-        }
+        );
         Ok(true)
     }
     fn evaluate<'i, 'v>(
         &'i self,
         ctx: &'i mut keyword::Context,
         _value: &'v Value,
-    ) -> Result<Option<Eval<'v>>, EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         Ok(Some(ctx.annotate(
             Some(READ_ONLY),
             Some(Annotation::StaticRef(boolean(self.value))),

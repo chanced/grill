@@ -10,7 +10,7 @@ use serde_json::Value;
 use grill_core::{
     error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
     keyword::{self, Compile, Context, Kind},
-    static_pointer_fn, AbsoluteUri, Evaluation, Key, Schema, Uri,
+    static_pointer_fn, AbsoluteUri, Key, Output, Schema, Uri,
 };
 
 use super::{dynamic_anchor::DynamicAnchors, DYNAMIC_REF};
@@ -71,7 +71,7 @@ impl keyword::Keyword for DynamicRef {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         let key = ctx
             .eval_state()
             .get::<DynamicAnchors>()

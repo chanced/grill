@@ -130,9 +130,8 @@ impl<'v> Error<'v> for &'v str {
 /// the value of `"annotation"` or `"error"` in [`Output`](`crate::Output`).
 pub type AnnotationOrError<'v> = Result<Option<Annotation<'v>>, Option<BoxedError<'v>>>;
 
-pub enum Report<'v> {
+pub enum Report<'v, A> {
     Annotation(Annotation<'v>),
-    Error(BoxedError<'v>),
 }
 
 /*

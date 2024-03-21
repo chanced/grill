@@ -19,6 +19,7 @@ grill-uri         = { version = "0.1.0", path = "grill-uri" }
 
 async-trait        = { version = "0.1" }
 bitflags           = { version = "2.4.1" }
+dyn-clone          = { version = "1.0.17" }
 either             = { version = "1.8.1" }
 erased-serde       = { version = "0.4.2" }
 inherent           = { version = "1.0.10" }
@@ -37,7 +38,7 @@ serde_json         = { version = "1.0.107", features = ["arbitrary_precision"] }
 serde_yaml         = { version = "0.9.21" }
 similar            = { version = "2.2.1" }
 slotmap            = { version = "1.0.6" }
-snafu              = { version = "0.8" }
+snafu              = { version = "0.8.2" }
 strum              = { version = "0.26", features = ["derive"] }
 strum_macros       = { version = "0.26" }
 tokio              = { version = "1.33" }

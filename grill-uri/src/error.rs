@@ -167,7 +167,7 @@ impl Error {
 */
 /// Returned from `set_authority` on [`Uri`], [`AbsoluteUri`], and [`RelativeUri`]
 #[derive(Debug, Snafu)]
-#[snafu(context(suffix(Ctx)), module)]
+#[snafu(module)]
 pub enum AuthorityError {
     /// The authority contains a path
     #[snafu(display("authority contains path: {value}"))]
@@ -226,7 +226,6 @@ pub enum AuthorityError {
 #[derive(Debug, Snafu)]
 #[snafu(
     display("port \"{value}\" is malformed or exceeds maximum value of 65535"),
-    context(suffix(Ctx)),
     module
 )]
 pub struct InvalidPortError {
@@ -246,7 +245,7 @@ pub struct InvalidPortError {
 /// Errors which can occur when parsing or modifying a
 /// [`RelativeUri`](crate::uri::RelativeUri).
 #[derive(Debug, Snafu)]
-#[snafu(context(suffix(Ctx)), module)]
+#[snafu(module)]
 pub enum RelativeUriError {
     /// The length of the input exceeds `u32::MAX`
     Overflow {
@@ -276,7 +275,6 @@ impl From<OverflowError> for RelativeUriError {
 #[snafu(
     display("length of uri exceeds maximum size of 4GB"),
     visibility(pub),
-    context(suffix(Ctx)),
     module
 )]
 /*

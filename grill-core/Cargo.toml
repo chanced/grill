@@ -17,6 +17,7 @@ grill-uri    = { workspace = true, features = ["serde"] }
 
 async-trait      = { workspace = true }
 bitflags         = { workspace = true }
+dyn-clone        = { workspace = true }
 either           = { workspace = true }
 erased-serde     = { workspace = true }
 inherent         = { workspace = true }

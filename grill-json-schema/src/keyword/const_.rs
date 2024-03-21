@@ -16,7 +16,7 @@ use serde_json::Value;
 use grill_core::{
     error::EvaluateError,
     keyword::{Compile, Context},
-    Evaluation, Schema,
+    Output, Schema,
 };
 
 use crate::keyword::CONST;
@@ -75,7 +75,7 @@ impl Keyword for Const {
         &'i self,
         ctx: &'i mut Context,
         value: &'v Value,
-    ) -> Result<Option<Evaluation<'v>>, EvaluateError> {
+    ) -> Result<Option<Output<'v>>, EvaluateError> {
         if let Value::Number(n) = value {
             if let Some(expected_number) = self.expected_number.as_deref() {
                 let actual_number = ctx.number_ref(n)?;
