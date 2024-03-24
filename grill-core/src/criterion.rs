@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::fmt;
+use std::fmt::{self, Display};
 use std::ops::{ControlFlow, Deref};
 
 use crate::error::{
@@ -46,7 +46,7 @@ pub type CriterionReport<'v, C, K> = <C as Criterion<K>>::Report<'v>;
 /// the given `Criterion` `C`.
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
-pub trait Report<'v>: std::error::Error + Serialize + DeserializeOwned {
+pub trait Report<'v>: ToOwned + std::error::Error + Serialize + DeserializeOwned {
     type Error: Serialize + DeserializeOwned;
     type Annotation: Serialize + DeserializeOwned;
     type Output: self::Output;
@@ -60,7 +60,7 @@ pub trait Report<'v>: std::error::Error + Serialize + DeserializeOwned {
     ) -> Self;
 
     fn is_valid(&self) -> bool;
-    fn into_owned(self) -> impl Report<'static>;
+    fn into_owned(self) -> Self::Owned;
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
 }
@@ -69,7 +69,7 @@ pub trait Criterion<K: Key>: Sized + Clone + Debug {
     type Context;
     type Compile: 'static;
     type Keyword: Keyword<Self, K>;
-    type Report<'v>: Report<'v>;
+    type Report<'v>: Report<'v> + ToOwned<Owned = Self::Report<'static>>;
 
     /// Creates a new context for the given `params`.
     fn context(&self, params: Context<Self, K>) -> Self::Context;
@@ -1011,14 +1011,14 @@ where
     /// [`Structure`].
     pub fn evaluate<'v>(
         &self,
-        output: CriterionReportOutput<C, K>,
+        output: CriterionReportOutput<'v, C, K>,
         key: K,
         value: &'v Value,
     ) -> Result<C::Report<'v>, EvaluateError<K>> {
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(Evaluate {
-            output,
+            output: output as CriterionReportOutput<'v, C, K>,
             key,
             value,
             instance_location: Pointer::default(),

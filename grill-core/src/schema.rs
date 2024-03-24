@@ -41,17 +41,17 @@ use std::{
     ops::Deref,
 };
 
-pub struct Evaluate<'v, C: Criterion<K>, K: Key> {
-    pub output: CriterionReportOutput<'v, C, K>,
+pub struct Evaluate<'i, 'v, C: Criterion<K>, K: Key> {
+    pub output: <<C as Criterion<K>>::Report<'v> as Report<'v>>::Output,
     pub key: K,
     pub value: &'v Value,
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
-    pub sources: &'v Sources,
-    pub evaluated: &'v mut HashSet<String>,
-    pub global_numbers: &'v cache::Numbers,
-    pub eval_numbers: &'v mut cache::Numbers,
-    pub criterion: &'v C,
+    pub sources: &'i Sources,
+    pub evaluated: &'i mut HashSet<String>,
+    pub global_numbers: &'i cache::Numbers,
+    pub eval_numbers: &'i mut cache::Numbers,
+    pub criterion: &'i C,
 }
 
 /*
@@ -446,9 +446,9 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn evaluate<'v>(
+    pub fn evaluate<'i, 'v>(
         &self,
-        eval: Evaluate<'v, C, K>,
+        eval: Evaluate<'i, 'v, C, K>,
     ) -> Result<CriterionReport<'v, C, K>, EvaluateError<K>> {
         let Evaluate {
             key,

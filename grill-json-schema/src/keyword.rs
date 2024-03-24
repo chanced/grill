@@ -105,14 +105,16 @@ pub enum Keyword {
     // Format
 }
 
+macro_rules! delegate {
+    () => {};
+}
+
 impl<C, K> grill_core::criterion::Keyword<C, K> for Keyword
 where
     C: Criterion<K>,
     K: Key,
 {
-    fn kind(&self) -> grill_core::criterion::Kind {
-        todo!()
-    }
+    fn kind(&self) -> grill_core::criterion::Kind {}
 
     fn compile<'i>(
         &mut self,

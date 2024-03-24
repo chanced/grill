@@ -11,6 +11,8 @@ use snafu::Snafu;
 use std::collections::HashMap;
 
 use crate::criterion::Criterion;
+use crate::criterion::CriterionReport;
+use crate::criterion::Report;
 use crate::uri::Error as UriError;
 use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
 use serde_json::Value;
@@ -39,11 +41,12 @@ pub enum CompileError<C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
+    for<'v> <C::Report<'v> as ToOwned>::Owned: Debug + Display,
 {
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
     SchemaInvalid {
-        report: C::Report<'static>,
+        report: <CriterionReport<'static, C, K> as ToOwned>::Owned,
         backtrace: Backtrace,
     },
 
@@ -212,7 +215,10 @@ where
 /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), module)]
-pub enum BuildError<C: 'static + Criterion<K>, K: 'static + Key> {
+pub enum BuildError<C: 'static + Criterion<K>, K: 'static + Key>
+where
+    for<'v> <C::Report<'v> as ToOwned>::Owned: Debug + Display,
+{
     #[snafu(transparent)]
     /// A [`Schema`](crate::schema::Schema) failed to compile.
     FailedToCompile {
