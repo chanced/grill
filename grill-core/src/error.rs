@@ -43,7 +43,7 @@ where
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
     SchemaInvalid {
-        report: C::Report,
+        report: C::Report<'static>,
         backtrace: Backtrace,
     },
 

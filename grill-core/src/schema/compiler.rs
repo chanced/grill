@@ -7,7 +7,7 @@ use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 use jsonptr::{Pointer, Resolve};
 use serde_json::Value;
 use slotmap::Key;
-use snafu::{ensure, Backtrace, ResultExt};
+use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},

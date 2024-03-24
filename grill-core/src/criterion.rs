@@ -41,12 +41,12 @@ pub enum Assessment<A, E> {
 }
 
 /// Type alias for the associated type `Report` of the given `Criterion` `C`.
-pub type CriterionReport<C, K> = <C as Criterion<K>>::Report;
+pub type CriterionReport<'v, C, K> = <C as Criterion<K>>::Report<'v>;
 /// Type alias for the associated type `Output` of the `Report` associated with
 /// the given `Criterion` `C`.
-pub type CriterionReportOutput<C, K> = <CriterionReport<C, K> as Report>::Output;
+pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
-pub trait Report: std::error::Error + Serialize + DeserializeOwned {
+pub trait Report<'v>: std::error::Error + Serialize + DeserializeOwned {
     type Error: Serialize + DeserializeOwned;
     type Annotation: Serialize + DeserializeOwned;
     type Output: self::Output;
@@ -60,7 +60,7 @@ pub trait Report: std::error::Error + Serialize + DeserializeOwned {
     ) -> Self;
 
     fn is_valid(&self) -> bool;
-    fn into_owned(self) -> Self;
+    fn into_owned(self) -> impl Report<'static>;
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
 }
@@ -69,7 +69,7 @@ pub trait Criterion<K: Key>: Sized + Clone + Debug {
     type Context;
     type Compile: 'static;
     type Keyword: Keyword<Self, K>;
-    type Report: Report;
+    type Report<'v>: Report<'v>;
 
     /// Creates a new context for the given `params`.
     fn context(&self, params: Context<Self, K>) -> Self::Context;
@@ -79,8 +79,8 @@ pub trait Criterion<K: Key>: Sized + Clone + Debug {
 }
 
 #[derive(Debug)]
-pub struct Context<'i, C: Criterion<K>, K: Key> {
-    pub output: <C::Report as Report>::Output,
+pub struct Context<'i, 'v, C: Criterion<K>, K: Key> {
+    pub output: CriterionReportOutput<'v, C, K>,
     pub eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
     pub schemas: &'i Schemas<C, K>,
@@ -93,8 +93,8 @@ pub struct Context<'i, C: Criterion<K>, K: Key> {
 pub struct Compile<'i, C: Criterion<K>, K: Key> {
     pub absolute_uri: &'i AbsoluteUri,
     pub global_numbers: &'i mut Numbers,
-    pub schemas: &'i mut Schemas<C, K>,
-    pub sources: &'i mut Sources,
+    pub schemas: &'i Schemas<C, K>,
+    pub sources: &'i Sources,
     pub dialects: &'i Dialects<C, K>,
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
@@ -1014,7 +1014,7 @@ where
         output: CriterionReportOutput<C, K>,
         key: K,
         value: &'v Value,
-    ) -> Result<C::Report, EvaluateError<K>> {
+    ) -> Result<C::Report<'v>, EvaluateError<K>> {
         let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(Evaluate {
@@ -1452,7 +1452,7 @@ where
         &'i self,
         ctx: &'i mut C::Context,
         value: &'v Value,
-    ) -> Result<Option<C::Report>, EvaluateError<K>>;
+    ) -> Result<Option<C::Report<'v>>, EvaluateError<K>>;
 
     /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> ControlFlow<(), Vec<Pointer>> {
@@ -1556,7 +1556,7 @@ macro_rules! keyword_fns {
                 keyword.downcast_ref::<$keyword>()
             }
             #[doc= "Returns `true` if `keyword` is an instance of `" $keyword "`"]
-            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::keyword::Keyword) -> bool {
+            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::criterion::Keyword) -> bool {
                 ::std::any::TypeId::of::<$keyword>() == keyword.type_id()
             }
 
@@ -1576,57 +1576,57 @@ pub use keyword_fns;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-/// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
-/// [`Error`](`crate::output::Error`).
-///
-/// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
-///
-/// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
-#[macro_export]
-macro_rules! define_translate {
-    ($error:ident, $default:ident) => {
-        paste::paste!{
-            /// A function which can translate [`$error`].
-            #[derive(Clone)]
-            pub enum [< Translate $error >]{
-                #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
-                Closure(
-                    ::std::sync::Arc<
-                        dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
-                    >,
-                ),
-                #[doc = "A `fn` which can translate [`" $error "`]"]
-                FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
-            }
+// /// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
+// /// [`Error`](`crate::output::Error`).
+// ///
+// /// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
+// ///
+// /// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
+// #[macro_export]
+// macro_rules! define_translate {
+//     ($error:ident, $default:ident) => {
+//         paste::paste!{
+//             /// A function which can translate [`$error`].
+//             #[derive(Clone)]
+//             pub enum [< Translate $error >]{
+//                 #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
+//                 Closure(
+//                     ::std::sync::Arc<
+//                         dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
+//                     >,
+//                 ),
+//                 #[doc = "A `fn` which can translate [`" $error "`]"]
+//                 FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
+//             }
 
-            #[::inherent::inherent]
-            impl grill_core::output::Translate<$error<'_>> for [< Translate $error>]{
-                /// Runs the translation
-                pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
-                    match self {
-                        Self::Closure(c) => c(f, v),
-                        Self::FnPtr(p) => p(f, v),
-                    }
-                }
-            }
-            impl ::std::fmt::Debug for [< Translate $error >] {
-                fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                    match self {
-                        Self::Closure(_) => f.debug_tuple("Closure").finish(),
-                        Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
-                    }
-                }
-            }
-            impl std::default::Default for [< Translate $error >] {
-                fn default() -> Self {
-                    Self::FnPtr($default)
-                }
-            }
-        }
-    };
-}
+//             #[::inherent::inherent]
+//             impl grill_core::criterion::Translate<$error<'_>> for [< Translate $error>]{
+//                 /// Runs the translation
+//                 pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
+//                     match self {
+//                         Self::Closure(c) => c(f, v),
+//                         Self::FnPtr(p) => p(f, v),
+//                     }
+//                 }
+//             }
+//             impl ::std::fmt::Debug for [< Translate $error >] {
+//                 fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//                     match self {
+//                         Self::Closure(_) => f.debug_tuple("Closure").finish(),
+//                         Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
+//                     }
+//                 }
+//             }
+//             impl std::default::Default for [< Translate $error >] {
+//                 fn default() -> Self {
+//                     Self::FnPtr($default)
+//                 }
+//             }
+//         }
+//     };
+// }
 
-pub use define_translate;
+// pub use define_translate;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

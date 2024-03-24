@@ -5,9 +5,8 @@
 //! - [Learn JSON Schema - else](https://www.learnjsonschema.com/2020-12/applicator/else/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.2.1)
 use grill_core::{
+    criterion::{static_pointer_fn, Compile, Context, Keyword, Kind},
     error::{CompileError, EvaluateError},
-    keyword::{static_pointer_fn, Compile, Context, Keyword, Kind},
-    output::Output,
     Key, Schema,
 };
 use serde_json::Value;
@@ -20,13 +19,13 @@ static_pointer_fn!(pub else "/else");
 
 /// [`Keyword`] for the `if`, `then`, and `else` keywords.
 #[derive(Debug, Clone, Default)]
-pub struct IfThenElse {
+pub struct IfThenElse<K: Key> {
     /// The key of the subschema for the `if` keyword.
-    pub if_key: Key,
+    pub if_key: K,
     /// The key of the subschema for the `then` keyword.
-    pub then_key: Option<Key>,
+    pub then_key: Option<K>,
     /// The key of the subschema for the `else` keyword.
-    pub else_key: Option<Key>,
+    pub else_key: Option<K>,
 }
 
 impl Keyword for IfThenElse {

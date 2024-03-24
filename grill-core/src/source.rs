@@ -567,7 +567,8 @@ impl Deref for Deserializers {
 pub fn deserialize_json(data: &str) -> Result<Value, erased_serde::Error> {
     use erased_serde::Deserializer;
     let mut json = serde_json::Deserializer::from_str(data);
-    erased_serde::deserialize(&mut <dyn Deserializer>::erase(&mut json))
+    let data = &mut <dyn Deserializer>::erase(&mut json);
+    erased_serde::deserialize(data)
 }
 
 /// Deserializes YAML data

@@ -7,7 +7,9 @@ pub mod traverse;
 pub mod dialect;
 
 use crate::cache;
-use crate::criterion::{Assessment, Context, Criterion, Report};
+use crate::criterion::{
+    Assessment, Context, Criterion, CriterionReport, CriterionReportOutput, Report,
+};
 use crate::error::{self, CompileError};
 
 pub use dialect::{Dialect, Dialects};
@@ -40,7 +42,7 @@ use std::{
 };
 
 pub struct Evaluate<'v, C: Criterion<K>, K: Key> {
-    pub output: <C::Report as Report>::Output,
+    pub output: CriterionReportOutput<'v, C, K>,
     pub key: K,
     pub value: &'v Value,
     pub instance_location: Pointer,
@@ -444,7 +446,10 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn evaluate<'v>(&self, eval: Evaluate<'v, C, K>) -> Result<C::Report, EvaluateError<K>> {
+    pub fn evaluate<'v>(
+        &self,
+        eval: Evaluate<'v, C, K>,
+    ) -> Result<CriterionReport<'v, C, K>, EvaluateError<K>> {
         let Evaluate {
             key,
             sources,
