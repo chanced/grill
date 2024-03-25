@@ -11,10 +11,7 @@ use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},
-    criterion::{
-        self, Criterion, CriterionReportOutput, CriterionReportOwned, Interrogator, Keyword,
-        Output, Report,
-    },
+    criterion::{self, Criterion, CriterionReportOutput, Interrogator, Keyword, Output, Report},
     error::{
         compile_error::{SchemaInvalidSnafu, SchemaNotFoundSnafu},
         CompileError,
@@ -734,11 +731,7 @@ where
         ensure!(
             report.is_valid(),
             SchemaInvalidSnafu {
-                report: unsafe {
-                    std::mem::transmute::<CriterionReportOwned<C, K>, CriterionReportOwned<C, K>>(
-                        report.into_owned(),
-                    )
-                }
+                report: report.into_owned()
             }
         );
         Ok(())
