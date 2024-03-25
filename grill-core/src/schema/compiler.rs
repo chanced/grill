@@ -11,7 +11,10 @@ use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},
-    criterion::{self, Criterion, CriterionReportOutput, Interrogator, Keyword, Output, Report},
+    criterion::{
+        self, Criterion, CriterionReportOutput, CriterionReportOwned, Interrogator, Keyword,
+        Output, Report,
+    },
     error::{
         compile_error::{SchemaInvalidSnafu, SchemaNotFoundSnafu},
         CompileError,
@@ -704,7 +707,11 @@ where
             .anchors(src)?)
     }
 
-    fn validate(&mut self, dialect_idx: usize, value: &Value) -> Result<(), CompileError<C, K>> {
+    fn validate<'v>(
+        &mut self,
+        dialect_idx: usize,
+        value: &'v Value,
+    ) -> Result<(), CompileError<C, K>> {
         if !self.validate {
             return Ok(());
         }
@@ -727,7 +734,11 @@ where
         ensure!(
             report.is_valid(),
             SchemaInvalidSnafu {
-                report: report.into_owned()
+                report: unsafe {
+                    std::mem::transmute::<CriterionReportOwned<C, K>, CriterionReportOwned<C, K>>(
+                        report.into_owned(),
+                    )
+                }
             }
         );
         Ok(())

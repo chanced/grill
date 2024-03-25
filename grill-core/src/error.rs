@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 use crate::criterion::Criterion;
 use crate::criterion::CriterionReport;
+use crate::criterion::CriterionReportOwned;
 use crate::criterion::Report;
 use crate::uri::Error as UriError;
 use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
@@ -46,7 +47,7 @@ where
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
     SchemaInvalid {
-        report: <CriterionReport<'static, C, K> as ToOwned>::Owned,
+        report: CriterionReportOwned<'static, C, K>,
         backtrace: Backtrace,
     },
 

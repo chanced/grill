@@ -114,7 +114,9 @@ where
     C: Criterion<K>,
     K: Key,
 {
-    fn kind(&self) -> grill_core::criterion::Kind {}
+    fn kind(&self) -> grill_core::criterion::Kind {
+        todo!()
+    }
 
     fn compile<'i>(
         &mut self,
@@ -128,7 +130,7 @@ where
         &'i self,
         ctx: &'i mut C::Context,
         value: &'v serde_json::Value,
-    ) -> Result<Option<C::Report>, grill_core::error::EvaluateError<K>> {
+    ) -> Result<Option<C::Report<'v>>, grill_core::error::EvaluateError<K>> {
         todo!()
     }
 }

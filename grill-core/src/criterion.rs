@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::fmt::{self, Display};
+use std::fmt::{self};
 use std::ops::{ControlFlow, Deref};
 
 use crate::error::{
@@ -42,34 +42,44 @@ pub enum Assessment<A, E> {
 
 /// Type alias for the associated type `Report` of the given `Criterion` `C`.
 pub type CriterionReport<'v, C, K> = <C as Criterion<K>>::Report<'v>;
+pub type CriterionReportOwned<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Owned;
 /// Type alias for the associated type `Output` of the `Report` associated with
 /// the given `Criterion` `C`.
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
-pub trait Report<'v>: ToOwned + std::error::Error + Serialize + DeserializeOwned {
-    type Error: Serialize + DeserializeOwned;
-    type Annotation: Serialize + DeserializeOwned;
+pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
+    type Error<'e>: Serialize + DeserializeOwned;
+    type Annotation<'a>: Serialize + DeserializeOwned;
     type Output: self::Output;
+    type Owned: 'static
+        + Report<
+            'static,
+            Error<'static> = Self::Error<'static>,
+            Annotation<'static> = Self::Annotation<'static>,
+            Output = Self::Output,
+        >
+        + From<Self>;
+
     fn new(
-        structure: Self::Output,
+        output: Self::Output,
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        assessment: Assessment<Self::Annotation, Self::Error>,
+        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
         is_transient: bool,
     ) -> Self;
 
     fn is_valid(&self) -> bool;
-    fn into_owned(self) -> Self::Owned;
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
+    fn into_owned(self) -> Self::Owned;
 }
 
 pub trait Criterion<K: Key>: Sized + Clone + Debug {
     type Context;
     type Compile: 'static;
     type Keyword: Keyword<Self, K>;
-    type Report<'v>: Report<'v> + ToOwned<Owned = Self::Report<'static>>;
+    type Report<'v>: Report<'v>;
 
     /// Creates a new context for the given `params`.
     fn context(&self, params: Context<Self, K>) -> Self::Context;

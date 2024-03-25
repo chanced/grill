@@ -21,13 +21,32 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
+use std::marker::PhantomData;
+
 use grill_core::{criterion::Criterion, Key};
 use serde::{Deserialize, Serialize};
 
 pub mod keyword;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Output {}
+impl grill_core::criterion::Output for Output {
+    fn verbose() -> Self {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Report {}
+pub struct Report<'v> {
+    marker: PhantomData<&'v i32>,
+}
+
+impl std::fmt::Display for Report<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+impl std::error::Error for Report<'_> {}
 
 pub struct Context {}
 
@@ -40,19 +59,24 @@ pub struct Compile {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error {}
 
-impl grill_core::criterion::Report for Report {
-    type Error = Error;
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Annotation {}
 
-    type Annotation;
+impl<'v> grill_core::criterion::Report<'v> for Report<'v> {
+    type Error<'e> = Error;
 
-    type Output;
+    type Annotation<'a> = Annotation;
+
+    type Output = Output;
+
+    type Owned = Report<'static>;
 
     fn new(
         structure: Self::Output,
         absolute_keyword_location: grill_core::uri::AbsoluteUri,
         keyword_location: jsonptr::Pointer,
         instance_location: jsonptr::Pointer,
-        assessment: grill_core::criterion::Assessment<Self::Annotation, Self::Error>,
+        assessment: grill_core::criterion::Assessment<Self::Annotation<'v>, Self::Error<'v>>,
         is_transient: bool,
     ) -> Self {
         todo!()
@@ -62,15 +86,15 @@ impl grill_core::criterion::Report for Report {
         todo!()
     }
 
-    fn into_owned(self) -> Self {
-        todo!()
-    }
-
     fn append(&mut self, nodes: impl Iterator<Item = Self>) {
         todo!()
     }
 
     fn push(&mut self, output: Self) {
+        todo!()
+    }
+
+    fn into_owned(self) -> Self::Owned {
         todo!()
     }
 }
@@ -85,7 +109,7 @@ where
 
     type Keyword = keyword::Keyword;
 
-    type Report = Report;
+    type Report<'v> = Report<'v>;
 
     fn context(&self, params: grill_core::criterion::Context<Self, K>) -> Self::Context {
         todo!()
