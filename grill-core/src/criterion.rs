@@ -48,16 +48,11 @@ pub type CriterionReportOwned<'v, C, K> = <CriterionReport<'v, C, K> as Report<'
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
 pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
-    type Error<'e>: Serialize + DeserializeOwned;
-    type Annotation<'a>: Serialize + DeserializeOwned;
+    type Error: Serialize + DeserializeOwned;
+    type Annotation: Serialize + DeserializeOwned;
     type Output: self::Output;
     type Owned: 'static
-        + Report<
-            'static,
-            Error<'static> = Self::Error<'static>,
-            Annotation<'static> = Self::Annotation<'static>,
-            Output = Self::Output,
-        >
+        + Report<'static, Error = Self::Error, Annotation = Self::Annotation, Output = Self::Output>
         + From<Self>;
 
     fn new(
@@ -65,7 +60,7 @@ pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
+        assessment: Assessment<Self::Annotation, Self::Error>,
         is_transient: bool,
     ) -> Self;
 

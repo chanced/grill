@@ -63,9 +63,9 @@ pub enum Error {}
 pub enum Annotation {}
 
 impl<'v> grill_core::criterion::Report<'v> for Report<'v> {
-    type Error<'e> = Error;
+    type Error = Error;
 
-    type Annotation<'a> = Annotation;
+    type Annotation = Annotation;
 
     type Output = Output;
 
@@ -76,7 +76,7 @@ impl<'v> grill_core::criterion::Report<'v> for Report<'v> {
         absolute_keyword_location: grill_core::uri::AbsoluteUri,
         keyword_location: jsonptr::Pointer,
         instance_location: jsonptr::Pointer,
-        assessment: grill_core::criterion::Assessment<Self::Annotation<'v>, Self::Error<'v>>,
+        assessment: grill_core::criterion::Assessment<Self::Annotation, Self::Error>,
         is_transient: bool,
     ) -> Self {
         todo!()
