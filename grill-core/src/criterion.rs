@@ -48,25 +48,30 @@ pub type CriterionReportOwned<'v, C, K> = <CriterionReport<'v, C, K> as Report<'
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
 pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
-    type Error: 'v + Serialize + DeserializeOwned;
-    type Annotation: 'v + Serialize + DeserializeOwned;
+    type Error<'e>: 'e + Serialize + DeserializeOwned;
+    type Annotation<'a>: 'a + Serialize + DeserializeOwned;
     type Output: 'static + Output;
     type Owned: 'static
-        + Report<'static, Error = Self::Error, Annotation = Self::Annotation, Output = Self::Output>;
+        + Report<
+            'static,
+            Error<'static> = Self::Error<'static>,
+            Annotation<'static> = Self::Annotation<'static>,
+            Output = Self::Output,
+        >;
+    fn into_owned(self) -> Self::Owned;
 
     fn new(
         output: Self::Output,
         absolute_keyword_location: AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        assessment: Assessment<Self::Annotation, Self::Error>,
+        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
         is_transient: bool,
     ) -> Self;
 
     fn is_valid(&self) -> bool;
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
-    fn into_owned(self) -> Self::Owned;
 }
 
 pub trait Criterion<K: Key>: Sized + Clone + Debug {

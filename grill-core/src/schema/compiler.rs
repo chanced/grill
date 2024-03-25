@@ -728,12 +728,20 @@ where
             global_numbers: self.numbers,
             eval_numbers: &mut eval_numbers,
         })?;
-        ensure!(
-            report.is_valid(),
-            SchemaInvalidSnafu {
-                report: report.into_owned()
-            }
-        );
+        if !report.is_valid() {
+            let report: <C::Report<'v> as Report>::Owned = report.into_owned();
+            return Err(CompileError::SchemaInvalid {
+                report,
+                backtrace: Backtrace::capture(),
+            });
+        }
+        // TODO: remove the above if statement and replace with the below once fixed
+        // ensure!(
+        //     report.is_valid(),
+        //     SchemaInvalidSnafu {
+        //         report: report.into_owned()
+        //     }
+        // );
         Ok(())
     }
 }
