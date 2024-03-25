@@ -42,7 +42,7 @@ pub enum CompileError<C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
-    for<'v> <C::Report<'v> as ToOwned>::Owned: Debug + Display,
+    for<'v> <<C as Criterion<K>>::Report<'v> as ToOwned>::Owned: Debug + Display,
 {
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
