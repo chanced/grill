@@ -36,16 +36,9 @@ pub mod big;
 #[cfg(test)]
 pub mod test;
 
-use std::{
-    any,
-    borrow::Cow,
-    collections::HashSet,
-    fmt::Debug,
-    ops::{ControlFlow, Deref},
-};
+use std::ops::ControlFlow;
 
-use jsonptr::Pointer;
-use serde_json::{Number, Value};
+use serde_json::Value;
 
 /// See [`slotmap`](`slotmap`) for more information.
 pub use slotmap::{new_key_type, Key};

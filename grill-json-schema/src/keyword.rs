@@ -1,10 +1,5 @@
 // //! # Json Schema Keywords
 
-// use grill_core::{
-//     error::{AnchorError, AnchorInvalidLeadChar},
-//     keyword::Context,
-// };
-
 // pub mod additional_properties;
 // pub mod all_of;
 // pub mod anchor;
@@ -24,15 +19,23 @@
 // pub mod properties;
 // pub mod read_only;
 // pub mod ref_;
-// pub mod schema;
+pub mod schema;
 // pub mod type_;
 // pub mod write_only;
 
-use grill_core::{criterion::Criterion, Key};
+use crate::alias;
+use crate::JsonSchema;
+use grill_core::{
+    criterion::{Criterion, Kind},
+    error::{CompileError, EvaluateError},
+    Key, Schema,
+};
+use serde_json::Value;
+use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub enum Keyword {
-    // Schema(schema::Schema),
+    Schema(schema::Schema),
     // Id(id::Id),
     // Ref(ref_::Ref),
     // Defs(defs::Defs),
@@ -106,31 +109,34 @@ pub enum Keyword {
 }
 
 macro_rules! delegate {
-    () => {};
+    ($inst:ident, Keyword::$method:ident($($param:ident),*)) => {
+        match $inst {
+            Keyword::Schema(v) => v.$method($( $param, )*),
+        }
+    };
 }
 
-impl<C, K> grill_core::criterion::Keyword<C, K> for Keyword
+impl<K> grill_core::criterion::Keyword<JsonSchema, K> for Keyword
 where
-    C: Criterion<K>,
     K: Key,
 {
-    fn kind(&self) -> grill_core::criterion::Kind {
+    fn kind(&self) -> Kind {
         todo!()
     }
 
     fn compile<'i>(
         &mut self,
-        compile: &mut C::Compile,
-        schema: grill_core::Schema<'i, C, K>,
-    ) -> Result<std::ops::ControlFlow<()>, grill_core::error::CompileError<C, K>> {
+        compile: &mut alias::Compile<K>,
+        schema: Schema<'i, JsonSchema, K>,
+    ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         todo!()
     }
 
     fn evaluate<'i, 'v>(
         &'i self,
-        ctx: &'i mut C::Context,
-        value: &'v serde_json::Value,
-    ) -> Result<Option<C::Report<'v>>, grill_core::error::EvaluateError<K>> {
+        ctx: &'i mut alias::Context<K>,
+        value: &'v Value,
+    ) -> Result<Option<alias::Report<'v, K>>, EvaluateError<K>> {
         todo!()
     }
 }
@@ -143,34 +149,6 @@ where
 //         } else {
 //             None
 //         }
-//     }
-// }
-
-// impl grill_core::keyword::Keyword for Keyword {
-//     type Context = Context;
-//     type Compile;
-//     type Evaluation;
-//     type ValidationError;
-//     type CompileError;
-//     type EvaluateError;
-//     fn kind(&self) -> grill_core::keyword::Kind {
-//         todo!()
-//     }
-
-//     fn compile<'i>(
-//         &mut self,
-//         compile: &mut grill_core::keyword::Compile<'i>,
-//         schema: grill_core::Schema<'i>,
-//     ) -> Result<bool, grill_core::error::CompileError> {
-//         todo!()
-//     }
-
-//     fn evaluate<'i, 'v>(
-//         &'i self,
-//         ctx: &'i mut Self::Context,
-//         value: &'v serde_json::Value,
-//     ) -> Result<Option<grill_core::output::Output<'v>>, grill_core::error::EvaluateError> {
-//         todo!()
 //     }
 // }
 

@@ -11,8 +11,8 @@ use snafu::Snafu;
 use std::collections::HashMap;
 
 use crate::criterion::Criterion;
+use crate::criterion::CriterionOwnedReport;
 use crate::criterion::CriterionReport;
-use crate::criterion::CriterionReportOwned;
 use crate::criterion::Report;
 use crate::uri::Error as UriError;
 use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
@@ -42,12 +42,12 @@ pub enum CompileError<C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
-    for<'v> <<C as Criterion<K>>::Report<'v> as Report<'v>>::Owned: Debug + Display,
+    <<C as Criterion<K>>::OwnedReport as Report<'static>>::Owned: Debug + Display,
 {
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
     SchemaInvalid {
-        report: CriterionReportOwned<'static, C, K>,
+        report: CriterionOwnedReport<C, K>,
         backtrace: Backtrace,
     },
 

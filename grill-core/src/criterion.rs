@@ -42,7 +42,7 @@ pub enum Assessment<A, E> {
 
 /// Type alias for the associated type `Report` of the given `Criterion` `C`.
 pub type CriterionReport<'v, C, K> = <C as Criterion<K>>::Report<'v>;
-pub type CriterionReportOwned<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Owned;
+pub type CriterionOwnedReport<C, K> = <C as Criterion<K>>::OwnedReport;
 /// Type alias for the associated type `Output` of the `Report` associated with
 /// the given `Criterion` `C`.
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
@@ -74,54 +74,93 @@ pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
     fn push(&mut self, output: Self);
 }
 
-pub trait Criterion<K: Key>: Sized + Clone + Debug {
-    type Context;
-    type Compile: 'static;
-    type Keyword: Keyword<Self, K>;
-    type Report<'v>: Report<'v>;
+pub mod context {
+    use super::{Criterion, CriterionReportOutput};
+    use crate::{cache::Numbers, schema::Schemas, source::Sources};
+    use grill_uri::AbsoluteUri;
+    use jsonptr::Pointer;
+    use slotmap::Key;
+    use std::fmt::Debug;
 
-    /// Creates a new context for the given `params`.
-    fn context(&self, params: Context<Self, K>) -> Self::Context;
-
-    /// Creates a new `Self::Compile`
-    fn compile(&mut self, params: Compile<Self, K>) -> Self::Compile;
-}
-
-#[derive(Debug)]
-pub struct Context<'i, 'v, C: Criterion<K>, K: Key> {
-    pub output: CriterionReportOutput<'v, C, K>,
-    pub eval_numbers: &'i mut Numbers,
-    pub global_numbers: &'i Numbers,
-    pub schemas: &'i Schemas<C, K>,
-    pub sources: &'i Sources,
-    pub absolute_keyword_location: &'i AbsoluteUri,
-    pub keyword_location: Pointer,
-    pub instance_location: Pointer,
-}
-
-pub struct Compile<'i, C: Criterion<K>, K: Key> {
-    pub absolute_uri: &'i AbsoluteUri,
-    pub global_numbers: &'i mut Numbers,
-    pub schemas: &'i Schemas<C, K>,
-    pub sources: &'i Sources,
-    pub dialects: &'i Dialects<C, K>,
-    pub resolvers: &'i Resolvers,
-    pub deserializers: &'i Deserializers,
-    pub values: &'i mut Values,
-}
-impl<C: Criterion<K>, K: Key> Debug for Compile<'_, C, K> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NewCompile")
-            .field("absolute_uri", &self.absolute_uri)
-            .field("global_numbers", &self.global_numbers)
-            .field("schemas", &self.schemas)
-            .field("sources", &self.sources)
-            .field("dialects", &self.dialects)
-            // .field("resolvers", &self.resolvers)
-            .field("deserializers", &self.deserializers)
-            .field("values", &self.values)
-            .finish_non_exhaustive()
+    pub trait Context<'i, C: Criterion<K>, K: Key>: Debug {
+        fn new<'v>(params: Params<'i, 'v, C, K>) -> Self;
     }
+
+    #[derive(Debug)]
+    pub struct Params<'i, 'v, C: Criterion<K>, K: Key> {
+        pub criterion: &'i C,
+        pub output: CriterionReportOutput<'v, C, K>,
+        pub eval_numbers: &'i mut Numbers,
+        pub global_numbers: &'i Numbers,
+        pub schemas: &'i Schemas<C, K>,
+        pub sources: &'i Sources,
+        pub absolute_keyword_location: &'i AbsoluteUri,
+        pub keyword_location: Pointer,
+        pub instance_location: Pointer,
+    }
+}
+
+pub use context::Context;
+
+pub mod compile {
+    use super::Criterion;
+    use crate::{
+        cache::{Numbers, Values},
+        schema::{Dialects, Schemas},
+        source::{Deserializers, Resolvers, Sources},
+    };
+    use grill_uri::AbsoluteUri;
+    use slotmap::Key;
+    use std::fmt::Debug;
+
+    pub trait Compile<'i, C: Criterion<K>, K: Key>: Debug {
+        fn new<'v>(params: Params<'i, C, K>) -> Self;
+    }
+
+    pub struct Params<'i, C: Criterion<K>, K: Key> {
+        /// it'd be ideal if this were mutable but it may not work
+        // TDOO: remove the comment above after I know whether this works or not
+        pub criterion: &'i mut C,
+        /// AbsoluteUri of the Schema being compiled
+        pub absolute_uri: &'i AbsoluteUri,
+        /// Global cache of numbers
+        pub global_numbers: &'i mut Numbers,
+        /// Current collection of compiled schemas at the point of compilation
+        pub schemas: &'i Schemas<C, K>,
+        pub sources: &'i Sources,
+        pub dialects: &'i Dialects<C, K>,
+        pub resolvers: &'i Resolvers,
+        pub deserializers: &'i Deserializers,
+        pub values: &'i mut Values,
+    }
+
+    impl<C: Criterion<K>, K: Key> Debug for Params<'_, C, K> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("NewCompile")
+                .field("absolute_uri", &self.absolute_uri)
+                .field("global_numbers", &self.global_numbers)
+                .field("schemas", &self.schemas)
+                .field("sources", &self.sources)
+                .field("dialects", &self.dialects)
+                // .field("resolvers", &self.resolvers)
+                .field("deserializers", &self.deserializers)
+                .field("values", &self.values)
+                .finish_non_exhaustive()
+        }
+    }
+}
+pub use compile::Compile;
+
+pub trait Criterion<K: Key>: Sized + Clone + Debug {
+    type Context<'i>: Context<'i, Self, K>;
+    type Compile<'i>: Compile<'i, Self, K>;
+    type Keyword: Keyword<Self, K>;
+    /// This should be the same type as `Report`. The additional associated type
+    /// is to specify that `into_owned` returns the same type as `Report` but
+    /// with an owned lifetime since there is no way to indicate that
+    /// `into_owned` (of `Report`) should return `Self<'static>`.
+    type OwnedReport: Report<'static>;
+    type Report<'v>: Report<'v, Owned = <Self as Criterion<K>>::OwnedReport>;
 }
 
 #[derive(Default)]
@@ -1452,14 +1491,14 @@ where
 
     fn compile<'i>(
         &mut self,
-        compile: &mut C::Compile,
+        compile: &mut C::Compile<'i>,
         schema: Schema<'i, C, K>,
     ) -> Result<ControlFlow<()>, CompileError<C, K>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'v>(
         &'i self,
-        ctx: &'i mut C::Context,
+        ctx: &'i mut C::Context<'i>,
         value: &'v Value,
     ) -> Result<Option<C::Report<'v>>, EvaluateError<K>>;
 

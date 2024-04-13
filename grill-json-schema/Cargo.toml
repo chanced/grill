@@ -6,19 +6,18 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags     = { workspace = true }
-either       = { workspace = true }
-grill-core   = { workspace = true }
-grill-macros = { workspace = true }
-inherent     = { workspace = true }
-jsonptr      = { workspace = true }
-once_cell    = { workspace = true }
-paste        = { workspace = true }
-regex        = { workspace = true }
-serde        = { workspace = true }
-serde_json   = { workspace = true }
-snafu        = { workspace = true }
-tracing      = { workspace = true }
+bitflags   = { workspace = true }
+either     = { workspace = true }
+grill-core = { workspace = true }
+inherent   = { workspace = true }
+jsonptr    = { workspace = true }
+once_cell  = { workspace = true }
+paste      = { workspace = true }
+regex      = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+snafu      = { workspace = true }
+tracing    = { workspace = true }
 
 [dev-dependencies]
 # grill              = { workspace = true }

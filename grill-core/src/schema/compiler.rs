@@ -581,16 +581,17 @@ where
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
         for mut keyword in possible.iter().cloned() {
-            let mut compile = self.criterion.compile(criterion::Compile {
-                absolute_uri: schema.absolute_uri(),
-                schemas: self.schemas,
-                global_numbers: self.numbers,
-                deserializers: self.deserializers,
-                sources: self.sources,
-                dialects: self.dialects,
-                resolvers: self.resolvers,
-                values: self.values,
-            });
+            let mut compile = C::Compile::new();
+            // let mut compile = self.criterion.compile(criterion::Compile {
+            //     absolute_uri: schema.absolute_uri(),
+            //     schemas: self.schemas,
+            //     global_numbers: self.numbers,
+            //     deserializers: self.deserializers,
+            //     sources: self.sources,
+            //     dialects: self.dialects,
+            //     resolvers: self.resolvers,
+            //     values: self.values,
+            // });
             let res = keyword.compile(&mut compile, schema.clone())?;
             if matches!(res, ControlFlow::Continue(_)) {
                 keywords.push(keyword);

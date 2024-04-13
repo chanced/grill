@@ -7,6 +7,7 @@ pub mod traverse;
 pub mod dialect;
 
 use crate::cache;
+use crate::criterion::context::Params;
 use crate::criterion::{
     Assessment, Context, Criterion, CriterionReport, CriterionReportOutput, Report,
 };
@@ -463,7 +464,8 @@ where
             criterion,
         } = eval;
         let schema = self.get(key, sources)?;
-        let mut ctx = criterion.context(Context {
+        let mut context = C::Context::new(Params {
+            criterion,
             absolute_keyword_location: schema.absolute_uri(),
             keyword_location: keyword_location.clone(),
             instance_location: instance_location.clone(),
@@ -484,7 +486,7 @@ where
             false,
         );
         for keyword in &*schema.keywords {
-            if let Some(op) = keyword.evaluate(&mut ctx, value)? {
+            if let Some(op) = keyword.evaluate(&mut context, value)? {
                 output.push(op);
             }
         }
