@@ -60,7 +60,7 @@ pub struct Report<'v> {
 }
 
 impl std::fmt::Display for Report<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -149,11 +149,11 @@ impl<'v> CriterionReport<'v> for Report<'v> {
         todo!()
     }
 
-    fn append(&mut self, nodes: impl Iterator<Item = Self>) {
+    fn append(&mut self, _nodes: impl Iterator<Item = Self>) {
         todo!()
     }
 
-    fn push(&mut self, output: Self) {
+    fn push(&mut self, _output: Self) {
         todo!()
     }
 
@@ -162,11 +162,11 @@ impl<'v> CriterionReport<'v> for Report<'v> {
     }
 
     fn new(
-        output: Self::Output,
-        absolute_keyword_location: &AbsoluteUri,
-        keyword_location: jsonptr::Pointer,
-        instance_location: jsonptr::Pointer,
-        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
+        _output: Self::Output,
+        _absolute_keyword_location: &AbsoluteUri,
+        _keyword_location: jsonptr::Pointer,
+        _instance_location: jsonptr::Pointer,
+        _assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
     ) -> Self {
         todo!()
     }
@@ -185,13 +185,13 @@ where
     type OwnedReport = Report<'static>;
     type Report<'v> = Report<'v>;
 
-    fn new_compile<'i>(&mut self, params: NewCompile<'i, Self, K>) -> Self::Compile<'i> {
+    fn new_compile<'i>(&mut self, _params: NewCompile<'i, Self, K>) -> Self::Compile<'i> {
         todo!()
     }
 
     fn new_context<'i, 'v, 'r>(
         &self,
-        params: NewContext<'i, 'v, 'r, Self, K>,
+        _params: NewContext<'i, 'v, 'r, Self, K>,
     ) -> Self::Context<'i> {
         todo!()
     }

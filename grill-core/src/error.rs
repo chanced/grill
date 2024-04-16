@@ -497,8 +497,8 @@ impl From<LinkError> for SourceError {
         match err {
             LinkError::SourceConflict {
                 uri,
-                existing_path,
-                new_path,
+                existing_path: _,
+                new_path: _,
                 backtrace,
             } => Self::SourceConflict { uri, backtrace },
             LinkError::PathNotFound { source, backtrace } => {

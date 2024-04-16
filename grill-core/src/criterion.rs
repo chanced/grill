@@ -1,33 +1,27 @@
-use std::borrow::Cow;
-use std::collections::HashSet;
+
+
 use std::fmt::{self};
-use std::ops::{ControlFlow, Deref};
+use std::ops::{ControlFlow};
 
 use crate::error::{
-    AnchorError, BuildError, CompileError, DeserializeError, EvaluateError, IdentifyError, RefError,
+    AnchorError, CompileError, EvaluateError, IdentifyError, RefError,
 };
-use crate::schema::{Anchor, Evaluate, Iter, IterUnchecked, Ref};
+use crate::schema::{Anchor, Ref};
 use crate::{
     cache::{Numbers, Values},
-    error::{source_error, SourceError, UnknownKeyError},
     schema::{
-        compiler::Compiler,
-        traverse::{
-            AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
-            TransitiveDependencies,
-        },
-        Dialect, Dialects, Schemas,
+        Dialects, Schemas,
     },
-    source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources},
-    uri::{AbsoluteUri, Error, TryIntoAbsoluteUri},
+    source::{Deserializers, Resolvers, Sources},
+    uri::{AbsoluteUri},
 };
-use crate::{source, Schema, FALSE, TRUE};
+use crate::{Schema, FALSE, TRUE};
 use grill_uri::Uri;
 use jsonptr::{Pointer, Token};
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::{Number, Value};
+use serde_json::{Value};
 use slotmap::Key;
-use snafu::ResultExt;
+
 use std::fmt::Debug;
 // Output determines the granularity of a [`Report`].
 pub trait Output: Copy + Clone + fmt::Debug + Serialize + DeserializeOwned {

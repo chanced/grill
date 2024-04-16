@@ -651,27 +651,27 @@ impl<'a, C: Criterion<K>, K: 'static + Key> IntoIterator for &'a Dialects<C, K> 
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
+    
 
-    use serde_json::json;
+    
 
     use crate::uri::AbsoluteUri;
 
-    use super::Dialect;
+    
 
     #[test]
     fn test_is_pertinent_to() {
-        let valid = [
+        let _valid = [
             "http://json-schema.org/draft-04/schema#",
             "http://json-schema.org/draft-04/schema",
             "https://json-schema.org/draft-04/schema#",
             "https://JSON-schema.org/draft-04/schema#",
         ];
-        let invalid = [
+        let _invalid = [
             "http://json-schema.org/draft-04/schema#fragmented",
             "http://json-schema.org/draft-04",
         ];
-        let id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
+        let _id: AbsoluteUri = "http://json-schema.org/draft-04/schema#".parse().unwrap();
         // let dialect = Dialect::build(id.clone())
         //     .add_metaschema(id.clone(), Cow::Owned(json!({})))
         //     .add_keyword(test::keyword::schema::SchemaKeyword::new("$schema", true))

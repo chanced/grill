@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    ops::ControlFlow,
 };
 
 use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
@@ -14,8 +13,7 @@ use crate::{
     criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Report},
     error::{compile_error::SchemaNotFoundSnafu, CompileError},
     schema::{dialect::Dialects, Schemas},
-    source::{Deserializers, Link, Resolvers, SourceKey, Sources},
-    ControlFlowExt, Interrogator, Validate,
+    source::{Deserializers, Link, Resolvers, SourceKey, Sources}, Interrogator, Validate,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};

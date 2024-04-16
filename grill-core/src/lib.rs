@@ -112,14 +112,14 @@ impl<B, C> ControlFlowExt<B, C> for ControlFlow<B, C> {
         }
     }
 
-    fn map_continue<U, F: FnOnce(C) -> Option<U>>(self, f: F) -> Option<U> {
+    fn map_continue<U, F: FnOnce(C) -> Option<U>>(self, _f: F) -> Option<U> {
         match self {
             ControlFlow::Continue(_) => todo!(),
             ControlFlow::Break(_) => todo!(),
         }
     }
 
-    fn map_break<U, F: FnOnce(B) -> Option<U>>(self, f: F) -> Option<U> {
+    fn map_break<U, F: FnOnce(B) -> Option<U>>(self, _f: F) -> Option<U> {
         todo!()
     }
 }

@@ -4,7 +4,7 @@ use super::{Reference, Schemas};
 use crate::{criterion::Criterion, source::Sources, uri::AbsoluteUri, Key, Schema};
 use either::Either;
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashSet},
     iter::{empty, once, Empty, Map, Once},
     vec::IntoIter,
 };

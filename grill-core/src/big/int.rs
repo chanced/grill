@@ -171,7 +171,7 @@ mod tests {
             assert_eq!(int, expected);
         }
 
-        let invalid_tests = [(
+        let _invalid_tests = [(
             "12.345",
             NumberError::NotAnInteger {
                 value: "12.345".to_string(),

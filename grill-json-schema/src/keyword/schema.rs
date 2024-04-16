@@ -4,7 +4,6 @@
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
 
 use std::{
-    cell::OnceCell,
     ops::ControlFlow,
     sync::{Arc, OnceLock},
 };
@@ -64,14 +63,14 @@ where
     }
     fn compile<'i>(
         &mut self,
-        compile: &mut C::Compile<'i>,
+        _compile: &mut C::Compile<'i>,
         schema: grill_core::Schema<'i, C, K>,
     ) -> Result<ControlFlow<()>, CompileError<C, K>> {
         match schema.value() {
             Value::Bool(bool) => {
                 self.boolean = Some(*bool);
             }
-            Value::Object(obj) => {}
+            Value::Object(_obj) => {}
             other => {
                 // there should probably be a variant specifically for invalid schema type
                 return Err(InvalidTypeError {
@@ -86,7 +85,7 @@ where
     }
     fn dialect(
         &self,
-        schema: &Value,
+        _schema: &Value,
     ) -> ControlFlow<(), Result<Option<AbsoluteUri>, IdentifyError>> {
         todo!()
         // let Some(schema) = schema.get(self.keyword) else {
@@ -119,8 +118,8 @@ where
 
     fn evaluate<'i, 'v, 'c>(
         &'i self,
-        ctx: &'c mut <C as Criterion<K>>::Context<'i>,
-        value: &'v Value,
+        _ctx: &'c mut <C as Criterion<K>>::Context<'i>,
+        _value: &'v Value,
     ) -> Result<Option<<C as Criterion<K>>::Report<'v>>, EvaluateError<K>> {
         todo!()
     }
