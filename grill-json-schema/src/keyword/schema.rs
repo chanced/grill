@@ -57,14 +57,14 @@ impl Schema {
 impl<C, K> Keyword<C, K> for Schema
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn kind(&self) -> Kind {
         self.keyword.into()
     }
     fn compile<'i>(
         &mut self,
-        compile: &mut C::Compile,
+        compile: &mut C::Compile<'i>,
         schema: grill_core::Schema<'i, C, K>,
     ) -> Result<ControlFlow<()>, CompileError<C, K>> {
         match schema.value() {
@@ -83,21 +83,6 @@ where
             }
         }
         Ok(ControlFlow::Continue(()))
-    }
-    fn evaluate<'i, 'v>(
-        &'i self,
-        ctx: &'i mut C::Context,
-        value: &'v Value,
-    ) -> Result<Option<C::Report<'v>>, EvaluateError<K>> {
-        // let Some(bool) = self.boolean else {
-        //     return Ok(None);
-        // };
-        // if bool {
-        //     Ok(Some(ctx.annotate(None, None)))
-        // } else {
-        //     Ok(Some(ctx.error(None, None)))
-        // }
-        todo!()
     }
     fn dialect(
         &self,
@@ -130,5 +115,13 @@ where
         //     return Ok(Err(IdentifyError::FragmentedId(uri.into())));
         // }
         // Ok(Ok(Some(uri)))
+    }
+
+    fn evaluate<'i, 'v, 'c>(
+        &'i self,
+        ctx: &'c mut <C as Criterion<K>>::Context<'i>,
+        value: &'v Value,
+    ) -> Result<Option<<C as Criterion<K>>::Report<'v>>, EvaluateError<K>> {
+        todo!()
     }
 }

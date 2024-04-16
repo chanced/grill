@@ -2,21 +2,19 @@
 //!
 //!
 //!
+use crate::criterion::Criterion;
+use crate::criterion::CriterionOwnedReport;
+use crate::criterion::Report;
+use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
+pub use grill_uri::error::Error as UriError;
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
+use serde_json::Value;
 use slotmap::Key;
 use snafu::Backtrace;
 use snafu::Snafu;
 use std::collections::HashMap;
-
-use crate::criterion::Criterion;
-use crate::criterion::CriterionOwnedReport;
-use crate::criterion::CriterionReport;
-use crate::criterion::Report;
-use crate::uri::Error as UriError;
-use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
-use serde_json::Value;
 use std::{
     error::Error as StdError,
     fmt::{self, Debug, Display},

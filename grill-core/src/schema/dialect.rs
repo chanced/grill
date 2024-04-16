@@ -34,7 +34,7 @@ use std::{
 };
 
 /// Builds a [`Dialect`].
-pub struct Build<C: Criterion<K>, K: Key> {
+pub struct Build<C: Criterion<K>, K: 'static + Key> {
     id: AbsoluteUri,
     metaschemas: Vec<(Result<AbsoluteUri, crate::uri::Error>, Cow<'static, Value>)>,
     keywords: Vec<C::Keyword>,
@@ -44,7 +44,7 @@ pub struct Build<C: Criterion<K>, K: Key> {
 impl<C, K> Build<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     /// Adds a metaschema to the [`Dialect`]. These are used to validate the
     /// schemas of the [`Dialect`], as determined by [`Dialect::is_pertinent_to`].
@@ -95,7 +95,7 @@ where
 pub struct Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     /// Identifier of the `Dialect`. A meta schema must be defined in
     /// `metaschemas` with this `id`.
@@ -114,7 +114,7 @@ where
 impl<C, K> std::fmt::Display for Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
@@ -124,7 +124,7 @@ where
 impl<C, K> Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     /// Returns a new `Dialect` [`Build`].
     #[must_use]
@@ -375,7 +375,7 @@ where
 impl<C, K> PartialEq for Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -384,7 +384,7 @@ where
 impl<C, K> Hash for Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
@@ -394,7 +394,7 @@ where
 impl<C, K> Debug for Dialect<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Dialect")
@@ -422,7 +422,7 @@ where
 
 /// A collection of [`Dialect`]s.
 #[derive(Debug, Clone)]
-pub struct Dialects<C: Criterion<K>, K: Key> {
+pub struct Dialects<C: Criterion<K>, K: 'static + Key> {
     dialects: Vec<Dialect<C, K>>,
     default: usize,
 }
@@ -430,7 +430,7 @@ pub struct Dialects<C: Criterion<K>, K: Key> {
 impl<C, K> Deref for Dialects<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     type Target = [Dialect<C, K>];
 
@@ -442,7 +442,7 @@ where
 impl<C, K> Dialects<C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     /// Creates a new [`Dialects`] from a [`Vec`] of [`Dialect`]s.
     ///
@@ -639,7 +639,7 @@ where
     }
 }
 
-impl<'a, C: Criterion<K>, K: Key> IntoIterator for &'a Dialects<C, K> {
+impl<'a, C: Criterion<K>, K: 'static + Key> IntoIterator for &'a Dialects<C, K> {
     type Item = &'a Dialect<C, K>;
 
     type IntoIter = std::slice::Iter<'a, Dialect<C, K>>;

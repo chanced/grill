@@ -19,7 +19,7 @@ static_pointer_fn!(pub else "/else");
 
 /// [`Keyword`] for the `if`, `then`, and `else` keywords.
 #[derive(Debug, Clone, Default)]
-pub struct IfThenElse<K: Key> {
+pub struct IfThenElse<K: 'static + Key> {
     /// The key of the subschema for the `if` keyword.
     pub if_key: K,
     /// The key of the subschema for the `then` keyword.

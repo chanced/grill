@@ -6,7 +6,7 @@ use crate::{criterion::Criterion, Schema};
 /// [`Reference`]s, [`Anchor`]s, and [`Keyword`]s.
 #[allow(unused_variables)]
 #[allow(clippy::needless_lifetimes)]
-pub trait Visitor<'i, C: Criterion<K>, K: Key> {
+pub trait Visitor<'i, C: Criterion<K>, K: 'static + Key> {
     /// Error type returned by the `Visitor`
     type Error;
 

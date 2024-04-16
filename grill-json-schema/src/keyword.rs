@@ -118,7 +118,7 @@ macro_rules! delegate {
 
 impl<K> grill_core::criterion::Keyword<JsonSchema, K> for Keyword
 where
-    K: Key,
+    K: 'static + Key,
 {
     fn kind(&self) -> Kind {
         todo!()

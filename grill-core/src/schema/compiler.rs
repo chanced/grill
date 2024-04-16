@@ -11,13 +11,11 @@ use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},
-    criterion::{self, Criterion, CriterionReportOutput, Interrogator, Keyword, Output, Report},
-    error::{
-        compile_error::{SchemaInvalidSnafu, SchemaNotFoundSnafu},
-        CompileError,
-    },
+    criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Report},
+    error::{compile_error::SchemaNotFoundSnafu, CompileError},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
+    ControlFlowExt, Interrogator, Validate,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};
@@ -57,7 +55,7 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, C: Criterion<K>, K: Key> {
+pub(crate) struct Compiler<'i, C: Criterion<K>, K: 'static + Key> {
     schemas: &'i mut Schemas<C, K>,
     sources: &'i mut Sources,
     dialects: &'i Dialects<C, K>,
@@ -65,7 +63,7 @@ pub(crate) struct Compiler<'i, C: Criterion<K>, K: Key> {
     resolvers: &'i Resolvers,
     numbers: &'i mut Numbers,
     values: &'i mut Values,
-    validate: bool,
+    validate: Validate,
     indexed: HashSet<AbsoluteUri>,
     ids: HashMap<AbsoluteUri, Option<AbsoluteUri>>,
     anchors: HashMap<AbsoluteUri, Vec<Anchor>>,
@@ -85,7 +83,7 @@ where
     C: Criterion<K>,
     K: Key,
 {
-    pub(crate) fn new(interrogator: &'i mut Interrogator<C, K>, validate: bool) -> Self {
+    pub(crate) fn new(interrogator: &'i mut Interrogator<C, K>, validate: Validate) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -580,20 +578,29 @@ where
     ) -> Result<Box<[C::Keyword]>, CompileError<C, K>> {
         let schema = self.schemas.get(key, self.sources).unwrap();
         let mut keywords = Vec::new();
-        for mut keyword in possible.iter().cloned() {
-            let mut compile = C::Compile::new();
-            // let mut compile = self.criterion.compile(criterion::Compile {
-            //     absolute_uri: schema.absolute_uri(),
-            //     schemas: self.schemas,
-            //     global_numbers: self.numbers,
-            //     deserializers: self.deserializers,
-            //     sources: self.sources,
-            //     dialects: self.dialects,
-            //     resolvers: self.resolvers,
-            //     values: self.values,
-            // });
-            let res = keyword.compile(&mut compile, schema.clone())?;
-            if matches!(res, ControlFlow::Continue(_)) {
+        for keyword in possible.iter() {
+            // this is used instead of .iter().cloned() because I'm hunting a lifetime error
+            let mut keyword = keyword.clone();
+            let mut compile = self.criterion.new_compile(NewCompile {
+                absolute_uri: schema.absolute_uri(),
+                global_numbers: self.numbers,
+                schemas: &self.schemas,
+                sources: &self.sources,
+                dialects: &self.dialects,
+                resolvers: &self.resolvers,
+                deserializers: &self.deserializers,
+                values: self.values,
+            });
+            let ctrl_flow = keyword.compile(&mut compile, schema.clone())?;
+            let is_continue = ctrl_flow.is_continue();
+
+            // will not compile without this explicit drop
+            // even tho Criterion::Keyword is bound to 'static
+            // not sure why that is.
+            // rust 1.75
+            drop(compile);
+
+            if is_continue {
                 keywords.push(keyword);
             }
         }
@@ -704,16 +711,17 @@ where
             .unwrap()
             .anchors(src)?)
     }
-
+    fn should_validate(&self) -> bool {
+        (self.validate).into()
+    }
     fn validate<'v>(
         &mut self,
         dialect_idx: usize,
         value: &'v Value,
     ) -> Result<(), CompileError<C, K>> {
-        if !self.validate {
+        if !self.should_validate() {
             return Ok(());
         }
-        let mut evaluated = HashSet::default();
         let mut eval_numbers = Numbers::with_capacity(7);
         let key = self.dialects.get_by_index(dialect_idx).unwrap().schema_key;
 
@@ -725,7 +733,6 @@ where
             instance_location: Pointer::default(),
             keyword_location: Pointer::default(),
             sources: self.sources,
-            evaluated: &mut evaluated,
             global_numbers: self.numbers,
             eval_numbers: &mut eval_numbers,
         })?;

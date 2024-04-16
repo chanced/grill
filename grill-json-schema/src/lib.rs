@@ -21,11 +21,14 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
+use core::criterion::{NewCompile, NewContext};
 use std::{borrow::Cow, marker::PhantomData};
+
+pub(crate) use grill_core as core;
 
 use grill_core::{
     cache::{Numbers, Values},
-    criterion::{Criterion, Report as CriterionReport},
+    criterion::{Assessment, Criterion, Report as CriterionReport},
     schema::{Dialects, Schemas},
     source::{Deserializers, Resolvers, Sources},
     uri::AbsoluteUri,
@@ -66,13 +69,26 @@ impl std::error::Error for Report<'_> {}
 #[derive(Debug, Clone)]
 pub struct JsonSchema {}
 
-pub struct Context {}
-
+impl<'i, C, K> grill_core::criterion::Context<'i, C, K> for Context<'i, C, K>
+where
+    C: Criterion<K>,
+    K: 'static + Key,
+{
+}
 #[derive(Debug, Clone)]
+pub struct Context<'i, C, K>
+where
+    C: Criterion<K>,
+    K: 'static + Key,
+{
+    marker: PhantomData<&'i C>,
+    marker2: PhantomData<&'i K>,
+}
+
 pub struct Compile<'i, C, K>
 where
     C: Criterion<K>,
-    K: Key,
+    K: 'static + Key,
 {
     pub absolute_uri: &'i AbsoluteUri,
     pub global_numbers: &'i mut Numbers,
@@ -84,6 +100,30 @@ where
     pub values: &'i mut Values,
 }
 
+impl<'i, C, K> grill_core::criterion::Compile<'i> for Compile<'i, C, K>
+where
+    C: Criterion<K>,
+    K: 'static + Key,
+{
+}
+
+impl<'i, C, K> std::fmt::Debug for Compile<'i, C, K>
+where
+    C: Criterion<K>,
+    K: 'static + Key,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Compile")
+            .field("absolute_uri", &self.absolute_uri)
+            .field("global_numbers", &self.global_numbers)
+            .field("schemas", &self.schemas)
+            .field("sources", &self.sources)
+            .field("dialects", &self.dialects)
+            .field("deserializers", &self.deserializers)
+            .field("values", &self.values)
+            .finish_non_exhaustive()
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error<'v> {
     X(Cow<'v, str>),
@@ -93,23 +133,17 @@ pub enum Error<'v> {
 pub enum Annotation<'v> {
     X(Cow<'v, str>),
 }
+impl Default for Annotation<'_> {
+    fn default() -> Self {
+        todo!()
+    }
+}
 
 impl<'v> CriterionReport<'v> for Report<'v> {
     type Error<'e> = Error<'e>;
     type Annotation<'a> = Annotation<'a>;
     type Output = Output;
     type Owned = Report<'static>;
-
-    fn new(
-        structure: Self::Output,
-        absolute_keyword_location: AbsoluteUri,
-        keyword_location: jsonptr::Pointer,
-        instance_location: jsonptr::Pointer,
-        assessment: grill_core::criterion::Assessment<Self::Annotation<'v>, Self::Error<'v>>,
-        is_transient: bool,
-    ) -> Self {
-        todo!()
-    }
 
     fn is_valid(&self) -> bool {
         todo!()
@@ -126,26 +160,47 @@ impl<'v> CriterionReport<'v> for Report<'v> {
     fn into_owned(self) -> Self::Owned {
         todo!()
     }
+
+    fn new(
+        output: Self::Output,
+        absolute_keyword_location: &AbsoluteUri,
+        keyword_location: jsonptr::Pointer,
+        instance_location: jsonptr::Pointer,
+        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
+    ) -> Self {
+        todo!()
+    }
 }
 
 impl<K> Criterion<K> for JsonSchema
 where
-    K: Key,
+    K: 'static + Key + 'static,
 {
-    type Context = Context;
+    type Context<'i> = Context<'i, Self, K>;
 
-    type Compile = Compile<'i, Self, K>;
+    type Compile<'i> = Compile<'i, Self, K>;
 
     type Keyword = Keyword;
 
     type OwnedReport = Report<'static>;
     type Report<'v> = Report<'v>;
+
+    fn new_compile<'i>(&mut self, params: NewCompile<'i, Self, K>) -> Self::Compile<'i> {
+        todo!()
+    }
+
+    fn new_context<'i, 'v, 'r>(
+        &self,
+        params: NewContext<'i, 'v, 'r, Self, K>,
+    ) -> Self::Context<'i> {
+        todo!()
+    }
 }
 pub(crate) mod alias {
     use crate::JsonSchema;
     use grill_core::criterion::Criterion;
 
-    pub(crate) type Compile<K> = <JsonSchema as Criterion<K>>::Compile;
-    pub(crate) type Context<K> = <JsonSchema as Criterion<K>>::Context;
+    pub(crate) type Compile<'i, K> = <JsonSchema as Criterion<K>>::Compile<'i>;
+    pub(crate) type Context<'i, K> = <JsonSchema as Criterion<K>>::Context<'i>;
     pub(crate) type Report<'v, K> = <JsonSchema as Criterion<K>>::Report<'v>;
 }
