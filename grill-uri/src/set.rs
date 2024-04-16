@@ -54,7 +54,7 @@ pub(crate) mod url {
             let username = authority.username().unwrap_or_default();
             if !username.is_empty() {
                 return Err(AuthorityError::UsernameNotAllowed {
-                    value: username.to_string().into(),
+                    value: username.to_string(),
                     scheme: u.scheme().to_string(),
                     backtrace: Backtrace::capture(),
                 }
