@@ -25,8 +25,9 @@ pub mod schema;
 
 use crate::alias;
 use crate::JsonSchema;
+use grill_core::criterion::Criterion;
 use grill_core::{
-    criterion::{Kind},
+    criterion::Kind,
     error::{CompileError, EvaluateError},
     Key, Schema,
 };
@@ -132,11 +133,11 @@ where
         todo!()
     }
 
-    fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'v, 'r>(
         &'i self,
-        _ctx: &'i mut alias::Context<K>,
-        _value: &'v Value,
-    ) -> Result<Option<alias::Report<'v, K>>, EvaluateError<K>> {
+        _ctx: <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>, //alias::Context<'i, 'v, 'r, K>,
+        value: &'v Value,
+    ) -> Result<(), EvaluateError<K>> {
         todo!()
     }
 }

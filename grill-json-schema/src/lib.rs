@@ -28,7 +28,7 @@ pub(crate) use grill_core as core;
 
 use grill_core::{
     cache::{Numbers, Values},
-    criterion::{Assessment, Criterion, Report as CriterionReport},
+    criterion::{self, Criterion},
     schema::{Dialects, Schemas},
     source::{Deserializers, Resolvers, Sources},
     uri::AbsoluteUri,
@@ -38,25 +38,12 @@ use keyword::Keyword;
 use serde::{Deserialize, Serialize};
 
 pub mod keyword;
+pub mod report;
 
-// /// Set of keywords to check which disable short-circuiting
-// pub const DISABLING_KEYWORDS: [&'static str; 2] = [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS];
+pub use report::Report;
 
-// if Self::ENABLING_STRUCTURES.contains(ctx.structure().into()) {
-//     ctx.enable_short_circuiting();
-// }
-// pub const ENABLING_STRUCTURES: Structures = Structures::FLAG;
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Output {}
-impl grill_core::criterion::Output for Output {
-    fn verbose() -> Self {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Report<'v> {
-    marker: PhantomData<&'v i32>,
+pub enum Annotation<'v> {
+    Schema(Cow<'v, str>),
 }
 
 impl std::fmt::Display for Report<'_> {
@@ -69,20 +56,23 @@ impl std::error::Error for Report<'_> {}
 #[derive(Debug, Clone)]
 pub struct JsonSchema {}
 
-impl<'i, C, K> grill_core::criterion::Context<'i, C, K> for Context<'i, C, K>
+impl<'i, 'v, 'r, C, K> criterion::Context<'i, 'v, 'r, C, K> for Context<'i, 'v, 'r, C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
 {
 }
-#[derive(Debug, Clone)]
-pub struct Context<'i, C, K>
+#[derive(Debug)]
+pub struct Context<'i, 'v, 'r, C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
 {
-    marker: PhantomData<&'i C>,
-    marker2: PhantomData<&'i K>,
+    pub report: &'r mut Report<'v>,
+    pub eval_numbers: &'i mut Numbers,
+    pub global_numbers: &'i Numbers,
+    pub schemas: &'i Schemas<C, K>,
+    pub sources: &'i Sources,
 }
 
 pub struct Compile<'i, C, K>
@@ -100,7 +90,7 @@ where
     pub values: &'i mut Values,
 }
 
-impl<'i, C, K> grill_core::criterion::Compile<'i> for Compile<'i, C, K>
+impl<'i, C, K> criterion::Compile<'i> for Compile<'i, C, K>
 where
     C: Criterion<K>,
     K: 'static + Key,
@@ -124,50 +114,14 @@ where
             .finish_non_exhaustive()
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error<'v> {
     X(Cow<'v, str>),
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Annotation<'v> {
-    X(Cow<'v, str>),
-}
 impl Default for Annotation<'_> {
     fn default() -> Self {
-        todo!()
-    }
-}
-
-impl<'v> CriterionReport<'v> for Report<'v> {
-    type Error<'e> = Error<'e>;
-    type Annotation<'a> = Annotation<'a>;
-    type Output = Output;
-    type Owned = Report<'static>;
-
-    fn is_valid(&self) -> bool {
-        todo!()
-    }
-
-    fn append(&mut self, _nodes: impl Iterator<Item = Self>) {
-        todo!()
-    }
-
-    fn push(&mut self, _output: Self) {
-        todo!()
-    }
-
-    fn into_owned(self) -> Self::Owned {
-        todo!()
-    }
-
-    fn new(
-        _output: Self::Output,
-        _absolute_keyword_location: &AbsoluteUri,
-        _keyword_location: jsonptr::Pointer,
-        _instance_location: jsonptr::Pointer,
-        _assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
-    ) -> Self {
         todo!()
     }
 }
@@ -176,7 +130,7 @@ impl<K> Criterion<K> for JsonSchema
 where
     K: 'static + Key + 'static,
 {
-    type Context<'i> = Context<'i, Self, K>;
+    type Context<'i, 'v, 'r> = Context<'i, 'v, 'r, Self, K> where 'v: 'r;
 
     type Compile<'i> = Compile<'i, Self, K>;
 
@@ -192,7 +146,7 @@ where
     fn new_context<'i, 'v, 'r>(
         &self,
         _params: NewContext<'i, 'v, 'r, Self, K>,
-    ) -> Self::Context<'i> {
+    ) -> Self::Context<'i, 'v, 'r> {
         todo!()
     }
 }
@@ -201,6 +155,6 @@ pub(crate) mod alias {
     use grill_core::criterion::Criterion;
 
     pub(crate) type Compile<'i, K> = <JsonSchema as Criterion<K>>::Compile<'i>;
-    pub(crate) type Context<'i, K> = <JsonSchema as Criterion<K>>::Context<'i>;
+    pub(crate) type Context<'i, 'v, 'r, K> = <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>;
     pub(crate) type Report<'v, K> = <JsonSchema as Criterion<K>>::Report<'v>;
 }

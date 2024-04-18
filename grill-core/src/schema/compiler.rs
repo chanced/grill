@@ -1,6 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 use jsonptr::{Pointer, Resolve};
@@ -13,7 +11,8 @@ use crate::{
     criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Report},
     error::{compile_error::SchemaNotFoundSnafu, CompileError},
     schema::{dialect::Dialects, Schemas},
-    source::{Deserializers, Link, Resolvers, SourceKey, Sources}, Interrogator, Validate,
+    source::{Deserializers, Link, Resolvers, SourceKey, Sources},
+    Interrogator, Validate,
 };
 
 use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};
@@ -698,17 +697,17 @@ where
         Ok(())
     }
 
-    fn find_anchors(
-        &mut self,
-        dialect_idx: usize,
-        src: &Value,
-    ) -> Result<Vec<Anchor>, CompileError<C, K>> {
-        Ok(self
-            .dialects
-            .get_by_index(dialect_idx)
-            .unwrap()
-            .anchors(src)?)
-    }
+    // fn find_anchors(
+    //     &mut self,
+    //     dialect_idx: usize,
+    //     src: &Value,
+    // ) -> Result<Vec<Anchor>, CompileError<C, K>> {
+    //     Ok(self
+    //         .dialects
+    //         .get_by_index(dialect_idx)
+    //         .unwrap()
+    //         .anchors(src)?)
+    // }
     fn should_validate(&self) -> bool {
         (self.validate).into()
     }

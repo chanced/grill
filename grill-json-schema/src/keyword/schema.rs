@@ -4,10 +4,12 @@
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
 
 use std::{
-    ops::ControlFlow,
+    borrow::Cow,
+    ops::{ControlFlow, Deref},
     sync::{Arc, OnceLock},
 };
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use grill_core::{
@@ -116,11 +118,46 @@ where
         // Ok(Ok(Some(uri)))
     }
 
-    fn evaluate<'i, 'v, 'c>(
+    fn evaluate<'i, 'v, 'r>(
         &'i self,
-        _ctx: &'c mut <C as Criterion<K>>::Context<'i>,
+        _ctx: <C as Criterion<K>>::Context<'i, 'v, 'r>,
         _value: &'v Value,
-    ) -> Result<Option<<C as Criterion<K>>::Report<'v>>, EvaluateError<K>> {
+    ) -> Result<(), EvaluateError<K>> {
         todo!()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Annotation<'v>(pub Cow<'v, AbsoluteUri>);
+impl AsRef<AbsoluteUri> for Annotation<'_> {
+    fn as_ref(&self) -> &AbsoluteUri {
+        &self.0
+    }
+}
+
+impl Deref for Annotation<'_> {
+    type Target = AbsoluteUri;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<AbsoluteUri> for Annotation<'static> {
+    fn from(uri: AbsoluteUri) -> Self {
+        Self(Cow::Owned(uri))
+    }
+}
+
+impl<'u> From<&'u AbsoluteUri> for Annotation<'u> {
+    fn from(uri: &'u AbsoluteUri) -> Self {
+        Self(Cow::Borrowed(uri))
+    }
+}
+
+impl<'v> From<Annotation<'v>> for AbsoluteUri {
+    fn from(annotation: Annotation<'v>) -> Self {
+        annotation.0.into_owned()
     }
 }

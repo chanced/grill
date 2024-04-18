@@ -1,37 +1,26 @@
-
-
+use std::error::Error;
 use std::fmt::{self};
-use std::ops::{ControlFlow};
+use std::ops::ControlFlow;
 
-use crate::error::{
-    AnchorError, CompileError, EvaluateError, IdentifyError, RefError,
-};
+use crate::error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError};
 use crate::schema::{Anchor, Ref};
 use crate::{
     cache::{Numbers, Values},
-    schema::{
-        Dialects, Schemas,
-    },
+    schema::{Dialects, Schemas},
     source::{Deserializers, Resolvers, Sources},
-    uri::{AbsoluteUri},
 };
 use crate::{Schema, FALSE, TRUE};
-use grill_uri::Uri;
+use grill_uri::{AbsoluteUri, Uri};
 use jsonptr::{Pointer, Token};
+use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::{Value};
+use serde_json::Value;
 use slotmap::Key;
 
 use std::fmt::Debug;
 // Output determines the granularity of a [`Report`].
 pub trait Output: Copy + Clone + fmt::Debug + Serialize + DeserializeOwned {
     fn verbose() -> Self;
-}
-
-/// The result of a keyword's evaluation.
-pub enum Assessment<A, E> {
-    Annotation(Option<A>),
-    Error(Option<E>),
 }
 
 /// Type alias for the associated type `Report` of the given `Criterion` `C`.
@@ -41,17 +30,9 @@ pub type CriterionOwnedReport<C, K> = <C as Criterion<K>>::OwnedReport;
 /// the given `Criterion` `C`.
 pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
 
-pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
-    type Error<'e>: 'e + Serialize + DeserializeOwned;
-    type Annotation<'a>: 'a + Default + Serialize + DeserializeOwned;
+pub trait Report<'v>: Clone + Error + Serialize + Deserialize<'v> {
     type Output: 'static + Output;
-    type Owned: 'static
-        + Report<
-            'static,
-            Error<'static> = Self::Error<'static>,
-            Annotation<'static> = Self::Annotation<'static>,
-            Output = Self::Output,
-        >;
+    type Owned: 'static + Report<'static, Output = Self::Output>;
     fn into_owned(self) -> Self::Owned;
 
     fn new(
@@ -59,10 +40,10 @@ pub trait Report<'v>: Clone + std::error::Error + Serialize + DeserializeOwned {
         absolute_keyword_location: &AbsoluteUri,
         keyword_location: Pointer,
         instance_location: Pointer,
-        assessment: Assessment<Self::Annotation<'v>, Self::Error<'v>>,
     ) -> Self;
 
     fn is_valid(&self) -> bool;
+
     fn append(&mut self, nodes: impl Iterator<Item = Self>);
     fn push(&mut self, output: Self);
 }
@@ -117,16 +98,18 @@ where
     }
 }
 
-pub trait Context<'i, C, K>: Debug {}
+pub trait Context<'i, 'v, 'r, C, K>: Debug {}
 pub trait Compile<'i>: Debug {}
 
 pub trait Criterion<K>: Sized + Clone + Debug
 where
     K: 'static + Key,
 {
-    type Context<'i>: Context<'i, Self, K>
+    type Context<'i, 'v, 'r>: Context<'i, 'v, 'r, Self, K>
     where
-        Self: 'i;
+        Self: 'i,
+        'v: 'r;
+
     type Compile<'i>: Compile<'i>
     where
         Self: 'i;
@@ -143,7 +126,7 @@ where
     fn new_context<'i, 'v, 'r>(
         &self,
         new_context: NewContext<'i, 'v, 'r, Self, K>,
-    ) -> Self::Context<'i>;
+    ) -> Self::Context<'i, 'v, 'r>;
 }
 
 /*
@@ -175,11 +158,11 @@ where
     ) -> Result<ControlFlow<()>, CompileError<C, K>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
-    fn evaluate<'i, 'c, 'v>(
+    fn evaluate<'i, 'v, 'r>(
         &'i self,
-        ctx: &'c mut C::Context<'i>,
+        ctx: C::Context<'i, 'v, 'r>,
         value: &'v Value,
-    ) -> Result<Option<C::Report<'v>>, EvaluateError<K>>;
+    ) -> Result<(), EvaluateError<K>>;
 
     /// Returns the paths to subschemas that this `Keyword` is aware of.
     fn subschemas(&self, schema: &Value) -> ControlFlow<(), Vec<Pointer>> {
@@ -239,131 +222,6 @@ pub const fn boolean(value: bool) -> &'static Value {
         FALSE
     }
 }
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                          static_pointer_fn!                           ║
-║                         ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Generates a static function which returns a [`Pointer`] to the given path.
-/// # Example
-/// ```no_run
-/// static_pointer_fn!(pub if "/if");
-/// assert_eq!(if_pointer(), &Pointer::new(["if"]));
-/// ```
-///
-#[macro_export]
-macro_rules! static_pointer_fn {
-    ($vis:vis $ident:ident $path:literal) => {
-        paste::paste! {
-            #[doc = "Returns a static [`Pointer`] to \"" $path "\""]
-            pub fn [< $ident _pointer >]() -> &'static jsonptr::Pointer {
-                use ::once_cell::sync::Lazy;
-                static POINTER: Lazy<jsonptr::Pointer> = Lazy::new(|| jsonptr::Pointer::parse($path).unwrap());
-                &POINTER
-            }
-        }
-    };
-}
-
-pub use static_pointer_fn;
-
-/// Generates an `as_<Keyword>` and `is_<Keyword>` fn for the given `Keyword` type.
-#[macro_export]
-macro_rules! keyword_fns {
-    ($keyword:ident) => {
-        paste::paste! {
-            #[doc= "Attempts to downcast `keyword` as `" $keyword "`"]
-            pub fn [< as_ $keyword:snake >](keyword: &dyn ::std::any::Any) -> Option<&$keyword> {
-                keyword.downcast_ref::<$keyword>()
-            }
-            #[doc= "Returns `true` if `keyword` is an instance of `" $keyword "`"]
-            pub fn [< is_ $keyword:snake >](keyword: &dyn $crate::criterion::Keyword) -> bool {
-                ::std::any::TypeId::of::<$keyword>() == keyword.type_id()
-            }
-
-        }
-    };
-}
-
-pub use keyword_fns;
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                           define_translate!                           ║
-║                          ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-// /// Generates an `enum` which contains implements [`Translate`](crate::output::Translate) for a given
-// /// [`Error`](`crate::output::Error`).
-// ///
-// /// The variants are either a `fn` pointer or `Fn` closure wrapped in an `Arc`.
-// ///
-// /// Note: requires the [`inherent`](https://docs.rs/inherent/latest/inherent/) crate.
-// #[macro_export]
-// macro_rules! define_translate {
-//     ($error:ident, $default:ident) => {
-//         paste::paste!{
-//             /// A function which can translate [`$error`].
-//             #[derive(Clone)]
-//             pub enum [< Translate $error >]{
-//                 #[doc= "A closure `Fn` wrapped in an `Arc` that can translate [`" $error "`]."]
-//                 Closure(
-//                     ::std::sync::Arc<
-//                         dyn Send + Sync + Fn(&mut ::std::fmt::Formatter, &$error) -> ::std::fmt::Result,
-//                     >,
-//                 ),
-//                 #[doc = "A `fn` which can translate [`" $error "`]"]
-//                 FnPtr(fn(&mut ::std::fmt::Formatter, &$error) -> std::fmt::Result),
-//             }
-
-//             #[::inherent::inherent]
-//             impl grill_core::criterion::Translate<$error<'_>> for [< Translate $error>]{
-//                 /// Runs the translation
-//                 pub fn run(&self, f: &mut ::std::fmt::Formatter, v: &$error) -> ::std::fmt::Result {
-//                     match self {
-//                         Self::Closure(c) => c(f, v),
-//                         Self::FnPtr(p) => p(f, v),
-//                     }
-//                 }
-//             }
-//             impl ::std::fmt::Debug for [< Translate $error >] {
-//                 fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-//                     match self {
-//                         Self::Closure(_) => f.debug_tuple("Closure").finish(),
-//                         Self::FnPtr(_) => f.debug_tuple("Pointer").finish(),
-//                     }
-//                 }
-//             }
-//             impl std::default::Default for [< Translate $error >] {
-//                 fn default() -> Self {
-//                     Self::FnPtr($default)
-//                 }
-//             }
-//         }
-//     };
-// }
-
-// pub use define_translate;
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                                Compile                                ║
-║                                ¯¯¯¯¯¯¯                                ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -433,11 +291,6 @@ pub enum Kind {
     Keyword(&'static str),
     /// The [`Keyword`] is a composite of multiple keywords with additional
     /// logic that handles co-dependencies between the embedded keywords.
-    ///
-    /// The output of this keyword should be a transient
-    /// [`Output`](`crate::Output`), with `is_transient` set to `true`.
-    /// Depending on the specified `Output`, the [`Report`] may be expanded
-    /// into multiple nodes.
     Composite(&'static [&'static str]),
 }
 

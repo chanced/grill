@@ -6,7 +6,7 @@ pub mod traverse;
 
 pub mod dialect;
 
-use crate::criterion::{Assessment, Criterion, CriterionReport, NewContext, Report};
+use crate::criterion::{Criterion, CriterionReport, NewContext, Report};
 use crate::error::{self, CompileError};
 use crate::{cache, Key};
 
@@ -469,21 +469,19 @@ where
             schema.absolute_uri(),
             keyword_location,
             instance_location,
-            Assessment::Annotation(None),
         );
 
         for keyword in &*schema.keywords {
-            let mut ctx = criterion.new_context(NewContext {
+            let ctx = criterion.new_context(NewContext {
                 global_numbers,
                 eval_numbers,
                 sources,
                 report: &mut report,
                 schemas: self,
             });
-            if let Some(op) = keyword.evaluate(&mut ctx, value)? {
-                report.push(op);
-            }
+            keyword.evaluate(ctx, value)?;
         }
+
         Ok(report)
     }
     pub(crate) fn is_compiled_by_uri(&self, uri: &AbsoluteUri) -> bool {
