@@ -248,7 +248,6 @@ where
             .clone();
 
         let dialect_idx = self.dialect_idx(src, default_dialect_idx);
-
         let dialect = &self.dialects[dialect_idx];
         let (id, mut uris) = dialect.identify(uri.clone(), src)?;
         append_ancestry_uris(&mut uris, &sub_path, &ancestry_uris)?;
@@ -730,12 +729,13 @@ where
             instance_location: Pointer::default(),
             keyword_location: Pointer::default(),
             sources: self.sources,
+            dialects: self.dialects,
             global_numbers: self.numbers,
             eval_numbers: &mut eval_numbers,
         })?;
         if !report.is_valid() {
             let report: <C::Report<'v> as Report>::Owned = report.into_owned();
-            return Err(CompileError::SchemaInvalid {
+            return Err(CompileError::InvalidSchema {
                 report,
                 backtrace: Backtrace::capture(),
             });
@@ -853,14 +853,14 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-fn identify<C: Criterion<K>, K: Key>(
-    uri: &AbsoluteUri,
-    source: &Value,
-    dialect: &Dialect<C, K>,
-) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError<C, K>> {
-    let (id, uris) = dialect.identify(uri.clone(), source)?;
-    // if identify did not find a primary id, use the uri + pointer fragment
-    // as the lookup which will be at the first position in the uris list
-    let uri = id.as_ref().unwrap_or(&uris[0]);
-    Ok((uri.clone(), id, uris))
-}
+// fn identify<C: Criterion<K>, K: Key>(
+//     uri: &AbsoluteUri,
+//     source: &Value,
+//     dialect: &Dialect<C, K>,
+// ) -> Result<(AbsoluteUri, Option<AbsoluteUri>, Vec<AbsoluteUri>), CompileError<C, K>> {
+//     let (id, uris) = dialect.identify(uri.clone(), source)?;
+//     // if identify did not find a primary id, use the uri + pointer fragment
+//     // as the lookup which will be at the first position in the uris list
+//     let uri = id.as_ref().unwrap_or(&uris[0]);
+//     Ok((uri.clone(), id, uris))
+// }

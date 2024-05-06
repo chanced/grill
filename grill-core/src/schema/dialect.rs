@@ -5,17 +5,17 @@ use super::{Anchor, Ref};
 use crate::{
     criterion::{Criterion, Keyword},
     error::{
-        dialect_error::{
+        new_dialect_error::{
             DefaultNotFoundSnafu, DialectNotImplementedSnafu, FragmentedIdSnafu,
             IdentifyNotImplementedSnafu,
         },
-        dialects_error::DuplicateSnafu,
-        AnchorError, DialectError, DialectsError, IdentifyError, RefError,
+        new_dialects_error::DuplicateDialectSnafu,
+        AnchorError, IdentifyError, NewDialectError, NewDialectsError, RefsError,
     },
     source::Input,
-    uri::{AbsoluteUri, TryIntoAbsoluteUri},
     ControlFlowExt, EMPTY_OBJ,
 };
+use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 use jsonptr::Pointer;
 use serde_json::Value;
 use slotmap::Key;
@@ -36,7 +36,7 @@ use std::{
 /// Builds a [`Dialect`].
 pub struct Build<C: Criterion<K>, K: 'static + Key> {
     id: AbsoluteUri,
-    metaschemas: Vec<(Result<AbsoluteUri, crate::uri::Error>, Cow<'static, Value>)>,
+    metaschemas: Vec<(Result<AbsoluteUri, grill_uri::Error>, Cow<'static, Value>)>,
     keywords: Vec<C::Keyword>,
     marker: PhantomData<fn(K) -> !>,
 }
@@ -66,7 +66,7 @@ where
     }
 
     /// Finalizes the [`Dialect`].
-    pub fn finish(self) -> Result<Dialect<C, K>, DialectError> {
+    pub fn finish(self) -> Result<Dialect<C, K>, NewDialectError> {
         let metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)> = self
             .metaschemas
             .into_iter()
@@ -74,7 +74,7 @@ where
                 let id = id?;
                 Ok((id.clone(), schema))
             })
-            .collect::<Result<_, crate::uri::Error>>()?;
+            .collect::<Result<_, grill_uri::Error>>()?;
         Dialect::new(self.id, metaschemas, self.keywords)
     }
 }
@@ -104,11 +104,17 @@ where
     metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>>,
     /// Set of [`Keyword`]s defined by the dialect.
     keywords: Box<[C::Keyword]>,
+    /// indexes of keywords which implement the `identify` method.
     identify_indexes: Box<[u16]>,
+    /// indexes of keywords which implement the `dialect` method.
     dialect_indexes: Box<[u16]>,
+    /// indexes of keywords which implement the `subschemas` method.
     subschemas_indexes: Box<[u16]>,
+    /// indexes of keywords which implement the `anchors` method.
     anchors_indexes: Box<[u16]>,
+    /// indexes of keywords which implement the `refs` method.
     references_indexes: Box<[u16]>,
+
     pub(crate) schema_key: K,
 }
 impl<C, K> std::fmt::Display for Dialect<C, K>
@@ -142,7 +148,7 @@ where
         id: AbsoluteUri,
         metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
         keywords: Vec<C::Keyword>,
-    ) -> Result<Self, DialectError> {
+    ) -> Result<Self, NewDialectError> {
         let metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>> =
             metaschemas.into_iter().collect();
         let keywords = keywords.into_boxed_slice();
@@ -172,7 +178,7 @@ where
     /// Attempts to identify a `schema` based on the [`Keyword`]s associated
     /// with this `Dialect`. It returns the primary id (if any) and all
     /// additional, secondary [`AbsoluteUri`]s the
-    /// [`Schema`](`crate::schema::Schema`) can be referenced by.
+    /// [`Schema`](`crate::schema::Schema`) can b referenced by.
     pub fn identify(
         &self,
         uri: AbsoluteUri,
@@ -223,7 +229,7 @@ where
     /// # Errors
     /// Returns [`RefError`] if any [`Keyword`] fails to parse the [`Ref`]s. This could include
     /// invalid JSON types or malformed URIs.
-    pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, RefError> {
+    pub fn refs(&self, source: &Value) -> Result<Vec<Ref>, RefsError> {
         let mut refs = Vec::new();
         for res in self
             .references_indexes
@@ -273,14 +279,7 @@ where
         for idx in &*self.dialect_indexes {
             let idx = *idx as usize;
             let dialect = self.keywords[idx].dialect(schema).unwrap_continue();
-            if dialect.is_err() {
-                continue;
-            }
-            let dialect = dialect.unwrap();
-            if dialect.is_none() {
-                continue;
-            }
-            let dialect = dialect.unwrap();
+            let Ok(Some(dialect)) = dialect else { continue };
             if dialect == self.id {
                 return true;
             }
@@ -350,7 +349,7 @@ where
     fn find_identify_indexes(
         uri: &AbsoluteUri,
         keywords: &[C::Keyword],
-    ) -> Result<Box<[u16]>, DialectError> {
+    ) -> Result<Box<[u16]>, NewDialectError> {
         let indexes = Self::find_impl_indexes(keywords, Keyword::identify);
         ensure!(
             !indexes.is_empty(),
@@ -362,7 +361,7 @@ where
     fn find_dialect_indexes(
         uri: &AbsoluteUri,
         keywords: &[C::Keyword],
-    ) -> Result<Box<[u16]>, DialectError> {
+    ) -> Result<Box<[u16]>, NewDialectError> {
         let indexes = Self::find_impl_indexes(keywords, Keyword::dialect);
         ensure!(
             !indexes.is_empty(),
@@ -451,10 +450,10 @@ where
     pub fn new(
         dialects: Vec<Dialect<C, K>>,
         default: Option<AbsoluteUri>,
-    ) -> Result<Self, DialectsError> {
+    ) -> Result<Self, NewDialectsError> {
         ensure!(
             !dialects.is_empty(),
-            crate::error::dialects_error::EmptySnafu
+            crate::error::new_dialects_error::EmptySnafu
         );
 
         let mut collected = Vec::with_capacity(dialects.len());
@@ -468,7 +467,7 @@ where
             );
             ensure!(
                 !lookup.contains_key(&dialect.id),
-                DuplicateSnafu {
+                DuplicateDialectSnafu {
                     uri: dialect.id.clone()
                 }
             );
@@ -620,7 +619,7 @@ where
         dialects: &[Dialect<C, K>],
         lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<&AbsoluteUri>,
-    ) -> Result<usize, DialectError> {
+    ) -> Result<usize, NewDialectError> {
         let uri = default.unwrap_or(&dialects[0].id);
         lookup
             .get(uri)
@@ -651,13 +650,8 @@ impl<'a, C: Criterion<K>, K: 'static + Key> IntoIterator for &'a Dialects<C, K> 
 
 #[cfg(test)]
 mod tests {
-    
 
-    
-
-    use crate::uri::AbsoluteUri;
-
-    
+    use grill_uri::AbsoluteUri;
 
     #[test]
     fn test_is_pertinent_to() {

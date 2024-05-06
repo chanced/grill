@@ -1,14 +1,12 @@
 //! Schema source store, resolvers, and deserializers.
 //!
-use crate::{
-    error::{
-        link_error::SourceConflictSnafu, DeserializeError, LinkError, PointerError, ResolveError,
-        ResolveErrors, SourceError,
-    },
-    uri::{decode_lossy, AbsoluteUri},
+use crate::error::{
+    link_error::SourceConflictSnafu, DeserializeError, LinkError, PointerError, ResolveError,
+    ResolveErrors, SourceError,
 };
 use async_trait::async_trait;
 use dyn_clone::{clone_trait_object, DynClone};
+use grill_uri::{decode_lossy, AbsoluteUri};
 use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};

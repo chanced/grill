@@ -1,10 +1,11 @@
 //! Graph traversal [`Iterator`]s for [`Schema`]s
 
 use super::{Reference, Schemas};
-use crate::{criterion::Criterion, source::Sources, uri::AbsoluteUri, Key, Schema};
+use crate::{criterion::Criterion, source::Sources, Key, Schema};
 use either::Either;
+use grill_uri::AbsoluteUri;
 use std::{
-    collections::{HashSet},
+    collections::HashSet,
     iter::{empty, once, Empty, Map, Once},
     vec::IntoIter,
 };

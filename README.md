@@ -23,7 +23,7 @@ own schema language.
 -   Modify or roll your own `Dialect`.
 -   Hassle free source resolution with custom `Resolver` implementations.
 -   Easily translate or customize validation error messages.
--   Dial in output noise with 3 levels of granularity per the current [JSON
+-   Dial in output noise with 4 levels of granularity per the current [JSON
     Schema (2020-12) recommendation
     structures](https://json-schema.org/draft/2020-12/json-schema-core#name-output-formats).
 -   Confidently compare massive to minuscule numbers - they are all parsed as

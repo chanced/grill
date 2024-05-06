@@ -2,27 +2,28 @@
 //!
 //! - [Learn JSON Schema - `$ref`](https://www.learnjsonschema.com/2020-12/core/ref/)
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.3.1)
-use std::sync::Arc;
-
-use jsonptr::Pointer;
-use keyword::Unimplemented;
-use serde_json::Value;
+use std::{ops::ControlFlow, sync::Arc};
 
 use grill_core::{
-    error::{CompileError, EvaluateError, Expected, InvalidTypeError, RefError},
-    keyword::{self, Compile, Context, Kind},
-    Key, Output, Schema, Uri,
+    criterion::{Criterion, Keyword},
+    error::{invalid_type_error::InvalidTypeSnafu, Actual, CompileError, Expectated},
+    Key,
 };
+use grill_uri::Uri;
+use jsonptr::Pointer;
+use serde_json::Value;
+
+use crate::JsonSchema;
 
 /// A reference to another schema.
 #[derive(Debug, Clone, Default)]
-pub struct Ref {
+pub struct Ref<K: 'static + Key> {
     /// The name of the keyword.
     pub keyword: &'static str,
     /// The pointer to the keyword in the schema.
     pub keyword_ptr: Pointer,
     /// The key of the referenced schema.
-    pub ref_key: Key,
+    pub ref_key: K,
     /// the value of the keyword as a [`Value`] in an `Arc`
     pub ref_uri_value: Arc<Value>,
     /// Determines whether this `Ref` must evaluate or merely annotate.
@@ -31,7 +32,10 @@ pub struct Ref {
     pub must_eval: bool,
 }
 
-impl Ref {
+impl<K> Ref<K>
+where
+    K: Key,
+{
     /// Creates a new [`Keyword`] for handling direct references which may or
     /// may not evaluate, as determined by the `must_eval` parameter.
     #[must_use]
@@ -45,14 +49,18 @@ impl Ref {
         }
     }
 
-    fn get_ref(&self, schema: &Value) -> Result<Vec<grill_core::schema::Ref>, RefError> {
+    fn get_ref(
+        &self,
+        schema: &Value,
+    ) -> Result<Vec<grill_core::schema::Ref>, CompileError<JsonSchema, K>> {
         let Some(v) = schema.get(self.keyword) else {
             return Ok(Vec::default());
         };
         let Value::String(uri) = v else {
-            return Err(InvalidTypeError {
-                expected: Expected::String,
-                actual: Box::new(v.clone()),
+            return Err(InvalidTypeSnafu {
+                actual: Actual::from_value(v),
+                expected: Expectated::String,
+                value: None,
             }
             .into());
         };
@@ -64,23 +72,23 @@ impl Ref {
     }
 }
 
-impl keyword::Keyword for Ref {
-    fn kind(&self) -> Kind {
-        Kind::Keyword(self.keyword)
-    }
-
+impl<K> Keyword<JsonSchema, K> for Ref<K>
+where
+    K: 'static + Key + Send + Sync,
+{
     fn compile<'i>(
         &mut self,
-        compile: &mut Compile<'i>,
-        schema: Schema<'i>,
-    ) -> Result<bool, CompileError> {
+        compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
+        schema: grill_core::Schema<'i, JsonSchema, K>,
+    ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         let Some(v) = schema.get(self.keyword) else {
-            return Ok(false);
+            return Ok(ControlFlow::Break(()));
         };
         self.ref_uri_value = compile.value(v);
+
         let Value::String(uri) = v else {
             return Err(InvalidTypeError {
-                expected: Expected::String,
+                expected: Expectated::String,
                 actual: Box::new(v.clone()),
             }
             .into());

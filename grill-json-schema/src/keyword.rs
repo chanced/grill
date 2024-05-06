@@ -1,5 +1,7 @@
 // //! # Json Schema Keywords
 
+pub mod ref_;
+pub mod schema;
 // pub mod additional_properties;
 // pub mod all_of;
 // pub mod anchor;
@@ -18,8 +20,6 @@
 // pub mod pattern_properties;
 // pub mod properties;
 // pub mod read_only;
-// pub mod ref_;
-pub mod schema;
 // pub mod type_;
 // pub mod write_only;
 
@@ -27,7 +27,6 @@ use crate::alias;
 use crate::JsonSchema;
 use grill_core::criterion::Criterion;
 use grill_core::{
-    criterion::Kind,
     error::{CompileError, EvaluateError},
     Key, Schema,
 };
@@ -121,10 +120,6 @@ impl<K> grill_core::criterion::Keyword<JsonSchema, K> for Keyword
 where
     K: 'static + Key,
 {
-    fn kind(&self) -> Kind {
-        todo!()
-    }
-
     fn compile<'i>(
         &mut self,
         _compile: &mut alias::Compile<K>,
@@ -133,9 +128,9 @@ where
         todo!()
     }
 
-    fn evaluate<'i, 'v, 'r>(
+    fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        _ctx: <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>, //alias::Context<'i, 'v, 'r, K>,
+        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>, //alias::Context<'i, 'v, 'r, K>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         todo!()

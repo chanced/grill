@@ -2,7 +2,9 @@ use std::error::Error;
 use std::fmt::{self};
 use std::ops::ControlFlow;
 
-use crate::error::{AnchorError, CompileError, EvaluateError, IdentifyError, RefError};
+use crate::error::{
+    AnchorError, CompileError, DialectError, EvaluateError, IdentifyError, RefsError,
+};
 use crate::schema::{Anchor, Ref};
 use crate::{
     cache::{Numbers, Values},
@@ -43,9 +45,6 @@ pub trait Report<'v>: Clone + Error + Serialize + Deserialize<'v> {
     ) -> Self;
 
     fn is_valid(&self) -> bool;
-
-    fn append(&mut self, nodes: impl Iterator<Item = Self>);
-    fn push(&mut self, output: Self);
 }
 
 #[derive(Debug)]
@@ -59,6 +58,7 @@ where
     pub global_numbers: &'i Numbers,
     pub schemas: &'i Schemas<C, K>,
     pub sources: &'i Sources,
+    pub dialects: &'i Dialects<C, K>,
 }
 
 pub struct NewCompile<'i, C, K>
@@ -146,11 +146,6 @@ where
     C: Criterion<K>,
     K: 'static + Key,
 {
-    /// The [`Kind`] of the keyword. `Kind` can be either `Single`, which will
-    /// be the name of the keyword or `Composite`, which will be a list of
-    /// keywords.
-    fn kind(&self) -> Kind;
-
     fn compile<'i, 'c>(
         &'i mut self,
         compile: &'c mut C::Compile<'i>,
@@ -158,9 +153,9 @@ where
     ) -> Result<ControlFlow<()>, CompileError<C, K>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
-    fn evaluate<'i, 'v, 'r>(
+    fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: C::Context<'i, 'v, 'r>,
+        ctx: &'c mut C::Context<'i, 'v, 'r>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>>;
 
@@ -202,13 +197,13 @@ where
     fn dialect(
         &self,
         schema: &Value,
-    ) -> ControlFlow<(), Result<Option<AbsoluteUri>, IdentifyError>> {
+    ) -> ControlFlow<(), Result<Option<AbsoluteUri>, DialectError>> {
         ControlFlow::Break(())
     }
 
     /// Returns a list of [`Ref`](`crate::schema::Ref`)s to other
     /// schemas that `schema` depends on.
-    fn refs(&self, schema: &Value) -> ControlFlow<(), Result<Vec<Ref>, RefError>> {
+    fn refs(&self, schema: &Value) -> ControlFlow<(), Result<Vec<Ref>, RefsError>> {
         ControlFlow::Break(())
     }
 }
@@ -270,47 +265,5 @@ pub struct Unimplemented;
 impl fmt::Display for Unimplemented {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "not implemented")
-    }
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                                 Kind                                  ║
-║                                 ¯¯¯¯                                  ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Indicates the type of [`Keyword`] and the keyword(s) which it handles.
-#[derive(Clone, Debug, PartialEq, Eq, Copy)]
-pub enum Kind {
-    /// The [`Keyword`] is singular, evaluating the logic of a specific
-    /// JSON Schema Keyword.
-    Keyword(&'static str),
-    /// The [`Keyword`] is a composite of multiple keywords with additional
-    /// logic that handles co-dependencies between the embedded keywords.
-    Composite(&'static [&'static str]),
-}
-
-impl PartialEq<&str> for Kind {
-    fn eq(&self, other: &&str) -> bool {
-        if let Kind::Keyword(s) = self {
-            s == other
-        } else {
-            false
-        }
-    }
-}
-
-impl From<&'static str> for Kind {
-    fn from(s: &'static str) -> Self {
-        Kind::Keyword(s)
-    }
-}
-impl From<&'static [&'static str]> for Kind {
-    fn from(s: &'static [&'static str]) -> Self {
-        Kind::Composite(s)
     }
 }

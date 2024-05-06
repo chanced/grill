@@ -22,109 +22,27 @@
 #![recursion_limit = "256"]
 
 use core::criterion::{NewCompile, NewContext};
-use std::{borrow::Cow, marker::PhantomData};
 
 pub(crate) use grill_core as core;
 
-use grill_core::{
-    cache::{Numbers, Values},
-    criterion::{self, Criterion},
-    schema::{Dialects, Schemas},
-    source::{Deserializers, Resolvers, Sources},
-    uri::AbsoluteUri,
-    Key,
-};
+use grill_core::{criterion::Criterion, Key};
+use integration::{Compile, Context};
 use keyword::Keyword;
-use serde::{Deserialize, Serialize};
 
+pub mod integration;
 pub mod keyword;
 pub mod report;
 
-pub use report::Report;
-
-pub enum Annotation<'v> {
-    Schema(Cow<'v, str>),
-}
+pub use report::{Annotation, Error, Output, Report};
 
 impl std::fmt::Display for Report<'_> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
-impl std::error::Error for Report<'_> {}
 
 #[derive(Debug, Clone)]
 pub struct JsonSchema {}
-
-impl<'i, 'v, 'r, C, K> criterion::Context<'i, 'v, 'r, C, K> for Context<'i, 'v, 'r, C, K>
-where
-    C: Criterion<K>,
-    K: 'static + Key,
-{
-}
-#[derive(Debug)]
-pub struct Context<'i, 'v, 'r, C, K>
-where
-    C: Criterion<K>,
-    K: 'static + Key,
-{
-    pub report: &'r mut Report<'v>,
-    pub eval_numbers: &'i mut Numbers,
-    pub global_numbers: &'i Numbers,
-    pub schemas: &'i Schemas<C, K>,
-    pub sources: &'i Sources,
-}
-
-pub struct Compile<'i, C, K>
-where
-    C: Criterion<K>,
-    K: 'static + Key,
-{
-    pub absolute_uri: &'i AbsoluteUri,
-    pub global_numbers: &'i mut Numbers,
-    pub schemas: &'i Schemas<C, K>,
-    pub sources: &'i Sources,
-    pub dialects: &'i Dialects<C, K>,
-    pub resolvers: &'i Resolvers,
-    pub deserializers: &'i Deserializers,
-    pub values: &'i mut Values,
-}
-
-impl<'i, C, K> criterion::Compile<'i> for Compile<'i, C, K>
-where
-    C: Criterion<K>,
-    K: 'static + Key,
-{
-}
-
-impl<'i, C, K> std::fmt::Debug for Compile<'i, C, K>
-where
-    C: Criterion<K>,
-    K: 'static + Key,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Compile")
-            .field("absolute_uri", &self.absolute_uri)
-            .field("global_numbers", &self.global_numbers)
-            .field("schemas", &self.schemas)
-            .field("sources", &self.sources)
-            .field("dialects", &self.dialects)
-            .field("deserializers", &self.deserializers)
-            .field("values", &self.values)
-            .finish_non_exhaustive()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Error<'v> {
-    X(Cow<'v, str>),
-}
-
-impl Default for Annotation<'_> {
-    fn default() -> Self {
-        todo!()
-    }
-}
 
 impl<K> Criterion<K> for JsonSchema
 where
@@ -145,9 +63,16 @@ where
 
     fn new_context<'i, 'v, 'r>(
         &self,
-        _params: NewContext<'i, 'v, 'r, Self, K>,
+        params: NewContext<'i, 'v, 'r, Self, K>,
     ) -> Self::Context<'i, 'v, 'r> {
-        todo!()
+        Context {
+            eval_numbers: params.eval_numbers,
+            global_numbers: params.global_numbers,
+            report: params.report,
+            schemas: params.schemas,
+            sources: params.sources,
+            dialects: params.dialects,
+        }
     }
 }
 pub(crate) mod alias {
@@ -155,6 +80,6 @@ pub(crate) mod alias {
     use grill_core::criterion::Criterion;
 
     pub(crate) type Compile<'i, K> = <JsonSchema as Criterion<K>>::Compile<'i>;
-    pub(crate) type Context<'i, 'v, 'r, K> = <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>;
-    pub(crate) type Report<'v, K> = <JsonSchema as Criterion<K>>::Report<'v>;
+    // pub(crate) type Context<'i, 'v, 'r, K> = <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>;
+    // pub(crate) type Report<'v, K> = <JsonSchema as Criterion<K>>::Report<'v>;
 }

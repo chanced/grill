@@ -4,21 +4,27 @@
 //! - [Draft 2020-12 Specification](https://json-schema.org/draft/2020-12/json-schema-core.html#section-8.1.1)
 
 use std::{
-    borrow::Cow,
     ops::{ControlFlow, Deref},
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use snafu::IntoError;
+
 use grill_core::{
     criterion::{Criterion, Keyword, Kind},
-    error::{CompileError, EvaluateError, Expected, IdentifyError, InvalidTypeError},
-    uri::AbsoluteUri,
+    error::{
+        dialect_error, invalid_type_error, Actual, CompileError, DialectError, EvaluateError,
+        Expectated,
+    },
     Key,
 };
-use snafu::Backtrace;
+use grill_uri::AbsoluteUri;
+// use snafu::{Backtrace, ResultExt};
+
+use crate::JsonSchema;
 
 /// [`Keyword`] for `$schema`.
 #[derive(Debug, Clone)]
@@ -26,117 +32,89 @@ pub struct Schema {
     /// the keyword to use (eg. `$schema`)
     pub keyword: &'static str,
 
-    /// Whether the [`Dialect`](grill_core::Dialect) allows for fragmented
-    /// metaschema IDs
-    pub allow_fragment: bool,
-
     /// Indicates whether the schema is a boolean value or not
-    pub boolean: Option<bool>,
+    pub bool: Option<bool>,
 
-    /// The determined dialect. This may be inferred based on context or
-    /// configuration if the schema does not contain a `$schema` field.
-    pub dialect: OnceLock<AbsoluteUri>,
-
-    /// The value of the `$schema` field, if present
-    pub value: Option<Arc<Value>>,
+    /// The value of the `$schema` field parsed as an `AbsoluteUri`, if present
+    pub uri: Option<Arc<AbsoluteUri>>,
 }
 
 impl Schema {
     /// Construct a new `Schema` keyword.
     #[must_use]
-    pub fn new(keyword: &'static str, allow_fragment: bool) -> Self {
+    pub fn new(keyword: &'static str) -> Self {
         Self {
             keyword,
-            allow_fragment,
-            boolean: None,
-            dialect: OnceLock::new(),
-            value: None,
+            bool: None,
+            uri: None,
         }
     }
 }
 
-impl<C, K> Keyword<C, K> for Schema
+impl Schema {}
+
+impl<K> Keyword<JsonSchema, K> for Schema
 where
-    C: Criterion<K>,
     K: 'static + Key,
 {
-    fn kind(&self) -> Kind {
-        self.keyword.into()
-    }
     fn compile<'i>(
         &mut self,
-        _compile: &mut C::Compile<'i>,
-        schema: grill_core::Schema<'i, C, K>,
-    ) -> Result<ControlFlow<()>, CompileError<C, K>> {
+        _compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
+        schema: grill_core::Schema<'i, JsonSchema, K>,
+    ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         match schema.value() {
             Value::Bool(bool) => {
-                self.boolean = Some(*bool);
+                self.bool = Some(*bool);
+                Ok(ControlFlow::Continue(()))
             }
-            Value::Object(_obj) => {}
-            other => {
-                // there should probably be a variant specifically for invalid schema type
-                return Err(InvalidTypeError {
-                    expected: Expected::AnyOf(&[Expected::Bool, Expected::Object]),
-                    actual: Box::new(other.clone()),
-                    backtrace: Backtrace::capture(),
-                }
-                .into());
+            Value::Object(obj) => {
+                let uri = parse_obj(self.keyword, &obj)?;
+                self.uri = uri.map(Arc::new);
+                Ok(ControlFlow::Continue(()))
             }
+            _ => Ok(ControlFlow::Continue(())),
         }
-        Ok(ControlFlow::Continue(()))
     }
     fn dialect(
         &self,
-        _schema: &Value,
-    ) -> ControlFlow<(), Result<Option<AbsoluteUri>, IdentifyError>> {
-        todo!()
-        // let Some(schema) = schema.get(self.keyword) else {
-        //     return Ok(Ok(None));
-        // };
-        // let schema = schema.as_str().ok_or(IdentifyError::NotAString {
-        //     keyword: self.keyword,
-        //     value: Box::new(schema.clone()),
-        // });
-        // if let Err(err) = schema {
-        //     return Ok(Err(err));
-        // }
-        // let schema = schema.unwrap();
-        // let uri = AbsoluteUri::parse(schema)
-        //     .map(Some)
-        //     .map_err(IdentifyError::InvalidUri);
-        // if let Err(err) = uri {
-        //     return Ok(Err(err));
-        // }
-        // let uri = uri.unwrap();
-        // if uri.is_none() {
-        //     return Ok(Ok(None));
-        // }
-        // let uri = uri.unwrap();
-        // if !self.allow_fragment && !uri.is_fragment_empty_or_none() {
-        //     return Ok(Err(IdentifyError::FragmentedId(uri.into())));
-        // }
-        // Ok(Ok(Some(uri)))
+        schema: &Value,
+    ) -> ControlFlow<(), Result<Option<AbsoluteUri>, DialectError>> {
+        let Value::Object(obj) = schema else {
+            // if the schema is not an object or a bool, any relevant errors
+            // should be caught by validation.
+            return ControlFlow::Continue(Ok(None));
+        };
+        ControlFlow::Continue(parse_obj(self.keyword, obj))
     }
 
-    fn evaluate<'i, 'v, 'r>(
+    fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        _ctx: <C as Criterion<K>>::Context<'i, 'v, 'r>,
+        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
         _value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
-        todo!()
+        self.uri
+            .clone()
+            .map(Annotation)
+            .map(|annotation| ctx.report.push_annotation(annotation.into()));
+        Ok(())
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Annotation<'v>(pub Cow<'v, AbsoluteUri>);
-impl AsRef<AbsoluteUri> for Annotation<'_> {
+pub struct Annotation(pub Arc<AbsoluteUri>);
+impl AsRef<AbsoluteUri> for Annotation {
     fn as_ref(&self) -> &AbsoluteUri {
         &self.0
     }
 }
+impl From<Annotation> for crate::report::Annotation<'_> {
+    fn from(value: Annotation) -> Self {
+        crate::report::Annotation::Schema(value)
+    }
+}
 
-impl Deref for Annotation<'_> {
+impl Deref for Annotation {
     type Target = AbsoluteUri;
 
     fn deref(&self) -> &Self::Target {
@@ -144,20 +122,40 @@ impl Deref for Annotation<'_> {
     }
 }
 
-impl From<AbsoluteUri> for Annotation<'static> {
+impl From<AbsoluteUri> for Annotation {
     fn from(uri: AbsoluteUri) -> Self {
-        Self(Cow::Owned(uri))
+        Self(Arc::new(uri))
     }
 }
 
-impl<'u> From<&'u AbsoluteUri> for Annotation<'u> {
+impl<'u> From<&'u AbsoluteUri> for Annotation {
     fn from(uri: &'u AbsoluteUri) -> Self {
-        Self(Cow::Borrowed(uri))
+        Self(Arc::new(uri.clone()))
     }
 }
 
-impl<'v> From<Annotation<'v>> for AbsoluteUri {
-    fn from(annotation: Annotation<'v>) -> Self {
-        annotation.0.into_owned()
+impl<'v> From<Annotation> for AbsoluteUri {
+    fn from(annotation: Annotation) -> Self {
+        annotation.0.as_ref().clone()
     }
+}
+
+fn parse_obj(
+    keyword: &'static str,
+    obj: &serde_json::Map<String, Value>,
+) -> Result<Option<AbsoluteUri>, DialectError> {
+    if let Some(value) = obj.get(keyword) {
+        if let Some(s) = value.as_str() {
+            return Ok(Some(AbsoluteUri::parse(s)?));
+        }
+        return Err(dialect_error::InvalidTypeSnafu { keyword }.into_error(
+            invalid_type_error::InvalidTypeSnafu {
+                actual: Actual::from_value(value),
+                expected: Expectated::String,
+                value: Box::new(value.clone()),
+            }
+            .build(),
+        ));
+    }
+    Ok(None)
 }

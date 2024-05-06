@@ -15,7 +15,7 @@ use either::Either;
 use serde::{Serialize, Serializer};
 use snafu::Backtrace;
 
-use crate::uri::Uri;
+use grill_uri::{AbsoluteUri, Uri};
 pub(crate) mod compiler;
 
 use crate::{
@@ -26,7 +26,6 @@ use crate::{
         TransitiveDependencies,
     },
     source::{Link, Source, Sources},
-    uri::AbsoluteUri,
 };
 
 use jsonptr::Pointer;
@@ -45,6 +44,7 @@ where
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub sources: &'i Sources,
+    pub dialects: &'i Dialects<C, K>,
     pub global_numbers: &'i cache::Numbers,
     pub eval_numbers: &'i mut cache::Numbers,
     pub criterion: &'i C,
@@ -453,6 +453,7 @@ where
         let Evaluate {
             key,
             sources,
+            dialects,
             keyword_location,
             instance_location,
             output,
@@ -471,17 +472,20 @@ where
             instance_location,
         );
 
+        let mut ctx = criterion.new_context(NewContext {
+            global_numbers,
+            eval_numbers,
+            sources,
+            report: &mut report,
+            schemas: self,
+            dialects,
+        });
         for keyword in &*schema.keywords {
-            let ctx = criterion.new_context(NewContext {
-                global_numbers,
-                eval_numbers,
-                sources,
-                report: &mut report,
-                schemas: self,
-            });
-            keyword.evaluate(ctx, value)?;
+            keyword.evaluate(&mut ctx, value)?;
         }
-
+        // required otherwise borrowck sees `ctx` as still being potentially
+        // borrowed
+        drop(ctx);
         Ok(report)
     }
     pub(crate) fn is_compiled_by_uri(&self, uri: &AbsoluteUri) -> bool {
@@ -731,7 +735,10 @@ where
     }
 }
 
-/// A reference to a schema.
+/// A reference to a schema, returned from [`Keyword::refs`]. This is used to
+/// resolve the reference to the actual schema.
+///
+/// See [`Reference`] for use that is not implementing the [`Keyword`] trait.
 #[derive(Debug, Clone)]
 pub struct Ref {
     /// the parsed [`Uri`] value.

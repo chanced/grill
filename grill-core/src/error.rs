@@ -5,8 +5,9 @@
 use crate::criterion::Criterion;
 use crate::criterion::CriterionOwnedReport;
 use crate::criterion::Report;
-use crate::{schema::Anchor, uri::AbsoluteUri, uri::Uri};
+use crate::schema::Anchor;
 pub use grill_uri::error::Error as UriError;
+use grill_uri::{AbsoluteUri, Uri};
 use jsonptr::Pointer;
 #[doc(no_inline)]
 pub use jsonptr::{Error as ResolvePointerError, MalformedPointerError};
@@ -44,14 +45,20 @@ where
 {
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
-    SchemaInvalid {
+    InvalidSchema {
         report: CriterionOwnedReport<C, K>,
         backtrace: Backtrace,
     },
 
+    #[snafu(transparent)]
+    FailedToParseDialect {
+        #[snafu(backtrace)]
+        source: DialectError,
+    },
+
     /// Failed to identify a schema
     #[snafu(transparent)]
-    SchemaIdentificationFailed {
+    FailedToIdentifySchema {
         #[snafu(backtrace)]
         source: IdentifyError,
     },
@@ -176,7 +183,7 @@ where
     #[snafu(transparent)]
     RefError {
         #[snafu(backtrace)]
-        source: RefError,
+        source: RefsError,
     },
 
     /// A regular expression failed to parse
@@ -229,7 +236,7 @@ where
     /// An issue with [`Dialect`]s occurred.
     FailedToCreateDialects {
         #[snafu(backtrace)]
-        source: DialectsError,
+        source: NewDialectsError,
     },
 
     #[snafu(transparent)]
@@ -281,6 +288,25 @@ pub enum EvaluateError<K: 'static + crate::Key> {
     UnknownKey {
         #[snafu(backtrace)]
         source: UnknownKeyError<K>,
+    },
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), module)]
+pub enum DialectError {
+    #[snafu(
+        context(false),
+        display("failed to parse schema dialect URI: {source}")
+    )]
+    FailedToParseUri {
+        #[snafu(backtrace)]
+        source: UriError,
+    },
+    #[snafu(display("schema dialect ($schema) not valid; {source}"))]
+    InvalidType {
+        keyword: &'static str,
+        source: InvalidTypeError,
+        backtrace: Backtrace,
     },
 }
 
@@ -541,8 +567,8 @@ pub enum PointerError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                              DialectsError                            ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯¯¯                            ║
+║                            NewDialectsError                           ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                          ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -551,7 +577,7 @@ pub enum PointerError {
 /// [`Dialects`](crate::dialect::Dialects)
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), module)]
-pub enum DialectsError {
+pub enum NewDialectsError {
     /// No dialects were provided.
     #[snafu(display("no dialects were provided"))]
     Empty { backtrace: Backtrace },
@@ -559,11 +585,11 @@ pub enum DialectsError {
     #[snafu(transparent)]
     Dialect {
         #[snafu(backtrace)]
-        source: DialectError,
+        source: NewDialectError,
     },
     /// Multiple [`Dialect`]s with the same [`AbsoluteUri`] id were provided.
     #[snafu(display("duplicate dialect id provided: {uri}"))]
-    Duplicate {
+    DuplicateDialect {
         uri: AbsoluteUri,
         backtrace: Backtrace,
     },
@@ -573,8 +599,8 @@ pub enum DialectsError {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                               DialectError                            ║
-║                               ¯¯¯¯¯¯¯¯¯¯¯¯                            ║
+║                            NewDialectError                            ║
+║                           ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                           ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -583,7 +609,7 @@ pub enum DialectsError {
 /// [`Dialect`](crate::dialect::Dialect)
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), module)]
-pub enum DialectError {
+pub enum NewDialectError {
     /// The default [`Dialect`] was not found.
     #[snafu(display("default dialect not found: {uri}"))]
     DefaultNotFound {
@@ -640,7 +666,7 @@ pub enum DialectError {
 
     /// An [`AbsoluteUri`] failed to parse.
     #[snafu(transparent)]
-    UriPFailedToParse {
+    UriFailedToParse {
         #[snafu(backtrace)]
         source: UriError,
     },
@@ -995,15 +1021,54 @@ pub enum ResolveErrorSource {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
+║                                 Actual                                ║
+║                                ¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+fn x() {}
+#[derive(Clone, Debug, Copy, strum::Display)]
+pub enum Actual {
+    Bool,
+    Number,
+    String,
+    Array,
+    Object,
+    Null,
+}
+impl Actual {
+    pub fn from_value(value: &Value) -> Self {
+        Self::from(value)
+    }
+}
+impl From<&Value> for Actual {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Null => Self::Null,
+            Value::Bool(_) => Self::Bool,
+            Value::Number(_) => Self::Number,
+            Value::String(_) => Self::String,
+            Value::Array(_) => Self::Array,
+            Value::Object(_) => Self::Object,
+        }
+    }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
 ║                               Expected                                ║
-║                               ¯¯¯¯¯¯¯¯                                ║
+║                              ¯¯¯¯¯¯¯¯¯¯                               ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// The expected type of a [`Value`].
 #[derive(Clone, Debug, Copy)]
-pub enum Expected {
+pub enum Expectated {
+    /// Expected a null value
+    Null,
     /// Expected a boolean
     Bool,
     /// Expected a number
@@ -1015,18 +1080,18 @@ pub enum Expected {
     /// Expected an object
     Object,
     /// Expected any of the types in the slice
-    AnyOf(&'static [Expected]),
+    AnyOf(&'static [Expectated]),
 }
 
-impl Display for Expected {
+impl Display for Expectated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expected::Bool => write!(f, "Bool"),
-            Expected::Number => write!(f, "Number"),
-            Expected::String => write!(f, "String"),
-            Expected::Array => write!(f, "Array"),
-            Expected::Object => write!(f, "Object"),
-            Expected::AnyOf(anyof) => {
+            Expectated::Bool => write!(f, "Bool"),
+            Expectated::Number => write!(f, "Number"),
+            Expectated::String => write!(f, "String"),
+            Expectated::Array => write!(f, "Array"),
+            Expectated::Object => write!(f, "Object"),
+            Expectated::AnyOf(anyof) => {
                 write!(f, "[")?;
                 for (i, expected) in anyof.iter().enumerate() {
                     if i > 0 {
@@ -1036,6 +1101,7 @@ impl Display for Expected {
                 }
                 write!(f, "]")
             }
+            Expectated::Null => write!(f, "Null"),
         }
     }
 }
@@ -1052,15 +1118,16 @@ impl Display for Expected {
 /// A [`Value`] was not of the expected type.
 #[derive(Debug, Snafu)]
 #[snafu(
-    display("expected value with type {expected}, found {actual:?}"),
+    display("expected value of type {expected}, found {actual}"),
     module,
     visibility(pub)
 )]
 pub struct InvalidTypeError {
     /// The expected type of value.
-    pub expected: Expected,
+    pub expected: Expectated,
     /// The actual value.
-    pub actual: Box<Value>,
+    pub value: Box<Value>,
+    pub actual: Actual,
     pub backtrace: snafu::Backtrace,
 }
 
@@ -1076,7 +1143,7 @@ pub struct InvalidTypeError {
 
 /// An error occurred while attempting to identify a schema
 #[derive(Debug, Snafu)]
-#[snafu(module)]
+#[snafu(module, visibility(pub))]
 pub enum IdentifyError {
     /// The URI could not be parsed.
     #[snafu(transparent)]
@@ -1090,14 +1157,16 @@ pub enum IdentifyError {
     FragmentedId { uri: Uri, backtrace: Backtrace },
 
     /// The value of `$id` was not a string
-    #[snafu(display(
-        "the {keyword} of a schema must be a string in the form of a uri; found {value:?}"
-    ))]
+    #[snafu(display("the {keyword} field of a schema must be a string in the form of a uri"))]
     NotAString {
+        #[snafu(backtrace)]
+        backtrace: snafu::Backtrace,
         /// The keyword which was not a string
         keyword: &'static str,
         /// The value of the keyword
         value: Box<Value>,
+        /// Type of `value`
+        actual: Actual,
     },
 }
 
@@ -1196,16 +1265,16 @@ impl From<u64> for OverflowError {
 /// An error occurred while parsing a ref
 #[derive(Debug, Snafu)]
 #[snafu(module)]
-pub enum RefError {
+pub enum RefsError {
     /// The ref value was not a string.
     #[snafu(transparent)]
-    UnexpectedType {
+    InvalidType {
         #[snafu(backtrace)]
         source: InvalidTypeError,
     },
     /// The ref value failed to parse as a URI.
     #[snafu(transparent)]
-    UriError {
+    InvalidUri {
         #[snafu(backtrace)]
         source: UriError,
     },

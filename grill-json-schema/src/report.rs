@@ -1,5 +1,11 @@
-use grill_core::{criterion, uri::AbsoluteUri};
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
+use grill_core::criterion;
+use grill_uri::AbsoluteUri;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::{Map, Value};
+use std::{borrow::Cow, collections::BTreeMap};
+pub use verbose::Verbose;
+
+use self::verbose::Assessment;
 
 // /// Set of keywords to check which disable short-circuiting
 // pub const DISABLING_KEYWORDS: [&'static str; 2] = [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS];
@@ -70,98 +76,12 @@ pub enum Output {
     /// }
     /// ```
     Basic = 2,
-    /// The `Detailed` structure is based on the schema and can be more readable
-    /// for both humans and machines. Having the structure organized this way
-    /// makes associations between the errors more apparent. For example, the
-    /// fact that the missing "y" property and the extra "z" property both stem
-    /// from the same location in the instance is not immediately obvious in the
-    /// "Basic" structure. In a hierarchy, the correlation is more easily
-    /// identified.
-    ///
-    /// The following rules govern the construction of the results object:
-    ///
-    /// - All applicator keywords (`"*Of"`, `"$ref"`, `"if"`/`"then"`/`"else"`,
-    ///   etc.) require a node.
-    /// - Nodes that have no children are removed.
-    /// - Nodes that have a single child are replaced by the child.
-    /// - Branch nodes do not require an error message or an annotation.
-    ///
-    /// # Example
-    ///
-    /// ## Schema:
-    /// ```json
-    /// {
-    ///   "$id": "https://example.com/polygon",
-    ///   "$schema": "https://json-schema.org/draft/2020-12/schema",
-    ///   "$defs": {
-    ///     "point": {
-    ///       "type": "object",
-    ///       "properties": {
-    ///         "x": { "type": "number" },
-    ///         "y": { "type": "number" }
-    ///       },
-    ///       "additionalProperties": false,
-    ///       "required": [ "x", "y" ]
-    ///     }
-    ///   },
-    ///   "type": "array",
-    ///   "items": { "$ref": "#/$defs/point" },
-    ///   "minItems": 3
-    /// }
-    /// ```
-    /// ## Instance:
-    /// ```json
-    /// [ { "x": 2.5, "y": 1.3 }, { "x": 1, "z": 6.7 } ]
-    /// ```
-    /// ## Output:
-    ///
-    /// ```json
-    /// {
-    ///   "valid": false,
-    ///   "keywordLocation": "",
-    ///   "instanceLocation": "",
-    ///   "errors": [
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/items/$ref",
-    ///       "absoluteKeywordLocation":
-    ///         "https://example.com/polygon#/$defs/point",
-    ///       "instanceLocation": "/1",
-    ///       "errors": [
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/required",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/required",
-    ///           "instanceLocation": "/1",
-    ///           "error": "Required property 'y' not found."
-    ///         },
-    ///         {
-    ///           "valid": false,
-    ///           "keywordLocation": "/items/$ref/additionalProperties",
-    ///           "absoluteKeywordLocation":
-    ///             "https://example.com/polygon#/$defs/point/additionalProperties",
-    ///           "instanceLocation": "/1/z",
-    ///           "error": "Additional property 'z' found but was invalid."
-    ///         }
-    ///       ]
-    ///     },
-    ///     {
-    ///       "valid": false,
-    ///       "keywordLocation": "/minItems",
-    ///       "instanceLocation": "",
-    ///       "error": "Expected at least 3 items but found 2"
-    ///     }
-    ///   ]
-    /// }
-    ///
-    Detailed = 4,
     Verbose = 8,
 }
 
 impl criterion::Output for Output {
     fn verbose() -> Self {
-        todo!()
+        Self::Verbose
     }
 }
 
@@ -169,8 +89,32 @@ impl criterion::Output for Output {
 pub enum Report<'v> {
     Flag(Flag<'v>),
     Basic(Basic<'v>),
-    Detailed(Detailed<'v>),
     Verbose(Verbose<'v>),
+}
+
+impl std::error::Error for Report<'_> {}
+
+macro_rules! delegate {
+    ($self:ident.$fn:ident($($param:ident),*);) => {
+        match $self {
+            Report::Flag(flag) => flag.$fn($($param),*),
+            Report::Basic(basic) => basic.$fn($($param),*),
+            Report::Verbose(verbose) => verbose.$fn($($param),*),
+        }
+    };
+}
+
+impl<'v> Report<'v> {
+    pub fn push_annotation(&mut self, annotation: Annotation<'v>) {
+        delegate! {
+            self.push_annotation(annotation);
+        }
+    }
+    pub fn push_error(&mut self, error: Error<'v>) {
+        delegate! {
+            self.push_error(error);
+        }
+    }
 }
 
 impl<'v> criterion::Report<'v> for Report<'v> {
@@ -178,15 +122,9 @@ impl<'v> criterion::Report<'v> for Report<'v> {
     type Owned = Report<'static>;
 
     fn is_valid(&self) -> bool {
-        todo!()
-    }
-
-    fn append(&mut self, _nodes: impl Iterator<Item = Self>) {
-        todo!()
-    }
-
-    fn push(&mut self, _output: Self) {
-        todo!()
+        delegate! {
+            self.is_valid();
+        }
     }
 
     fn into_owned(self) -> Self::Owned {
@@ -222,25 +160,160 @@ impl Serialize for Report<'_> {
 
 #[derive(Clone, Debug)]
 pub struct Flag<'v> {
+    pub valid: bool,
+    pub additional_properties: Map<String, Value>,
     marker: std::marker::PhantomData<&'v ()>,
+}
+
+impl<'v> Flag<'v> {
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+    pub fn into_owned(self) -> Flag<'static> {
+        Flag {
+            valid: self.valid,
+            additional_properties: self.additional_properties,
+            marker: Default::default(),
+        }
+    }
+    /// Noop
+    pub fn push_annotation(&mut self, _annotation: Annotation<'v>) {}
+
+    /// Sets `valid` to `false`
+    pub fn push_error(&mut self, _error: Error<'v>) {
+        self.valid = false
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Basic<'v> {
     marker: std::marker::PhantomData<&'v ()>,
 }
-
-#[derive(Clone, Debug)]
-pub struct Detailed<'v> {
-    marker: std::marker::PhantomData<&'v ()>,
+impl<'v> Basic<'v> {
+    pub fn is_valid(&self) -> bool {
+        todo!()
+    }
+    pub fn into_owned(self) -> Basic<'static> {
+        todo!()
+    }
+    pub fn push_annotation(&mut self, annotation: Annotation<'v>) {
+        todo!()
+    }
+    pub fn push_error(&mut self, error: Error<'v>) {
+        todo!()
+    }
 }
 
-#[derive(Clone, Debug)]
-pub struct Verbose<'v> {
-    marker: std::marker::PhantomData<&'v ()>,
+pub mod verbose {
+    use super::{Annotation, Error};
+
+    #[derive(Clone, Debug)]
+    pub struct Verbose<'v> {
+        pub detail: Assessment<'v>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum Assessment<'v> {
+        Annotation {
+            annotations: Vec<Verbose<'v>>,
+            annotation: Option<Annotation<'v>>,
+        },
+        Error {
+            errors: Vec<Verbose<'v>>,
+            error: Option<Error<'v>>,
+        },
+    }
+
+    impl<'v> Verbose<'v> {
+        pub fn is_valid(&self) -> bool {
+            matches!(self.detail, Assessment::Annotation { .. })
+        }
+        pub fn into_owned(self) -> Verbose<'static> {
+            todo!()
+        }
+        pub fn push_annotation(&mut self, annotation: Annotation<'v>) {
+            if let Assessment::Annotation { annotations, .. } = &mut self.detail {
+                annotations.push(Verbose {
+                    detail: Assessment::Annotation {
+                        annotations: Vec::new(),
+                        annotation: Some(annotation),
+                    },
+                });
+            }
+        }
+        /// Set the annotation of the current assessment. If the current assessment
+        /// is not `Asssessment::Annotation` then `annotation` will be ignored.
+        pub fn set_annotation(&mut self, annotation: Option<Annotation<'v>>) {
+            if let Assessment::Annotation { annotation: a, .. } = &mut self.detail {
+                *a = annotation;
+            }
+        }
+        /// Push an error to the current assessment. If the current assessment
+        /// is not an error, it will be converted to an error.
+        pub fn push_error(&mut self, error: Error<'v>) {
+            if let Assessment::Error { errors, .. } = &mut self.detail {
+                errors.push(Verbose {
+                    detail: Assessment::Error {
+                        errors: Vec::new(),
+                        error: Some(error),
+                    },
+                });
+            } else {
+                self.detail = Assessment::Error {
+                    errors: Vec::new(),
+                    error: Some(error),
+                };
+            }
+        }
+        /// Set the error of the current assessment. If the current assessment
+        /// is not an error, it will be converted to an error
+        pub fn set_error(&mut self, error: Option<Error<'v>>) {
+            if let Assessment::Error { error: e, .. } = &mut self.detail {
+                *e = error;
+            } else {
+                self.detail = Assessment::Error {
+                    errors: Vec::new(),
+                    error,
+                };
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Annotation<'v> {
-    Schema(crate::keyword::schema::Annotation<'v>),
+    Schema(crate::keyword::schema::Annotation),
+    Unknown(Cow<'v, Value>),
 }
+
+macro_rules! impl_from {
+    ($($typ:ident),*) => {
+        $(impl<'v> From<$typ<'v>> for Report<'v> {
+            fn from(val: $typ<'v>) -> Self {
+                Self::$typ(val)
+            }
+        })*
+    };
+}
+macro_rules! impl_try_from {
+    ($($typ:ident),*) => {
+        $(impl<'v> TryFrom<Report<'v>> for $typ<'v> {
+            type Error = Report<'v>;
+            fn try_from(report: Report<'v>) -> Result<Self, Self::Error> {
+                if let Report::$typ(v) = report {
+                    Ok(v)
+                } else {
+                    Err(report)
+                }
+            }
+        })*
+    };
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Error<'v> {
+    X(Cow<'v, str>),
+}
+
+impl_from!(Flag, Basic, Verbose);
+impl_try_from!(Flag, Basic, Verbose);

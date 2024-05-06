@@ -1,4 +1,3 @@
-#![doc = include_str!("../../README.md")]
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -29,7 +28,6 @@ use error::{
     source_error, BuildError, CompileError, DeserializeError, EvaluateError, UnknownKeyError,
 };
 use error::{SourceError, UriError};
-pub use grill_uri as uri;
 
 pub mod schema;
 use jsonptr::Pointer;
@@ -43,7 +41,7 @@ use schema::{compiler::Compiler, Dialect, Dialects, Evaluate, Iter, IterUnchecke
 pub use schema::{DefaultKey, Schema};
 use snafu::ResultExt;
 use source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources};
-use uri::{AbsoluteUri, TryIntoAbsoluteUri};
+use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 
 pub mod source;
 
@@ -1054,6 +1052,7 @@ where
             instance_location: Pointer::default(),
             keyword_location: Pointer::default(),
             sources: &self.sources,
+            dialects: &self.dialects,
             global_numbers: &self.numbers,
             eval_numbers: &mut eval_numbers,
             criterion: &self.language,

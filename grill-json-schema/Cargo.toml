@@ -9,6 +9,7 @@ version = "0.1.0"
 bitflags   = { workspace = true }
 either     = { workspace = true }
 grill-core = { workspace = true }
+grill-uri  = { workspace = true }
 inherent   = { workspace = true }
 jsonptr    = { workspace = true }
 once_cell  = { workspace = true }
