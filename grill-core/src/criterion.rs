@@ -5,7 +5,7 @@ use std::ops::ControlFlow;
 use crate::error::{
     AnchorError, CompileError, DialectError, EvaluateError, IdentifyError, RefsError,
 };
-use crate::schema::{Anchor, Ref};
+use crate::schema::Anchor;
 use crate::{
     cache::{Numbers, Values},
     schema::{Dialects, Schemas},
@@ -266,4 +266,16 @@ impl fmt::Display for Unimplemented {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "not implemented")
     }
+}
+
+/// A reference to a schema, returned from [`Keyword::refs`]. This is used to
+/// resolve the reference to the actual schema.
+///
+/// See [`Reference`] for use that is not implementing the [`Keyword`] trait.
+#[derive(Debug, Clone)]
+pub struct Ref {
+    /// the parsed [`Uri`] value.
+    pub uri: Uri,
+    /// the keyword of the reference (i.e. $ref)
+    pub keyword: &'static str,
 }

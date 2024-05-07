@@ -75,11 +75,3 @@ where
         }
     }
 }
-pub(crate) mod alias {
-    use crate::JsonSchema;
-    use grill_core::criterion::Criterion;
-
-    pub(crate) type Compile<'i, K> = <JsonSchema as Criterion<K>>::Compile<'i>;
-    // pub(crate) type Context<'i, 'v, 'r, K> = <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>;
-    // pub(crate) type Report<'v, K> = <JsonSchema as Criterion<K>>::Report<'v>;
-}

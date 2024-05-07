@@ -873,6 +873,10 @@ impl AbsoluteUri {
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    ///
+    /// ## Errors
+    /// Returns an [`Error`] if resolving the `reference` results in a malformed
+    /// URI or if the URI exceeds 4GB.
     pub fn resolve(&self, reference: &impl AsUriRef) -> Result<AbsoluteUri, Error> {
         let reference = reference.as_uri_ref();
 
@@ -2584,6 +2588,11 @@ pub enum Uri {
     Relative(RelativeUri),
 }
 
+impl Uri {
+    pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
+        AbsoluteUri::try_from(self)
+    }
+}
 impl Default for Uri {
     fn default() -> Self {
         Self::Relative(RelativeUri::default())

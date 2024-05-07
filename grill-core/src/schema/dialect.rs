@@ -1,9 +1,9 @@
 //! A container of [`Keyword`]s and semantics which determine how to evaluate a
 //! [`Value`] against a [`Schema`](crate::Schema).
 
-use super::{Anchor, Ref};
+use super::Anchor;
 use crate::{
-    criterion::{Criterion, Keyword},
+    criterion::{Criterion, Keyword, Ref},
     error::{
         new_dialect_error::{
             DefaultNotFoundSnafu, DialectNotImplementedSnafu, FragmentedIdSnafu,

@@ -50,7 +50,7 @@ impl Values {
     /// Returns an `Arc<Value>` representation of `value`, either by returning
     /// an existing cached instance or inserts and returns a new instance.
     #[must_use]
-    pub fn value(&mut self, value: &Value) -> Arc<Value> {
+    pub fn get_or_insert(&mut self, value: &Value) -> Arc<Value> {
         match value {
             Value::Number(_) => self.resolve_number(value),
             Value::String(_) => self.resolve_string(value),

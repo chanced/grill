@@ -6,7 +6,10 @@ use std::{ops::ControlFlow, sync::Arc};
 
 use grill_core::{
     criterion::{Criterion, Keyword},
-    error::{invalid_type_error::InvalidTypeSnafu, Actual, CompileError, Expectated},
+    error::{
+        invalid_type_error::InvalidTypeSnafu, Actual, CompileError, EvaluateError, Expectated,
+        RefsError,
+    },
     Key,
 };
 use grill_uri::Uri;
@@ -43,33 +46,28 @@ where
         Self {
             keyword,
             keyword_ptr: Pointer::new([keyword]),
-            ref_key: Key::default(),
+            ref_key: K::default(),
             ref_uri_value: Arc::new(Value::Null),
             must_eval,
         }
     }
 
-    fn get_ref(
-        &self,
-        schema: &Value,
-    ) -> Result<Vec<grill_core::schema::Ref>, CompileError<JsonSchema, K>> {
-        let Some(v) = schema.get(self.keyword) else {
-            return Ok(Vec::default());
-        };
-        let Value::String(uri) = v else {
-            return Err(InvalidTypeSnafu {
-                actual: Actual::from_value(v),
-                expected: Expectated::String,
-                value: None,
-            }
-            .into());
-        };
-        let uri = Uri::parse(uri)?;
-        Ok(vec![grill_core::schema::Ref {
-            uri,
-            keyword: self.keyword,
-        }])
-    }
+    // fn get_ref(
+    //     &self,
+    //     schema: &Value,
+    // ) -> Result<Vec<grill_core::schema::Ref>, CompileError<JsonSchema, K>> {
+    //     let Some(v) = schema.get(self.keyword) else {
+    //         return Ok(Vec::default());
+    //     };
+    //     let Value::String(uri) = v else {
+    //         return Err(CompileError::invalid_type(v.clone(), Expectated::String));
+    //     };
+    //     let uri = Uri::parse(uri)?;
+    //     Ok(vec![grill_core::schema::Ref {
+    //         uri,
+    //         keyword: self.keyword,
+    //     }])
+    // }
 }
 
 impl<K> Keyword<JsonSchema, K> for Ref<K>
@@ -84,24 +82,24 @@ where
         let Some(v) = schema.get(self.keyword) else {
             return Ok(ControlFlow::Break(()));
         };
-        self.ref_uri_value = compile.value(v);
+        self.ref_uri_value = compile.values.get_or_insert(v);
 
         let Value::String(uri) = v else {
-            return Err(InvalidTypeError {
-                expected: Expectated::String,
-                actual: Box::new(v.clone()),
-            }
-            .into());
+            return Err(CompileError::invalid_type(v.clone(), Expectated::String));
         };
-        let ref_key = compile.schema(uri)?;
-        self.ref_key = ref_key;
-        Ok(true)
+        let uri = Uri::parse(uri)?;
+        let uri = compile.schema_uri.with_fragment(None)?.resolve(&uri)?;
+        self.ref_key = compile
+            .schemas
+            .get_key(&uri)
+            .ok_or(CompileError::schema_not_found(uri))?;
+        Ok(ControlFlow::Continue(()))
     }
-    fn evaluate<'i, 'v>(
+    fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'i mut Context,
+        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
         value: &'v Value,
-    ) -> Result<Option<Output<'v>>, EvaluateError> {
+    ) -> Result<(), EvaluateError<K>> {
         if !self.must_eval {
             return ctx
                 .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))
@@ -116,8 +114,7 @@ where
     fn refs(
         &self,
         schema: &Value,
-    ) -> Result<Result<Vec<grill_core::schema::Ref>, RefError>, Unimplemented> {
-        Ok(self.get_ref(schema))
+    ) -> ControlFlow<(), Result<Vec<grill_core::criterion::Ref>, RefsError>> {
     }
 }
 

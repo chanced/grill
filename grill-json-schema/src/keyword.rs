@@ -23,7 +23,6 @@ pub mod schema;
 // pub mod type_;
 // pub mod write_only;
 
-use crate::alias;
 use crate::JsonSchema;
 use grill_core::criterion::Criterion;
 use grill_core::{
@@ -122,7 +121,7 @@ where
 {
     fn compile<'i>(
         &mut self,
-        _compile: &mut alias::Compile<K>,
+        _compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
         _schema: Schema<'i, JsonSchema, K>,
     ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         todo!()
@@ -130,7 +129,7 @@ where
 
     fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>, //alias::Context<'i, 'v, 'r, K>,
+        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         todo!()

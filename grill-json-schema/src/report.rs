@@ -1,11 +1,19 @@
+pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
 use grill_core::criterion;
 use grill_uri::AbsoluteUri;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::{Map, Value};
-use std::{borrow::Cow, collections::BTreeMap};
-pub use verbose::Verbose;
+use serde_json::Value;
+use std::borrow::Cow;
 
-use self::verbose::Assessment;
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Output                                ║
+║                                ¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 // /// Set of keywords to check which disable short-circuiting
 // pub const DISABLING_KEYWORDS: [&'static str; 2] = [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS];
@@ -85,6 +93,16 @@ impl criterion::Output for Output {
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Report                                ║
+║                                ¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
 #[derive(Debug, Clone)]
 pub enum Report<'v> {
     Flag(Flag<'v>),
@@ -113,6 +131,21 @@ impl<'v> Report<'v> {
     pub fn push_error(&mut self, error: Error<'v>) {
         delegate! {
             self.push_error(error);
+        }
+    }
+    pub fn instance_location(&self) -> &jsonptr::Pointer {
+        delegate! {
+            self.instance_location();
+        }
+    }
+    pub fn keyword_location(&self) -> &jsonptr::Pointer {
+        delegate! {
+            self.keyword_location();
+        }
+    }
+    pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
+        delegate! {
+            self.absolute_keyword_location();
         }
     }
 }
@@ -158,53 +191,121 @@ impl Serialize for Report<'_> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Flag<'v> {
-    pub valid: bool,
-    pub additional_properties: Map<String, Value>,
-    marker: std::marker::PhantomData<&'v ()>,
-}
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Flag                                  ║
+║                                ¯¯¯¯¯¯                                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
-impl<'v> Flag<'v> {
-    pub fn is_valid(&self) -> bool {
-        self.valid
+pub mod flag {
+    use grill_uri::AbsoluteUri;
+    use serde_json::{Map, Value};
+
+    use super::{Annotation, Error};
+
+    #[derive(Clone, Debug)]
+    pub struct Flag<'v> {
+        pub valid: bool,
+        pub absolute_keyword_location: Option<AbsoluteUri>,
+        pub additional_properties: Map<String, Value>,
+        marker: std::marker::PhantomData<&'v ()>,
     }
-    pub fn into_owned(self) -> Flag<'static> {
-        Flag {
-            valid: self.valid,
-            additional_properties: self.additional_properties,
-            marker: Default::default(),
+
+    impl<'v> Flag<'v> {
+        pub fn is_valid(&self) -> bool {
+            self.valid
+        }
+        pub fn into_owned(self) -> Flag<'static> {
+            Flag {
+                valid: self.valid,
+                additional_properties: self.additional_properties,
+                absolute_keyword_location: self.absolute_keyword_location,
+                marker: Default::default(),
+            }
+        }
+        /// Noop
+        pub fn push_annotation(&mut self, _annotation: Annotation<'v>) {}
+
+        /// Sets `valid` to `false`
+        pub fn push_error(&mut self, _error: Error<'v>) {
+            self.valid = false
+        }
+
+        pub fn instance_location(&self) -> &jsonptr::Pointer {
+            &jsonptr::Pointer::default()
+        }
+        pub fn keyword_location(&self) -> &jsonptr::Pointer {
+            &jsonptr::Pointer::default()
+        }
+        pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
+            None
         }
     }
-    /// Noop
-    pub fn push_annotation(&mut self, _annotation: Annotation<'v>) {}
-
-    /// Sets `valid` to `false`
-    pub fn push_error(&mut self, _error: Error<'v>) {
-        self.valid = false
-    }
 }
 
-#[derive(Clone, Debug)]
-pub struct Basic<'v> {
-    marker: std::marker::PhantomData<&'v ()>,
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                 Basic                                 ║
+║                                ¯¯¯¯¯¯¯                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+pub mod basic {
+    use std::marker::PhantomData;
+
+    use grill_uri::AbsoluteUri;
+
+    use crate::{Annotation, Error};
+
+    #[derive(Clone, Debug)]
+    pub struct Basic<'v> {
+        marker: PhantomData<&'v str>,
+    }
+    impl<'v> Basic<'v> {
+        pub fn is_valid(&self) -> bool {
+            todo!()
+        }
+        pub fn into_owned(self) -> Basic<'static> {
+            todo!()
+        }
+        pub fn push_annotation(&mut self, annotation: Annotation<'v>) {
+            todo!()
+        }
+        pub fn push_error(&mut self, error: Error<'v>) {
+            todo!()
+        }
+        pub fn instance_location(&self) -> &jsonptr::Pointer {
+            todo!()
+        }
+        pub fn keyword_location(&self) -> &jsonptr::Pointer {
+            todo!()
+        }
+        pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
+            todo!()
+        }
+    }
 }
-impl<'v> Basic<'v> {
-    pub fn is_valid(&self) -> bool {
-        todo!()
-    }
-    pub fn into_owned(self) -> Basic<'static> {
-        todo!()
-    }
-    pub fn push_annotation(&mut self, annotation: Annotation<'v>) {
-        todo!()
-    }
-    pub fn push_error(&mut self, error: Error<'v>) {
-        todo!()
-    }
-}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Verbose                                ║
+║                               ¯¯¯¯¯¯¯¯¯                               ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 pub mod verbose {
+    use grill_uri::AbsoluteUri;
+
     use super::{Annotation, Error};
 
     #[derive(Clone, Debug)]
@@ -277,8 +378,27 @@ pub mod verbose {
                 };
             }
         }
+        pub fn instance_location(&self) -> &jsonptr::Pointer {
+            todo!()
+        }
+        pub fn keyword_location(&self) -> &jsonptr::Pointer {
+            todo!()
+        }
+        pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
+            todo!()
+        }
     }
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                              Annotation                               ║
+║                             ¯¯¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Clone, Debug)]
 pub enum Annotation<'v> {
@@ -309,6 +429,16 @@ macro_rules! impl_try_from {
         })*
     };
 }
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Error                                  ║
+║                               ¯¯¯¯¯¯¯                                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error<'v> {

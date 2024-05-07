@@ -74,7 +74,7 @@ where
 
     /// Failed to parse a [`Uri`] or
     /// [`AbsoluteUri`](`crate::uri::AbsoluteUri`)
-    #[snafu(transparent)]
+    #[snafu(transparent, context(false))]
     FailedToParseUri {
         #[snafu(backtrace)]
         source: UriError,
@@ -206,6 +206,34 @@ where
         #[snafu(source(from(Box<dyn std::error::Error>, Some)))]
         source: Option<Box<dyn std::error::Error>>,
     },
+}
+impl<C, K> CompileError<C, K>
+where
+    C: Criterion<K>,
+    K: Key,
+{
+    pub fn custom(message: impl Into<String>) -> Self {
+        Self::Custom {
+            message: message.into(),
+            source: None,
+        }
+    }
+    pub fn invalid_type(value: Value, expected: Expectated) -> Self {
+        Self::InvalidType {
+            source: InvalidTypeError {
+                backtrace: Backtrace::capture(),
+                actual: Actual::from_value(&value),
+                expected,
+                value: Box::new(value),
+            },
+        }
+    }
+    pub fn schema_not_found(uri: AbsoluteUri) -> Self {
+        Self::SchemaNotFound {
+            uri,
+            backtrace: Backtrace::capture(),
+        }
+    }
 }
 
 /*

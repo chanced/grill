@@ -567,7 +567,7 @@ where
         }
         &self.store
     }
-    pub(crate) fn get_key(&self, uri: &AbsoluteUri) -> Option<K> {
+    pub fn get_key(&self, uri: &AbsoluteUri) -> Option<K> {
         self.store().get_index(uri)
     }
     // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
@@ -733,18 +733,6 @@ where
     pub(crate) fn contains_uri(&self, uri: &AbsoluteUri) -> bool {
         self.store().contains_uri(uri)
     }
-}
-
-/// A reference to a schema, returned from [`Keyword::refs`]. This is used to
-/// resolve the reference to the actual schema.
-///
-/// See [`Reference`] for use that is not implementing the [`Keyword`] trait.
-#[derive(Debug, Clone)]
-pub struct Ref {
-    /// the parsed [`Uri`] value.
-    pub uri: Uri,
-    /// the keyword of the reference (i.e. $ref)
-    pub keyword: &'static str,
 }
 
 /// A reference to a schema.

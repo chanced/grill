@@ -8,14 +8,14 @@ use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},
-    criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Report},
+    criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Ref, Report},
     error::{compile_error::SchemaNotFoundSnafu, CompileError},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     Interrogator, Validate,
 };
 
-use super::{Anchor, CompiledSchema, Dialect, Evaluate, Ref, Reference};
+use super::{Anchor, CompiledSchema, Dialect, Evaluate, Reference};
 
 // TODO: insert a link for the uri + an empty fragment if None (http://example/path/ -> http://example/path/#)
 // TODO: handle 07 style $ids (hashtagged)
