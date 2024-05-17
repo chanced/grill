@@ -14,7 +14,7 @@ use serde_json::Value;
 use snafu::IntoError;
 
 use grill_core::{
-    criterion::{Criterion, Keyword, Kind},
+    criterion::{Criterion, Keyword},
     error::{
         dialect_error, invalid_type_error, Actual, CompileError, DialectError, EvaluateError,
         Expectated,
@@ -92,51 +92,12 @@ where
         ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
         _value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
-        self.uri
-            .clone()
-            .map(Annotation)
-            .map(|annotation| ctx.report.push_annotation(annotation.into()));
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Annotation(pub Arc<AbsoluteUri>);
-impl AsRef<AbsoluteUri> for Annotation {
-    fn as_ref(&self) -> &AbsoluteUri {
-        &self.0
-    }
-}
-impl From<Annotation> for crate::report::Annotation<'_> {
-    fn from(value: Annotation) -> Self {
-        crate::report::Annotation::Schema(value)
-    }
-}
-
-impl Deref for Annotation {
-    type Target = AbsoluteUri;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<AbsoluteUri> for Annotation {
-    fn from(uri: AbsoluteUri) -> Self {
-        Self(Arc::new(uri))
-    }
-}
-
-impl<'u> From<&'u AbsoluteUri> for Annotation {
-    fn from(uri: &'u AbsoluteUri) -> Self {
-        Self(Arc::new(uri.clone()))
-    }
-}
-
-impl<'v> From<Annotation> for AbsoluteUri {
-    fn from(annotation: Annotation) -> Self {
-        annotation.0.as_ref().clone()
+        // self.uri
+        //     .clone()
+        //     .map(Annotation)
+        //     .map(|annotation| ctx.report.push_annotation(annotation.into()));
+        // Ok(())
+        todo!()
     }
 }
 

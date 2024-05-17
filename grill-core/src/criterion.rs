@@ -37,12 +37,10 @@ pub trait Report<'v>: Clone + Error + Serialize + Deserialize<'v> {
     type Owned: 'static + Report<'static, Output = Self::Output>;
     fn into_owned(self) -> Self::Owned;
 
-    fn new(
-        output: Self::Output,
-        absolute_keyword_location: &AbsoluteUri,
-        keyword_location: Pointer,
-        instance_location: Pointer,
-    ) -> Self;
+    fn new<'i, C, K>(output: Self::Output, schema: &Schema<'i, C, K>) -> Self
+    where
+        C: Criterion<K>,
+        K: 'static + Key;
 
     fn is_valid(&self) -> bool;
 }
@@ -59,6 +57,8 @@ where
     pub schemas: &'i Schemas<C, K>,
     pub sources: &'i Sources,
     pub dialects: &'i Dialects<C, K>,
+    pub instance_location: Pointer,
+    pub keyword_location: Pointer,
 }
 
 pub struct NewCompile<'i, C, K>

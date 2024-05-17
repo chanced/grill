@@ -454,23 +454,18 @@ where
             key,
             sources,
             dialects,
-            keyword_location,
-            instance_location,
             output,
             global_numbers,
             eval_numbers,
             value,
             criterion,
+            instance_location,
+            keyword_location,
         } = eval;
 
         let schema = self.get(key, sources)?;
 
-        let mut report = <<C as Criterion<K>>::Report<'v> as Report<'v>>::new(
-            output,
-            schema.absolute_uri(),
-            keyword_location,
-            instance_location,
-        );
+        let mut report = <<C as Criterion<K>>::Report<'v> as Report<'v>>::new(output, &schema);
 
         let mut ctx = criterion.new_context(NewContext {
             global_numbers,
@@ -479,7 +474,10 @@ where
             report: &mut report,
             schemas: self,
             dialects,
+            instance_location,
+            keyword_location,
         });
+
         for keyword in &*schema.keywords {
             keyword.evaluate(&mut ctx, value)?;
         }

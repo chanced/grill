@@ -15,7 +15,7 @@ use crate::{
     Interrogator, Validate,
 };
 
-use super::{Anchor, CompiledSchema, Dialect, Evaluate, Reference};
+use super::{Anchor, CompiledSchema, Evaluate, Reference};
 
 // TODO: insert a link for the uri + an empty fragment if None (http://example/path/ -> http://example/path/#)
 // TODO: handle 07 style $ids (hashtagged)

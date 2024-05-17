@@ -6,10 +6,7 @@ use std::{ops::ControlFlow, sync::Arc};
 
 use grill_core::{
     criterion::{Criterion, Keyword},
-    error::{
-        invalid_type_error::InvalidTypeSnafu, Actual, CompileError, EvaluateError, Expectated,
-        RefsError,
-    },
+    error::{CompileError, EvaluateError, Expectated, RefsError},
     Key,
 };
 use grill_uri::Uri;
@@ -101,12 +98,15 @@ where
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         if !self.must_eval {
-            return ctx
-                .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))
-                .into();
+            // return ctx
+            //     .annotate(Some(self.keyword), Some(self.ref_uri_value.clone().into()))
+            //     .into();
+            todo!()
         }
-        ctx.evaluate(self.ref_key, None, &self.keyword_ptr, value)?
-            .into()
+        // ctx.evaluate(self.ref_key, None, &self.keyword_ptr, value)?
+
+        //     .into()
+        todo!()
     }
 
     /// Returns a list of [`Ref`]s to other
@@ -115,134 +115,135 @@ where
         &self,
         schema: &Value,
     ) -> ControlFlow<(), Result<Vec<grill_core::criterion::Ref>, RefsError>> {
+        todo!()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::borrow::Cow;
+// #[cfg(test)]
+// mod tests {
+//     use std::borrow::Cow;
 
-    use super::*;
-    use serde_json::json;
+//     use super::*;
+//     use serde_json::json;
 
-    use crate::{
-        draft_2020_12::json_schema_2020_12_uri,
-        keyword::{const_, id, schema, ID, REF, SCHEMA},
-    };
-    use grill_core::{schema::Dialect, AbsoluteUri, Interrogator, Output};
+//     use crate::{
+//         draft_2020_12::json_schema_2020_12_uri,
+//         keyword::{const_, id, schema, ID, REF, SCHEMA},
+//     };
+//     use grill_core::{schema::Dialect, AbsoluteUri, Interrogator, Output};
 
-    async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
-        let dialect = Dialect::build(json_schema_2020_12_uri().clone())
-            .add_keyword(schema::Schema::new(SCHEMA, false))
-            .add_keyword(const_::Const::new(None))
-            .add_keyword(id::Id::new(ID, false))
-            .add_keyword(Ref::new(REF, true))
-            .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
-            .finish()
-            .unwrap();
-        Interrogator::build()
-            .dialect(dialect)
-            .source_owned_value(
-                "https://example.com/referenced",
-                json!({
-                    "const": "value"
-                }),
-            )
-            .source_owned_value(
-                "https://example.com/with_$ref",
-                json!({
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://example.com/with_$ref",
-                    "$ref": Value::String(ref_value.to_string())
-                }),
-            )
-            .source_owned_value(
-                "https://example.com/without_$ref",
-                json!({
-                    "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://example.com/without_$ref",
-                }),
-            )
-            .finish()
-            .await
-            .unwrap()
-    }
+//     async fn create_interrogator(ref_value: impl ToString) -> Interrogator {
+//         let dialect = Dialect::build(json_schema_2020_12_uri().clone())
+//             .add_keyword(schema::Schema::new(SCHEMA, false))
+//             .add_keyword(const_::Const::new(None))
+//             .add_keyword(id::Id::new(ID, false))
+//             .add_keyword(Ref::new(REF, true))
+//             .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+//             .finish()
+//             .unwrap();
+//         Interrogator::build()
+//             .dialect(dialect)
+//             .source_owned_value(
+//                 "https://example.com/referenced",
+//                 json!({
+//                     "const": "value"
+//                 }),
+//             )
+//             .source_owned_value(
+//                 "https://example.com/with_$ref",
+//                 json!({
+//                     "$schema": "https://json-schema.org/draft/2020-12/schema",
+//                     "$id": "https://example.com/with_$ref",
+//                     "$ref": Value::String(ref_value.to_string())
+//                 }),
+//             )
+//             .source_owned_value(
+//                 "https://example.com/without_$ref",
+//                 json!({
+//                     "$schema": "https://json-schema.org/draft/2020-12/schema",
+//                     "$id": "https://example.com/without_$ref",
+//                 }),
+//             )
+//             .finish()
+//             .await
+//             .unwrap()
+//     }
 
-    #[tokio::test]
-    async fn test_setup() {
-        let mut interrogator = create_interrogator("https://example.com/referenced").await;
-        let key = interrogator
-            .compile("https://example.com/with_$ref")
-            .await
-            .unwrap();
-        let schema = interrogator.schema(key).unwrap();
-        assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
-        let key = interrogator
-            .compile("https://example.com/without_$ref")
-            .await
-            .unwrap();
-        let schema = interrogator.schema(key).unwrap();
-        assert!(!schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
-    }
-    #[tokio::test]
-    async fn test_evaluate() {
-        let mut interrogator = create_interrogator("https://example.com/referenced").await;
-        let key = interrogator
-            .compile("https://example.com/with_$ref")
-            .await
-            .unwrap();
-        let schema = interrogator.schema(key).unwrap();
-        assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
-        let _ = interrogator
-            .compile("https://example.com/without_$ref")
-            .await
-            .unwrap();
-        let value = json!(34.34);
-        let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
-        println!("++ verbose:\n{output}");
-        let basic_output = interrogator.evaluate(Output::Basic, key, &value).unwrap();
-        println!("++ basic:\n{basic_output}");
-    }
+//     #[tokio::test]
+//     async fn test_setup() {
+//         let mut interrogator = create_interrogator("https://example.com/referenced").await;
+//         let key = interrogator
+//             .compile("https://example.com/with_$ref")
+//             .await
+//             .unwrap();
+//         let schema = interrogator.schema(key).unwrap();
+//         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
+//         let key = interrogator
+//             .compile("https://example.com/without_$ref")
+//             .await
+//             .unwrap();
+//         let schema = interrogator.schema(key).unwrap();
+//         assert!(!schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
+//     }
+//     #[tokio::test]
+//     async fn test_evaluate() {
+//         let mut interrogator = create_interrogator("https://example.com/referenced").await;
+//         let key = interrogator
+//             .compile("https://example.com/with_$ref")
+//             .await
+//             .unwrap();
+//         let schema = interrogator.schema(key).unwrap();
+//         assert!(schema.keywords.iter().map(|kw| kw.kind()).any(|k| k == REF));
+//         let _ = interrogator
+//             .compile("https://example.com/without_$ref")
+//             .await
+//             .unwrap();
+//         let value = json!(34.34);
+//         let output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
+//         println!("++ verbose:\n{output}");
+//         let basic_output = interrogator.evaluate(Output::Basic, key, &value).unwrap();
+//         println!("++ basic:\n{basic_output}");
+//     }
 
-    #[tokio::test]
-    async fn test_recursive() {
-        println!("-----------");
-        let schema = json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "properties": {
-                "foo": {"$ref": "#"}
-            },
-            "additionalProperties": false
-        });
-        let dialect = Dialect::build(
-            "https://json-schema.org/draft/2020-12/schema"
-                .try_into()
-                .unwrap(),
-        )
-        .add_keyword(schema::Schema::new(SCHEMA, false))
-        .add_keyword(const_::Const::new(None))
-        .add_keyword(id::Id::new(ID, false))
-        .add_keyword(Ref::new(REF, true))
-        .add_keyword(crate::keyword::properties::Properties::default())
-        .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
-        .finish()
-        .unwrap();
+//     #[tokio::test]
+//     async fn test_recursive() {
+//         println!("-----------");
+//         let schema = json!({
+//             "$schema": "https://json-schema.org/draft/2020-12/schema",
+//             "properties": {
+//                 "foo": {"$ref": "#"}
+//             },
+//             "additionalProperties": false
+//         });
+//         let dialect = Dialect::build(
+//             "https://json-schema.org/draft/2020-12/schema"
+//                 .try_into()
+//                 .unwrap(),
+//         )
+//         .add_keyword(schema::Schema::new(SCHEMA, false))
+//         .add_keyword(const_::Const::new(None))
+//         .add_keyword(id::Id::new(ID, false))
+//         .add_keyword(Ref::new(REF, true))
+//         .add_keyword(crate::keyword::properties::Properties::default())
+//         .add_metaschema(json_schema_2020_12_uri().clone(), Cow::Owned(json!({})))
+//         .finish()
+//         .unwrap();
 
-        let mut interrogator = Interrogator::build()
-            .dialect(dialect)
-            .source_owned_value("https://example.com/recursive", schema)
-            .await
-            .unwrap();
-        let key = interrogator
-            .compile("https://example.com/recursive")
-            .await
-            .unwrap();
-        dbg!(&interrogator);
-        dbg!(key);
-        let uri = AbsoluteUri::parse("https://example.com/recursive#/properties/foo").unwrap();
-        let _schema = interrogator.schema_by_uri(&uri).unwrap();
-        // dbg!(schema);
-        let value = json!({"foo": {"bar": false}});
-        let _output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
-    }
-}
+//         let mut interrogator = Interrogator::build()
+//             .dialect(dialect)
+//             .source_owned_value("https://example.com/recursive", schema)
+//             .await
+//             .unwrap();
+//         let key = interrogator
+//             .compile("https://example.com/recursive")
+//             .await
+//             .unwrap();
+//         dbg!(&interrogator);
+//         dbg!(key);
+//         let uri = AbsoluteUri::parse("https://example.com/recursive#/properties/foo").unwrap();
+//         let _schema = interrogator.schema_by_uri(&uri).unwrap();
+//         // dbg!(schema);
+//         let value = json!({"foo": {"bar": false}});
+//         let _output = interrogator.evaluate(Output::Verbose, key, &value).unwrap();
+//     }
+// }

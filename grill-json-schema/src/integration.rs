@@ -77,12 +77,6 @@ where
         // )
         todo!()
     }
-    pub fn annotate(&mut self, annotation: Annotation) {
-        self.report.push_annotation(annotation);
-    }
-    pub fn error(&mut self, error: Error) {
-        self.report.push_error(error);
-    }
 }
 
 impl<'i, 'v, 'r, C, K> criterion::Context<'i, 'v, 'r, C, K> for Context<'i, 'v, 'r, C, K>

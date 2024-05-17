@@ -30,6 +30,7 @@ use error::{
 use error::{SourceError, UriError};
 
 pub mod schema;
+use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 use jsonptr::Pointer;
 use once_cell::sync::Lazy;
 use schema::traverse::{
@@ -41,7 +42,6 @@ use schema::{compiler::Compiler, Dialect, Dialects, Evaluate, Iter, IterUnchecke
 pub use schema::{DefaultKey, Schema};
 use snafu::ResultExt;
 use source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources};
-use grill_uri::{AbsoluteUri, TryIntoAbsoluteUri};
 
 pub mod source;
 
@@ -1049,8 +1049,8 @@ where
             output: output as CriterionReportOutput<'v, C, K>,
             key,
             value,
-            instance_location: Pointer::default(),
             keyword_location: Pointer::default(),
+            instance_location: Pointer::default(),
             sources: &self.sources,
             dialects: &self.dialects,
             global_numbers: &self.numbers,
