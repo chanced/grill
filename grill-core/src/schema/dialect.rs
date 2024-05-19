@@ -3,7 +3,6 @@
 
 use super::Anchor;
 use crate::{
-    criterion::{Criterion, Keyword, Ref},
     error::{
         new_dialect_error::{
             DefaultNotFoundSnafu, DialectNotImplementedSnafu, FragmentedIdSnafu,
@@ -12,6 +11,7 @@ use crate::{
         new_dialects_error::DuplicateDialectSnafu,
         AnchorError, IdentifyError, NewDialectError, NewDialectsError, RefsError,
     },
+    language::{Keyword, Language, Ref},
     source::Input,
     ControlFlowExt, EMPTY_OBJ,
 };
@@ -34,16 +34,16 @@ use std::{
 };
 
 /// Builds a [`Dialect`].
-pub struct Build<C: Criterion<K>, K: 'static + Key> {
+pub struct Build<L: Language<K>, K: 'static + Key> {
     id: AbsoluteUri,
     metaschemas: Vec<(Result<AbsoluteUri, grill_uri::Error>, Cow<'static, Value>)>,
-    keywords: Vec<C::Keyword>,
+    keywords: Vec<L::Keyword>,
     marker: PhantomData<fn(K) -> !>,
 }
 
-impl<C, K> Build<C, K>
+impl<L, K> Build<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Adds a metaschema to the [`Dialect`]. These are used to validate the
@@ -60,13 +60,13 @@ where
 
     /// Adds a [`Keyword`] to the [`Dialect`].
     #[must_use]
-    pub fn add_keyword(mut self, keyword: C::Keyword) -> Self {
+    pub fn add_keyword(mut self, keyword: L::Keyword) -> Self {
         self.keywords.push(keyword);
         self
     }
 
     /// Finalizes the [`Dialect`].
-    pub fn finish(self) -> Result<Dialect<C, K>, NewDialectError> {
+    pub fn finish(self) -> Result<Dialect<L, K>, NewDialectError> {
         let metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)> = self
             .metaschemas
             .into_iter()
@@ -92,9 +92,9 @@ where
 /// A set of keywords and semantics which are used to evaluate a [`Value`] against a
 /// schema.
 #[derive(Clone)]
-pub struct Dialect<C, K>
+pub struct Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Identifier of the `Dialect`. A meta schema must be defined in
@@ -103,7 +103,7 @@ where
     /// Set of meta schemas which make up the dialect.
     metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>>,
     /// Set of [`Keyword`]s defined by the dialect.
-    keywords: Box<[C::Keyword]>,
+    keywords: Box<[L::Keyword]>,
     /// indexes of keywords which implement the `identify` method.
     identify_indexes: Box<[u16]>,
     /// indexes of keywords which implement the `dialect` method.
@@ -117,9 +117,9 @@ where
 
     pub(crate) schema_key: K,
 }
-impl<C, K> std::fmt::Display for Dialect<C, K>
+impl<L, K> std::fmt::Display for Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,14 +127,14 @@ where
     }
 }
 
-impl<C, K> Dialect<C, K>
+impl<L, K> Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Returns a new `Dialect` [`Build`].
     #[must_use]
-    pub fn build(id: AbsoluteUri) -> Build<C, K> {
+    pub fn build(id: AbsoluteUri) -> Build<L, K> {
         Build {
             id,
             metaschemas: Vec::new(),
@@ -147,7 +147,7 @@ where
     fn new(
         id: AbsoluteUri,
         metaschemas: Vec<(AbsoluteUri, Cow<'static, Value>)>,
-        keywords: Vec<C::Keyword>,
+        keywords: Vec<L::Keyword>,
     ) -> Result<Self, NewDialectError> {
         let metaschemas: HashMap<AbsoluteUri, Cow<'static, Value>> =
             metaschemas.into_iter().collect();
@@ -326,13 +326,13 @@ where
 
     #[must_use]
     /// Returns the [`Keyword`]s of this `Dialect`.
-    pub fn keywords(&self) -> &[C::Keyword] {
+    pub fn keywords(&self) -> &[L::Keyword] {
         self.keywords.as_ref()
     }
 
-    fn find_impl_indexes<'a, F, B, R>(keywords: &'a [C::Keyword], func: F) -> Box<[u16]>
+    fn find_impl_indexes<'a, F, B, R>(keywords: &'a [L::Keyword], func: F) -> Box<[u16]>
     where
-        F: for<'b> Fn(&'a C::Keyword, &'b Value) -> ControlFlow<B, R>,
+        F: for<'b> Fn(&'a L::Keyword, &'b Value) -> ControlFlow<B, R>,
     {
         keywords
             .iter()
@@ -348,7 +348,7 @@ where
     }
     fn find_identify_indexes(
         uri: &AbsoluteUri,
-        keywords: &[C::Keyword],
+        keywords: &[L::Keyword],
     ) -> Result<Box<[u16]>, NewDialectError> {
         let indexes = Self::find_impl_indexes(keywords, Keyword::identify);
         ensure!(
@@ -360,7 +360,7 @@ where
 
     fn find_dialect_indexes(
         uri: &AbsoluteUri,
-        keywords: &[C::Keyword],
+        keywords: &[L::Keyword],
     ) -> Result<Box<[u16]>, NewDialectError> {
         let indexes = Self::find_impl_indexes(keywords, Keyword::dialect);
         ensure!(
@@ -371,18 +371,18 @@ where
     }
 }
 
-impl<C, K> PartialEq for Dialect<C, K>
+impl<L, K> PartialEq for Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-impl<C, K> Hash for Dialect<C, K>
+impl<L, K> Hash for Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -390,9 +390,9 @@ where
     }
 }
 
-impl<C, K> Debug for Dialect<C, K>
+impl<L, K> Debug for Dialect<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -421,26 +421,26 @@ where
 
 /// A collection of [`Dialect`]s.
 #[derive(Debug, Clone)]
-pub struct Dialects<C: Criterion<K>, K: 'static + Key> {
-    dialects: Vec<Dialect<C, K>>,
+pub struct Dialects<L: Language<K>, K: 'static + Key> {
+    dialects: Vec<Dialect<L, K>>,
     default: usize,
 }
 
-impl<C, K> Deref for Dialects<C, K>
+impl<L, K> Deref for Dialects<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    type Target = [Dialect<C, K>];
+    type Target = [Dialect<L, K>];
 
     fn deref(&self) -> &Self::Target {
         &self.dialects
     }
 }
 
-impl<C, K> Dialects<C, K>
+impl<L, K> Dialects<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Creates a new [`Dialects`] from a [`Vec`] of [`Dialect`]s.
@@ -448,7 +448,7 @@ where
     /// If `default` is `None`, the first [`Dialect`] in the list is used as the
     /// default.
     pub fn new(
-        dialects: Vec<Dialect<C, K>>,
+        dialects: Vec<Dialect<L, K>>,
         default: Option<AbsoluteUri>,
     ) -> Result<Self, NewDialectsError> {
         ensure!(
@@ -484,7 +484,7 @@ where
 
     /// Returns the [`Dialect`].
     #[must_use]
-    pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect<C, K>> {
+    pub fn get(&self, id: &AbsoluteUri) -> Option<&Dialect<L, K>> {
         self.index_of(id).map(|idx| &self.dialects[idx])
     }
 
@@ -506,7 +506,7 @@ where
     /// example, a `Dialect` with the `$id` `"https://example.com"` would consider
     /// a schema with a `$schema` of `"http://example.com#"` to be pertinent.
     #[must_use]
-    pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect<C, K>> {
+    pub fn pertinent_to(&self, schema: &Value) -> Option<&Dialect<L, K>> {
         self.dialects
             .iter()
             .find(|&dialect| dialect.is_pertinent_to(schema))
@@ -526,7 +526,7 @@ where
     ///
     /// # Errors
     /// Returns the [`DialectExistsError`] if a `Dialect` already exists with the same `id`.
-    pub fn push(&mut self, dialect: Dialect<C, K>) -> Result<(), AbsoluteUri> {
+    pub fn push(&mut self, dialect: Dialect<L, K>) -> Result<(), AbsoluteUri> {
         if self.contains(&dialect.id) {
             return Err(dialect.id.clone());
         }
@@ -544,7 +544,7 @@ where
     /// Returns the [`Dialect`] that is pertinent to the schema or the default
     /// [`Dialect`] if the [`Dialect`] can not be determined from schema.
     #[must_use]
-    pub fn pertinent_to_or_default(&self, schema: &Value) -> &Dialect<C, K> {
+    pub fn pertinent_to_or_default(&self, schema: &Value) -> &Dialect<L, K> {
         self.pertinent_to(schema).unwrap_or(self.primary())
     }
 
@@ -575,7 +575,7 @@ where
 
     /// Returns a slice of [`Dialect`].
     #[must_use]
-    pub fn as_slice(&self) -> &[Dialect<C, K>] {
+    pub fn as_slice(&self) -> &[Dialect<L, K>] {
         &self.dialects
     }
 
@@ -586,13 +586,13 @@ where
         self.default
     }
     /// Returns an [`Iterator`] over the [`Dialect`]s.
-    pub fn iter(&self) -> std::slice::Iter<'_, Dialect<C, K>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Dialect<L, K>> {
         self.dialects.iter()
     }
 
     /// Returns the primary [`Dialect`].
     #[must_use]
-    pub fn primary(&self) -> &Dialect<C, K> {
+    pub fn primary(&self) -> &Dialect<L, K> {
         &self.dialects[self.default]
     }
 
@@ -605,18 +605,18 @@ where
 
     /// Returns the index of the given [`Dialect`] in the list of [`Dialect`]s.
     #[must_use]
-    pub fn position(&self, dialect: &Dialect<C, K>) -> Option<usize> {
+    pub fn position(&self, dialect: &Dialect<L, K>) -> Option<usize> {
         self.dialects.iter().position(|d| d == dialect)
     }
 
     /// Returns the [`Dialect`] at the given index.
     #[must_use]
-    pub fn get_by_index(&self, idx: usize) -> Option<&Dialect<C, K>> {
+    pub fn get_by_index(&self, idx: usize) -> Option<&Dialect<L, K>> {
         self.dialects.get(idx)
     }
 
     fn find_primary(
-        dialects: &[Dialect<C, K>],
+        dialects: &[Dialect<L, K>],
         lookup: &HashMap<AbsoluteUri, usize>,
         default: Option<&AbsoluteUri>,
     ) -> Result<usize, NewDialectError> {
@@ -638,10 +638,10 @@ where
     }
 }
 
-impl<'a, C: Criterion<K>, K: 'static + Key> IntoIterator for &'a Dialects<C, K> {
-    type Item = &'a Dialect<C, K>;
+impl<'a, L: Language<K>, K: 'static + Key> IntoIterator for &'a Dialects<L, K> {
+    type Item = &'a Dialect<L, K>;
 
-    type IntoIter = std::slice::Iter<'a, Dialect<C, K>>;
+    type IntoIter = std::slice::Iter<'a, Dialect<L, K>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.dialects.iter()

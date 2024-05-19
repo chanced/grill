@@ -2,9 +2,9 @@
 //!
 //!
 //!
-use crate::criterion::Criterion;
-use crate::criterion::CriterionOwnedReport;
-use crate::criterion::Report;
+use crate::language::CriterionOwnedReport;
+use crate::language::Language;
+use crate::language::Report;
 use crate::schema::Anchor;
 pub use grill_uri::error::Error as UriError;
 use grill_uri::{AbsoluteUri, Uri};
@@ -37,16 +37,16 @@ use std::{
 /// An error occurred while compiling a schema.
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), module)]
-pub enum CompileError<C, K>
+pub enum CompileError<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
-    <<C as Criterion<K>>::OwnedReport as Report<'static>>::Owned: Debug + Display,
+    <<L as Language<K>>::OwnedReport as Report<'static>>::Owned: Debug + Display,
 {
     /// The schema failed evaluation, represented by the failed [`Output`].
     #[snafu(display("schema failed evaluation: {report}"))]
     InvalidSchema {
-        report: CriterionOwnedReport<C, K>,
+        report: CriterionOwnedReport<L, K>,
         backtrace: Backtrace,
     },
 
@@ -207,9 +207,9 @@ where
         source: Option<Box<dyn std::error::Error>>,
     },
 }
-impl<C, K> CompileError<C, K>
+impl<L, K> CompileError<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: Key,
 {
     pub fn custom(message: impl Into<String>) -> Self {
@@ -249,15 +249,15 @@ where
 /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub), module)]
-pub enum BuildError<C: 'static + Criterion<K>, K: 'static + Key>
+pub enum BuildError<L: 'static + Language<K>, K: 'static + Key>
 where
-    for<'v> <C::Report<'v> as ToOwned>::Owned: Debug + Display,
+    for<'v> <L::Report<'v> as ToOwned>::Owned: Debug + Display,
 {
     #[snafu(transparent)]
     /// A [`Schema`](crate::schema::Schema) failed to compile.
     FailedToCompile {
         #[snafu(backtrace)]
-        source: CompileError<C, K>,
+        source: CompileError<L, K>,
     },
 
     #[snafu(transparent)]

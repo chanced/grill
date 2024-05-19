@@ -25,45 +25,37 @@ pub trait Output: Copy + Clone + fmt::Debug + Serialize + DeserializeOwned {
     fn verbose() -> Self;
 }
 
-/// Type alias for the associated type `Report` of the given `Criterion` `C`.
-pub type CriterionReport<'v, C, K> = <C as Criterion<K>>::Report<'v>;
-pub type CriterionOwnedReport<C, K> = <C as Criterion<K>>::OwnedReport;
-/// Type alias for the associated type `Output` of the `Report` associated with
-/// the given `Criterion` `C`.
-pub type CriterionReportOutput<'v, C, K> = <CriterionReport<'v, C, K> as Report<'v>>::Output;
-
 pub trait Report<'v>: Clone + Error + Serialize + Deserialize<'v> {
     type Output: 'static + Output;
     type Owned: 'static + Report<'static, Output = Self::Output>;
     fn into_owned(self) -> Self::Owned;
 
-    fn new<'i, C, K>(output: Self::Output, schema: &Schema<'i, C, K>) -> Self
+    fn new<'i, L, K>(output: Self::Output, schema: &Schema<'i, L, K>) -> Self
     where
-        C: Criterion<K>,
+        L: Language<K>,
         K: 'static + Key;
 
     fn is_valid(&self) -> bool;
 }
 
 #[derive(Debug)]
-pub struct NewContext<'i, 'v, 'r, C, K>
+pub struct NewContext<'i, 'v, 'r, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    pub report: &'r mut CriterionReport<'v, C, K>,
     pub eval_numbers: &'i mut Numbers,
     pub global_numbers: &'i Numbers,
-    pub schemas: &'i Schemas<C, K>,
+    pub schemas: &'i Schemas<L, K>,
     pub sources: &'i Sources,
-    pub dialects: &'i Dialects<C, K>,
+    pub dialects: &'i Dialects<L, K>,
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
 }
 
-pub struct NewCompile<'i, C, K>
+pub struct NewCompile<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// AbsoluteUri of the Schema being compiled
@@ -71,17 +63,17 @@ where
     /// Global cache of numbers
     pub global_numbers: &'i mut Numbers,
     /// Current collection of compiled schemas at the point of compilation
-    pub schemas: &'i Schemas<C, K>,
+    pub schemas: &'i Schemas<L, K>,
     pub sources: &'i Sources,
-    pub dialects: &'i Dialects<C, K>,
+    pub dialects: &'i Dialects<L, K>,
     pub resolvers: &'i Resolvers,
     pub deserializers: &'i Deserializers,
     pub values: &'i mut Values,
 }
 
-impl<'i, C, K> Debug for NewCompile<'i, C, K>
+impl<'i, L, K> Debug for NewCompile<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -98,10 +90,10 @@ where
     }
 }
 
-pub trait Context<'i, 'v, 'r, C, K>: Debug {}
+pub trait Context<'i, 'v, 'r, L, K>: Debug {}
 pub trait Compile<'i>: Debug {}
 
-pub trait Criterion<K>: Sized + Clone + Debug
+pub trait Language<K>: Sized + Clone + Debug
 where
     K: 'static + Key,
 {
@@ -120,7 +112,7 @@ where
     /// with an owned lifetime since there is no way to indicate that
     /// `into_owned` (of `Report`) should return `Self<'static>`.
     type OwnedReport: Report<'static>;
-    type Report<'v>: Report<'v, Owned = <Self as Criterion<K>>::OwnedReport>;
+    type Report<'v>: Report<'v, Owned = <Self as Language<K>>::OwnedReport>;
 
     fn new_compile<'i>(&mut self, new_compile: NewCompile<'i, Self, K>) -> Self::Compile<'i>;
     fn new_context<'i, 'v, 'r>(
@@ -141,21 +133,21 @@ where
 
 /// Handles the setup and execution of logic for a given keyword in a JSON Schema.
 #[allow(unused_variables)]
-pub trait Keyword<C, K>: 'static + Send + Sync + Clone + fmt::Debug
+pub trait Keyword<L, K>: 'static + Send + Sync + Clone + fmt::Debug
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn compile<'i, 'c>(
         &'i mut self,
-        compile: &'c mut C::Compile<'i>,
-        schema: Schema<'i, C, K>,
-    ) -> Result<ControlFlow<()>, CompileError<C, K>>;
+        compile: &'c mut L::Compile<'i>,
+        schema: Schema<'i, L, K>,
+    ) -> Result<ControlFlow<()>, CompileError<L, K>>;
 
     /// Executes the keyword logic for the given [`Schema`] and [`Value`].
     fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'c mut C::Context<'i, 'v, 'r>,
+        ctx: &'c mut L::Context<'i, 'v, 'r>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>>;
 
@@ -229,8 +221,13 @@ pub const fn boolean(value: bool) -> &'static Value {
 */
 
 /// Returns a [`Vec`] of [`Pointer`]s to the fields of the object at `field`.
+///
+/// TODO: This needs to be updated - it should accept `&Map<String, Value> without the `field` parameter
 #[must_use]
-pub fn paths_of_object(field: &'static str, object: &Value) -> Vec<Pointer> {
+#[deprecated(
+    note = "This needs to be updated - it should accept `&Map<String, Value> without the `field` parameter"
+)]
+pub fn paths_of_obj_fields(field: &'static str, object: &Value) -> Vec<Pointer> {
     let Some(Value::Object(props)) = object.get(field) else {
         return Vec::new();
     };

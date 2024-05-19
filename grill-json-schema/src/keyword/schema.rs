@@ -14,11 +14,11 @@ use serde_json::Value;
 use snafu::IntoError;
 
 use grill_core::{
-    criterion::{Criterion, Keyword},
     error::{
         dialect_error, invalid_type_error, Actual, CompileError, DialectError, EvaluateError,
         Expectated,
     },
+    language::{Keyword, Language},
     Key,
 };
 use grill_uri::AbsoluteUri;
@@ -59,7 +59,7 @@ where
 {
     fn compile<'i>(
         &mut self,
-        _compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
+        _compile: &mut <JsonSchema as Language<K>>::Compile<'i>,
         schema: grill_core::Schema<'i, JsonSchema, K>,
     ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         match schema.value() {
@@ -89,7 +89,7 @@ where
 
     fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
+        ctx: &'c mut <JsonSchema as Language<K>>::Context<'i, 'v, 'r>,
         _value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         // self.uri

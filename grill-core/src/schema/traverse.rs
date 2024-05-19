@@ -1,7 +1,7 @@
 //! Graph traversal [`Iterator`]s for [`Schema`]s
 
 use super::{Reference, Schemas};
-use crate::{criterion::Criterion, source::Sources, Key, Schema};
+use crate::{language::Language, source::Sources, Key, Schema};
 use either::Either;
 use grill_uri::AbsoluteUri;
 use std::{
@@ -20,85 +20,85 @@ use std::{
 // pertains to "compile"/setup
 
 /// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
-pub trait Traverse<'i, C, K, Iter>: Iterator<Item = Schema<'i, C, K>>
+pub trait Traverse<'i, L, K, Iter>: Iterator<Item = Schema<'i, L, K>>
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
     Self: Sized,
-    Iter: Iterator<Item = Schema<'i, C, K>>,
+    Iter: Iterator<Item = Schema<'i, L, K>>,
 {
     /// Returns a new [`Keys`] [`Iterator`] which consumes this `Iterator` and
     /// yields an `Iterator` of `Key`
-    fn keys(self) -> Keys<'i, C, K, Iter>;
+    fn keys(self) -> Keys<'i, L, K, Iter>;
 
     /// Returns a new [`MapIntoOwned`] [`Iterator`] which consumes this
-    /// `Iterator` of [`Schema<'i, C, K>`] and yields owned copies (i.e.
+    /// `Iterator` of [`Schema<'i, L, K>`] and yields owned copies (i.e.
     /// [`Schema<'static>`]).
-    fn map_into_owned(self) -> MapIntoOwned<'i, C, K, Self>;
+    fn map_into_owned(self) -> MapIntoOwned<'i, L, K, Self>;
 
     /// Searches the [`Iterator`] for a [`Schema`] with the specified
     /// [`AbsoluteUri`] in it's set of URIs
-    fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, C, K>>;
+    fn find_by_uri(self, uri: &AbsoluteUri) -> Option<Schema<'i, L, K>>;
 }
 
-impl<'i, C, K, I> Traverse<'i, C, K, I> for I
+impl<'i, L, K, I> Traverse<'i, L, K, I> for I
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
-    I: Iterator<Item = Schema<'i, C, K>>,
+    I: Iterator<Item = Schema<'i, L, K>>,
 {
-    fn keys(self) -> Keys<'i, C, K, I> {
+    fn keys(self) -> Keys<'i, L, K, I> {
         Keys { iter: self }
     }
 
-    fn map_into_owned(self) -> MapIntoOwned<'i, C, K, I> {
+    fn map_into_owned(self) -> MapIntoOwned<'i, L, K, I> {
         MapIntoOwned { iter: self }
     }
 
-    fn find_by_uri(mut self, uri: &AbsoluteUri) -> Option<Schema<'i, C, K>> {
+    fn find_by_uri(mut self, uri: &AbsoluteUri) -> Option<Schema<'i, L, K>> {
         self.find(|schema| schema.id.as_deref() == Some(uri) || schema.uris.contains(uri))
     }
 }
 
-/// Maps an [`Iterator`] of [`Schema<'i, C, K>`](`Schema`) into one of [`Schema<'static>`](`Schema`).
-pub struct MapIntoOwned<'i, C, K, I>
+/// Maps an [`Iterator`] of [`Schema<'i, L, K>`](`Schema`) into one of [`Schema<'static>`](`Schema`).
+pub struct MapIntoOwned<'i, L, K, I>
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
-    I: Iterator<Item = Schema<'i, C, K>>,
+    I: Iterator<Item = Schema<'i, L, K>>,
 {
     iter: I,
 }
-impl<'i, C, K, I> Iterator for MapIntoOwned<'i, C, K, I>
+impl<'i, L, K, I> Iterator for MapIntoOwned<'i, L, K, I>
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
-    I: Iterator<Item = Schema<'i, C, K>>,
+    I: Iterator<Item = Schema<'i, L, K>>,
 {
-    type Item = Schema<'static, C, K>;
+    type Item = Schema<'static, L, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(Schema::into_owned)
     }
 }
 
-/// Maps an [`Iterator`] of [`Schema<'i, C, K>`](crate::schema::Schema) into one of `Key`
+/// Maps an [`Iterator`] of [`Schema<'i, L, K>`](crate::schema::Schema) into one of `Key`
 ///
 /// See [`Traverse::keys`] for usage.
-pub struct Keys<'i, C, K, I>
+pub struct Keys<'i, L, K, I>
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
-    I: Iterator<Item = Schema<'i, C, K>>,
+    I: Iterator<Item = Schema<'i, L, K>>,
 {
     iter: I,
 }
 
-impl<'i, C, K, I> Iterator for Keys<'i, C, K, I>
+impl<'i, L, K, I> Iterator for Keys<'i, L, K, I>
 where
-    C: 'static + Criterion<K>,
+    L: 'static + Language<K>,
     K: 'static + Key,
-    I: Iterator<Item = Schema<'i, C, K>>,
+    I: Iterator<Item = Schema<'i, L, K>>,
 {
     type Item = K;
 
@@ -109,12 +109,12 @@ where
 
 macro_rules! impl_traverse {
     ($name:ident, $func:ident) => {
-        impl<'i, C, K> Iterator for $name<'i, C, K>
+        impl<'i, L, K> Iterator for $name<'i, L, K>
         where
-            C: Criterion<K>,
+            L: Criterion<K>,
             K: 'static + Key,
         {
-            type Item = Schema<'i, C, K>;
+            type Item = Schema<'i, L, K>;
             fn next(&mut self) -> Option<Self::Item> {
                 self.traverse.next()
             }
@@ -125,27 +125,27 @@ macro_rules! impl_traverse {
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependents of
 /// a [`Schema`].
-pub struct AllDependents<'i, C: Criterion<K>, K: 'static + Key> {
-    traverse: Slices<'i, C, K>,
+pub struct AllDependents<'i, L: Language<K>, K: 'static + Key> {
+    traverse: Slices<'i, L, K>,
 }
 
 impl_traverse!(AllDependents, all_dependents);
 
-fn all_dependents<C, K>(schema: Schema<'_, C, K>) -> IntoIter<K>
+fn all_dependents<L, K>(schema: Schema<'_, L, K>) -> IntoIter<K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
     schema.dependents.into_owned().into_iter()
 }
 
-impl<'i, C, K> AllDependents<'i, C, K>
+impl<'i, L, K> AllDependents<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    pub(crate) fn new(key: K, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+    pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             traverse: DepthFirst::new(key, schemas, sources, all_dependents),
         }
@@ -155,22 +155,22 @@ where
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependencies of
 /// a [`Schema`].
-pub struct TransitiveDependencies<'i, C: Criterion<K>, K: 'static + Key> {
-    traverse: TransitiveDeps<'i, C, K>,
+pub struct TransitiveDependencies<'i, L: Language<K>, K: 'static + Key> {
+    traverse: TransitiveDeps<'i, L, K>,
 }
 
 impl_traverse!(TransitiveDependencies, transitive_dependencies);
-fn transitive_dependencies<C: Criterion<K>, K: 'static + Key>(schema: Schema<'_, C, K>) -> Deps<K> {
+fn transitive_dependencies<L: Language<K>, K: 'static + Key>(schema: Schema<'_, L, K>) -> Deps<K> {
     #[allow(clippy::unnecessary_to_owned)]
     schema.references.into_owned().into_iter().map(|r| r.key)
 }
 
-impl<'i, C, K> TransitiveDependencies<'i, C, K>
+impl<'i, L, K> TransitiveDependencies<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    pub(crate) fn new(key: K, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+    pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             traverse: DepthFirst::new(key, schemas, sources, transitive_dependencies),
         }
@@ -185,14 +185,14 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Ancestors<'i, C: Criterion<K>, K: 'static + Key> {
-    traverse: Instances<'i, C, K>,
+pub struct Ancestors<'i, L: Language<K>, K: 'static + Key> {
+    traverse: Instances<'i, L, K>,
 }
 
 impl_traverse!(Ancestors, ancestors);
-fn ancestors<C, K>(schema: Schema<'_, C, K>) -> Either<Once<K>, Empty<K>>
+fn ancestors<L, K>(schema: Schema<'_, L, K>) -> Either<Once<K>, Empty<K>>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     if let Some(parent) = schema.parent {
@@ -201,12 +201,12 @@ where
         Either::Right(empty())
     }
 }
-impl<'i, C, K> Ancestors<'i, C, K>
+impl<'i, L, K> Ancestors<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    pub(crate) fn new(key: K, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+    pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             traverse: DepthFirst::new(key, schemas, sources, ancestors),
         }
@@ -221,47 +221,47 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Descendants<'i, C: Criterion<K>, K: 'static + Key> {
-    traverse: Slices<'i, C, K>,
+pub struct Descendants<'i, L: Language<K>, K: 'static + Key> {
+    traverse: Slices<'i, L, K>,
 }
 impl_traverse!(Descendants, descendants);
-fn descendants<C, K>(schema: Schema<'_, C, K>) -> IntoIter<K>
+fn descendants<L, K>(schema: Schema<'_, L, K>) -> IntoIter<K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
     schema.subschemas.into_owned().into_iter()
 }
-impl<'i, C, K> Descendants<'i, C, K>
+impl<'i, L, K> Descendants<'i, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    pub(crate) fn new(key: K, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+    pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             traverse: DepthFirst::new(key, schemas, sources, descendants),
         }
     }
 }
 
-struct Flat<'i, C, K, Inner>
+struct Flat<'i, L, K, Inner>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Inner: Iterator<Item = K>,
 {
     iter: Inner,
-    schemas: &'i Schemas<C, K>,
+    schemas: &'i Schemas<L, K>,
     sources: &'i Sources,
 }
-impl<'i, C, K, Inner> Flat<'i, C, K, Inner>
+impl<'i, L, K, Inner> Flat<'i, L, K, Inner>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Inner: Iterator<Item = K>,
 {
-    fn new(iter: Inner, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+    fn new(iter: Inner, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             iter,
             schemas,
@@ -270,43 +270,43 @@ where
     }
 }
 
-impl<'i, C, K, Inner> Iterator for Flat<'i, C, K, Inner>
+impl<'i, L, K, Inner> Iterator for Flat<'i, L, K, Inner>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Inner: Iterator<Item = K>,
 {
-    type Item = Schema<'i, C, K>;
+    type Item = Schema<'i, L, K>;
     fn next(&mut self) -> Option<Self::Item> {
         let key = self.iter.next()?;
         Some(self.schemas.get_unchecked(key, self.sources))
     }
 }
 
-struct DepthFirst<'i, C, K, Iter, Func>
+struct DepthFirst<'i, L, K, Iter, Func>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Iter: Iterator<Item = K>,
-    Func: Fn(Schema<'i, C, K>) -> Iter,
+    Func: Fn(Schema<'i, L, K>) -> Iter,
 {
     handle: Func,
     stack: Vec<Iter>,
     sent: HashSet<K>,
-    schemas: &'i Schemas<C, K>,
+    schemas: &'i Schemas<L, K>,
     sources: &'i Sources,
 }
 
-impl<'i, C, K, Iter, Func> DepthFirst<'i, C, K, Iter, Func>
+impl<'i, L, K, Iter, Func> DepthFirst<'i, L, K, Iter, Func>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Iter: 'i + Iterator<Item = K>,
-    Func: Fn(Schema<'i, C, K>) -> Iter,
+    Func: Fn(Schema<'i, L, K>) -> Iter,
 {
     pub(crate) fn new(
         key: K,
-        schemas: &'i Schemas<C, K>,
+        schemas: &'i Schemas<L, K>,
         sources: &'i Sources,
         handle: Func,
     ) -> Self {
@@ -319,19 +319,19 @@ where
             sources,
         }
     }
-    fn exec(&self, schema: Schema<'i, C, K>) -> Iter {
+    fn exec(&self, schema: Schema<'i, L, K>) -> Iter {
         (self.handle)(schema)
     }
 }
 
-impl<'i, C, K, Iter, Func> Iterator for DepthFirst<'i, C, K, Iter, Func>
+impl<'i, L, K, Iter, Func> Iterator for DepthFirst<'i, L, K, Iter, Func>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
     Iter: 'i + Iterator<Item = K>,
-    Func: Fn(Schema<'i, C, K>) -> Iter,
+    Func: Fn(Schema<'i, L, K>) -> Iter,
 {
-    type Item = Schema<'i, C, K>;
+    type Item = Schema<'i, L, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -362,12 +362,12 @@ macro_rules! iter {
 
     ) => {
         $(#[$($attrss)*])*
-        $vis struct $name<'i, C: Criterion<K>, K: 'static + Key> {
-            iter: Flat<'i, C, K, $iter<K>>,
+        $vis struct $name<'i, L: Criterion<K>, K: 'static + Key> {
+            iter: Flat<'i, L, K, $iter<K>>,
         }
-        impl<'i, C, K>  $name<'i, C, K>  where C: Criterion<K>, K: 'static + Key {
+        impl<'i, L, K>  $name<'i, L, K>  where L: Criterion<K>, K: 'static + Key {
             #[doc=concat!("Creates a new ", stringify!($name))]
-            pub(crate) fn new(key: K, schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self
+            pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self
             {
                 let schema = schemas.get_unchecked(key, sources);
                 let iter = $func(schema);
@@ -375,12 +375,12 @@ macro_rules! iter {
                 Self { iter }
             }
         }
-        impl<'i, C, K> Iterator for $name<'i, C, K>
+        impl<'i, L, K> Iterator for $name<'i, L, K>
         where
-            C: Criterion<K>,
+            L: Criterion<K>,
             K: 'static + Key
         {
-            type Item = Schema<'i, C, K>;
+            type Item = Schema<'i, L, K>;
 
             fn next(&mut self) -> Option<Self::Item> {
                 self.iter.next()
@@ -397,11 +397,11 @@ iter! {
 type IntoKeyIter<K> = IntoIter<K>;
 
 type Deps<K> = Map<IntoIter<Reference<K>>, fn(Reference<K>) -> K>;
-type TransitiveDeps<'i, C, K> = DepthFirst<'i, C, K, Deps<K>, fn(Schema<'i, C, K>) -> Deps<K>>;
+type TransitiveDeps<'i, L, K> = DepthFirst<'i, L, K, Deps<K>, fn(Schema<'i, L, K>) -> Deps<K>>;
 
-fn direct_dependencies<C, K>(schema: Schema<'_, C, K>) -> Deps<K>
+fn direct_dependencies<L, K>(schema: Schema<'_, L, K>) -> Deps<K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     #[allow(clippy::unnecessary_to_owned)]
@@ -413,20 +413,20 @@ iter! {
     /// depend on a specified [`Schema`](crate::schema::Schema)
     pub DirectDependents @ direct_dependents -> IntoKeyIter
 }
-fn direct_dependents<C: Criterion<K>, K: 'static + Key>(schema: Schema<'_, C, K>) -> IntoIter<K> {
+fn direct_dependents<L: Language<K>, K: 'static + Key>(schema: Schema<'_, L, K>) -> IntoIter<K> {
     #[allow(clippy::unnecessary_to_owned)]
     schema.dependents.into_owned().into_iter()
 }
 
-type Slices<'i, C, K> =
-    DepthFirst<'i, C, K, IntoKeyIter<K>, fn(Schema<'i, C, K>) -> IntoKeyIter<K>>;
+type Slices<'i, L, K> =
+    DepthFirst<'i, L, K, IntoKeyIter<K>, fn(Schema<'i, L, K>) -> IntoKeyIter<K>>;
 
-type Instances<'i, C, K> = DepthFirst<
+type Instances<'i, L, K> = DepthFirst<
     'i,
-    C,
+    L,
     K,
     Either<Once<K>, Empty<K>>,
-    fn(Schema<'i, C, K>) -> Either<Once<K>, Empty<K>>,
+    fn(Schema<'i, L, K>) -> Either<Once<K>, Empty<K>>,
 >;
 
 // #[cfg(test)]

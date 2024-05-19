@@ -1,5 +1,5 @@
 pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
-use grill_core::{criterion, Schema};
+use grill_core::{language, Schema};
 use grill_uri::AbsoluteUri;
 use jsonptr::Pointer;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -88,7 +88,7 @@ pub enum Output {
     Verbose = 8,
 }
 
-impl criterion::Output for Output {
+impl language::Output for Output {
     fn verbose() -> Self {
         Self::Verbose
     }
@@ -231,7 +231,7 @@ impl<'v> Report<'v> {
     }
 }
 
-impl<'v> criterion::Report<'v> for Report<'v> {
+impl<'v> language::Report<'v> for Report<'v> {
     type Output = Output;
     type Owned = Report<'static>;
 
@@ -251,9 +251,9 @@ impl<'v> criterion::Report<'v> for Report<'v> {
         }
     }
 
-    fn new<'i, C, K>(output: Self::Output, schema: &Schema<'i, C, K>) -> Self
+    fn new<'i, L, K>(output: Self::Output, schema: &Schema<'i, L, K>) -> Self
     where
-        C: criterion::Criterion<K>,
+        L: language::Language<K>,
         K: 'static + grill_core::Key,
     {
         todo!()

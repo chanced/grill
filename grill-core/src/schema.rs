@@ -6,7 +6,7 @@ pub mod traverse;
 
 pub mod dialect;
 
-use crate::criterion::{Criterion, CriterionReport, NewContext, Report};
+use crate::language::{CriterionReport, Language, NewContext, Report};
 use crate::error::{self, CompileError};
 use crate::{cache, Key};
 
@@ -16,10 +16,9 @@ use serde::{Serialize, Serializer};
 use snafu::Backtrace;
 
 use grill_uri::{AbsoluteUri, Uri};
-pub(crate) mod compiler;
 
 use crate::{
-    criterion::Keyword,
+    language::Keyword,
     error::{EvaluateError, UnknownKeyError},
     schema::traverse::{
         AllDependents, Ancestors, Descendants, DirectDependencies, DirectDependents,
@@ -33,21 +32,21 @@ use serde_json::Value;
 use slotmap::{new_key_type, SlotMap};
 use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
 
-pub struct Evaluate<'i, 'v, C, K>
+pub struct Evaluate<'i, 'v, L, K>
 where
     K: 'static + Key,
-    C: Criterion<K>,
+    L: Language<K>,
 {
-    pub output: <<C as Criterion<K>>::Report<'v> as Report<'v>>::Output,
+    pub output: <<L as Language<K>>::Report<'v> as Report<'v>>::Output,
     pub key: K,
     pub value: &'v Value,
     pub instance_location: Pointer,
     pub keyword_location: Pointer,
     pub sources: &'i Sources,
-    pub dialects: &'i Dialects<C, K>,
+    pub dialects: &'i Dialects<L, K>,
     pub global_numbers: &'i cache::Numbers,
     pub eval_numbers: &'i mut cache::Numbers,
-    pub criterion: &'i C,
+    pub criterion: &'i L,
 }
 
 /*
@@ -87,9 +86,9 @@ pub struct Anchor {
 */
 
 #[derive(Clone, Debug)]
-pub(crate) struct CompiledSchema<C, K>
+pub(crate) struct CompiledSchema<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Abs URI of the schema.
@@ -124,7 +123,7 @@ where
     pub(crate) metaschema: AbsoluteUri,
 
     // Compiled keywords.
-    pub(crate) keywords: Box<[C::Keyword]>,
+    pub(crate) keywords: Box<[L::Keyword]>,
 
     /// Absolute URI of the source and path to this schema.
     pub(crate) link: Link,
@@ -132,9 +131,9 @@ where
     pub(crate) compiled: bool,
 }
 
-impl<C, K> CompiledSchema<C, K>
+impl<L, K> CompiledSchema<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     pub(crate) fn new(
@@ -145,7 +144,7 @@ where
         anchors: Vec<Anchor>,
         parent: Option<K>,
         metaschema: AbsoluteUri,
-    ) -> CompiledSchema<C, K> {
+    ) -> CompiledSchema<L, K> {
         Self {
             id,
             path,
@@ -162,9 +161,9 @@ where
         }
     }
 }
-impl<C, K> CompiledSchema<C, K>
+impl<L, K> CompiledSchema<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Returns most relevant URI for the schema, either using the `$id` or the
@@ -175,9 +174,9 @@ where
     }
 }
 
-impl<C, K> PartialEq for CompiledSchema<C, K>
+impl<L, K> PartialEq for CompiledSchema<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -185,7 +184,7 @@ where
     }
 }
 
-impl<C: Criterion<K>, K: 'static + Key> Eq for CompiledSchema<C, K> {}
+impl<L: Language<K>, K: 'static + Key> Eq for CompiledSchema<L, K> {}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -199,7 +198,7 @@ impl<C: Criterion<K>, K: 'static + Key> Eq for CompiledSchema<C, K> {}
 
 /// A compiled schema.
 #[derive(Clone, Debug)]
-pub struct Schema<'i, C: Criterion<K>, K: 'static + Key> {
+pub struct Schema<'i, L: Language<K>, K: 'static + Key> {
     /// Key of the `Schema`
     pub key: K,
 
@@ -238,25 +237,25 @@ pub struct Schema<'i, C: Criterion<K>, K: 'static + Key> {
     pub references: Cow<'i, [Reference<K>]>,
 
     /// Compiled [`Keyword`]s.
-    pub keywords: Cow<'i, [C::Keyword]>,
+    pub keywords: Cow<'i, [L::Keyword]>,
 
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]
     pub source: Source<'i>,
 }
 
-impl<C, K> PartialEq<Schema<'_, C, K>> for Value
+impl<L, K> PartialEq<Schema<'_, L, K>> for Value
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    fn eq(&self, other: &Schema<'_, C, K>) -> bool {
+    fn eq(&self, other: &Schema<'_, L, K>) -> bool {
         self == other.value()
     }
 }
-impl<C, K> PartialEq<Value> for Schema<'_, C, K>
+impl<L, K> PartialEq<Value> for Schema<'_, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn eq(&self, other: &Value) -> bool {
@@ -264,9 +263,9 @@ where
     }
 }
 
-impl<C, K> Serialize for Schema<'_, C, K>
+impl<L, K> Serialize for Schema<'_, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -274,10 +273,10 @@ where
     }
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> Schema<'i, C, K> {
+impl<'i, L: Language<K>, K: 'static + Key> Schema<'i, L, K> {
     /// Clones the `Schema`
     #[must_use]
-    pub fn into_owned(self) -> Schema<'static, C, K> {
+    pub fn into_owned(self) -> Schema<'static, L, K> {
         Schema {
             key: self.key,
             parent: self.parent,
@@ -301,9 +300,9 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Schema<'i, C, K> {
         self.id.as_deref().unwrap_or(&self.uris[0])
     }
 }
-impl<C, K> std::ops::Index<&str> for Schema<'_, C, K>
+impl<L, K> std::ops::Index<&str> for Schema<'_, L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     type Output = Value;
@@ -313,7 +312,7 @@ where
     }
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> Schema<'i, C, K> {
+impl<'i, L: Language<K>, K: 'static + Key> Schema<'i, L, K> {
     /// [`Value`] of the schema
     #[must_use]
     pub fn value(&self) -> &Value {
@@ -321,7 +320,7 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Schema<'i, C, K> {
     }
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> Deref for Schema<'i, C, K> {
+impl<'i, L: Language<K>, K: 'static + Key> Deref for Schema<'i, L, K> {
     type Target = Value;
 
     fn deref(&self) -> &Self::Target {
@@ -329,12 +328,12 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Deref for Schema<'i, C, K> {
     }
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> PartialEq for Schema<'i, C, K> {
+impl<'i, L: Language<K>, K: 'static + Key> PartialEq for Schema<'i, L, K> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.metaschema == other.metaschema
     }
 }
-impl<'i, C: Criterion<K>, K: 'static + Key> Eq for Schema<'i, C, K> {}
+impl<'i, L: Language<K>, K: 'static + Key> Eq for Schema<'i, L, K> {}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -347,13 +346,13 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Eq for Schema<'i, C, K> {}
 */
 
 #[derive(Debug, Clone)]
-struct Store<C: Criterion<K>, K: 'static + Key> {
-    table: SlotMap<K, CompiledSchema<C, K>>,
+struct Store<L: Language<K>, K: 'static + Key> {
+    table: SlotMap<K, CompiledSchema<L, K>>,
     index: HashMap<AbsoluteUri, K>,
 }
-impl<C, K> Default for Store<C, K>
+impl<L, K> Default for Store<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn default() -> Self {
@@ -364,15 +363,15 @@ where
     }
 }
 #[allow(clippy::unnecessary_box_returns)]
-impl<C, K> Store<C, K>
+impl<L, K> Store<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
-    fn get_mut(&mut self, key: K) -> Option<&mut CompiledSchema<C, K>> {
+    fn get_mut(&mut self, key: K) -> Option<&mut CompiledSchema<L, K>> {
         self.table.get_mut(key)
     }
-    fn get(&self, key: K) -> Option<&CompiledSchema<C, K>> {
+    fn get(&self, key: K) -> Option<&CompiledSchema<L, K>> {
         self.table.get(key)
     }
     pub(crate) fn get_index(&self, id: &AbsoluteUri) -> Option<K> {
@@ -393,7 +392,7 @@ where
     /// # Errors
     /// Returns the URI of the existing schema if it is not equal to the new
     /// schema.
-    pub(crate) fn insert(&mut self, schema: CompiledSchema<C, K>) -> Result<K, error::SourceError> {
+    pub(crate) fn insert(&mut self, schema: CompiledSchema<L, K>) -> Result<K, error::SourceError> {
         let id = schema.id.as_ref().unwrap_or(&schema.uris[0]);
         if let Some(key) = self.index.get(id) {
             let existing = self.table.get(*key).unwrap();
@@ -427,14 +426,14 @@ where
 */
 
 #[derive(Clone, Debug, Default)]
-pub struct Schemas<C: Criterion<K>, K: 'static + Key> {
-    store: Store<C, K>,
-    sandbox: Option<Store<C, K>>,
+pub struct Schemas<L: Language<K>, K: 'static + Key> {
+    store: Store<L, K>,
+    sandbox: Option<Store<L, K>>,
 }
 
-impl<C, K> Schemas<C, K>
+impl<L, K> Schemas<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     #[must_use]
@@ -448,8 +447,8 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn evaluate<'i, 'v>(
         &self,
-        eval: Evaluate<'i, 'v, C, K>,
-    ) -> Result<CriterionReport<'v, C, K>, EvaluateError<K>> {
+        eval: Evaluate<'i, 'v, L, K>,
+    ) -> Result<CriterionReport<'v, L, K>, EvaluateError<K>> {
         let Evaluate {
             key,
             sources,
@@ -465,7 +464,7 @@ where
 
         let schema = self.get(key, sources)?;
 
-        let mut report = <<C as Criterion<K>>::Report<'v> as Report<'v>>::new(output, &schema);
+        let mut report = <<L as Language<K>>::Report<'v> as Report<'v>>::new(output, &schema);
 
         let mut ctx = criterion.new_context(NewContext {
             global_numbers,
@@ -508,7 +507,7 @@ where
         uri: &AbsoluteUri,
         references: &[Reference<K>],
         sources: &Sources,
-    ) -> Result<(), error::CompileError<C, K>> {
+    ) -> Result<(), error::CompileError<L, K>> {
         for reference in references {
             if key == reference.key
                 || self
@@ -537,7 +536,7 @@ where
     pub(crate) fn has_keywords(&self, key: K) -> bool {
         !self.store().get(key).unwrap().keywords.is_empty()
     }
-    pub(crate) fn set_keywords(&mut self, key: K, keywords: Box<[C::Keyword]>) {
+    pub(crate) fn set_keywords(&mut self, key: K, keywords: Box<[L::Keyword]>) {
         self.sandbox().table.get_mut(key).unwrap().keywords = keywords;
     }
 
@@ -553,13 +552,13 @@ where
             .map(|(k, _)| k)
     }
 
-    fn sandbox(&mut self) -> &mut Store<C, K> {
+    fn sandbox(&mut self) -> &mut Store<L, K> {
         self.sandbox
             .as_mut()
             .expect("transaction failed: schema sandbox not found.\n\nthis is a bug, please report it: https://github.com/chanced/grill/issues/new")
     }
 
-    fn store(&self) -> &Store<C, K> {
+    fn store(&self) -> &Store<L, K> {
         if let Some(sandbox) = self.sandbox.as_ref() {
             return sandbox;
         }
@@ -571,7 +570,7 @@ where
     // pub(crate) fn index_entry(&mut self, id: AbsoluteUri) -> Entry<'_, AbsoluteUri, Key> {
     //     self.sandbox().index_entry(id)
     // }
-    pub(crate) fn insert(&mut self, schema: CompiledSchema<C, K>) -> Result<K, error::SourceError> {
+    pub(crate) fn insert(&mut self, schema: CompiledSchema<L, K>) -> Result<K, error::SourceError> {
         self.sandbox().insert(schema)
     }
 
@@ -579,11 +578,11 @@ where
     //     self.store().iter()
     // }
 
-    pub(crate) fn ancestors<'i>(&'i self, key: K, sources: &'i Sources) -> Ancestors<'i, C, K> {
+    pub(crate) fn ancestors<'i>(&'i self, key: K, sources: &'i Sources) -> Ancestors<'i, L, K> {
         Ancestors::new(key, self, sources)
     }
 
-    pub(crate) fn descendants<'i>(&'i self, key: K, sources: &'i Sources) -> Descendants<'i, C, K> {
+    pub(crate) fn descendants<'i>(&'i self, key: K, sources: &'i Sources) -> Descendants<'i, L, K> {
         Descendants::new(key, self, sources)
     }
 
@@ -605,7 +604,7 @@ where
         &'i self,
         key: K,
         sources: &'i Sources,
-    ) -> DirectDependents<'i, C, K> {
+    ) -> DirectDependents<'i, L, K> {
         DirectDependents::new(key, self, sources)
     }
 
@@ -613,7 +612,7 @@ where
         &'i self,
         key: K,
         sources: &'i Sources,
-    ) -> AllDependents<'i, C, K> {
+    ) -> AllDependents<'i, L, K> {
         AllDependents::new(key, self, sources)
     }
 
@@ -621,7 +620,7 @@ where
         &'i self,
         key: K,
         sources: &'i Sources,
-    ) -> TransitiveDependencies<'i, C, K> {
+    ) -> TransitiveDependencies<'i, L, K> {
         TransitiveDependencies::new(key, self, sources)
     }
 
@@ -629,15 +628,15 @@ where
         &'i self,
         key: K,
         sources: &'i Sources,
-    ) -> DirectDependencies<'i, C, K> {
+    ) -> DirectDependencies<'i, L, K> {
         DirectDependencies::new(key, self, sources)
     }
 
-    pub(crate) fn get_unchecked<'i>(&'i self, key: K, sources: &'i Sources) -> Schema<'i, C, K> {
+    pub(crate) fn get_unchecked<'i>(&'i self, key: K, sources: &'i Sources) -> Schema<'i, L, K> {
         self.get(key, sources).unwrap()
     }
 
-    pub(crate) fn get_compiled(&self, key: K) -> Option<CompiledSchema<C, K>> {
+    pub(crate) fn get_compiled(&self, key: K) -> Option<CompiledSchema<L, K>> {
         self.store().get(key).cloned()
     }
 
@@ -646,7 +645,7 @@ where
         &'i self,
         key: K,
         sources: &'i Sources,
-    ) -> Result<Schema<'i, C, K>, UnknownKeyError<K>> {
+    ) -> Result<Schema<'i, L, K>, UnknownKeyError<K>> {
         let schema = self.store().get(key).ok_or(UnknownKeyError {
             key,
             backtrace: Backtrace::capture(),
@@ -672,7 +671,7 @@ where
     ///
     /// # Panics
     /// Panics if a transaction has not been started.
-    pub(crate) fn get_mut(&mut self, key: K) -> Option<&mut CompiledSchema<C, K>> {
+    pub(crate) fn get_mut(&mut self, key: K) -> Option<&mut CompiledSchema<L, K>> {
         self.sandbox().get_mut(key)
     }
 
@@ -681,7 +680,7 @@ where
         key: K,
         ref_: Reference<K>,
         sources: &Sources,
-    ) -> Result<(), CompileError<C, K>> {
+    ) -> Result<(), CompileError<L, K>> {
         let references = self.get_compiled(ref_.key).unwrap().references.clone();
         self.ensure_not_cyclic(key, &ref_.absolute_uri, &references, sources)?;
         self.get_mut(key).unwrap().references.push(ref_);
@@ -697,7 +696,7 @@ where
         &'i self,
         uri: &AbsoluteUri,
         sources: &'i Sources,
-    ) -> Option<Schema<'i, C, K>> {
+    ) -> Option<Schema<'i, L, K>> {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
@@ -753,14 +752,14 @@ pub struct Reference<Key> {
 /// [`Interrogator`](`crate::Interrogator`). If this is not a concern, use
 /// [`unchecked`](`Iter::unchecked`) which unwraps all `Result`s.
 ///
-pub struct Iter<'i, C: Criterion<K>, K: 'static + Key> {
+pub struct Iter<'i, L: Language<K>, K: 'static + Key> {
     sources: &'i Sources,
-    schemas: &'i Schemas<C, K>,
+    schemas: &'i Schemas<L, K>,
     inner: Either<std::slice::Iter<'i, K>, std::vec::IntoIter<K>>,
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> Iter<'i, C, K> {
-    pub(crate) fn new(keys: &'i [K], schemas: &'i Schemas<C, K>, sources: &'i Sources) -> Self {
+impl<'i, L: Language<K>, K: 'static + Key> Iter<'i, L, K> {
+    pub(crate) fn new(keys: &'i [K], schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
         Self {
             sources,
             schemas,
@@ -774,7 +773,7 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Iter<'i, C, K> {
     /// Do not use this unless you are certain all `Key`s are associated with
     /// the [`Interrogator`] from which this is originated.
     #[must_use]
-    pub fn unchecked(self) -> IterUnchecked<'i, C, K> {
+    pub fn unchecked(self) -> IterUnchecked<'i, L, K> {
         IterUnchecked { inner: self }
     }
 
@@ -786,8 +785,8 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Iter<'i, C, K> {
     //     }
     // }
 }
-impl<'i, C: Criterion<K>, K: 'static + Key> Iterator for Iter<'i, C, K> {
-    type Item = Result<Schema<'i, C, K>, UnknownKeyError<K>>;
+impl<'i, L: Language<K>, K: 'static + Key> Iterator for Iter<'i, L, K> {
+    type Item = Result<Schema<'i, L, K>, UnknownKeyError<K>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let key = match self.inner.as_mut() {
@@ -802,12 +801,12 @@ impl<'i, C: Criterion<K>, K: 'static + Key> Iterator for Iter<'i, C, K> {
 /// # Panics
 /// This will panic if any of the [`Key`]s are not associated with the same
 /// [`Interrogator`](`crate::Interrogator`).
-pub struct IterUnchecked<'i, C: Criterion<K>, K: 'static + Key> {
-    inner: Iter<'i, C, K>,
+pub struct IterUnchecked<'i, L: Language<K>, K: 'static + Key> {
+    inner: Iter<'i, L, K>,
 }
 
-impl<'i, C: Criterion<K>, K: 'static + Key> Iterator for IterUnchecked<'i, C, K> {
-    type Item = Schema<'i, C, K>;
+impl<'i, L: Language<K>, K: 'static + Key> Iterator for IterUnchecked<'i, L, K> {
+    type Item = Schema<'i, L, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(std::result::Result::unwrap)

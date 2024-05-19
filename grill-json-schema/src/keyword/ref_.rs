@@ -5,7 +5,7 @@
 use std::{ops::ControlFlow, sync::Arc};
 
 use grill_core::{
-    criterion::{Criterion, Keyword},
+    language::{Language, Keyword},
     error::{CompileError, EvaluateError, Expectated, RefsError},
     Key,
 };
@@ -73,7 +73,7 @@ where
 {
     fn compile<'i>(
         &mut self,
-        compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
+        compile: &mut <JsonSchema as Language<K>>::Compile<'i>,
         schema: grill_core::Schema<'i, JsonSchema, K>,
     ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         let Some(v) = schema.get(self.keyword) else {
@@ -94,7 +94,7 @@ where
     }
     fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
+        ctx: &'c mut <JsonSchema as Language<K>>::Context<'i, 'v, 'r>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         if !self.must_eval {
@@ -114,7 +114,7 @@ where
     fn refs(
         &self,
         schema: &Value,
-    ) -> ControlFlow<(), Result<Vec<grill_core::criterion::Ref>, RefsError>> {
+    ) -> ControlFlow<(), Result<Vec<grill_core::language::Ref>, RefsError>> {
         todo!()
     }
 }

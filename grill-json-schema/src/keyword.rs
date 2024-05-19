@@ -24,7 +24,7 @@ pub mod schema;
 // pub mod write_only;
 
 use crate::JsonSchema;
-use grill_core::criterion::Criterion;
+use grill_core::language::Language;
 use grill_core::{
     error::{CompileError, EvaluateError},
     Key, Schema,
@@ -115,13 +115,13 @@ macro_rules! delegate {
     };
 }
 
-impl<K> grill_core::criterion::Keyword<JsonSchema, K> for Keyword
+impl<K> grill_core::language::Keyword<JsonSchema, K> for Keyword
 where
     K: 'static + Key,
 {
     fn compile<'i>(
         &mut self,
-        _compile: &mut <JsonSchema as Criterion<K>>::Compile<'i>,
+        _compile: &mut <JsonSchema as Language<K>>::Compile<'i>,
         _schema: Schema<'i, JsonSchema, K>,
     ) -> Result<ControlFlow<()>, CompileError<JsonSchema, K>> {
         todo!()
@@ -129,7 +129,7 @@ where
 
     fn evaluate<'i, 'c, 'v, 'r>(
         &'i self,
-        ctx: &'c mut <JsonSchema as Criterion<K>>::Context<'i, 'v, 'r>,
+        ctx: &'c mut <JsonSchema as Language<K>>::Context<'i, 'v, 'r>,
         value: &'v Value,
     ) -> Result<(), EvaluateError<K>> {
         todo!()

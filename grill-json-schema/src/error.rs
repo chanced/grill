@@ -181,12 +181,12 @@
 // /// Various errors that can occur while building an [`Interrogator`](crate::Interrogator).
 // #[derive(Debug, Snafu)]
 // #[snafu(visibility(pub), context(suffix(Ctx)), module)]
-// pub enum BuildError<C: CompileError> {
+// pub enum BuildError<L: CompileError> {
 //     #[snafu(transparent)]
 //     /// A [`Schema`](crate::schema::Schema) failed to compile.
 //     FailedToCompile {
 //         #[snafu(backtrace)]
-//         source: C,
+//         source: L,
 //     },
 
 //     #[snafu(transparent)]

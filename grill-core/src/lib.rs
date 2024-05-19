@@ -18,12 +18,15 @@
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
 pub mod cache;
-pub mod criterion;
-pub mod error;
+use cache::{Numbers, Values};
+
+pub mod language;
+use language::{Language, CriterionReportOutput};
+
 /// Keywords
 pub mod visitor;
-use cache::{Numbers, Values};
-use criterion::{Criterion, CriterionReportOutput};
+
+pub mod error;
 use error::{
     source_error, BuildError, CompileError, DeserializeError, EvaluateError, UnknownKeyError,
 };
@@ -38,8 +41,8 @@ use schema::traverse::{
     TransitiveDependencies,
 };
 use schema::Schemas;
-use schema::{compiler::Compiler, Dialect, Dialects, Evaluate, Iter, IterUnchecked};
 pub use schema::{DefaultKey, Schema};
+use schema::{Dialect, Dialects, Evaluate, Iter, IterUnchecked};
 use snafu::ResultExt;
 use source::{deserialize_json, Deserializer, Deserializers, Resolve, Resolvers, Sources};
 
@@ -65,62 +68,6 @@ pub const FALSE: &Value = &Value::Bool(false);
 
 pub const EMPTY_OBJ: Lazy<Value> = Lazy::new(|| Value::Object(Default::default()));
 
-#[derive(Clone, Copy)]
-pub(crate) enum Validate {
-    Required,
-    Skip,
-}
-impl From<Validate> for bool {
-    fn from(value: Validate) -> Self {
-        matches!(value, Validate::Required)
-    }
-}
-
-pub(crate) trait ControlFlowExt<B, C>: Sized {
-    /// Converts the `ControlFlow` into an `Option` which is `Some` if the
-    /// `ControlFlow` was `Break` and `None` otherwise.
-    ///
-    /// Named `break_val` to avoid conflict with the `break` keyword and the
-    /// nightly `break_value` method of `ControlFlow`.
-
-    fn break_val(self) -> Option<B>;
-    fn continue_val(self) -> Option<C>;
-    fn map_continue<U, F: FnOnce(C) -> Option<U>>(self, f: F) -> Option<U>;
-    fn map_break<U, F: FnOnce(B) -> Option<U>>(self, f: F) -> Option<U>;
-    fn unwrap_break(self) -> B {
-        self.break_val().unwrap()
-    }
-    fn unwrap_continue(self) -> C {
-        self.continue_val().unwrap()
-    }
-}
-
-impl<B, C> ControlFlowExt<B, C> for ControlFlow<B, C> {
-    fn break_val(self) -> Option<B> {
-        match self {
-            ControlFlow::Break(b) => Some(b),
-            _ => None,
-        }
-    }
-
-    fn continue_val(self) -> Option<C> {
-        match self {
-            ControlFlow::Continue(c) => Some(c),
-            _ => None,
-        }
-    }
-
-    fn map_continue<U, F: FnOnce(C) -> Option<U>>(self, _f: F) -> Option<U> {
-        match self {
-            ControlFlow::Continue(_) => todo!(),
-            ControlFlow::Break(_) => todo!(),
-        }
-    }
-
-    fn map_break<U, F: FnOnce(B) -> Option<U>>(self, _f: F) -> Option<U> {
-        todo!()
-    }
-}
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
@@ -143,9 +90,9 @@ impl<B, C> ControlFlowExt<B, C> for ControlFlow<B, C> {
 // }
 #[derive(Default)]
 /// Constructs an [`Interrogator`].
-pub struct Build<C: Criterion<K>, K: 'static + Key> {
-    dialects: Vec<Dialect<C, K>>,
-    precompile: Vec<Result<AbsoluteUri, CompileError<C, K>>>,
+pub struct Build<L: Language<K>, K: 'static + Key> {
+    dialects: Vec<Dialect<L, K>>,
+    precompile: Vec<Result<AbsoluteUri, CompileError<L, K>>>,
     pending_srcs: Vec<PendingSrc>,
     default_dialect_idx: Option<usize>,
     resolvers: Vec<Box<dyn Resolve>>,
@@ -154,7 +101,7 @@ pub struct Build<C: Criterion<K>, K: 'static + Key> {
     // serialize and deserialize interrogator
     deserializers: Vec<(&'static str, Box<dyn Deserializer>)>,
     numbers: Vec<Number>,
-    language: C,
+    language: L,
 }
 
 // impl IntoFuture for Build {
@@ -165,14 +112,14 @@ pub struct Build<C: Criterion<K>, K: 'static + Key> {
 //     }
 // }
 
-impl<C, K> Build<C, K>
+impl<L, K> Build<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Constructs a new `Build`
     #[must_use]
-    pub fn new(language: C) -> Self {
+    pub fn new(language: L) -> Self {
         Self {
             language,
             dialects: Vec::new(),
@@ -186,14 +133,14 @@ where
     }
 }
 
-impl<C, K> Build<C, K>
+impl<L, K> Build<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     /// Adds a new [`Dialect`] to the [`Interrogator`] constructed by [`Build`].
     #[must_use]
-    pub fn dialect(mut self, dialect: Dialect<C, K>) -> Self {
+    pub fn dialect(mut self, dialect: Dialect<L, K>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         if self.default_dialect_idx.is_none() {
@@ -205,7 +152,7 @@ where
     /// Sets the default [`Dialect`] for the [`Interrogator`] constructed by
     /// [`Build`].
     #[must_use]
-    pub fn default_dialect(mut self, dialect: Dialect<C, K>) -> Self {
+    pub fn default_dialect(mut self, dialect: Dialect<L, K>) -> Self {
         let idx = self.dialects.len();
         self.dialects.push(dialect);
         self.default_dialect_idx = Some(idx);
@@ -581,7 +528,7 @@ where
     /// Finishes building the [`Interrogator`]. Alternatively, you can simply
     /// `await` any method as `Build` implements [`IntoFuture`].
     ///
-    pub async fn finish(self) -> Result<Interrogator<C, K>, BuildError<C, K>> {
+    pub async fn finish(self) -> Result<Interrogator<L, K>, BuildError<L, K>> {
         let Self {
             language,
             dialects,
@@ -666,20 +613,20 @@ where
 
 /// Compiles and evaluates JSON Schemas.
 #[derive(Clone)]
-pub struct Interrogator<C: Criterion<K>, K: 'static + Key> {
-    pub(crate) dialects: Dialects<C, K>,
-    pub(crate) sources: Sources,
-    pub(crate) resolvers: Resolvers,
-    pub(crate) schemas: Schemas<C, K>,
-    pub(crate) deserializers: Deserializers,
-    pub(crate) numbers: Numbers,
-    pub(crate) values: Values,
-    pub(crate) language: C,
+pub struct Interrogator<L: Language<K>, K: 'static + Key> {
+    pub dialects: Dialects<L, K>,
+    pub sources: Sources,
+    pub resolvers: Resolvers,
+    pub schemas: Schemas<L, K>,
+    pub deserializers: Deserializers,
+    pub numbers: Numbers,
+    pub values: Values,
+    pub language: L,
 }
 
-impl<C, K> std::fmt::Debug for Interrogator<C, K>
+impl<L, K> std::fmt::Debug for Interrogator<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -694,9 +641,9 @@ where
     }
 }
 
-impl<C, K> Interrogator<C, K>
+impl<L, K> Interrogator<L, K>
 where
-    C: Criterion<K>,
+    L: Language<K>,
     K: 'static + Key,
 {
     pub fn print_source_index(&self) {
@@ -707,7 +654,7 @@ where
     ///
     /// # Errors
     /// Returns [`UnknownKeyError`] if the `key` does not belong to this `Interrgator`.
-    pub fn schema(&self, key: K) -> Result<Schema<'_, C, K>, UnknownKeyError<K>> {
+    pub fn schema(&self, key: K) -> Result<Schema<'_, L, K>, UnknownKeyError<K>> {
         self.schemas.get(key, &self.sources)
     }
 
@@ -716,13 +663,13 @@ where
     ///
     /// # Panics
     /// Panics if the `key` does not belong to this `Interrgator`.
-    pub fn schema_unchecked(&self, key: K) -> Schema<'_, C, K> {
+    pub fn schema_unchecked(&self, key: K) -> Schema<'_, L, K> {
         self.schemas.get_unchecked(key, &self.sources)
     }
 
     /// Returns the [`Schema`] with the given `id` if it exists.
     #[must_use]
-    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_, C, K>> {
+    pub fn schema_by_uri(&self, id: &AbsoluteUri) -> Option<Schema<'_, L, K>> {
         self.schemas.get_by_uri(id, &self.sources)
     }
 
@@ -745,7 +692,7 @@ where
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this
     /// `Interrogator`
-    pub fn ancestors(&self, key: K) -> Result<Ancestors<'_, C, K>, UnknownKeyError<K>> {
+    pub fn ancestors(&self, key: K) -> Result<Ancestors<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.ancestors(key, &self.sources))
     }
     /// Returns [`Ancestors`] which is an [`Iterator`] over the [`Schema`]s
@@ -761,7 +708,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn ancestors_unchecked(&self, key: K) -> Ancestors<'_, C, K> {
+    pub fn ancestors_unchecked(&self, key: K) -> Ancestors<'_, L, K> {
         self.schemas.ancestors(key, &self.sources)
     }
 
@@ -776,7 +723,7 @@ where
     ///
     /// # Errors
     /// Returns `UnknownKeyError` if `key` does not belong to this `Interrogator`
-    pub fn descendants(&self, key: K) -> Result<Descendants<'_, C, K>, UnknownKeyError<K>> {
+    pub fn descendants(&self, key: K) -> Result<Descendants<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -794,7 +741,7 @@ where
     pub fn descendants_unchecked(
         &self,
         key: K,
-    ) -> Result<Descendants<'_, C, K>, UnknownKeyError<K>> {
+    ) -> Result<Descendants<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.descendants(key, &self.sources))
     }
 
@@ -806,7 +753,7 @@ where
     pub fn direct_dependencies(
         &self,
         key: K,
-    ) -> Result<DirectDependencies<'_, C, K>, UnknownKeyError<K>> {
+    ) -> Result<DirectDependencies<'_, L, K>, UnknownKeyError<K>> {
         self.schemas
             .ensure_key_exists(key, || self.schemas.direct_dependencies(key, &self.sources))
     }
@@ -817,7 +764,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn direct_dependencies_unchecked(&self, key: K) -> DirectDependencies<'_, C, K> {
+    pub fn direct_dependencies_unchecked(&self, key: K) -> DirectDependencies<'_, L, K> {
         self.schemas.direct_dependencies(key, &self.sources)
     }
 
@@ -831,7 +778,7 @@ where
     pub fn transitive_dependencies(
         &self,
         key: K,
-    ) -> Result<TransitiveDependencies<'_, C, K>, UnknownKeyError<K>> {
+    ) -> Result<TransitiveDependencies<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || {
             self.schemas.transitive_dependencies(key, &self.sources)
         })
@@ -845,7 +792,7 @@ where
     /// # Panics
     /// Panics if `key` does not belong to this `Interrogator`
     #[must_use]
-    pub fn transitive_dependencies_unchecked(&self, key: K) -> TransitiveDependencies<'_, C, K> {
+    pub fn transitive_dependencies_unchecked(&self, key: K) -> TransitiveDependencies<'_, L, K> {
         self.schemas.transitive_dependencies(key, &self.sources)
     }
 
@@ -858,7 +805,7 @@ where
     pub fn direct_dependents(
         &self,
         key: K,
-    ) -> Result<DirectDependents<'_, C, K>, UnknownKeyError<K>> {
+    ) -> Result<DirectDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
@@ -871,13 +818,13 @@ where
     pub fn direct_dependents_unchecked(
         &self,
         key: K,
-    ) -> Result<DirectDependents<'_, C, K>, UnknownKeyError<K>> {
+    ) -> Result<DirectDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.direct_dependents(key, &self.sources))
     }
 
     /// Returns [`AllDependents`] which is an [`Iterator`] over [`Schema`]s which
     /// depend on a specified [`Schema`](crate::schema::Schema)
-    pub fn all_dependents(&self, key: K) -> Result<AllDependents<'_, C, K>, UnknownKeyError<K>> {
+    pub fn all_dependents(&self, key: K) -> Result<AllDependents<'_, L, K>, UnknownKeyError<K>> {
         self.ensure_key_exists(key, || self.schemas.all_dependents(key, &self.sources))
     }
 
@@ -919,30 +866,23 @@ where
     ///
     /// ## Errors
     /// Returns [`CompileError`] if any of the schemas fail to compile.
-    //
+    ///
     #[allow(clippy::unused_async)]
     pub async fn compile_all<I>(
         &mut self,
         uris: I,
-    ) -> Result<Vec<(AbsoluteUri, K)>, CompileError<C, K>>
+    ) -> Result<Vec<(AbsoluteUri, K)>, CompileError<L, K>>
     where
         I: IntoIterator,
         I::Item: TryIntoAbsoluteUri,
     {
         let uris = uris.into_iter();
         self.start_txn();
-        match Compiler::new(self, Validate::Required)
+        Compiler::new(self, Validate::Required)
             .compile_all(uris)
             .await
-        {
-            Ok(key) => {
-                self.commit_txn();
-                Ok(key)
-            }
-            Err(err) => {
-                self.rollback_txn();
-                Err(err)
-            }
+            .map(|key| self.commit_txn(key))
+            .map_err(|err| self.rollback_txn(err))
         }
     }
 
@@ -956,7 +896,7 @@ where
     ///   - the uri fails to convert to an [`AbsoluteUri`].
     ///   - the schema fails to validate with the determined [`Dialect`]'s metaschema
     #[allow(clippy::unused_async)]
-    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<K, CompileError<C, K>> {
+    pub async fn compile(&mut self, uri: impl TryIntoAbsoluteUri) -> Result<K, CompileError<L, K>> {
         // TODO: use the txn method once async closures are available: https://github.com/rust-lang/rust/issues/62290
         let uri = uri.try_into_absolute_uri()?;
         self.start_txn();
@@ -975,7 +915,7 @@ where
     async fn compile_dialects_schemas(
         &mut self,
         uris: Vec<AbsoluteUri>,
-    ) -> Result<(), CompileError<C, K>> {
+    ) -> Result<(), CompileError<L, K>> {
         let uris = uris.into_iter();
         self.start_txn();
         match Compiler::new(self, Validate::Skip).compile_all(uris).await {
@@ -999,7 +939,7 @@ where
     /// If you know that all of the keys belong to this `Interrogator`, you can use
     /// [`iter_unchecked`](`Interrogator::iter_unchecked`) instead.
     #[must_use]
-    pub fn iter<'i>(&'i self, keys: &'i [K]) -> Iter<'i, C, K> {
+    pub fn iter<'i>(&'i self, keys: &'i [K]) -> Iter<'i, L, K> {
         Iter::new(keys, &self.schemas, &self.sources)
     }
 
@@ -1011,7 +951,7 @@ where
     /// have multiple `Interrogator` instances where mixing up keys could occur,
     /// use [`iter`](`Interrogator::iter`) instead.
     #[must_use]
-    pub fn iter_unchecked<'i>(&'i self, keys: &'i [K]) -> IterUnchecked<'i, C, K> {
+    pub fn iter_unchecked<'i>(&'i self, keys: &'i [K]) -> IterUnchecked<'i, L, K> {
         self.iter(keys).unchecked()
     }
 
@@ -1019,19 +959,19 @@ where
         &mut self,
         uri: AbsoluteUri,
         validate: Validate,
-    ) -> Result<K, CompileError<C, K>> {
+    ) -> Result<K, CompileError<L, K>> {
         Compiler::new(self, validate).compile(uri).await
     }
 
     /// Returns the [`Dialects`] for this `Interrogator`
     #[must_use]
-    pub fn dialects(&self) -> &Dialects<C, K> {
+    pub fn dialects(&self) -> &Dialects<L, K> {
         &self.dialects
     }
 
     /// Returns the default [`Dialect`] for the `Interrogator`.
     #[must_use]
-    pub fn default_dialect(&self) -> &Dialect<C, K> {
+    pub fn default_dialect(&self) -> &Dialect<L, K> {
         self.dialects.primary()
     }
 
@@ -1041,12 +981,12 @@ where
     pub fn evaluate<'v>(
         &self,
         key: K,
-        output: CriterionReportOutput<'v, C, K>,
+        output: CriterionReportOutput<'v, L, K>,
         value: &'v Value,
-    ) -> Result<C::Report<'v>, EvaluateError<K>> {
+    ) -> Result<L::Report<'v>, EvaluateError<K>> {
         let mut eval_numbers = Numbers::with_capacity(7);
         self.schemas.evaluate(Evaluate {
-            output: output as CriterionReportOutput<'v, C, K>,
+            output: output as CriterionReportOutput<'v, L, K>,
             key,
             value,
             keyword_location: Pointer::default(),
@@ -1392,12 +1332,12 @@ where
     /// Returns a new, empty [`Build`].
     #[must_use]
     #[allow(unused_must_use)]
-    pub fn build(lang: C) -> Build<C, K> {
+    pub fn build(lang: L) -> Build<L, K> {
         Build::new(lang)
     }
 
-    /// Starts a new transaction.
-    fn start_txn(&mut self) {
+    /// Starts a new transaction - should only be used by implementations of
+    pub fn start_txn(&mut self) {
         self.schemas.start_txn();
         self.sources.start_txn();
     }

@@ -21,11 +21,11 @@
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
-use core::criterion::{NewCompile, NewContext};
+use core::language::{NewCompile, NewContext};
 
 pub(crate) use grill_core as core;
 
-use grill_core::{criterion::Criterion, Key};
+use grill_core::{language::Language, Key};
 use integration::{Compile, Context};
 use keyword::Keyword;
 
@@ -44,7 +44,7 @@ impl std::fmt::Display for Report<'_> {
 #[derive(Debug, Clone)]
 pub struct JsonSchema {}
 
-impl<K> Criterion<K> for JsonSchema
+impl<K> Language<K> for JsonSchema
 where
     K: 'static + Key + 'static,
 {
