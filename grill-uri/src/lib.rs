@@ -706,6 +706,10 @@ impl AbsoluteUri {
         Ok(new)
     }
 
+    pub fn without_fragment(&self) -> AbsoluteUri {
+        self.with_fragment(None).unwrap()
+    }
+
     /// Returns the authority (`Url`) or namespace (`Urn`)
     #[must_use]
     pub fn authority_or_namespace(&self) -> Option<Cow<'_, str>> {

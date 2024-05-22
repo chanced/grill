@@ -12,7 +12,7 @@ use grill_uri::{AbsoluteUri, Uri};
 
 use crate::{Annotation, Error, JsonSchema, Report};
 
-/// Types only needed for integration with [`Criterion`].
+/// Types only needed for integration with [`Language`].
 
 #[derive(Debug)]
 pub struct Context<'i, 'v, 'r, L, K>
@@ -72,7 +72,7 @@ where
         //     dialects: todo!(),
         //     global_numbers: todo!(),
         //     eval_numbers: todo!(),
-        //     criterion: todo!(),
+        //     language: todo!(),
         // }
         // )
         todo!()

@@ -17,7 +17,7 @@ use std::{
 
 // TODO: Before creating an impl of traversal for `CompiledSchema`, benchmark
 // & measure WASM output & compile time. This is low priority as this only
-// pertains to "compile"/setup
+// occurs during compilation.
 
 /// A trait composed of utility methods for dealing with [`Iterator`]s of [`Schema`]s.
 pub trait Traverse<'i, L, K, Iter>: Iterator<Item = Schema<'i, L, K>>
@@ -111,7 +111,7 @@ macro_rules! impl_traverse {
     ($name:ident, $func:ident) => {
         impl<'i, L, K> Iterator for $name<'i, L, K>
         where
-            L: Criterion<K>,
+            L: Language<K>,
             K: 'static + Key,
         {
             type Item = Schema<'i, L, K>;
@@ -125,7 +125,11 @@ macro_rules! impl_traverse {
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependents of
 /// a [`Schema`].
-pub struct AllDependents<'i, L: Language<K>, K: 'static + Key> {
+pub struct AllDependents<'i, L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     traverse: Slices<'i, L, K>,
 }
 
@@ -155,12 +159,20 @@ where
 /// A [depth-first](https://en.wikipedia.org/wiki/Depth-first_search)
 /// [`Iterator`] which traverses both direct and indirect dependencies of
 /// a [`Schema`].
-pub struct TransitiveDependencies<'i, L: Language<K>, K: 'static + Key> {
+pub struct TransitiveDependencies<'i, L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     traverse: TransitiveDeps<'i, L, K>,
 }
 
 impl_traverse!(TransitiveDependencies, transitive_dependencies);
-fn transitive_dependencies<L: Language<K>, K: 'static + Key>(schema: Schema<'_, L, K>) -> Deps<K> {
+fn transitive_dependencies<L, K>(schema: Schema<'_, L, K>) -> Deps<K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     #[allow(clippy::unnecessary_to_owned)]
     schema.references.into_owned().into_iter().map(|r| r.key)
 }
@@ -185,7 +197,11 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Ancestors<'i, L: Language<K>, K: 'static + Key> {
+pub struct Ancestors<'i, L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     traverse: Instances<'i, L, K>,
 }
 
@@ -221,7 +237,11 @@ where
 /// `id` field for Draft 04 and earlier), then it must be the document root. As
 /// such, embedded schemas with an id  will not have a parent, even if the
 /// [`Schema`] is embedded.
-pub struct Descendants<'i, L: Language<K>, K: 'static + Key> {
+pub struct Descendants<'i, L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     traverse: Slices<'i, L, K>,
 }
 impl_traverse!(Descendants, descendants);
@@ -362,10 +382,10 @@ macro_rules! iter {
 
     ) => {
         $(#[$($attrss)*])*
-        $vis struct $name<'i, L: Criterion<K>, K: 'static + Key> {
+        $vis struct $name<'i, L: Language<K>, K: 'static + Key> {
             iter: Flat<'i, L, K, $iter<K>>,
         }
-        impl<'i, L, K>  $name<'i, L, K>  where L: Criterion<K>, K: 'static + Key {
+        impl<'i, L, K>  $name<'i, L, K>  where L: Language<K>, K: 'static + Key {
             #[doc=concat!("Creates a new ", stringify!($name))]
             pub(crate) fn new(key: K, schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self
             {
@@ -377,7 +397,7 @@ macro_rules! iter {
         }
         impl<'i, L, K> Iterator for $name<'i, L, K>
         where
-            L: Criterion<K>,
+            L: Language<K>,
             K: 'static + Key
         {
             type Item = Schema<'i, L, K>;

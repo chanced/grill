@@ -34,7 +34,11 @@ use std::{
 };
 
 /// Builds a [`Dialect`].
-pub struct Build<L: Language<K>, K: 'static + Key> {
+pub struct Build<L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     id: AbsoluteUri,
     metaschemas: Vec<(Result<AbsoluteUri, grill_uri::Error>, Cow<'static, Value>)>,
     keywords: Vec<L::Keyword>,
@@ -421,7 +425,11 @@ where
 
 /// A collection of [`Dialect`]s.
 #[derive(Debug, Clone)]
-pub struct Dialects<L: Language<K>, K: 'static + Key> {
+pub struct Dialects<L, K>
+where
+    L: Language<K>,
+    K: 'static + Key,
+{
     dialects: Vec<Dialect<L, K>>,
     default: usize,
 }

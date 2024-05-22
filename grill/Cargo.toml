@@ -12,9 +12,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-grill-core        = { workspace = true }
-grill-json-schema = { workspace = true }
-strum             = { workspace = true }
+grill-core = { workspace = true }
+# grill-json-schema = { workspace = true }
+strum = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1.28", features = ["full"] }

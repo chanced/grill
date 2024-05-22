@@ -8,8 +8,8 @@ use snafu::{ensure, Backtrace};
 
 use crate::{
     cache::{Numbers, Values},
-    criterion::{Criterion, CriterionReportOutput, Keyword, NewCompile, Output, Ref, Report},
     error::{compile_error::SchemaNotFoundSnafu, CompileError},
+    language::{Keyword, Language, LanguageReportOutput, NewCompile, Output, Ref, Report},
     schema::{dialect::Dialects, Schemas},
     source::{Deserializers, Link, Resolvers, SourceKey, Sources},
     Interrogator, Validate,
@@ -52,7 +52,7 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, L: Criterion<K>, K: 'static + Key> {
+pub(crate) struct Compiler<'i, L: Language<K>, K: 'static + Key> {
     schemas: &'i mut Schemas<L, K>,
     sources: &'i mut Sources,
     dialects: &'i Dialects<L, K>,
@@ -71,7 +71,7 @@ pub(crate) struct Compiler<'i, L: Criterion<K>, K: 'static + Key> {
     paths: HashMap<AbsoluteUri, Pointer>,
     refs: HashMap<AbsoluteUri, Vec<Ref>>,
     keywords: HashMap<AbsoluteUri, &'i [L::Keyword]>,
-    criterion: &'i mut L,
+    language: &'i mut L,
 }
 
 impl From<Validate> for bool {
@@ -83,7 +83,7 @@ impl From<Validate> for bool {
 #[allow(clippy::too_many_arguments)]
 impl<'i, L, K> Compiler<'i, L, K>
 where
-    L: Criterion<K>,
+    L: Language<K>,
     K: Key,
 {
     pub(crate) fn new(interrogator: &'i mut Interrogator<L, K>, validate: Validate) -> Self {
@@ -95,7 +95,7 @@ where
             resolvers: &interrogator.resolvers,
             numbers: &mut interrogator.numbers,
             values: &mut interrogator.values,
-            criterion: &mut interrogator.language,
+            language: &mut interrogator.language,
             validate,
             ids: HashMap::default(),
             indexed: HashSet::default(),
@@ -583,7 +583,7 @@ where
         for keyword in possible.iter() {
             // this is used instead of .iter().cloned() because I'm hunting a lifetime error
             let mut keyword = keyword.clone();
-            let mut compile = self.criterion.new_compile(NewCompile {
+            let mut compile = self.language.new_compile(NewCompile {
                 absolute_uri: schema.absolute_uri(),
                 global_numbers: self.numbers,
                 schemas: &self.schemas,
@@ -597,7 +597,7 @@ where
             let is_continue = ctrl_flow.is_continue();
 
             // will not compile without this explicit drop
-            // even tho Criterion::Keyword is bound to 'static
+            // even tho Language::Keyword is bound to 'static
             // not sure why that is.
             // rust 1.75
             drop(compile);
@@ -730,8 +730,8 @@ where
         let report = self.schemas.evaluate(Evaluate {
             key,
             value,
-            criterion: &self.criterion,
-            output: <CriterionReportOutput<L, K>>::verbose(),
+            language: &self.language,
+            output: <LanguageReportOutput<L, K>>::verbose(),
             instance_location: Pointer::default(),
             keyword_location: Pointer::default(),
             sources: self.sources,
@@ -757,7 +757,7 @@ where
     }
 }
 
-fn subschemas<'c, L: Criterion<K>, K: Key>(
+fn subschemas<'c, L: Language<K>, K: Key>(
     key: K,
     uri: &AbsoluteUri,
     subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
@@ -801,7 +801,7 @@ fn append_all_front<K: Key>(
     true
 }
 
-fn append_anchor_uris<'i, L: Criterion<K>, K: Key>(
+fn append_anchor_uris<'i, L: Language<K>, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'i AbsoluteUri,
     anchors: &'i [Anchor],
@@ -819,7 +819,7 @@ fn append_anchor_uris<'i, L: Criterion<K>, K: Key>(
     Ok(())
 }
 
-fn append_ancestry_uris<'a, L: Criterion<K>, K: Key>(
+fn append_ancestry_uris<'a, L: Language<K>, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     path: &'a Pointer,
     parent_uris: &'a [AbsoluteUri],
@@ -836,7 +836,7 @@ fn append_ancestry_uris<'a, L: Criterion<K>, K: Key>(
     Ok(())
 }
 
-fn append_uri_path<L: Criterion<K>, K: Key>(
+fn append_uri_path<L: Language<K>, K: Key>(
     path: &Pointer,
     uri: &AbsoluteUri,
     fragment: &str,
@@ -859,7 +859,7 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-// fn identify<L: Criterion<K>, K: Key>(
+// fn identify<L: Language<K>, K: Key>(
 //     uri: &AbsoluteUri,
 //     source: &Value,
 //     dialect: &Dialect<L, K>,

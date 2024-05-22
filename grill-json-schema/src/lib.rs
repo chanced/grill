@@ -75,3 +75,13 @@ where
         }
     }
 }
+
+/// Returns a static reference to [`Value::Bool`] with the given value.
+#[must_use]
+pub const fn boolean(value: bool) -> &'static Value {
+    if value {
+        TRUE
+    } else {
+        FALSE
+    }
+}

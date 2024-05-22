@@ -8,7 +8,7 @@ use num_rational::BigRational;
 use once_cell::sync::Lazy;
 use serde_json::{Number, Value};
 
-use crate::{big::parse_rational, error::NumberError};
+use crate::big::{self, parse_rational};
 
 fn boolean(value: bool) -> Arc<Value> {
     static TRUE: Lazy<Arc<Value>> = Lazy::new(|| Arc::new(Value::Bool(true)));
@@ -68,8 +68,9 @@ impl Values {
         if let Some(object) = objects.iter().find(|o| o.as_object().unwrap() == object) {
             return object.clone();
         }
-        objects.push(Arc::new(value.clone()));
-        objects.last().unwrap().clone()
+        let value = Arc::new(value.clone());
+        objects.push(value.clone());
+        value
     }
 
     fn resolve_array(&mut self, value: &Value) -> Arc<Value> {
@@ -80,8 +81,9 @@ impl Values {
         if let Some(object) = arrays.iter().find(|o| o.as_array().unwrap() == array) {
             return object.clone();
         }
-        arrays.push(Arc::new(value.clone()));
-        arrays.last().unwrap().clone()
+        let value = Arc::new(value.clone());
+        arrays.push(value.clone());
+        value
     }
 
     fn resolve_string(&mut self, value: &Value) -> Arc<Value> {
@@ -133,8 +135,8 @@ impl Numbers {
     /// Creates a new [`Numbers`] cache, seeded with `seed`
     ///
     /// # Errors
-    /// Returns [`NumberError`] if any of the numbers fail to parse
-    pub fn new<'n>(seed: impl IntoIterator<Item = &'n Number>) -> Result<Self, NumberError> {
+    /// Returns [`big::ParseError`](crate::big::ParseError) if any of the numbers fail to parse
+    pub fn new<'n>(seed: impl IntoIterator<Item = &'n Number>) -> Result<Self, big::ParseError> {
         let mut numbers = Self::default();
         for number in seed {
             numbers.get_or_insert_arc(number)?;
@@ -147,8 +149,11 @@ impl Numbers {
     /// returns a reference to the [`BigRational`].
     ///
     /// # Errors
-    /// Returns [`NumberError`] if the number fails to parse
-    pub fn get_or_insert_arc(&mut self, number: &Number) -> Result<Arc<BigRational>, NumberError> {
+    /// Returns [`big::ParseError`] if the number fails to parse
+    pub fn get_or_insert_arc(
+        &mut self,
+        number: &Number,
+    ) -> Result<Arc<BigRational>, big::ParseError> {
         use std::collections::hash_map::Entry::{Occupied, Vacant};
         match self.rationals.entry(number.to_string()) {
             Occupied(entry) => Ok(entry.get().clone()),
@@ -161,8 +166,8 @@ impl Numbers {
     /// returns a reference to the [`BigRational`].
     ///
     /// # Errors
-    /// Returns [`NumberError`] if the number fails to parse
-    pub fn get_or_insert_ref(&mut self, number: &Number) -> Result<&BigRational, NumberError> {
+    /// Returns [`big::ParseError`] if the number fails to parse
+    pub fn get_or_insert_ref(&mut self, number: &Number) -> Result<&BigRational, big::ParseError> {
         if self.rationals.contains_key(number.as_str()) {
             return Ok(self.rationals.get(number.as_str()).unwrap().as_ref());
         }
@@ -207,8 +212,8 @@ impl Numbers {
     // /// assert_eq!(&*int, &BigInt::from(34));
     // /// ```
     // /// # Errors
-    // /// Returns `NumberError` if the number fails to parse
-    // pub fn int(&mut self, value: &Number) -> Result<Arc<BigInt>, NumberError> {
+    // /// Returns `big::ParseError` if the number fails to parse
+    // pub fn int(&mut self, value: &Number) -> Result<Arc<BigInt>, big::ParseError> {
     //     use std::collections::hash_map::Entry::{Occupied, Vacant};
 
     //     match self.ints.entry(value.to_string()) {
@@ -232,8 +237,8 @@ impl Numbers {
     // /// assert_eq!(&*rat, &parse_rational("34.3434").unwrap());
     // /// ```
     // /// # Errors
-    // /// Returns `NumberError` if the number fails to parse
-    // pub fn rational(&mut self, value: &Number) -> Result<Arc<BigRational>, NumberError> {
+    // /// Returns `big::ParseError` if the number fails to parse
+    // pub fn rational(&mut self, value: &Number) -> Result<Arc<BigRational>, big::ParseError> {
     //     use std::collections::hash_map::Entry::{Occupied, Vacant};
 
     //     match self.rationals.entry(value.to_string()) {

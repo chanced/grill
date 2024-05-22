@@ -3,17 +3,17 @@ members = [
 	"grill",
 	"grill-core",
 	"grill-uri",
-	"grill-json-schema",
-	"grill-test-builder",
+	# "grill-json-schema",
+	# "grill-test-builder",
 	# "tests",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-grill             = { version = "0.1.0", path = "grill" }
-grill-core        = { version = "0.1.0", path = "grill-core" }
-grill-json-schema = { workspace = "0.1.0", path = "grill-json-schema" }
-grill-uri         = { version = "0.1.0", path = "grill-uri" }
+grill      = { version = "0.1.0", path = "grill" }
+grill-core = { version = "0.1.0", path = "grill-core" }
+# grill-json-schema = { workspace = "0.1.0", path = "grill-json-schema" }
+grill-uri = { version = "0.1.0", path = "grill-uri" }
 
 async-trait        = { version = "0.1" }
 bitflags           = { version = "2.4.1" }

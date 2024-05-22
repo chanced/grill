@@ -1,9 +1,15 @@
-use crate::Criterion;
+use slotmap::Key;
+use std::fmt::Debug;
 
-/// The associated type `Keyword` of
-pub type Keyword<L, K> = <L as Criterion<K>>::Keyword;
-// pub type Context<L, K> = <Keyword<L, K> as crate::Keyword<L, K>>::Context;
-// pub type Compile<L, K> = <Keyword<L, K> as crate::Keyword<L, K>>::Compile;
-// pub type Output<L, K> = <Keyword<L, K> as crate::Keyword<L, K>>::Evaluation;
-// pub type Structure<L, K> = <Output<L, K> as crate::Evaluation>::Output;
-// pub type ValidationError<L, K> = <Output<L, K> as crate::Evaluation>::Error;
+use crate::schema::{Schema, Schemas};
+
+pub struct Compile<'i, S, K: Key> {
+    pub schemas: &'i mut Schemas<S, K>,
+}
+
+pub trait Language<K>: Sized + Clone + Debug
+where
+    K: 'static + Key,
+{
+    type Schema<'i>: Schema<'i, K>;
+}
