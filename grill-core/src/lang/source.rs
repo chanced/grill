@@ -1,3 +1,5 @@
+//! Source repository for JSON Schema documents.
+
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use grill_uri::AbsoluteUri;
@@ -69,7 +71,7 @@ pub struct Link {
     pub path: Pointer,
 }
 
-/// A collection of [`Value`]s indexed by [`AbsoluteUri`]s with interior
+/// A repository of [`Value`]s indexed by [`AbsoluteUri`]s with interior
 /// indexing of paths by JSON [`Pointer`]s.
 ///
 /// # Example
@@ -93,6 +95,7 @@ pub struct Link {
 /// let source = sources.get(&uri).unwrap();
 /// assert_eq!(source.resolve(), &json!("baz"));
 /// ```
+#[derive(Debug, Default, Clone)]
 pub struct Sources {
     docs: SlotMap<SrcKey, Arc<Value>>,
     links: HashMap<AbsoluteUri, Link>,

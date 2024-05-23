@@ -1,10 +1,12 @@
+//! Cache stores for numbers and JSON values.
+
 use std::{
     collections::HashMap,
     hash::{BuildHasher, Hasher},
     sync::Arc,
 };
 
-use num_rational::BigRational;
+use num::BigRational;
 use once_cell::sync::Lazy;
 use serde_json::{Number, Value};
 
