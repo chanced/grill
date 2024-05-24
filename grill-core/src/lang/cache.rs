@@ -49,6 +49,15 @@ pub struct Values {
 }
 
 impl Values {
+    /// Creates a new [`Values`] cache.
+    pub fn new() -> Self {
+        Self {
+            strings: Vec::new(),
+            numbers: Vec::new(),
+            objects: Map::default(),
+            arrays: Map::default(),
+        }
+    }
     /// Returns an `Arc<Value>` representation of `value`, either by returning
     /// an existing cached instance or inserts and returns a new instance.
     #[must_use]
@@ -134,16 +143,11 @@ pub struct Numbers {
 }
 
 impl Numbers {
-    /// Creates a new [`Numbers`] cache, seeded with `seed`
-    ///
-    /// # Errors
-    /// Returns [`big::ParseError`](crate::big::ParseError) if any of the numbers fail to parse
-    pub fn new<'n>(seed: impl IntoIterator<Item = &'n Number>) -> Result<Self, big::ParseError> {
-        let mut numbers = Self::default();
-        for number in seed {
-            numbers.get_or_insert_arc(number)?;
+    /// Creates a new [`Numbers`] cache
+    pub fn new() -> Self {
+        Self {
+            rationals: HashMap::new(),
         }
-        Ok(numbers)
     }
 
     /// Either returns an [`Arc`] to a previously parsed [`BigRational`]
@@ -156,13 +160,12 @@ impl Numbers {
         &mut self,
         number: &Number,
     ) -> Result<Arc<BigRational>, big::ParseError> {
-        use std::collections::hash_map::Entry::{Occupied, Vacant};
-        match self.rationals.entry(number.to_string()) {
-            Occupied(entry) => Ok(entry.get().clone()),
-            Vacant(entry) => Ok(entry
-                .insert(Arc::new(parse_rational(number.as_str())?))
-                .clone()),
+        if let Some(existing) = self.rationals.get(number.as_str()) {
+            return Ok(existing.clone());
         }
+        let num = Arc::new(parse_rational(number.as_str())?);
+        self.rationals.insert(number.to_string(), num.clone());
+        Ok(num)
     }
     /// Either returns a reference to a previously parsed [`BigRational`] or parses and
     /// returns a reference to the [`BigRational`].

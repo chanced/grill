@@ -20,8 +20,7 @@ strum = { workspace = true }
 tokio = { version = "1.28", features = ["full"] }
 
 [features]
-default = ["http", "toml", "yaml"]
-http    = ["grill-core/http"]
+default = ["toml"]
 toml    = ["grill-core/toml"]
 yaml    = ["grill-core/yaml"]
 

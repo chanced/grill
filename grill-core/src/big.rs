@@ -79,49 +79,13 @@ pub enum ParseError {
     },
 }
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                             OverflowError                             ║
-║                             ¯¯¯¯¯¯¯¯¯¯¯¯¯                             ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-/// A slice or string overflowed an allowed length maximum of `M`.
-#[derive(Debug, Snafu)]
-#[snafu(display("The value {value} overflowed {}", Self::MAX), module)]
-pub struct OverflowError {
-    /// The value that caused the overflow
-    pub value: u64,
-    /// The backtrace of the error
-    pub backtrace: Backtrace,
-}
-impl OverflowError {
-    /// The maximum allowed size.
-    pub const MAX: u64 = usize::MAX as u64;
-}
-
-impl From<u64> for OverflowError {
-    fn from(value: u64) -> Self {
-        Self {
-            value,
-            backtrace: Backtrace::capture(),
-        }
-    }
-}
-
 /// Attempts to convert a `u64` to `usize`
 ///
 /// # Errors
-/// Returns `OverflowError<u64, { usize::MAX as u64 }>` if the architure is not
-/// 64-bit and the value is too large
+/// Returns `value` if the architure is less than 64-bit and the value is too large
 #[inline]
-pub(crate) fn u64_to_usize(value: u64) -> Result<usize, OverflowError> {
-    value.try_into().map_err(|_| OverflowError {
-        value,
-        backtrace: Backtrace::capture(),
-    })
+pub(crate) fn u64_to_usize(value: u64) -> Result<usize, u64> {
+    value.try_into().map_err(|_| value)
 }
 
 mod int {

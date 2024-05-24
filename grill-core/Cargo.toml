@@ -28,7 +28,6 @@ paste            = { workspace = true }
 percent-encoding = { workspace = true }
 pin-project      = { workspace = true }
 regex            = { workspace = true }
-reqwest          = { workspace = true, optional = true }
 serde            = { workspace = true }
 serde_json       = { workspace = true, features = ["arbitrary_precision"] }
 serde_yaml       = { workspace = true, optional = true }
@@ -46,7 +45,6 @@ tokio              = { workspace = true, features = ["full"] }
 tracing-subscriber = { workspace = true }
 
 [features]
-default = ["http"]
-http    = ["reqwest"]
+default = ["toml"]
 toml    = ["dep:toml"]
 yaml    = ["dep:serde_yaml"]

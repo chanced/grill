@@ -27,11 +27,11 @@ pub use {
     source::Sources,
 };
 
-use async_trait::async_trait;
 use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use slotmap::Key;
 use std::fmt::Debug;
+use {crate::Resolve, async_trait::async_trait};
 
 /// A trait which defines how to compile and evaluate a schema against a
 /// [`Value`].
@@ -40,20 +40,28 @@ use std::fmt::Debug;
 #[async_trait]
 pub trait Language<K>: Sized + Clone + Debug
 where
-    K: Key,
+    K: 'static + Key,
 {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
     type CompiledSchema: schema::CompiledSchema<K>;
-    /// The error type that can be returned when compiling a schema.
-    type CompileError: std::error::Error;
-    /// The result type that can be returned when evaluating a schema.
-    type EvaluateResult;
+
+    /// The error type possibly returned from [`compile`](Language::compile).
+    type CompileError;
+
+    /// The result type returned from [`evaluate`](Language::evaluate).
+    type EvaluateResult<'v>;
 
     /// Context type supplied to `evaluate`.
     ///
     /// For example, `grill-json-schema` uses an `enum` to represent the desired
     /// format of the output.
     type Context;
+
+    /// The error type that can be returned when initializing the language.
+    type InitError;
+
+    /// Initializes the language with the given [`Init`] request.
+    fn init(&mut self, init: Init<'_, Self::CompiledSchema, K>) -> Result<(), Self::InitError>;
 
     /// Compiles a schema for the given [`Compile`] request and returns the key,
     /// if successful.
@@ -63,20 +71,39 @@ where
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    async fn compile(
-        &mut self,
-        compile: Compile<Self::CompiledSchema, K>,
+    async fn compile<'i, R: Resolve + Send + Sync>(
+        &'i mut self,
+        compile: Compile<'i, Self::CompiledSchema, R, K>,
     ) -> Result<K, Self::CompileError>;
+
+    /// Compiles all schemas for the given [`CompileAll`] request and returns the
+    /// keys, if successful.
+    async fn compile_all<'i, R: Resolve + Send + Sync>(
+        &'i mut self,
+        compile_all: CompileAll<'i, Self::CompiledSchema, R, K>,
+    ) -> Result<Vec<K>, Self::CompileError>;
 
     /// Evaluates a schema for the given [`Evaluate`] request.
     fn evaluate<'i, 'v>(
         &'i self,
         eval: Evaluate<'i, 'v, Self::CompiledSchema, Self::Context, K>,
-    ) -> Self::EvaluateResult;
+    ) -> Self::EvaluateResult<'v>;
+}
+
+/// Request to initialize a language.
+pub struct Init<'i, S, K: Key> {
+    /// Schema graph
+    pub schemas: &'i mut Schemas<S, K>,
+    /// Source repository
+    pub sources: &'i mut Sources,
+    /// Number cache
+    pub numbers: &'i mut Numbers,
+    /// Values cache
+    pub values: &'i mut Values,
 }
 
 /// Request to compile a schema.
-pub struct Compile<'i, S, K: Key> {
+pub struct Compile<'i, S, R, K: Key> {
     /// The URI of the schema to compile
     pub uri: AbsoluteUri,
     /// Schema graph
@@ -87,6 +114,24 @@ pub struct Compile<'i, S, K: Key> {
     pub numbers: &'i mut Numbers,
     /// Values cache
     pub values: &'i mut Values,
+    /// Implementation of [`Resolve`]
+    pub resolve: &'i R,
+}
+
+/// Request to compile a schema.
+pub struct CompileAll<'i, S, R, K: Key> {
+    /// The URI of the schema to compile
+    pub uris: Vec<AbsoluteUri>,
+    /// Schema graph
+    pub schemas: &'i mut Schemas<S, K>,
+    /// Source repository
+    pub sources: &'i mut Sources,
+    /// Number cache
+    pub numbers: &'i mut Numbers,
+    /// Values cache
+    pub values: &'i mut Values,
+    /// Implementation of [`Resolve`]
+    pub resolve: &'i R,
 }
 
 /// Request to evaluate a schema.

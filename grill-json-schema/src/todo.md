@@ -1,27 +1,27 @@
--   [x] $schema
--   [x] $id
--   [x] $ref
--   [x] $defs
--   [x] $comment
--   [x] $dynamicRef
--   [x] $dynamicAnchor
--   [x] $anchor
--   [x] allOf
--   [x] anyOf
--   [x] oneOf
--   [x] then
--   [x] if
--   [x] else
--   [x] not
--   [x] properties
--   [x] type
--   [x] enum
--   [x] const
--   [x] pattern
--   [x] patternProperties
--   [x] writeOnly
--   [x] readOnly
--   [x] additionalProperties
+-   [ ] $schema
+-   [ ] $id
+-   [ ] $ref
+-   [ ] $defs
+-   [ ] $comment
+-   [ ] $dynamicRef
+-   [ ] $dynamicAnchor
+-   [ ] $anchor
+-   [ ] allOf
+-   [ ] anyOf
+-   [ ] oneOf
+-   [ ] then
+-   [ ] if
+-   [ ] else
+-   [ ] not
+-   [ ] properties
+-   [ ] type
+-   [ ] enum
+-   [ ] const
+-   [ ] pattern
+-   [ ] patternProperties
+-   [ ] writeOnly
+-   [ ] readOnly
+-   [ ] additionalProperties
 -   [ ] dependentSchemas
 -   [ ] propertyNames
 -   [ ] items

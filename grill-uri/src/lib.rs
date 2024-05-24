@@ -1,4 +1,3 @@
-//! # Data structures to represent Uniform Resource Identifiers (URI) [RFC 3986](https://tools.ietf.org/html/rfc3986).
 //!
 //! A Uniform Resource Identifier (URI) provides a simple and extensible means
 //! for identifying a resource.
@@ -186,6 +185,26 @@ use std::{
     str::{FromStr, Split},
     string::{String, ToString},
 };
+
+#[macro_export]
+macro_rules! uri {
+    ($($t:tt)*) => {
+        {
+            let uri = format!($($t)*);
+            crate::Uri::parse(&uri).expect(&format!("failed to parse uri \"{}\"", uri))
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! absolute_uri {
+    ($($t:tt)*) => {
+        {
+            let uri = format!($($t)*);
+            crate::AbsoluteUri::parse(&uri).expect(format!("failed to parse uri {}", uri))
+        }
+    };
+}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -583,6 +602,18 @@ impl AbsoluteUri {
         }
     }
 
+    /// Attempts to parse an `AbsoluteUri`.
+    ///
+    /// # Panics
+    /// Panics if `value` can not be parsed as a [`Url`](`url::Url`) or
+    /// [`Urn`](`urn::Urn`)
+    pub fn must_parse(value: &str) -> Self {
+        match Self::parse(value) {
+            Ok(uri) => uri,
+            Err(err) => panic!("failed to parse AbsoluteUri \"{value}\"\n\ncaused by:\n\t:{err}"),
+        }
+    }
+
     /// Returns a cloned [`Uri`](`crate::uri::Uri`) representation of the this
     /// `AbsoluteUri`.
     #[must_use]
@@ -868,7 +899,7 @@ impl AbsoluteUri {
 
     /// Returns `true` if the fragment is either `None` or an empty string
     #[must_use]
-    pub fn is_fragment_empty_or_none(&self) -> bool {
+    pub fn fragment_is_empty_or_none(&self) -> bool {
         self.fragment().map_or(true, |f| f.trim().is_empty())
     }
 
@@ -1029,15 +1060,25 @@ impl AbsoluteUri {
         self.set_path_or_nss(&normalized).unwrap();
     }
 
-    /// Returns `true` if this `AbsoluteUri` has a query component.
+    /// Returns `true` if this URI has a query component.
     #[must_use]
     pub fn has_query(&self) -> bool {
         self.query().is_some()
     }
-    /// Returns `true` if this `AbsoluteUri` has a fragment component.
+    /// Returns `true` if this URI has a fragment component.
     #[must_use]
     pub fn has_fragment(&self) -> bool {
         self.fragment().is_some()
+    }
+
+    /// Returns `true` if this `AbsoluteUri` has a fragment component which
+    /// contains one or more non-whitespace characters.
+    #[must_use]
+    pub fn has_non_empty_fragment(&self) -> bool {
+        self.fragment()
+            .map(str::trim)
+            .map(str::is_empty)
+            .unwrap_or(false)
     }
 }
 
@@ -1709,8 +1750,10 @@ impl RelativeUri {
     /// Returns `true` if this `Uri` has a fragment component.
     #[must_use]
     pub fn has_fragment(&self) -> bool {
-        self.query().is_some()
+        self.fragment().is_some()
     }
+
+    /// Returns `true` if this
 
     fn has_path(&self) -> bool {
         !self.path().is_empty()
@@ -4053,5 +4096,11 @@ mod tests {
         let uri = AbsoluteUri::parse("https://example.com/#/patternProperties/^%C3%A1").unwrap();
         println!("{uri}");
         println!("{:?}", uri.fragment_decoded_lossy());
+    }
+
+    #[test]
+    fn test_uri() {
+        let uri = uri!("https://example.com");
+        dbg!(uri);
     }
 }

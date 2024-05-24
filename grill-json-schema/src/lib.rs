@@ -4,84 +4,71 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-// #![warn(missing_docs)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::result_large_err,
-    clippy::enum_glob_use,
-    clippy::implicit_hasher,
-    clippy::needless_pass_by_value,
-    clippy::similar_names,
-    clippy::missing_panics_doc, // TODO: remove after todo!()s are removed
-    clippy::missing_errors_doc, // TODO: remove when I get around to documenting
-    clippy::wildcard_imports,
-    clippy::module_inception,
-    clippy::unreadable_literal
-)]
+#![warn(missing_docs)]
+#![allow(clippy::implicit_hasher, clippy::wildcard_imports)]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
-use core::language::{NewCompile, NewContext};
-
-pub(crate) use grill_core as core;
-
-use grill_core::{language::Language, Key};
-use integration::{Compile, Context};
-use keyword::Keyword;
-
-pub mod integration;
-pub mod keyword;
+pub mod compile;
 pub mod report;
+pub mod schema;
 
-pub use report::{Annotation, Error, Output, Report};
+pub use {
+    compile::CompileError,
+    report::{Output, Report},
+};
 
-impl std::fmt::Display for Report<'_> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
+use async_trait::async_trait;
+use grill_core::{
+    lang::{Compile, CompileAll, Evaluate, Init},
+    Key, Language, Resolve,
+};
 
 #[derive(Debug, Clone)]
-pub struct JsonSchema {}
+/// JSON Schema [`Language`] implementation.
+pub struct JsonSchema<K: Key> {
+    _marker: std::marker::PhantomData<K>,
+}
 
-impl<K> Language<K> for JsonSchema
+#[async_trait]
+impl<K> Language<K> for JsonSchema<K>
 where
-    K: 'static + Key + 'static,
+    K: 'static + Key + Send + Sync,
 {
-    type Context<'i, 'v, 'r> = Context<'i, 'v, 'r, Self, K> where 'v: 'r;
+    type CompiledSchema = schema::CompiledSchema<K>;
+    type CompileError = CompileError;
+    type EvaluateResult<'v> = Result<Report<'v>, EvaluateError<K>>;
+    type Context = Output;
+    type InitError = ();
 
-    type Compile<'i> = Compile<'i, Self, K>;
-
-    type Keyword = Keyword;
-
-    type OwnedReport = Report<'static>;
-    type Report<'v> = Report<'v>;
-
-    fn new_compile<'i>(&mut self, _params: NewCompile<'i, Self, K>) -> Self::Compile<'i> {
+    fn init(&mut self, init: Init<'_, Self::CompiledSchema, K>) -> Result<(), Self::InitError> {
         todo!()
     }
 
-    fn new_context<'i, 'v, 'r>(
-        &self,
-        params: NewContext<'i, 'v, 'r, Self, K>,
-    ) -> Self::Context<'i, 'v, 'r> {
-        Context {
-            eval_numbers: params.eval_numbers,
-            global_numbers: params.global_numbers,
-            report: params.report,
-            schemas: params.schemas,
-            sources: params.sources,
-            dialects: params.dialects,
-        }
+    async fn compile<'i, R: Resolve + Send + Sync>(
+        &'i mut self,
+        compile: Compile<'i, Self::CompiledSchema, R, K>,
+    ) -> Result<K, Self::CompileError> {
+        todo!()
+    }
+
+    async fn compile_all<'i, R: Resolve + Send + Sync>(
+        &'i mut self,
+        compile_all: CompileAll<'i, Self::CompiledSchema, R, K>,
+    ) -> Result<Vec<K>, Self::CompileError> {
+        todo!()
+    }
+
+    fn evaluate<'i, 'v>(
+        &'i self,
+        eval: Evaluate<'i, 'v, Self::CompiledSchema, Self::Context, K>,
+    ) -> Self::EvaluateResult<'v> {
+        todo!()
     }
 }
 
-/// Returns a static reference to [`Value::Bool`] with the given value.
-#[must_use]
-pub const fn boolean(value: bool) -> &'static Value {
-    if value {
-        TRUE
-    } else {
-        FALSE
-    }
+pub struct EvaluateError<K> {
+    pub key: K,
 }
+
+pub struct InitError {}

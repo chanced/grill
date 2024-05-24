@@ -40,7 +40,7 @@ pub trait Schema<'i, K> {
 /// This trait is satisfied by [`Language`](crate::lang::Language)
 /// implementations. See your desired language's documentation for more
 /// information.
-pub trait CompiledSchema<K>: PartialEq {
+pub trait CompiledSchema<K>: Clone + PartialEq {
     /// The borrowed schema representation.
     type Schema<'i>: Schema<'i, K>;
 
@@ -135,7 +135,7 @@ mod tests {
 
     use super::*;
 
-    #[derive(Default, Debug, PartialEq, Eq)]
+    #[derive(Default, Clone, Debug, PartialEq, Eq)]
     struct Compiled {
         key: DefaultKey,
     }

@@ -1,5 +1,4 @@
 pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
-use grill_core::{language, Schema};
 use grill_uri::AbsoluteUri;
 use jsonptr::Pointer;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -86,12 +85,6 @@ pub enum Output {
     /// ```
     Basic = 2,
     Verbose = 8,
-}
-
-impl language::Output for Output {
-    fn verbose() -> Self {
-        Self::Verbose
-    }
 }
 
 /*
@@ -189,7 +182,12 @@ pub enum Report<'v> {
     Verbose(Verbose<'v>),
 }
 
-impl std::error::Error for Report<'_> {}
+impl<'v> std::fmt::Display for Report<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+impl<'v> std::error::Error for Report<'v> {}
 
 impl<'v> Report<'v> {
     pub fn instance_location(&self) -> Option<&jsonptr::Pointer> {
@@ -229,36 +227,16 @@ impl<'v> Report<'v> {
             Report::Verbose(v) => v.assess(location),
         }
     }
-}
 
-impl<'v> language::Report<'v> for Report<'v> {
-    type Output = Output;
-    type Owned = Report<'static>;
-
-    fn is_valid(&self) -> bool {
-        match self {
-            Report::Flag(f) => f.is_valid(),
-            Report::Basic(b) => b.is_valid(),
-            Report::Verbose(v) => v.is_valid(),
-        }
-    }
-
-    fn into_owned(self) -> Self::Owned {
+    pub fn into_owned(self) -> Report<'static> {
         match self {
             Report::Flag(f) => Report::Flag(f.into_owned()),
             Report::Basic(b) => Report::Basic(b.into_owned()),
             Report::Verbose(v) => Report::Verbose(v.into_owned()),
         }
     }
-
-    fn new<'i, L, K>(output: Self::Output, schema: &Schema<'i, L, K>) -> Self
-    where
-        L: language::Language<K>,
-        K: 'static + grill_core::Key,
-    {
-        todo!()
-    }
 }
+
 impl<'de> Deserialize<'de> for Report<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Report<'static>, D::Error>
     where
