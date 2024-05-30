@@ -6,21 +6,22 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = { workspace = true }
-bitflags    = { workspace = true }
-either      = { workspace = true }
-grill-core  = { workspace = true }
-grill-uri   = { workspace = true }
-inherent    = { workspace = true }
-jsonptr     = { workspace = true }
-once_cell   = { workspace = true }
-paste       = { workspace = true }
-regex       = { workspace = true }
-serde       = { workspace = true }
-serde_json  = { workspace = true }
-snafu       = { workspace = true }
-strum       = { workspace = true }
-tracing     = { workspace = true }
+bitflags      = { workspace = true }
+either        = { workspace = true }
+enum_dispatch = { workspace = true }
+grill-core    = { workspace = true }
+grill-uri     = { workspace = true }
+inherent      = { workspace = true }
+jsonptr       = { workspace = true }
+once_cell     = { workspace = true }
+paste         = { workspace = true }
+regex         = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+snafu         = { workspace = true }
+strum         = { workspace = true }
+tracing       = { workspace = true }
+trait-variant = { workspace = true }
 
 [dev-dependencies]
 # grill              = { workspace = true }

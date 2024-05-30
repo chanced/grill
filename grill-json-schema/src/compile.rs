@@ -1,19 +1,18 @@
-use grill_core::lang::source::{InsertError, LinkError, SourceError};
 use grill_uri::AbsoluteUri;
-use serde_json::Value;
 use snafu::Snafu;
 
+/// Failed to compile a schema.
 #[derive(Debug, Snafu)]
 #[snafu(display("failed to compile schema \"{uri}\""))]
-pub struct CompileError {
+pub struct CompileError<E> {
+    /// [`AbsoluteUri`] of the schema.
     pub uri: AbsoluteUri,
-    pub value: Box<Value>,
+
+    /// Cause of the error.
     #[snafu(source, backtrace)]
-    pub cause: CompileErrorCause,
+    pub cause: CompileErrorCause<E>,
 }
 
+/// The cause of a [`CompileError`].
 #[derive(Debug, Snafu)]
-pub enum CompileErrorCause {
-    #[snafu(display("failed to source schema"))]
-    Source { source: SourceError },
-}
+pub enum CompileErrorCause<E> {}

@@ -27,17 +27,17 @@ pub use {
     source::Sources,
 };
 
+use crate::Resolve;
 use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use slotmap::Key;
 use std::fmt::Debug;
-use {crate::Resolve, async_trait::async_trait};
 
 /// A trait which defines how to compile and evaluate a schema against a
 /// [`Value`].
 ///
 /// See the [`mod`](crate::lang) for more information.
-#[async_trait]
+#[trait_variant::make(Send)]
 pub trait Language<K>: Sized + Clone + Debug
 where
     K: 'static + Key,

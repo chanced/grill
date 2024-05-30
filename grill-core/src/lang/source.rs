@@ -127,6 +127,7 @@ impl<'i> Source<'i> {
         self.link.path.resolve(&self.document).unwrap()
     }
 
+    /// Consumes this `Source`` and returns an owned, `'static` variant.
     pub fn into_owned(self) -> Source<'static> {
         Source {
             key: self.key,
@@ -475,24 +476,6 @@ pub enum LinkErrorCause {
     },
 }
 
-/// An error occurred while sourcing a value.
-#[derive(Debug, Snafu)]
-pub enum SourceError {
-    /// An error occurred while inserting a source.
-    #[snafu(transparent)]
-    Insert {
-        /// source of the error
-        #[snafu(backtrace)]
-        source: InsertError,
-    },
-    /// An error occurred while linking a source.
-    #[snafu(transparent)]
-    Link {
-        /// source of the error
-        #[snafu(backtrace)]
-        source: LinkError,
-    },
-}
 /// A source was not found at the given URI.
 #[derive(Debug, Snafu)]
 #[snafu(display("source not found: {}", uri))]

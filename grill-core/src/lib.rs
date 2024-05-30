@@ -13,17 +13,15 @@ pub mod big;
 pub mod iter;
 pub mod lang;
 
-use async_trait::async_trait;
 pub use lang::{schema::DefaultKey, Language};
 pub use slotmap::{new_key_type, Key};
 
 use grill_uri::AbsoluteUri;
 use lang::{source, Compile, Evaluate, Numbers, Schemas, Sources, Values};
 use serde_json::Value;
-use snafu::{Backtrace, Snafu};
 
 /// A trait for resolving and deserializing a [`Value`] at a given [`AbsoluteUri`].
-#[async_trait]
+#[trait_variant::make(Send)]
 pub trait Resolve {
     /// The error type that can be returned when resolving a [`Value`].
     type Error;
@@ -35,7 +33,6 @@ pub trait Resolve {
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Value, Self::Error>;
 }
 
-#[async_trait]
 impl Resolve for () {
     type Error = source::NotFoundError;
     async fn resolve(&self, uri: &AbsoluteUri) -> Result<Value, Self::Error> {
@@ -43,36 +40,21 @@ impl Resolve for () {
     }
 }
 
+/// Type alias for `()` which implements [`Resolve`] by always returning
+/// [`NotFoundError`], thus relying entirely on documents added as sources
+/// to the [`Interrogator`].
+pub type Internal = ();
+
 /// Evaluates the integrity of data through a schema language.
-pub struct Interrogator<L: Language<K>, R = (), K: 'static + Key = DefaultKey> {
+pub struct Interrogator<L: Language<K>, K: 'static + Key = DefaultKey> {
     lang: L,
     schemas: Schemas<L::CompiledSchema, K>,
     sources: Sources,
     values: Values,
     numbers: Numbers,
-    resolve: R,
 }
 
-impl<L, R, K> Interrogator<L, R, K>
-where
-    L: Language<K>,
-    R: Resolve,
-    K: Key,
-{
-    /// Creates a new `Interrogator` with the given language and `Resolve`
-    pub fn new_with_resolve(lang: L, resolve: R) -> Self {
-        Self {
-            lang,
-            schemas: Schemas::new(),
-            sources: Sources::new(),
-            values: Values::new(),
-            numbers: Numbers::new(),
-            resolve,
-        }
-    }
-}
-
-impl<L: Language<K>, R, K: Key> Interrogator<L, R, K> {
+impl<L: Language<K>, K: Key> Interrogator<L, K> {
     fn init(mut self) -> Result<Self, L::InitError> {
         self.lang.init(lang::Init {
             schemas: &mut self.schemas,
@@ -82,9 +64,7 @@ impl<L: Language<K>, R, K: Key> Interrogator<L, R, K> {
         })?;
         Ok(self)
     }
-}
 
-impl<L: Language<K>, K: Key> Interrogator<L, (), K> {
     /// Creates a new `Interrogator`.
     pub fn new(lang: L) -> Result<Self, L::InitError> {
         Self {
@@ -93,30 +73,10 @@ impl<L: Language<K>, K: Key> Interrogator<L, (), K> {
             sources: Sources::new(),
             values: Values::new(),
             numbers: Numbers::new(),
-            resolve: (),
         }
         .init()
     }
-    /// Sets the [`Resolve`] implementation for the `Interrogator` using a
-    /// builder fashion (consume and return).
-    pub fn with_resolve<R: Resolve>(self, resolve: R) -> Interrogator<L, R, K> {
-        Interrogator {
-            lang: self.lang,
-            schemas: self.schemas,
-            sources: self.sources,
-            values: self.values,
-            numbers: self.numbers,
-            resolve,
-        }
-    }
-}
 
-impl<L, R, K> Interrogator<L, R, K>
-where
-    L: Language<K>,
-    R: Resolve + Send + Sync,
-    K: 'static + Key,
-{
     /// Compiles a schema for the given [`Compile`] request and returns the key,
     /// if successful.
     ///
@@ -125,7 +85,14 @@ where
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    pub async fn compile(&mut self, schema_uri: AbsoluteUri) -> Result<K, L::CompileError> {
+    pub async fn compile<R>(
+        &mut self,
+        schema_uri: AbsoluteUri,
+        resolve: &R,
+    ) -> Result<K, L::CompileError>
+    where
+        R: Resolve + Sync,
+    {
         let mut sources = self.sources.clone();
         let mut schemas = self.schemas.clone();
         let c = Compile {
@@ -134,7 +101,7 @@ where
             sources: &mut sources,
             numbers: &mut self.numbers,
             values: &mut self.values,
-            resolve: &self.resolve,
+            resolve,
         };
 
         let key = self.lang.compile(c).await?;
