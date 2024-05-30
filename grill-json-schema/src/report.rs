@@ -1,9 +1,18 @@
+use crate::{
+    spec::{self, ShouldSerialize},
+    IntoOwned,
+};
+
 pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
 use grill_uri::AbsoluteUri;
+use inherent::inherent;
 use jsonptr::Pointer;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, fmt::Debug};
+use std::{
+    borrow::Cow,
+    fmt::{self, Debug},
+};
 
 // /// Set of keywords to check which disable short-circuiting
 // pub const DISABLING_KEYWORDS: [&'static str; 2] = [UNEVALUATED_PROPERTIES, UNEVALUATED_ITEMS];
@@ -117,6 +126,16 @@ pub enum Annotation<'v> {
     Schema(AbsoluteUri),
     Unknown(Cow<'v, Value>),
 }
+impl ShouldSerialize for Annotation<'_> {
+    fn should_serialize(&self) -> bool {
+        todo!()
+    }
+}
+impl From<Value> for Annotation<'_> {
+    fn from(v: Value) -> Self {
+        Self::Unknown(Cow::Owned(v))
+    }
+}
 
 impl<'v, 'de> Deserialize<'de> for Annotation<'v> {
     fn deserialize<D>(deserializer: D) -> Result<Annotation<'v>, D::Error>
@@ -142,7 +161,28 @@ impl<'v, 'de> Deserialize<'de> for Annotation<'v> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error<'v> {
     X(Cow<'v, str>),
+    Unknown(String),
 }
+impl IntoOwned for Error<'_> {
+    type Owned = Error<'static>;
+    fn into_owned(self) -> Self::Owned {
+        match self {
+            Error::X(x) => Error::X(x.into_owned().into()),
+            Error::Unknown(u) => Error::Unknown(u),
+        }
+    }
+}
+impl From<String> for Error<'_> {
+    fn from(s: String) -> Self {
+        Error::Unknown(s)
+    }
+}
+impl fmt::Display for Error<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -153,70 +193,13 @@ pub enum Error<'v> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+pub type DefaultReport<'v> = Report<Annotation<'v>, Error<'v>>;
+
 #[derive(Debug, Clone)]
 pub enum Report<A, E> {
     Flag(Flag),
     Basic(Basic<A, E>),
     Verbose(Verbose<A, E>),
-}
-impl<A, E> std::fmt::Display for Report<A, E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl<A, E> std::error::Error for Report<A, E>
-where
-    A: Debug,
-    E: Debug,
-{
-}
-
-impl<A, E> Report<A, E> {
-    pub fn instance_location(&self) -> Option<&jsonptr::Pointer> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.instance_location(),
-            Report::Verbose(v) => Some(v.instance_location()),
-        }
-    }
-    pub fn keyword_location(&self) -> Option<&jsonptr::Pointer> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.keyword_location(),
-            Report::Verbose(v) => Some(v.keyword_location()),
-        }
-    }
-    pub fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.absolute_keyword_location(),
-            Report::Verbose(v) => Some(v.absolute_keyword_location()),
-        }
-    }
-    pub fn is_valid(&self) -> bool {
-        match self {
-            Report::Flag(f) => f.is_valid(),
-            Report::Basic(b) => b.is_valid(),
-            Report::Verbose(v) => v.is_valid(),
-        }
-    }
-    pub fn assess(&mut self, location: Location) -> Assess<'_, A, E> {
-        match self {
-            Report::Flag(f) => f.assess(location),
-            Report::Basic(b) => b.assess(location),
-            Report::Verbose(v) => v.assess(location),
-        }
-    }
-}
-
-impl<'de, A, E> Deserialize<'de> for Report<A, E> {
-    fn deserialize<D>(deserializer: D) -> Result<Report<A, E>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        todo!()
-    }
 }
 
 impl<A, E> Serialize for Report<A, E> {
@@ -224,6 +207,83 @@ impl<A, E> Serialize for Report<A, E> {
     where
         S: serde::Serializer,
     {
+        todo!()
+    }
+}
+
+impl<'de, 'v, A, E> Deserialize<'de> for Report<A, E>
+where
+    A: From<Value>,
+    E: From<String>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        todo!()
+    }
+}
+
+impl<'v, A, E> std::fmt::Display for Report<A, E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl<'v, A, E> std::error::Error for Report<A, E>
+where
+    A: Debug,
+    E: Debug,
+{
+}
+impl<'v, A, E> spec::Report<'v, A, E> for Report<A, E>
+where
+    A: 'v + From<Annotation<'v>> + From<Value> + Debug + Send,
+    E: 'v + From<Error<'v>> + From<String> + Debug + Send,
+{
+    type Assess<'r> = Assess<'r, A, E> where Self: 'r;
+
+    fn new(output: Output, location: Location) -> Self {
+        todo!()
+    }
+
+    fn instance_location(&self) -> Option<&jsonptr::Pointer> {
+        match self {
+            Report::Flag(_) => None,
+            Report::Basic(b) => b.instance_location(),
+            Report::Verbose(v) => Some(v.instance_location()),
+        }
+    }
+    fn keyword_location(&self) -> Option<&jsonptr::Pointer> {
+        match self {
+            Report::Flag(_) => None,
+            Report::Basic(b) => b.keyword_location(),
+            Report::Verbose(v) => Some(v.keyword_location()),
+        }
+    }
+    fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
+        match self {
+            Report::Flag(_) => None,
+            Report::Basic(b) => b.absolute_keyword_location(),
+            Report::Verbose(v) => Some(v.absolute_keyword_location()),
+        }
+    }
+    fn is_valid(&self) -> bool {
+        match self {
+            Report::Flag(f) => f.is_valid(),
+            Report::Basic(b) => b.is_valid(),
+            Report::Verbose(v) => v.is_valid(),
+        }
+    }
+    fn assess(&mut self, location: Location) -> Assess<'_, A, E> {
+        match self {
+            Report::Flag(f) => f.assess(location),
+            Report::Basic(b) => b.assess(location),
+            Report::Verbose(v) => v.assess(location),
+        }
+    }
+
+    fn location(&self) -> Option<&Location> {
         todo!()
     }
 }
@@ -239,7 +299,6 @@ impl<A, E> Serialize for Report<A, E> {
 */
 
 pub mod flag {
-    use grill_uri::AbsoluteUri;
     use serde::{Deserialize, Serialize};
     use serde_json::{Map, Value};
 
@@ -501,23 +560,6 @@ pub mod verbose {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                                                                       ║
-║                               IntoOwned                               ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-/// A trait implemented by types that can be converted into an owned type.
-pub trait IntoOwned {
-    /// The owned type.
-    type Owned: 'static;
-    /// Consumes `self`, returning `Self::Owned`.
-    fn into_owned(self) -> Self::Owned;
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
 ║                                Location                               ║
 ║                               ¯¯¯¯¯¯¯¯¯¯                              ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -586,13 +628,13 @@ pub enum Assess<'r, A, E> {
     Verbose(&'r mut Verbose<A, E>),
 }
 
-impl<'r, A, E> Assess<'r, A, E> {
+impl<'r, A, E> spec::Assess<'r, A, E> for Assess<'r, A, E> {
     /// Depending on the variant, may set the [`Annotation`] of the current assessment
     /// and return the previous value, if present.
     ///
     /// - [`Basic`] and [`Verbose`]: sets the [`Annotation`]
     /// - [`Flag`]: discards `annotation`
-    pub fn annotate(&mut self, annotation: A) -> Option<A> {
+    fn annotate(&mut self, annotation: A) -> Option<A> {
         match self {
             Assess::Flag(_) => None,
             Assess::Basic(b) => b.set_annotation(annotation),
@@ -605,7 +647,7 @@ impl<'r, A, E> Assess<'r, A, E> {
     /// - [`Flag`]: discards `error`
     /// - [`Basic`]: sets the [`Error`]
     /// - [`Verbose`]: sets the [`Error`]
-    pub fn fail(&mut self, error: E) {
+    fn fail(&mut self, error: E) {
         match self {
             Assess::Flag(flag) => {
                 flag.valid = false;
@@ -631,7 +673,7 @@ impl<'r, A, E> Assess<'r, A, E> {
 */
 
 pub trait Translate<E> {
-    fn translate(&self, error: E) -> E;
+    fn translate(&self, error: E) -> String;
 }
 
 /*
@@ -644,7 +686,7 @@ pub trait Translate<E> {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-pub struct Translated<'t, T, A, E> {
-    pub report: Report<A, E>,
+pub struct Translated<'t, T, R> {
+    pub report: R,
     pub translator: &'t T,
 }

@@ -13,126 +13,92 @@ pub mod compile;
 pub mod keyword;
 pub mod report;
 pub mod schema;
-
-use std::fmt::Display;
+pub mod spec;
 
 use grill_core::{lang::Init, Key, Language, Resolve};
-use keyword::{eval, spec::Spec};
-use report::{Annotation, Error, IntoOwned};
-use schema::CompiledSchema;
-use serde::{de::DeserializeOwned, Serialize};
+use report::{Annotation, Error};
+use schema::{dialect::Dialect, CompiledSchema};
+use spec::{alias, Specification};
 
 pub use {
     compile::CompileError,
     report::{Output, Report},
 };
-/// A trait implemented by types which are capable of evaluating a specification
-/// of JSON Schema.
-pub trait Specification<K: Key> {
-    /// The error type that can be returned when initializing the dialect.
-    type InitError;
 
-    /// The error type that can be returned when compiling a schema.
-    type CompileError: for<'v> From<CompileError<<Self::Error<'v> as IntoOwned>::Owned>>;
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                               IntoOwned                               ║
+║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+/// A trait implemented by types that can be converted into an owned type.
+pub trait IntoOwned {
+    /// The owned type.
+    type Owned: 'static;
+    /// Consumes `self`, returning `Self::Owned`.
+    fn into_owned(self) -> Self::Owned;
+}
 
-    type EvaluateError: for<'v> From<EvaluateError<K>>;
+#[derive(Debug, Clone)]
+pub struct JsonSchema<S = Spec>(pub S);
 
-    /// The context type supplied to `evaluate`.
-    type Evaluate: keyword::Evaluate<K>;
-
-    type Compile: keyword::Compile<K>;
-
-    type Keyword: keyword::Keyword<Self, K>;
-
-    /// The annotation type to be used in [`Report`s](report::Report).
-    ///
-    /// Even if an annotation is not used for a keyword, it is helpful to have
-    /// unit struct as an annotation for analysis pre-serialization.
-    ///
-    ///[`ShouldSerialize`] is used by the `Report` to determine which annotations
-    /// should be serialized.
-    type Annotation<'v>: From<Annotation<'v>> + Serialize + ShouldSerialize + DeserializeOwned;
-
-    /// The error type to be used in [`Report`s](report::Report).
-    type Error<'v>: From<Error<'v>> + IntoOwned + Display;
-
-    /// Initializes the specification.
-    fn init(
-        &mut self,
-        init: Init<'_, CompiledSchema<Self::Keyword, K>, K>,
-    ) -> Result<(), Self::InitError> {
-        Ok(())
+impl<S> JsonSchema<S> {
+    pub fn new(spec: S) -> Self {
+        Self(spec)
     }
-
-    async fn compile<'i, R: Resolve + Send + Sync>(
-        &'i mut self,
-        compile: grill_core::lang::Compile<'i, CompiledSchema<Self::Keyword, K>, R, K>,
-    ) -> Result<Self::Compile, Self::CompileError>;
-
-    fn evaluate<'i, 'v>(
-        &'i self,
-        eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self::Keyword, K>, Output, K>,
-    ) -> Result<Report<Self::Annotation<'v>, Self::Error<'v>>, Self::EvaluateError>;
 }
 
-pub(crate) mod alias {
-    use super::{Report, Specification};
-    pub(super) type InitError<S, K> = <S as Specification<K>>::InitError;
-    pub(super) type CompileError<S, K> = <S as Specification<K>>::CompileError;
-    pub(super) type EvaluateError<S, K> = <S as Specification<K>>::EvaluateError;
-    pub(super) type Evaluate<S, K> = <S as Specification<K>>::Evaluate;
-    pub(super) type Compile<S, K> = <S as Specification<K>>::Compile;
-    pub(super) type Annotation<'v, S, K> = <S as Specification<K>>::Annotation<'v>;
-    pub(super) type Error<'v, S, K> = <S as Specification<K>>::Error<'v>;
-    pub(super) type TypedReport<'v, S, K> = Report<Annotation<'v, S, K>, Error<'v, S, K>>;
-    pub(super) type EvaluateResult<'v, S, K> = Result<TypedReport<'v, S, K>, EvaluateError<S, K>>;
+/// Std JSON Schema specification.
+#[derive(Clone, Debug)]
+pub struct Spec {
+    dialects: Vec<Dialect<keyword::Keyword>>,
+    primary_dialect_idx: usize,
 }
 
-pub trait ShouldSerialize {
-    fn should_serialize(&self) -> bool;
-}
-
-pub struct JsonSchema {}
-
-impl<K: Key + Send> Specification<K> for JsonSchema {
+impl<K: Key + Send> Specification<K> for Spec {
     type InitError = ();
 
     type CompileError = CompileError<Error<'static>>;
 
     type EvaluateError = EvaluateError<K>;
 
-    type Evaluate = eval::Context;
+    type Evaluate = keyword::Evaluate;
 
-    type Compile = keyword::compile::Context<Spec<Self, K>, K>;
+    type Compile = keyword::Compile<Self, K>;
 
-    type Keyword = keyword::spec::Spec<Self, K>;
+    type Keyword = keyword::Keyword;
 
     type Annotation<'v> = report::Annotation<'v>;
 
     type Error<'v> = report::Error<'v>;
 
+    type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
+
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile: grill_core::lang::Compile<'i, CompiledSchema<Self::Keyword, K>, R, K>,
+        compile: grill_core::lang::Compile<'i, CompiledSchema<Self, K>, R, K>,
     ) -> Result<Self::Compile, Self::CompileError> {
         todo!()
     }
 
     fn evaluate<'i, 'v>(
         &'i self,
-        eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self::Keyword, K>, Output, K>,
-    ) -> Result<Report<Self::Annotation<'v>, Self::Error<'v>>, Self::EvaluateError> {
+        eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self, K>, Output, K>,
+    ) -> Result<Self::Evaluate, Self::EvaluateError> {
         todo!()
     }
 }
 
-impl<S, K> Language<K> for S
+impl<S, K> Language<K> for JsonSchema<S>
 where
     S: Specification<K> + Send,
-    K: Key + Send,
+    K: 'static + Key + Send,
 {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
-    type CompiledSchema = CompiledSchema<K, S::Keyword>;
+    type CompiledSchema = CompiledSchema<S, K>;
 
     /// The error type possibly returned from [`compile`](Language::compile).
     type CompileError = alias::CompileError<S, K>;
