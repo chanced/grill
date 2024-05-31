@@ -6,7 +6,7 @@ use snafu::Snafu;
 /// Failed to compile a schema.
 #[derive(Debug, Snafu)]
 #[snafu(display("failed to compile schema \"{uri}\""))]
-pub struct CompileError<E: Debug> {
+pub struct CompileError<E: 'static + Debug> {
     /// [`AbsoluteUri`] of the schema.
     pub uri: AbsoluteUri,
 

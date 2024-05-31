@@ -114,7 +114,13 @@ where
 
     /// Initializes the language with the given [`Init`] request.
     fn init(&mut self, init: Init<'_, Self::CompiledSchema, K>) -> Result<(), Self::InitError> {
-        Specification::init(self, init)
+        let Init {
+            schemas,
+            sources,
+            numbers,
+            values,
+        } = init;
+        todo!()
     }
 
     /// Compiles a schema for the given [`Compile`] request and returns the key,
