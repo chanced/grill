@@ -13,11 +13,19 @@ pub mod big;
 pub mod iter;
 pub mod lang;
 
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
+
 pub use lang::{schema::DefaultKey, Language};
 pub use slotmap::{new_key_type, Key};
 
 use grill_uri::AbsoluteUri;
-use lang::{source, Compile, Evaluate, Numbers, Schemas, Sources, Values};
+use lang::{
+    source::{self, NotFoundError},
+    Compile, Evaluate, Numbers, Schemas, Sources, Values,
+};
 use serde_json::Value;
 
 /// A trait for resolving and deserializing a [`Value`] at a given [`AbsoluteUri`].
@@ -30,12 +38,37 @@ pub trait Resolve {
     ///
     /// # Errors
     /// Returns [`Self::Error`] if an error occurs during resolution.
-    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Value, Self::Error>;
+    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Arc<Value>, Self::Error>;
 }
+
+macro_rules! resolve_maps {
+    ($($map:ident),*) => {
+        $(
+            impl Resolve for $map<AbsoluteUri, Arc<Value>> {
+                type Error = NotFoundError;
+                async fn resolve(&self, uri: &AbsoluteUri) -> Result<Arc<Value>, Self::Error> {
+                    self.get(uri)
+                        .cloned()
+                        .ok_or_else(|| NotFoundError::new(uri.clone()))
+                }
+            }
+            impl Resolve for $map<AbsoluteUri, Value> {
+                type Error = NotFoundError;
+                async fn resolve(&self, uri: &AbsoluteUri) -> Result<Arc<Value>, Self::Error> {
+                    self.get(uri)
+                        .cloned()
+                        .map(Arc::new)
+                        .ok_or_else(|| NotFoundError::new(uri.clone()))
+                }
+            }
+        )*
+    };
+}
+resolve_maps!(HashMap, BTreeMap);
 
 impl Resolve for () {
     type Error = source::NotFoundError;
-    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Value, Self::Error> {
+    async fn resolve(&self, uri: &AbsoluteUri) -> Result<Arc<Value>, Self::Error> {
         Err(source::NotFoundError::new(uri.clone()))
     }
 }

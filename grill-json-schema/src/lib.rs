@@ -15,6 +15,8 @@ pub mod report;
 pub mod schema;
 pub mod spec;
 
+use std::borrow::Cow;
+
 use grill_core::{lang::Init, Key, Language, Resolve};
 use report::{Annotation, Error};
 use schema::{dialect::Dialect, CompiledSchema};
@@ -71,6 +73,8 @@ impl<K: Key + Send> Specification<K> for Spec {
 
     type Keyword = keyword::Keyword;
 
+    type Keywords<'i> = keyword::Keywords<'i>;
+
     type Annotation<'v> = report::Annotation<'v>;
 
     type Error<'v> = report::Error<'v>;
@@ -114,13 +118,7 @@ where
 
     /// Initializes the language with the given [`Init`] request.
     fn init(&mut self, init: Init<'_, Self::CompiledSchema, K>) -> Result<(), Self::InitError> {
-        let Init {
-            schemas,
-            sources,
-            numbers,
-            values,
-        } = init;
-        todo!()
+        self.0.init(init)
     }
 
     /// Compiles a schema for the given [`Compile`] request and returns the key,

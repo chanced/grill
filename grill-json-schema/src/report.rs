@@ -246,28 +246,6 @@ where
     fn new(output: Output, location: Location) -> Self {
         todo!()
     }
-
-    fn instance_location(&self) -> Option<&jsonptr::Pointer> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.instance_location(),
-            Report::Verbose(v) => Some(v.instance_location()),
-        }
-    }
-    fn keyword_location(&self) -> Option<&jsonptr::Pointer> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.keyword_location(),
-            Report::Verbose(v) => Some(v.keyword_location()),
-        }
-    }
-    fn absolute_keyword_location(&self) -> Option<&AbsoluteUri> {
-        match self {
-            Report::Flag(_) => None,
-            Report::Basic(b) => b.absolute_keyword_location(),
-            Report::Verbose(v) => Some(v.absolute_keyword_location()),
-        }
-    }
     fn is_valid(&self) -> bool {
         match self {
             Report::Flag(f) => f.is_valid(),
@@ -281,10 +259,6 @@ where
             Report::Basic(b) => b.assess(location),
             Report::Verbose(v) => v.assess(location),
         }
-    }
-
-    fn location(&self) -> Option<&Location> {
-        todo!()
     }
 }
 

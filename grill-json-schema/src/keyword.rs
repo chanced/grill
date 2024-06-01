@@ -9,7 +9,7 @@ use grill_core::{
 use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use snafu::Snafu;
-use std::fmt;
+use std::{fmt, ops::Deref};
 
 mod consts;
 pub use consts::*;
@@ -44,6 +44,45 @@ where
         eval: spec::alias::Evaluate<S, K>,
     ) -> Result<(), spec::alias::EvaluateError<S, K>> {
         todo!()
+    }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║                                Keywords                               ║
+║                               ¯¯¯¯¯¯¯¯¯¯                              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+
+/// A slice of [`Keyword`]s belonging to a schema.
+pub struct Keywords<'i>(pub &'i [Keyword]);
+
+impl<'i> From<&'i [Keyword]> for Keywords<'i> {
+    fn from(keywords: &'i [Keyword]) -> Self {
+        Self(keywords)
+    }
+}
+impl<'i> IntoIterator for Keywords<'i> {
+    type Item = &'i Keyword;
+    type IntoIter = std::slice::Iter<'i, Keyword>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Keywords<'_> {
+    /// Returns the slice of keywords.
+    pub fn as_slice(&self) -> &[Keyword] {
+        self.0
+    }
+}
+impl AsRef<[Keyword]> for Keywords<'_> {
+    fn as_ref(&self) -> &[Keyword] {
+        self.0
     }
 }
 

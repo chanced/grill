@@ -1,5 +1,7 @@
 use std::{
+    borrow::Cow,
     fmt::{Debug, Display},
+    ops::Deref,
     sync::Arc,
 };
 
@@ -34,12 +36,66 @@ pub trait Specification<K: Key>: Sized + Debug + Clone {
 
     type EvaluateError: for<'v> From<EvaluateError<K>>;
 
-    /// The context type supplied to `evaluate`.
+    /// Context type supplied to `evaluate`.
     type Evaluate: Evaluate<K>;
 
+    /// Context type supplied to `compile`.
     type Compile: Compile<K>;
 
-    type Keyword: Keyword<Self, K>;
+    type Keyword: 'static + Keyword<Self, K>;
+
+    /// A type which can hold a slice [`Self::Keyword`]s, returned from
+    /// [`JsonSchema::keywords`].
+    ///
+    /// The purpose of allowing for this to be typed is so that convience
+    /// accessor methods, can be accessed.
+    ///
+    /// # Example
+    /// ```
+    ///    pub struct Keywords<'i>(&'i [Keyword]);
+    ///    impl<'i> From<&'i [Keyword]> for Keywords<'i> {
+    ///        fn from(k: &'i [Keyword]) -> Self {
+    ///            Self(k)
+    ///        }
+    ///    }
+    ///
+    ///    impl<'i> std::iter::IntoIterator for Keywords<'i> {
+    ///        type Item = &'i Keyword;
+    ///        type IntoIter: Iterator<Item = Self::Item>;
+    ///    
+    ///        // Required method
+    ///        fn into_iter(self) -> Self::IntoIter {
+    ///            self.0.iter()
+    ///        }
+    ///    }
+    ///    
+    ///    impl<'i> Keywords<'i> {
+    ///        pub fn format(&self) -> Option<&format::Keyword> {
+    ///            self.0.iter().find_map(|k| k.as_format())
+    ///        }
+    ///    }
+    ///    #[non_exhaustive]
+    ///    pub enum Keyword {
+    ///        Format(format::Keyword),
+    ///        Other(()),
+    ///    }
+    ///    impl Keyword {
+    ///        pub fn as_format(&self) -> Option<&format::Keyword> {
+    ///            match self {
+    ///                Self::Format(k) => Some(k),
+    ///                _ => None,
+    ///            }
+    ///        }
+    ///    }
+    ///    
+    ///    pub mod format {
+    ///        pub struct Keyword;
+    ///    }
+    /// ```
+    type Keywords<'i>: From<&'i [Self::Keyword]> + IntoIterator<Item = &'i Self::Keyword>
+    where
+        Self: 'i,
+        Self::Keyword: 'static;
 
     /// The annotation type to be used in `Self::Report`.
     ///
@@ -56,6 +112,7 @@ pub trait Specification<K: Key>: Sized + Debug + Clone {
     type Report<'v>: Report<'v, Self::Annotation<'v>, Self::Error<'v>>;
 
     /// Initializes the specification.
+    #[allow(unused_variables)]
     fn init(&mut self, init: Init<'_, CompiledSchema<Self, K>, K>) -> Result<(), Self::InitError> {
         Ok(())
     }
@@ -139,12 +196,8 @@ pub trait Report<'v, A, E>: for<'de> Deserialize<'de> + Serialize + Display + De
     type Assess<'r>: Assess<'r, A, E>
     where
         Self: 'r;
-
+    /// Creates a new report.
     fn new(output: Output, location: Location) -> Self;
-    fn instance_location(&self) -> Option<&jsonptr::Pointer>;
-    fn keyword_location(&self) -> Option<&jsonptr::Pointer>;
-    fn absolute_keyword_location(&self) -> Option<&AbsoluteUri>;
-    fn location(&self) -> Option<&Location>;
     fn is_valid(&self) -> bool;
     fn assess(&mut self, location: Location) -> Self::Assess<'_>;
 }
