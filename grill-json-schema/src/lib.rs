@@ -60,16 +60,16 @@ pub struct Spec {
     primary_dialect_idx: usize,
 }
 
-impl<K: Key + Send> Specification<K> for Spec {
+impl<K: 'static + Key + Send> Specification<K> for Spec {
     type InitError = ();
 
     type CompileError = CompileError<Error<'static>>;
 
     type EvaluateError = EvaluateError<K>;
 
-    type Evaluate = keyword::Evaluate;
+    type Evaluate<'i> = keyword::Evaluate<'i>;
 
-    type Compile = keyword::Compile<Self, K>;
+    type Compile<'i> = keyword::Compile<'i, Self, K>;
 
     type Keyword = keyword::Keyword;
 
@@ -84,14 +84,14 @@ impl<K: Key + Send> Specification<K> for Spec {
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
         compile: grill_core::lang::Compile<'i, CompiledSchema<Self, K>, R, K>,
-    ) -> Result<Self::Compile, Self::CompileError> {
+    ) -> Result<Self::Compile<'i>, Self::CompileError> {
         todo!()
     }
 
     fn evaluate<'i, 'v>(
         &'i self,
         eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self, K>, Output, K>,
-    ) -> Result<Self::Evaluate, Self::EvaluateError> {
+    ) -> Result<Self::Evaluate<'i>, Self::EvaluateError> {
         todo!()
     }
 }
@@ -111,7 +111,7 @@ where
     type EvaluateResult<'v> = alias::EvaluateResult<'v, S, K>;
 
     /// Context type supplied to `evaluate`.
-    type Context = alias::Evaluate<S, K>;
+    type Context = Output;
 
     /// The error type that can be returned when initializing the language.
     type InitError = alias::InitError<S, K>;

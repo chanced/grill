@@ -16,14 +16,14 @@ impl<'i, K: Key> lang::schema::Schema<'i, K> for Schema<'i, K> {
 }
 
 #[derive(Debug)]
-pub struct CompiledSchema<S: Specification<K>, K: Key> {
+pub struct CompiledSchema<S: Specification<K>, K: 'static + Key> {
     key: K,
     keywords: Box<[S::Keyword]>,
 }
 impl<S, K> PartialEq for CompiledSchema<S, K>
 where
     S: Specification<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.keywords == other.keywords

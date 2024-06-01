@@ -9,7 +9,7 @@ use grill_core::{
 use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use snafu::Snafu;
-use std::{fmt, ops::Deref};
+use std::{fmt, marker::PhantomData, ops::Deref};
 
 mod consts;
 pub use consts::*;
@@ -24,13 +24,14 @@ pub use consts::*;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+/// A JSON Schema keyword.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Keyword {}
 
 impl<S, K> spec::Keyword<S, K> for Keyword
 where
     S: spec::Specification<K>,
-    K: Send + Key,
+    K: 'static + Send + Key,
 {
     fn compile<'i>(
         &self,
@@ -97,22 +98,26 @@ impl AsRef<[Keyword]> for Keywords<'_> {
 */
 
 /// Context for [`Keyword::compile`].
-pub struct Compile<S: Specification<K>, K: Key> {
-    pub(crate) schemas: Schemas<CompiledSchema<S, K>, K>,
-    pub(crate) sources: Sources,
-    pub(crate) numbers: Numbers,
-    pub(crate) values: Values,
-}
-impl<S, K> spec::Compile<K> for Compile<S, K>
+pub struct Compile<'i, S: Specification<K>, K>
 where
-    K: Send + Key,
+    K: 'static + Key,
+{
+    pub(crate) schemas: &'i mut Schemas<CompiledSchema<S, K>, K>,
+    pub(crate) sources: &'i mut Sources,
+    pub(crate) numbers: &'i mut Numbers,
+    pub(crate) values: &'i mut Values,
+}
+
+impl<'i, S, K> spec::Compile<'i, K> for Compile<'i, S, K>
+where
+    K: 'static + Send + Key,
     S: Specification<K>,
 {
     fn schema(&self, uri: &AbsoluteUri) -> Option<K> {
         todo!()
     }
 
-    fn numbers(&mut self) -> &mut Numbers {
+    fn numbers(&mut self) -> &'i mut Numbers {
         todo!()
     }
 
@@ -123,7 +128,7 @@ where
         todo!()
     }
 
-    fn values(&mut self) -> &mut Values {
+    fn values(&mut self) -> &'i mut Values {
         todo!()
     }
 
@@ -131,7 +136,7 @@ where
         todo!()
     }
 
-    fn sources(&self) -> &Sources {
+    fn sources(&self) -> &'i Sources {
         todo!()
     }
 
@@ -151,10 +156,11 @@ where
 */
 
 /// Context for [`Keyword::evaluate`].
-pub struct Evaluate {
+pub struct Evaluate<'i> {
+    marker: PhantomData<&'i ()>,
     // pub(crate) schemas: Schemas,
 }
-impl<K: Key> spec::Evaluate<K> for Evaluate {
+impl<'i, K: 'static + Key> spec::Evaluate<'i, K> for Evaluate<'i> {
     fn schema(&self, uri: &AbsoluteUri) -> Option<K> {
         todo!()
     }

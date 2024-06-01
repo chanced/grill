@@ -27,7 +27,7 @@ pub trait ShouldSerialize {
 
 /// A trait implemented by types which are capable of evaluating a specification
 /// of JSON Schema.
-pub trait Specification<K: Key>: Sized + Debug + Clone {
+pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
     /// The error type that can be returned when initializing the dialect.
     type InitError;
 
@@ -37,10 +37,16 @@ pub trait Specification<K: Key>: Sized + Debug + Clone {
     type EvaluateError: for<'v> From<EvaluateError<K>>;
 
     /// Context type supplied to `evaluate`.
-    type Evaluate: Evaluate<K>;
+    type Evaluate<'i>: Evaluate<'i, K>
+    where
+        Self: 'i,
+        K: 'static;
 
     /// Context type supplied to `compile`.
-    type Compile: Compile<K>;
+    type Compile<'i>: Compile<'i, K>
+    where
+        Self: 'i,
+        K: 'static;
 
     type Keyword: 'static + Keyword<Self, K>;
 
@@ -120,29 +126,38 @@ pub trait Specification<K: Key>: Sized + Debug + Clone {
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
         compile: grill_core::lang::Compile<'i, CompiledSchema<Self, K>, R, K>,
-    ) -> Result<Self::Compile, Self::CompileError>;
+    ) -> Result<Self::Compile<'i>, Self::CompileError>;
 
     fn evaluate<'i, 'v>(
         &'i self,
         eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self, K>, Output, K>,
-    ) -> Result<Self::Evaluate, Self::EvaluateError>;
+    ) -> Result<Self::Evaluate<'i>, Self::EvaluateError>;
 }
 
 pub mod alias {
     use super::Specification;
+    /// Alias for [`Specification::InitError`].
     pub type InitError<S, K> = <S as Specification<K>>::InitError;
+    /// Alias for [`Specification::CompileError`].
     pub type CompileError<S, K> = <S as Specification<K>>::CompileError;
+    /// Alias for [`Specification::EvaluateError`].
     pub type EvaluateError<S, K> = <S as Specification<K>>::EvaluateError;
-    pub type Evaluate<S, K> = <S as Specification<K>>::Evaluate;
-    pub type Compile<S, K> = <S as Specification<K>>::Compile;
+    /// Alias for [`Specification::Evaluate`].
+    pub type Evaluate<'i, S, K> = <S as Specification<K>>::Evaluate<'i>;
+    /// Alias for [`Specification::Compile`].
+    pub type Compile<'i, 'v, S, K> = <S as Specification<K>>::Compile<'i>;
+    /// Alias for [`Specification::Report`].
     pub type Report<'v, S, K> = <S as Specification<K>>::Report<'v>;
+    /// Alias for [`Specification::Annotation`].
     pub type Annotation<'v, S, K> = <S as Specification<K>>::Annotation<'v>;
+    /// Alias for [`Specification::Error`].
     pub type Error<'v, S, K> = <S as Specification<K>>::Error<'v>;
+    /// Alias for `Result<Specification::Report, Specification::EvaluateError>`.
     pub type EvaluateResult<'v, S, K> = Result<Report<'v, S, K>, EvaluateError<S, K>>;
 }
 
 /// Context for [`Keyword::compile`].
-pub trait Compile<K>
+pub trait Compile<'i, K>
 where
     K: Key,
 {
@@ -150,7 +165,7 @@ where
     fn schema(&self, uri: &AbsoluteUri) -> Option<K>;
 
     /// Returns a mutable reference to [`Numbers`] cache.
-    fn numbers(&mut self) -> &mut Numbers;
+    fn numbers(&mut self) -> &'i mut Numbers;
 
     /// Parses a JSON number into an [`Arc<BigRational>`](`BigRational`) and
     /// stores it in the [`Numbers`] cache if it is not already present.
@@ -158,7 +173,7 @@ where
     fn number(&mut self, number: &Number) -> Result<Arc<BigRational>, grill_core::big::ParseError>;
 
     /// Returns a mutable reference to [`Values`] cache.
-    fn values(&mut self) -> &mut Values;
+    fn values(&mut self) -> &'i mut Values;
 
     /// If `value` is already in the [`Values`] cache, the existing
     /// `Arc<Value>` is cloned and returned. Otherwise, `value` is inserted
@@ -166,7 +181,7 @@ where
     fn value(&mut self, value: &Value) -> Arc<Value>;
 
     /// Returns a reference to [`Sources`].
-    fn sources(&self) -> &Sources;
+    fn sources(&self) -> &'i Sources;
 
     /// Retrieves a [`Source`] from the store by [`AbsoluteUri`], if a
     /// [`Link`](grill_core::lang::source::Link) exists.
@@ -174,14 +189,14 @@ where
 }
 
 /// Context for [`Keyword::evaluate`].
-pub trait Evaluate<K: Key> {
+pub trait Evaluate<'i, K: Key> {
     fn schema(&self, uri: &AbsoluteUri) -> Option<K>;
 }
 
 pub trait Keyword<S, K>: Send + Debug + Clone + PartialEq + Eq
 where
     S: Specification<K>,
-    K: Key,
+    K: 'static + Key,
 {
     fn compile<'i>(
         &self,
