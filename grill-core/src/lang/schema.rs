@@ -30,8 +30,7 @@ pub trait Embedded<K> {
 /// This trait is satisfied by [`Language`](crate::lang::Language)
 /// implementations. See your desired language's documentation for more
 /// information.
-pub trait Schema<'i, K> {
-    /// Returns the key of the schema.
+pub trait Schema<'i, K>: AsRef<K> {
     fn key(&self) -> K;
 }
 
@@ -40,22 +39,25 @@ pub trait Schema<'i, K> {
 /// This trait is satisfied by [`Language`](crate::lang::Language)
 /// implementations. See your desired language's documentation for more
 /// information.
-pub trait CompiledSchema<K>: Clone + PartialEq {
+pub trait CompiledSchema<K>: AsRef<K> + Clone + PartialEq {
     /// The borrowed schema representation.
     type Schema<'i>: Schema<'i, K>;
+
+    /// Returns the key of the schema.
+    fn key(&self) -> K;
 
     /// Sets the key of the schema.
     fn set_key(&mut self, key: K);
 
     /// Returns the borrowed [`Self::Schema`] representation.
-    fn as_schema<'i>(&self, sources: &Sources) -> Self::Schema<'i>;
+    fn to_schema<'i>(&self, sources: &Sources) -> Self::Schema<'i>;
 }
 
 /// A collection of schemas indexed by [`AbsoluteUri`]s.
 #[derive(Debug, Clone)]
 pub struct Schemas<S, K: Key> {
-    schemas: SlotMap<K, S>,
-    keys: HashMap<AbsoluteUri, K>,
+    pub(crate) schemas: SlotMap<K, S>,
+    uris: HashMap<AbsoluteUri, K>,
 }
 impl<S, K: Key> Default for Schemas<S, K> {
     fn default() -> Self {
@@ -67,7 +69,7 @@ impl<S, K: Key> Schemas<S, K> {
     pub fn new() -> Self {
         Self {
             schemas: SlotMap::with_key(),
-            keys: HashMap::new(),
+            uris: HashMap::new(),
         }
     }
 }
@@ -90,7 +92,7 @@ where
     /// Returns [`DuplicateLinkError`] if a schema is already linked to the
     /// given `uri`.
     pub fn assign(&mut self, uri: AbsoluteUri, key: K) -> Result<(), DuplicateLinkError<K>> {
-        match self.keys.get(&uri).copied() {
+        match self.uris.get(&uri).copied() {
             Some(existing) => ensure!(existing == key, DuplicateLinkSnafu { existing, uri }),
             None => self.insert_uri(uri, key),
         }
@@ -98,17 +100,26 @@ where
     }
 
     fn insert_uri(&mut self, uri: AbsoluteUri, key: K) {
-        self.keys.insert(uri, key);
+        self.uris.insert(uri, key);
     }
     /// Returns [`Self::C::Schema`](CompiledSchema::Schema) for the supplied
     /// [`AbsoluteUri`], if it exists.
     pub fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&S> {
-        self.keys.get(uri).copied().and_then(|k| self.get_by_key(k))
+        self.uris.get(uri).copied().and_then(|k| self.get(k).ok())
     }
+
     /// Returns a reference to compiled schema ([`Self::C`](`CompiledSchema`))
-    /// with the supplied `key` (``)
-    pub fn get_by_key(&self, key: K) -> Option<&S> {
-        self.schemas.get(key)
+    /// with the supplied `key` or returns `InvalidKeyError` if the key does
+    /// not exist.
+    pub fn get(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
+        self.schemas.get(key).ok_or(InvalidKeyError { key })
+    }
+
+    /// Returns a reference to compiled schema ([`Self::C`](`CompiledSchema`))
+    /// with the supplied `key` or returns `InvalidKeyError` if the key does
+    /// not exist.
+    pub fn get_by_key(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
+        self.schemas.get(key).ok_or(InvalidKeyError { key })
     }
 
     /// Returns a mutable reference to the schema ([`C`](`CompiledSchema`)) with
@@ -140,10 +151,20 @@ mod tests {
         key: DefaultKey,
     }
 
+    impl AsRef<DefaultKey> for Compiled {
+        fn as_ref(&self) -> &DefaultKey {
+            &self.key
+        }
+    }
     #[derive(Debug, PartialEq, Eq)]
     struct TestSchema<'i> {
         key: DefaultKey,
         _marker: PhantomData<&'i ()>,
+    }
+    impl<'i> AsRef<DefaultKey> for TestSchema<'i> {
+        fn as_ref(&self) -> &DefaultKey {
+            &self.key
+        }
     }
     impl<'i> Schema<'i, DefaultKey> for TestSchema<'i> {
         fn key(&self) -> DefaultKey {
@@ -158,11 +179,15 @@ mod tests {
             self.key = key;
         }
 
-        fn as_schema<'i>(&self, _sources: &Sources) -> Self::Schema<'i> {
+        fn to_schema<'i>(&self, _sources: &Sources) -> Self::Schema<'i> {
             TestSchema {
                 key: self.key,
                 _marker: PhantomData,
             }
+        }
+
+        fn key(&self) -> DefaultKey {
+            self.key
         }
     }
 
@@ -176,4 +201,10 @@ mod tests {
         schemas.assign(uri.clone(), key).unwrap();
         assert_eq!(schemas.get_by_uri(&uri).unwrap().key, key);
     }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(display("invalid key: {key:?}"))]
+pub struct InvalidKeyError<K: Key = DefaultKey> {
+    pub key: K,
 }

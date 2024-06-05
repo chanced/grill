@@ -1,7 +1,5 @@
 use std::{
-    borrow::Cow,
     fmt::{Debug, Display},
-    ops::Deref,
     sync::Arc,
 };
 
@@ -11,16 +9,14 @@ use grill_core::{
     Key, Resolve,
 };
 use grill_uri::AbsoluteUri;
-use inherent::inherent;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 
 use crate::{
-    report::{Annotation, Error, Location},
-    schema::CompiledSchema,
-    CompileError, EvaluateError, IntoOwned, Output,
+    report::Location, schema::CompiledSchema, CompileError, EvaluateError, IntoOwned, Output,
 };
 
+/// [`ShouldSerialize`]
 pub trait ShouldSerialize {
     fn should_serialize(&self) -> bool;
 }
@@ -32,15 +28,19 @@ pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
     type InitError;
 
     /// The error type that can be returned when compiling a schema.
-    type CompileError: for<'v> From<CompileError<<Self::Error<'v> as IntoOwned>::Owned>>;
+    type CompileError: Send
+        + std::error::Error
+        + for<'v> From<CompileError<<Self::Error<'v> as IntoOwned>::Owned>>;
 
-    type EvaluateError: for<'v> From<EvaluateError<K>>;
+    type EvaluateError: Send + std::error::Error + for<'v> From<EvaluateError<K>>
+    where
+        K: Send;
 
     /// Context type supplied to `evaluate`.
     type Evaluate<'i>: Evaluate<'i, K>
     where
         Self: 'i,
-        K: 'static;
+        K: Send + 'static;
 
     /// Context type supplied to `compile`.
     type Compile<'i>: Compile<'i, K>
@@ -113,7 +113,7 @@ pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
     type Annotation<'v>: Serialize + ShouldSerialize;
 
     /// The error type to be used in `Self::Report`.
-    type Error<'v>: IntoOwned + Display;
+    type Error<'v>: Send + IntoOwned + Display;
 
     type Report<'v>: Report<'v, Self::Annotation<'v>, Self::Error<'v>>;
 
@@ -125,7 +125,7 @@ pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
 
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile: grill_core::lang::Compile<'i, CompiledSchema<Self, K>, R, K>,
+        compile: grill_core::lang::Compile<'i, AbsoluteUri, CompiledSchema<Self, K>, R, K>,
     ) -> Result<Self::Compile<'i>, Self::CompileError>;
 
     fn evaluate<'i, 'v>(
@@ -193,19 +193,24 @@ pub trait Evaluate<'i, K: Key> {
     fn schema(&self, uri: &AbsoluteUri) -> Option<K>;
 }
 
+/// A trait implemented by types which are capable of evaluating one or more
+/// keywords of a JSON Schema specification.
 pub trait Keyword<S, K>: Send + Debug + Clone + PartialEq + Eq
 where
     S: Specification<K>,
     K: 'static + Key,
 {
+    /// Compiles the keyword.
     fn compile<'i>(
         &self,
         compile: alias::Compile<S, K>,
     ) -> Option<Result<(), alias::CompileError<S, K>>>;
 
+    /// Evaluates the keyword.
     fn evaluate<'v>(&self, eval: alias::Evaluate<S, K>) -> Result<(), alias::EvaluateError<S, K>>;
 }
 
+/// The result of evaluating a JSON Schema.
 pub trait Report<'v, A, E>: for<'de> Deserialize<'de> + Serialize + Display + Debug + Send {
     /// A type which should allow for modification of a unit within the report.
     type Assess<'r>: Assess<'r, A, E>
@@ -213,7 +218,11 @@ pub trait Report<'v, A, E>: for<'de> Deserialize<'de> + Serialize + Display + De
         Self: 'r;
     /// Creates a new report.
     fn new(output: Output, location: Location) -> Self;
+    /// Returns `true` if the report is valid.
     fn is_valid(&self) -> bool;
+    /// Retrieves or creates a unit within the `Report` at the given location
+    /// and returns `Self::Assess`, which should be capable of mutating the unit
+    /// in place.
     fn assess(&mut self, location: Location) -> Self::Assess<'_>;
 }
 

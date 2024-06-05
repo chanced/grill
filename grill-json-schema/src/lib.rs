@@ -17,9 +17,12 @@ pub mod spec;
 
 use std::borrow::Cow;
 
+use compile::Compiler;
 use grill_core::{lang::Init, Key, Language, Resolve};
-use report::{Annotation, Error};
+use grill_uri::AbsoluteUri;
+use report::Error;
 use schema::{dialect::Dialect, CompiledSchema};
+use snafu::Snafu;
 use spec::{alias, Specification};
 
 pub use {
@@ -44,10 +47,12 @@ pub trait IntoOwned {
     fn into_owned(self) -> Self::Owned;
 }
 
+/// JSON Schema with support for drafts 2020-12, 2019-09, 07, and 04.
 #[derive(Debug, Clone)]
 pub struct JsonSchema<S = Spec>(pub S);
 
 impl<S> JsonSchema<S> {
+    /// Creates a new JSON Schema language for the given [`Specification`].
     pub fn new(spec: S) -> Self {
         Self(spec)
     }
@@ -83,7 +88,7 @@ impl<K: 'static + Key + Send> Specification<K> for Spec {
 
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile: grill_core::lang::Compile<'i, CompiledSchema<Self, K>, R, K>,
+        compile: grill_core::lang::Compile<'i, AbsoluteUri, CompiledSchema<Self, K>, R, K>,
     ) -> Result<Self::Compile<'i>, Self::CompileError> {
         todo!()
     }
@@ -131,8 +136,10 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile: grill_core::lang::Compile<'i, Self::CompiledSchema, R, K>,
+        compile: grill_core::lang::Compile<'i, AbsoluteUri, Self::CompiledSchema, R, K>,
     ) -> Result<K, Self::CompileError> {
+        let ctx = self.0.compile(compile).await?;
+        // Compiler::new(ctx).compile().await
         todo!()
     }
 
@@ -140,7 +147,7 @@ where
     /// keys, if successful.
     async fn compile_all<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile_all: grill_core::lang::CompileAll<'i, Self::CompiledSchema, R, K>,
+        compile_all: grill_core::lang::Compile<'i, Vec<AbsoluteUri>, Self::CompiledSchema, R, K>,
     ) -> Result<Vec<K>, Self::CompileError> {
         todo!()
     }
@@ -154,6 +161,8 @@ where
     }
 }
 
-pub struct EvaluateError<K> {
+#[derive(Debug, Snafu)]
+#[snafu(display("failed to evaluate schema {key}"))]
+pub struct EvaluateError<K: Send> {
     pub key: K,
 }

@@ -1,7 +1,10 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
+use grill_core::Key;
 use grill_uri::AbsoluteUri;
 use snafu::Snafu;
+
+use crate::spec::Specification;
 
 /// Failed to compile a schema.
 #[derive(Debug, Snafu)]
@@ -20,4 +23,22 @@ pub struct CompileError<E: 'static + Debug> {
 pub enum CompileErrorCause<E> {
     #[snafu(display(""))]
     Temp { e: E },
+}
+
+pub struct Compiler<'i, S, K>
+where
+    S: 'i + Specification<K>,
+    K: 'static + Key,
+{
+    ctx: S::Compile<'i>,
+}
+
+impl<'i, S, K> Compiler<'i, S, K>
+where
+    S: 'i + Specification<K>,
+    K: 'static + Key,
+{
+    pub fn new(ctx: S::Compile<'i>) -> Self {
+        Self { ctx }
+    }
 }

@@ -16,9 +16,6 @@ grill-core = { workspace = true }
 # grill-json-schema = { workspace = true }
 
 [features]
-default = ["toml"]
-toml    = ["grill-core/toml"]
-yaml    = ["grill-core/yaml"]
 
 [[bench]]
 harness = false

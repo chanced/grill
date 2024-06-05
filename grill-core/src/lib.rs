@@ -5,7 +5,7 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all, clippy::pedantic)]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![allow(clippy::implicit_hasher, clippy::wildcard_imports)]
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
@@ -23,6 +23,7 @@ pub use slotmap::{new_key_type, Key};
 
 use grill_uri::AbsoluteUri;
 use lang::{
+    schema::{CompiledSchema, InvalidKeyError},
     source::{self, NotFoundError},
     Compile, Evaluate, Numbers, Schemas, Sources, Values,
 };
@@ -98,6 +99,9 @@ impl<L: Language<K>, K: Key> Interrogator<L, K> {
         Ok(self)
     }
 
+    // fn iter(&self) -> (){
+    //     self.schemas.
+    // }
     /// Creates a new `Interrogator`.
     pub fn new(lang: L) -> Result<Self, L::InitError> {
         Self {
@@ -136,11 +140,35 @@ impl<L: Language<K>, K: Key> Interrogator<L, K> {
             values: &mut self.values,
             resolve,
         };
-
         let key = self.lang.compile(c).await?;
         self.schemas = schemas;
         self.sources = sources;
         Ok(key)
+    }
+
+    pub async fn compile_all<R, U>(
+        &mut self,
+        schema_uri: U,
+        resolve: &R,
+    ) -> Result<Vec<K>, L::CompileError>
+    where
+        R: Resolve + Sync,
+        U: IntoIterator<Item = AbsoluteUri>,
+    {
+        let mut sources = self.sources.clone();
+        let mut schemas = self.schemas.clone();
+        let c = Compile {
+            uri: schema_uri.into_iter().collect(),
+            schemas: &mut schemas,
+            sources: &mut sources,
+            numbers: &mut self.numbers,
+            values: &mut self.values,
+            resolve,
+        };
+        let keys = self.lang.compile_all(c).await?;
+        self.schemas = schemas;
+        self.sources = sources;
+        Ok(keys)
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
@@ -163,5 +191,15 @@ impl<L: Language<K>, K: Key> Interrogator<L, K> {
             numbers: &mut numbers,
             values: &mut values,
         })
+    }
+    pub fn schemas<T>(
+        &self,
+        keys: T,
+    ) -> Result<Vec<lang::alias::Schema<'_, L, K>>, InvalidKeyError<K>>
+    where
+        T: IntoIterator<Item = K>,
+    {
+        todo!()
+        // self.schemas.get_all(keys.into_iter())
     }
 }

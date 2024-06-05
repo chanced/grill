@@ -10,7 +10,7 @@ use std::{
     vec::IntoIter,
 };
 
-// TODO: create an impl for each mode of traversal for `CompiledSchema`
+// TODO: create an impl for each mode of traversal for `CompiledSchema`.
 // the current way of handling any internal op, which doesn't need the
 // source currently has to pull it anyway.
 // However... the bump in WASM / binary output size and compile time may not warrant this.

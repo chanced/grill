@@ -46,7 +46,7 @@ where
     type CompiledSchema: schema::CompiledSchema<K>;
 
     /// The error type possibly returned from [`compile`](Language::compile).
-    type CompileError;
+    type CompileError: Send + std::error::Error;
 
     /// The result type returned from [`evaluate`](Language::evaluate).
     type EvaluateResult<'v>;
@@ -73,23 +73,39 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     async fn compile<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile: Compile<'i, Self::CompiledSchema, R, K>,
+        compile: Compile<'i, AbsoluteUri, Self::CompiledSchema, R, K>,
     ) -> Result<K, Self::CompileError>;
 
     /// Compiles all schemas for the given [`CompileAll`] request and returns the
     /// keys, if successful.
     async fn compile_all<'i, R: Resolve + Send + Sync>(
         &'i mut self,
-        compile_all: CompileAll<'i, Self::CompiledSchema, R, K>,
+        compile_all: Compile<'i, Vec<AbsoluteUri>, Self::CompiledSchema, R, K>,
     ) -> Result<Vec<K>, Self::CompileError>;
 
-    /// Evaluates a schema for the given [`Evaluate`] request.
+    /// Evaluates a schema for the given [`Evaluae`] request.
     fn evaluate<'i, 'v>(
         &'i self,
         eval: Evaluate<'i, 'v, Self::CompiledSchema, Self::Context, K>,
     ) -> Self::EvaluateResult<'v>;
 }
 
+pub mod alias {
+    use super::Language;
+    /// Alias for [`Language::Context`].
+    pub type Context<L, K> = <L as Language<K>>::Context;
+    /// Alias for [`Language::CompiledSchema`].
+    pub type CompiledSchema<L, K> = <L as Language<K>>::CompiledSchema;
+    /// Alias for [`Language::CompiledSchema`].
+    pub type Schema<'i, L, K> =
+        <CompiledSchema<L, K> as super::schema::CompiledSchema<K>>::Schema<'i>;
+    /// Alias for [`Language::InitError`].
+    pub type InitError<L, K> = <L as Language<K>>::InitError;
+    /// Alias for [`Language::CompileError`].
+    pub type CompileError<L, K> = <L as Language<K>>::CompileError;
+    /// Alias for [`Language::EvaluateResult`].
+    pub type EvaluateResult<'v, L, K> = <L as Language<K>>::EvaluateResult<'v>;
+}
 /// Request to initialize a language.
 pub struct Init<'i, S, K: Key> {
     /// Schema graph
@@ -103,25 +119,10 @@ pub struct Init<'i, S, K: Key> {
 }
 
 /// Request to compile a schema.
-pub struct Compile<'i, S, R, K: Key> {
-    /// The URI of the schema to compile
-    pub uri: AbsoluteUri,
-    /// Schema graph
-    pub schemas: &'i mut Schemas<S, K>,
-    /// Source repository
-    pub sources: &'i mut Sources,
-    /// Number cache
-    pub numbers: &'i mut Numbers,
-    /// Values cache
-    pub values: &'i mut Values,
-    /// Implementation of [`Resolve`]
-    pub resolve: &'i R,
-}
-
-/// Request to compile a schema.
-pub struct CompileAll<'i, S, R, K: Key> {
-    /// The URI of the schema to compile
-    pub uris: Vec<AbsoluteUri>,
+pub struct Compile<'i, U, S, R, K: Key> {
+    /// Either the [`AbsoluteUri`] of the schema to `compile` in the case of
+    /// `compile` or a `Vec<AbsoluteUri>` in the case of `compile_all`
+    pub uri: U,
     /// Schema graph
     pub schemas: &'i mut Schemas<S, K>,
     /// Source repository
