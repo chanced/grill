@@ -28,7 +28,7 @@ pub enum CompileErrorCause<E> {
 pub struct Compiler<'i, S, K>
 where
     S: 'i + Specification<K>,
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     ctx: S::Compile<'i>,
 }
@@ -36,7 +36,7 @@ where
 impl<'i, S, K> Compiler<'i, S, K>
 where
     S: 'i + Specification<K>,
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     pub fn new(ctx: S::Compile<'i>) -> Self {
         Self { ctx }

@@ -100,7 +100,7 @@ impl AsRef<[Keyword]> for Keywords<'_> {
 /// Context for [`Keyword::compile`].
 pub struct Compile<'i, S: Specification<K>, K>
 where
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     pub(crate) schemas: &'i mut Schemas<CompiledSchema<S, K>, K>,
     pub(crate) sources: &'i mut Sources,
@@ -113,18 +113,7 @@ where
     K: 'static + Send + Key,
     S: Specification<K>,
 {
-    fn schema(&self, uri: &AbsoluteUri) -> Option<K> {
-        todo!()
-    }
-
     fn numbers(&mut self) -> &'i mut Numbers {
-        todo!()
-    }
-
-    fn number(
-        &mut self,
-        number: &serde_json::Number,
-    ) -> Result<std::sync::Arc<grill_core::big::BigRational>, grill_core::big::ParseError> {
         todo!()
     }
 
@@ -132,15 +121,11 @@ where
         todo!()
     }
 
-    fn value(&mut self, value: &Value) -> std::sync::Arc<Value> {
-        todo!()
-    }
-
     fn sources(&self) -> &'i Sources {
         todo!()
     }
 
-    fn source(&self, uri: &AbsoluteUri) -> Option<grill_core::lang::source::Source> {
+    fn schema(&self, uri: &AbsoluteUri) -> Option<K> {
         todo!()
     }
 }

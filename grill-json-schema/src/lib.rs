@@ -162,7 +162,7 @@ where
 }
 
 #[derive(Debug, Snafu)]
-#[snafu(display("failed to evaluate schema {key}"))]
-pub struct EvaluateError<K: Send> {
+#[snafu(display("failed to evaluate schema {key:?}"))]
+pub struct EvaluateError<K: std::fmt::Debug + Send> {
     pub key: K,
 }

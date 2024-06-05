@@ -21,11 +21,11 @@ impl<'i, K: Key> lang::schema::Schema<'i, K> for Schema<'i, K> {
 }
 
 #[derive(Debug)]
-pub struct CompiledSchema<S: Specification<K>, K: 'static + Key> {
+pub struct CompiledSchema<S: Specification<K>, K: 'static + Key + Send> {
     key: K,
     keywords: Box<[S::Keyword]>,
 }
-impl<S: Specification<K>, K: Key> AsRef<K> for CompiledSchema<S, K> {
+impl<S: Specification<K>, K: Key + Send> AsRef<K> for CompiledSchema<S, K> {
     fn as_ref(&self) -> &K {
         todo!()
     }
@@ -34,7 +34,7 @@ impl<S: Specification<K>, K: Key> AsRef<K> for CompiledSchema<S, K> {
 impl<S, K> PartialEq for CompiledSchema<S, K>
 where
     S: Specification<K>,
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.keywords == other.keywords
@@ -43,7 +43,7 @@ where
 impl<S, K> Clone for CompiledSchema<S, K>
 where
     S: Specification<K>,
-    K: Key,
+    K: Key + Send,
 {
     fn clone(&self) -> Self {
         Self {

@@ -1,4 +1,5 @@
 use std::{
+    error::Error as StdError,
     fmt::{Debug, Display},
     sync::Arc,
 };
@@ -23,18 +24,17 @@ pub trait ShouldSerialize {
 
 /// A trait implemented by types which are capable of evaluating a specification
 /// of JSON Schema.
-pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
+#[trait_variant::make(Send)]
+pub trait Specification<K: 'static + Key + Send>: Sized + Debug + Clone {
     /// The error type that can be returned when initializing the dialect.
     type InitError;
 
     /// The error type that can be returned when compiling a schema.
     type CompileError: Send
-        + std::error::Error
+        + StdError
         + for<'v> From<CompileError<<Self::Error<'v> as IntoOwned>::Owned>>;
 
-    type EvaluateError: Send + std::error::Error + for<'v> From<EvaluateError<K>>
-    where
-        K: Send;
+    type EvaluateError: Send + StdError + From<EvaluateError<K>>;
 
     /// Context type supplied to `evaluate`.
     type Evaluate<'i>: Evaluate<'i, K>
@@ -55,49 +55,6 @@ pub trait Specification<K: 'static + Key>: Sized + Debug + Clone {
     ///
     /// The purpose of allowing for this to be typed is so that convience
     /// accessor methods, can be accessed.
-    ///
-    /// # Example
-    /// ```
-    ///    pub struct Keywords<'i>(&'i [Keyword]);
-    ///    impl<'i> From<&'i [Keyword]> for Keywords<'i> {
-    ///        fn from(k: &'i [Keyword]) -> Self {
-    ///            Self(k)
-    ///        }
-    ///    }
-    ///
-    ///    impl<'i> std::iter::IntoIterator for Keywords<'i> {
-    ///        type Item = &'i Keyword;
-    ///        type IntoIter: Iterator<Item = Self::Item>;
-    ///    
-    ///        // Required method
-    ///        fn into_iter(self) -> Self::IntoIter {
-    ///            self.0.iter()
-    ///        }
-    ///    }
-    ///    
-    ///    impl<'i> Keywords<'i> {
-    ///        pub fn format(&self) -> Option<&format::Keyword> {
-    ///            self.0.iter().find_map(|k| k.as_format())
-    ///        }
-    ///    }
-    ///    #[non_exhaustive]
-    ///    pub enum Keyword {
-    ///        Format(format::Keyword),
-    ///        Other(()),
-    ///    }
-    ///    impl Keyword {
-    ///        pub fn as_format(&self) -> Option<&format::Keyword> {
-    ///            match self {
-    ///                Self::Format(k) => Some(k),
-    ///                _ => None,
-    ///            }
-    ///        }
-    ///    }
-    ///    
-    ///    pub mod format {
-    ///        pub struct Keyword;
-    ///    }
-    /// ```
     type Keywords<'i>: From<&'i [Self::Keyword]> + IntoIterator<Item = &'i Self::Keyword>
     where
         Self: 'i,
@@ -170,7 +127,9 @@ where
     /// Parses a JSON number into an [`Arc<BigRational>`](`BigRational`) and
     /// stores it in the [`Numbers`] cache if it is not already present.
     /// Otherwise, the existing [`BigRational`] is returned.
-    fn number(&mut self, number: &Number) -> Result<Arc<BigRational>, grill_core::big::ParseError>;
+    fn number(&mut self, number: &Number) -> Result<Arc<BigRational>, grill_core::big::ParseError> {
+        self.numbers().get_or_insert_arc(number)
+    }
 
     /// Returns a mutable reference to [`Values`] cache.
     fn values(&mut self) -> &'i mut Values;
@@ -178,14 +137,18 @@ where
     /// If `value` is already in the [`Values`] cache, the existing
     /// `Arc<Value>` is cloned and returned. Otherwise, `value` is inserted
     /// as an `Arc<Value>`, cloned, and returned.
-    fn value(&mut self, value: &Value) -> Arc<Value>;
+    fn value(&mut self, value: &Value) -> Arc<Value> {
+        self.values().get_or_insert(value)
+    }
 
     /// Returns a reference to [`Sources`].
     fn sources(&self) -> &'i Sources;
 
     /// Retrieves a [`Source`] from the store by [`AbsoluteUri`], if a
     /// [`Link`](grill_core::lang::source::Link) exists.
-    fn source(&self, uri: &AbsoluteUri) -> Option<Source>;
+    fn source(&self, uri: &AbsoluteUri) -> Option<Source<'i>> {
+        self.sources().get(uri)
+    }
 }
 
 /// Context for [`Keyword::evaluate`].
@@ -198,7 +161,7 @@ pub trait Evaluate<'i, K: Key> {
 pub trait Keyword<S, K>: Send + Debug + Clone + PartialEq + Eq
 where
     S: Specification<K>,
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     /// Compiles the keyword.
     fn compile<'i>(

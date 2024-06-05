@@ -40,10 +40,10 @@ use std::fmt::Debug;
 #[trait_variant::make(Send)]
 pub trait Language<K>: Sized + Clone + Debug
 where
-    K: 'static + Key,
+    K: 'static + Key + Send,
 {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
-    type CompiledSchema: schema::CompiledSchema<K>;
+    type CompiledSchema: Send + schema::CompiledSchema<K>;
 
     /// The error type possibly returned from [`compile`](Language::compile).
     type CompileError: Send + std::error::Error;

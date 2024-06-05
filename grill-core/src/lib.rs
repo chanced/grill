@@ -80,7 +80,7 @@ impl Resolve for () {
 pub type Internal = ();
 
 /// Evaluates the integrity of data through a schema language.
-pub struct Interrogator<L: Language<K>, K: 'static + Key = DefaultKey> {
+pub struct Interrogator<L: Language<K>, K: 'static + Key + Send = DefaultKey> {
     lang: L,
     schemas: Schemas<L::CompiledSchema, K>,
     sources: Sources,
@@ -88,7 +88,7 @@ pub struct Interrogator<L: Language<K>, K: 'static + Key = DefaultKey> {
     numbers: Numbers,
 }
 
-impl<L: Language<K>, K: Key> Interrogator<L, K> {
+impl<L: Language<K>, K: Key + Send> Interrogator<L, K> {
     fn init(mut self) -> Result<Self, L::InitError> {
         self.lang.init(lang::Init {
             schemas: &mut self.schemas,
