@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use grill_core::Key;
 use grill_uri::AbsoluteUri;

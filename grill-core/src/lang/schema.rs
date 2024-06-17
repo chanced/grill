@@ -5,6 +5,8 @@ use slotmap::{new_key_type, Key, SlotMap};
 use snafu::{ensure, Snafu};
 use std::collections::HashMap;
 
+use crate::iter::{AllCompiledSchemas, AllSchemas, Iter};
+
 use super::source::Sources;
 
 new_key_type! {
@@ -53,10 +55,10 @@ pub trait CompiledSchema<K>: AsRef<K> + Clone + PartialEq {
     fn to_schema<'i>(&self, sources: &Sources) -> Self::Schema<'i>;
 }
 
-/// A collection of schemas indexed by [`AbsoluteUri`]s.
+/// A graph of schemas indexed by [`AbsoluteUri`]s.
 #[derive(Debug, Clone)]
 pub struct Schemas<S, K: Key> {
-    pub(crate) schemas: SlotMap<K, S>,
+    pub(crate) map: SlotMap<K, S>,
     uris: HashMap<AbsoluteUri, K>,
 }
 impl<S, K: Key> Default for Schemas<S, K> {
@@ -68,7 +70,7 @@ impl<S, K: Key> Schemas<S, K> {
     /// Creates a new schema graph.
     pub fn new() -> Self {
         Self {
-            schemas: SlotMap::with_key(),
+            map: SlotMap::with_key(),
             uris: HashMap::new(),
         }
     }
@@ -81,8 +83,8 @@ where
 {
     /// Inserts `schema` into the graph and returns its key.
     pub fn insert(&mut self, schema: S) -> K {
-        let key = self.schemas.insert(schema);
-        self.schemas.get_mut(key).unwrap().set_key(key);
+        let key = self.map.insert(schema);
+        self.map.get_mut(key).unwrap().set_key(key);
         key
     }
 
@@ -112,20 +114,52 @@ where
     /// with the supplied `key` or returns `InvalidKeyError` if the key does
     /// not exist.
     pub fn get(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
-        self.schemas.get(key).ok_or(InvalidKeyError { key })
+        self.map.get(key).ok_or(InvalidKeyError { key })
     }
 
     /// Returns a reference to compiled schema ([`Self::C`](`CompiledSchema`))
     /// with the supplied `key` or returns `InvalidKeyError` if the key does
     /// not exist.
     pub fn get_by_key(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
-        self.schemas.get(key).ok_or(InvalidKeyError { key })
+        self.map.get(key).ok_or(InvalidKeyError { key })
     }
 
     /// Returns a mutable reference to the schema ([`C`](`CompiledSchema`)) with
     /// the given key.
     pub fn get_mut(&mut self, key: K) -> Option<&mut S> {
-        self.schemas.get_mut(key)
+        self.map.get_mut(key)
+    }
+
+    pub fn all_compiled_schemas(&self) -> AllCompiledSchemas<'_, S, K> {
+        AllCompiledSchemas::new(self)
+    }
+    pub fn all_schemas<'i>(&'i self, sources: &'i Sources) -> AllSchemas<'i, S, K> {
+        self.all_compiled_schemas().into_all_schemas(sources)
+    }
+
+    pub fn iter<'i, I>(&'i self, sources: &'i Sources, keys: I) -> Iter<'i, I, S, K>
+    where
+        I: 'i + Iterator<Item = K>,
+    {
+        Iter::new(self, sources, keys)
+    }
+    pub fn keys(&self) -> impl Iterator<Item = K> + '_ {
+        self.map.keys()
+    }
+    pub fn keys_and_compiled_schemas(&self) -> impl Iterator<Item = (K, &S)> + '_ {
+        self.map.iter()
+    }
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+    pub fn contains_key(&self, key: K) -> bool {
+        self.map.contains_key(key)
+    }
+    pub fn contains_uri(&self, uri: &AbsoluteUri) -> bool {
+        self.uris.contains_key(uri)
     }
 }
 

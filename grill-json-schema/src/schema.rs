@@ -27,7 +27,7 @@ pub struct CompiledSchema<S: Specification<K>, K: 'static + Key + Send> {
 }
 impl<S: Specification<K>, K: Key + Send> AsRef<K> for CompiledSchema<S, K> {
     fn as_ref(&self) -> &K {
-        todo!()
+        &self.key
     }
 }
 

@@ -96,7 +96,7 @@ pub mod alias {
     pub type Context<L, K> = <L as Language<K>>::Context;
     /// Alias for [`Language::CompiledSchema`].
     pub type CompiledSchema<L, K> = <L as Language<K>>::CompiledSchema;
-    /// Alias for [`Language::CompiledSchema`].
+    /// Alias for [`CompiledSchema::Schema`](`super::schema::CompiledSchema::Schema`).
     pub type Schema<'i, L, K> =
         <CompiledSchema<L, K> as super::schema::CompiledSchema<K>>::Schema<'i>;
     /// Alias for [`Language::InitError`].

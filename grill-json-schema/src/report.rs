@@ -5,7 +5,6 @@ use crate::{
 
 pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
 use grill_uri::AbsoluteUri;
-use inherent::inherent;
 use jsonptr::Pointer;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;

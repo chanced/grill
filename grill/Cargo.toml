@@ -12,8 +12,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-grill-core = { workspace = true }
-# grill-json-schema = { workspace = true }
+grill-core        = { workspace = true }
+grill-json-schema = { workspace = true }
 
 [features]
 

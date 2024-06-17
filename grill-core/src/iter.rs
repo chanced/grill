@@ -19,18 +19,27 @@ pub struct Ancestors<'i, S, K> {
 }
 
 pub fn all_compiled_schemas<S, K: Key>(schemas: &Schemas<S, K>) -> AllCompiledSchemas<'_, S, K> {
-    AllCompiledSchemas {
-        schemas,
-        iter: schemas.schemas.iter(),
-    }
+    AllCompiledSchemas::new(schemas)
 }
 
 #[derive(Debug)]
 pub struct AllCompiledSchemas<'i, S, K: Key = DefaultKey> {
-    schemas: &'i Schemas<S, K>,
     iter: slotmap::basic::Iter<'i, K, S>,
 }
 
+impl<'i, S, K: Key> AllCompiledSchemas<'i, S, K> {
+    pub fn new(schemas: &'i Schemas<S, K>) -> Self {
+        Self {
+            iter: schemas.map.iter(),
+        }
+    }
+    pub fn into_all_schemas(self, sources: &'i Sources) -> AllSchemas<'i, S, K> {
+        AllSchemas {
+            compiled: self,
+            sources,
+        }
+    }
+}
 impl<'i, S, K: Key> Iterator for AllCompiledSchemas<'i, S, K> {
     type Item = &'i S;
 
@@ -61,7 +70,24 @@ where
     }
 }
 
-pub struct AllSchemas<'i, S, K: Key>(Unchecked<Iter<'i, AllCompiledSchemas<'i, S, K>, S, K>>);
+impl<'i, I, S, K> Iter<'i, I, S, K>
+where
+    I: Iterator<Item = K>,
+    K: Key,
+{
+    pub fn new(schemas: &'i Schemas<S, K>, sources: &'i Sources, keys: I) -> Self {
+        Self {
+            iter: keys,
+            schemas,
+            sources,
+        }
+    }
+}
+
+pub struct AllSchemas<'i, S, K: Key> {
+    compiled: AllCompiledSchemas<'i, S, K>,
+    sources: &'i Sources,
+}
 
 impl<'i, S, K> Iterator for AllSchemas<'i, S, K>
 where
@@ -71,7 +97,7 @@ where
     type Item = S::Schema<'i>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        self.compiled.next().map(|s| s.to_schema(&self.sources))
     }
 }
 

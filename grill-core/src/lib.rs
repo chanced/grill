@@ -23,8 +23,7 @@ pub use slotmap::{new_key_type, Key};
 
 use grill_uri::AbsoluteUri;
 use lang::{
-    schema::{CompiledSchema, InvalidKeyError},
-    source::{self, NotFoundError},
+    source::{self, NotFoundError, Source},
     Compile, Evaluate, Numbers, Schemas, Sources, Values,
 };
 use serde_json::Value;
@@ -86,6 +85,7 @@ pub struct Interrogator<L: Language<K>, K: 'static + Key + Send = DefaultKey> {
     sources: Sources,
     values: Values,
     numbers: Numbers,
+    default_uri: Option<AbsoluteUri>,
 }
 
 impl<L: Language<K>, K: Key + Send> Interrogator<L, K> {
@@ -192,14 +192,20 @@ impl<L: Language<K>, K: Key + Send> Interrogator<L, K> {
             values: &mut values,
         })
     }
-    pub fn schemas<T>(
-        &self,
-        keys: T,
-    ) -> Result<Vec<lang::alias::Schema<'_, L, K>>, InvalidKeyError<K>>
-    where
-        T: IntoIterator<Item = K>,
-    {
-        todo!()
-        // self.schemas.get_all(keys.into_iter())
+    /// Returns a reference to the [`Sources`] of the `Interrogator`.
+    pub fn sources(&self) -> &Sources {
+        &self.sources
+    }
+    /// Returns a mutable reference to the [`Sources`] of the `Interrogator`.
+    pub fn sources_mut(&mut self) -> &mut Sources {
+        &mut self.sources
+    }
+    /// Returns the [`Source`] for the supplied [`AbsoluteUri`], if it exists.
+    pub fn source(&self, uri: &AbsoluteUri) -> Option<Source> {
+        self.sources.get(uri)
+    }
+    /// Returns the [`Schemas`] of the `Interrogator`.
+    pub fn schemas(&self) -> &Schemas<L::CompiledSchema, K> {
+        &self.schemas
     }
 }

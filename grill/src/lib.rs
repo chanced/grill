@@ -1,7 +1,9 @@
 // #![doc = include_str!("../../README.md")]
 
-// #[doc(inline)]
+#[doc(inline)]
 pub use grill_core::*;
+#[doc(inline)]
+pub use grill_json_schema as json_schema;
 
 // #[doc(inline)]
 // pub use grill_json_schema as json_schema;

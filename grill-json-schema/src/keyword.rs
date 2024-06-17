@@ -248,4 +248,14 @@ pub mod invalid_type {
         pub actual: Actual,
         pub backtrace: snafu::Backtrace,
     }
+    impl InvalidTypeError {
+        pub fn new(value: Value, expected: Expectated) -> Self {
+            InvalidTypeSnafu {
+                actual: Actual::from_value(&value),
+                value: Box::new(value),
+                expected,
+            }
+            .build()
+        }
+    }
 }

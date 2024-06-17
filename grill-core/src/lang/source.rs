@@ -29,6 +29,7 @@ pub struct Document<'i> {
     value: Arc<Value>,
     links: Cow<'i, [Link]>,
 }
+
 impl Document<'_> {
     /// The key of the document within the source repository.
     pub fn key(&self) -> DocumentKey {
