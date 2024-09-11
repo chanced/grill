@@ -5,7 +5,7 @@ use crate::{
 
 pub use self::{basic::Basic, flag::Flag, verbose::Verbose};
 use grill_uri::AbsoluteUri;
-use jsonptr::Pointer;
+use jsonptr::{Pointer, PointerBuf};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::{
@@ -176,6 +176,8 @@ impl From<String> for Error<'_> {
         Error::Unknown(s)
     }
 }
+impl std::error::Error for Error<'_> {}
+
 impl fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         todo!()
@@ -199,6 +201,26 @@ pub enum Report<A, E> {
     Flag(Flag),
     Basic(Basic<A, E>),
     Verbose(Verbose<A, E>),
+}
+impl<A, E> Report<A, E> {
+    pub fn as_flag(&self) -> Option<&Flag> {
+        match self {
+            Report::Flag(f) => Some(f),
+            _ => None,
+        }
+    }
+    pub fn as_basic(&self) -> Option<&Basic<A, E>> {
+        match self {
+            Report::Basic(b) => Some(b),
+            _ => None,
+        }
+    }
+    pub fn as_verbose(&self) -> Option<&Verbose<A, E>> {
+        match self {
+            Report::Verbose(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl<A, E> Serialize for Report<A, E> {
@@ -240,7 +262,7 @@ where
     A: 'v + From<Annotation<'v>> + From<Value> + Debug + Send,
     E: 'v + From<Error<'v>> + From<String> + Debug + Send,
 {
-    type Assess<'r> = Assess<'r, A, E> where Self: 'r;
+    type Assess<'rpt> = Assess<'rpt, A, E> where Self: 'rpt;
 
     fn new(output: Output, location: Location) -> Self {
         todo!()
@@ -333,7 +355,6 @@ pub mod basic {
         pub fn is_valid(&self) -> bool {
             self.valid
         }
-
         /// Returns a reference to the first [`Assessment`] in the list, if any.
         pub fn first(&self) -> Option<&Assessment<A, E>> {
             self.assessments.first()
@@ -369,7 +390,7 @@ pub mod basic {
             Self {
                 assessments: vec![Assessment::Annotation {
                     annotation: None,
-                    location: location,
+                    location,
                 }],
                 valid: true,
             }
@@ -474,19 +495,10 @@ pub mod verbose {
         pub detail: Assessment<A, E>,
     }
 
-    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-    #[serde(untagged)]
-    pub enum Assessment<A, E> {
-        Annotation {
-            annotations: Vec<Verbose<A, E>>,
-            annotation: Option<A>,
-        },
-        Error {
-            errors: Vec<Verbose<A, E>>,
-            error: Option<E>,
-        },
-    }
     impl<A, E> Verbose<A, E> {
+        pub fn location(&self) -> &super::Location {
+            &self.location
+        }
         pub fn is_valid(&self) -> bool {
             matches!(self.detail, Assessment::Annotation { .. })
         }
@@ -514,7 +526,7 @@ pub mod verbose {
             }
         }
         pub fn instance_location(&self) -> &jsonptr::Pointer {
-            todo!()
+            &self.location.instance
         }
         pub fn keyword_location(&self) -> &jsonptr::Pointer {
             &self.location.keyword
@@ -523,9 +535,22 @@ pub mod verbose {
             &self.location.absolute_keyword
         }
 
-        pub fn assess<'r>(&'r self, location: super::Location) -> super::Assess<'r, A, E> {
+        pub fn assess<'rpt>(&'rpt self, location: super::Location) -> super::Assess<'rpt, A, E> {
             todo!()
         }
+    }
+
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    #[serde(untagged)]
+    pub enum Assessment<A, E> {
+        Annotation {
+            annotations: Vec<Verbose<A, E>>,
+            annotation: Option<A>,
+        },
+        Error {
+            errors: Vec<Verbose<A, E>>,
+            error: Option<E>,
+        },
     }
 }
 
@@ -544,11 +569,11 @@ pub mod verbose {
 pub struct Location {
     /// The location of the instance within the JSON document.
     #[serde(rename = "instanceLocation")]
-    pub instance: jsonptr::Pointer,
+    pub instance: PointerBuf,
 
     /// The location of the keyword within the JSON Schema.
     #[serde(rename = "keywordLocation")]
-    pub keyword: jsonptr::Pointer,
+    pub keyword: PointerBuf,
 
     /// The absolute location of the keyword within the JSON Schema.
     #[serde(rename = "absoluteKeywordLocation")]
@@ -581,27 +606,27 @@ impl Location {
 */
 
 /// A mutable reference to a node in a [`Report`].
-pub enum Assess<'r, A, E> {
+pub enum Assess<'rpt, A, E> {
     /// A concise structure which only contains a single `"valid"` `bool` field.
     ///
     /// - [JSON Schema Core 2020-12 # 12.4.1
     ///   `Flag`](https://json-schema.org/draft/2020-12/json-schema-core.html#name-flag)
-    Flag(&'r mut Flag),
+    Flag(&'rpt mut Flag),
 
     /// A flat list of output units.
     ///
     /// - [JSON Schema Core 2020-12 # 12.4.2
     ///   Basic](https://json-schema.org/draft/2020-12/json-schema-core#name-basic)
-    Basic(&'r mut basic::Assessment<A, E>),
+    Basic(&'rpt mut basic::Assessment<A, E>),
 
     /// A tree structure of output units.
     ///
     /// - [JSON Schema Core 2020-12 # 12.4.4
     ///   Verbose](https://json-schema.org/draft/2020-12/json-schema-core#name-verbose)
-    Verbose(&'r mut Verbose<A, E>),
+    Verbose(&'rpt mut Verbose<A, E>),
 }
 
-impl<'r, A, E> spec::Assess<'r, A, E> for Assess<'r, A, E> {
+impl<'rpt, A, E> spec::Assess<'rpt, A, E> for Assess<'rpt, A, E> {
     /// Depending on the variant, may set the [`Annotation`] of the current assessment
     /// and return the previous value, if present.
     ///

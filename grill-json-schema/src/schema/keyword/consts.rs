@@ -102,7 +102,7 @@ pub const VOCABULARY: &str = "$vocabulary";
 /// data produced by this user interface.
 ///
 /// - [JSON Schema Validation 2020-12 # 9.1 `title` and
-///   "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
+///   `description`](bttps://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
 pub const TITLE: &str = "title";
 
 /// ## `description`
@@ -111,7 +111,7 @@ pub const TITLE: &str = "title";
 /// instance described by this schema.
 ///
 /// - [JSON Schema Validation 2020-12 # 9.1 `title` and
-///   "description"](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
+///   `description`](https://datatracker.ietf.org/doc/html/draft-bhutton-json-schema-validation-01#section-9.1)
 pub const DESCRIPTION: &str = "description";
 
 /// ## `deprecated`

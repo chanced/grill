@@ -1,6 +1,8 @@
 //! Big numeric data structures (re-exported from `num` crate) and parsers
 //! for `BigInt` and `BigRational`
 
+use std::error::Error;
+use std::fmt::{self, Display};
 use std::num::ParseIntError;
 
 pub use num;
@@ -8,14 +10,9 @@ pub use num::{BigInt, BigRational};
 
 use num::FromPrimitive;
 use once_cell::sync::Lazy;
-use snafu::{Backtrace, Snafu};
 
 /// The number ten (10) as a [`BigInt`]
-#[must_use]
-pub fn ten() -> &'static BigInt {
-    static TEN: Lazy<BigInt> = Lazy::new(|| BigInt::from_u8(10).unwrap());
-    &TEN
-}
+static TEN: Lazy<BigInt> = Lazy::new(|| BigInt::from_u8(10).unwrap());
 
 /// Parses a string into a [`BigInt`]
 pub fn parse_int(value: &str) -> Result<BigInt, ParseError> {
@@ -36,47 +33,171 @@ pub fn parse_rational(value: &str) -> Result<BigRational, ParseError> {
 ╚═══════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
+
 /// An error occurred while parsing a [`Number`] as a [`num::BigRational`].
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
+#[derive(Debug)]
 pub enum ParseError {
     /// Failed to parse exponent of a number.
-    #[snafu(display("failed to parse exponent of number \"{value}\":\n\t{source}"))]
-    FailedToParseExponent {
-        /// the value of the string being parsed
-        value: String,
-        /// the underlying error
-        source: ParseIntError,
-        /// backtrace
-        backtrace: Backtrace,
-    },
+    FailedToParseExponent(FailedToParseExpontentError),
+
     /// Unexpected character found in a number.
-    #[snafu(display("failed to parse number \"{value}\":\n\tunexpected character: '{character}' at index {index}"))]
-    UnexpectedChar {
-        /// the value of the string being parsed
-        value: String,
-        /// the character which caused the error
-        character: char,
-        /// the index of the character which caused the error
-        index: usize,
-        /// backtrace
-        backtrace: Backtrace,
-    },
+    UnexpectedChar(UnexpectedCharError),
+
     /// The number is not an integer.
-    #[snafu(display("failed to parse number \"{value}\":\n\tnot an integer"))]
-    NotAnInteger {
-        /// value of string being parsed
-        value: String,
-        /// backtrace
-        backtrace: Backtrace,
-    },
+    NotAnInteger(NotAnIntegerError),
 
     #[cfg(not(target_pointer_width = "64"))]
-    #[snafu(display("exponent ({value}) exceeds maximum value for non-64-bit architecture"))]
-    ExponentTooLarge {
-        #[snafu(backtrace)]
-        source: OverflowError<u64, { usize::MAX as u64 }>,
-    },
+    ExponentTooLarge(ExponentTooLargeError),
+}
+
+impl From<NotAnIntegerError> for ParseError {
+    fn from(err: NotAnIntegerError) -> Self {
+        Self::NotAnInteger(err)
+    }
+}
+impl From<UnexpectedCharError> for ParseError {
+    fn from(err: UnexpectedCharError) -> Self {
+        Self::UnexpectedChar(err)
+    }
+}
+impl From<FailedToParseExpontentError> for ParseError {
+    fn from(err: FailedToParseExpontentError) -> Self {
+        Self::FailedToParseExponent(err)
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+impl From<ExponentTooLargeError> for ParseError {
+    fn from(err: ExponentTooLargeError) -> Self {
+        return Self::ExponentTooLarge(err);
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+#[derive(Debug)]
+pub struct ExponentTooLargeError {
+    value: u64,
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+impl Display for ExponentTooLargeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "exponent ({}) exceeds maximum value for non-64-bit architecture",
+            self.value
+        )
+    }
+}
+#[cfg(not(target_pointer_width = "64"))]
+impl ExponentTooLargeError {
+    pub fn fail<T>(value: u64) -> Result<T, Self> {
+        Err(Self { value })
+    }
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct NotAnIntegerError {
+    /// the value of the string being parsed
+    value: String,
+}
+
+impl From<String> for NotAnIntegerError {
+    fn from(value: String) -> Self {
+        Self { value }
+    }
+}
+impl NotAnIntegerError {
+    pub fn new(value: String) -> Self {
+        Self { value }
+    }
+    pub fn fail<T>(value: String) -> Result<T, Self> {
+        Err(Self { value })
+    }
+    pub fn value(&self) -> &String {
+        &self.value
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UnexpectedCharError {
+    /// the value of the string being parsed
+    value: String,
+    /// the character which caused the error
+    character: char,
+    /// the index of the character which caused the error
+    index: usize,
+}
+impl UnexpectedCharError {
+    pub fn fail<T>(value: String, character: char, index: usize) -> Result<T, Self> {
+        Err(Self {
+            value,
+            character,
+            index,
+        })
+    }
+    pub fn value(&self) -> &String {
+        &self.value
+    }
+    pub fn character(&self) -> char {
+        self.character
+    }
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+impl Display for UnexpectedCharError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "failed to parse number \"{}\":\n\tunexpected character: '{}' at index {}",
+            self.value, self.character, self.index
+        )
+    }
+}
+
+impl Error for UnexpectedCharError {}
+
+#[derive(Debug)]
+pub struct FailedToParseExpontentError {
+    /// the value of the string being parsed
+    value: String,
+    /// the underlying error
+    source: ParseIntError,
+}
+impl FailedToParseExpontentError {
+    pub fn new(value: String, source: ParseIntError) -> Self {
+        Self { value, source }
+    }
+    pub fn fail<T>(value: String, source: ParseIntError) -> Result<T, Self> {
+        Err(Self { value, source })
+    }
+    pub fn value(&self) -> &String {
+        &self.value
+    }
+    /// the underlying [`ParseIntError`]
+    pub fn source(&self) -> &ParseIntError {
+        &self.source
+    }
+}
+
+impl Error for FailedToParseExpontentError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+impl Display for FailedToParseExpontentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to parse exponent of number \"{}\":\n\t{}",
+            self.value, self.source
+        )
+    }
 }
 
 /// Attempts to convert a `u64` to `usize`
@@ -89,11 +210,12 @@ pub(crate) fn u64_to_usize(value: u64) -> Result<usize, u64> {
 }
 
 mod int {
-    use super::ParseError;
-    use super::{ten, u64_to_usize};
+    use crate::big::{NotAnIntegerError, UnexpectedCharError};
+
+    use super::{u64_to_usize, TEN};
+    use super::{FailedToParseExpontentError, ParseError};
     use num::{pow, BigInt};
     use num_rational::BigRational;
-    use snafu::Backtrace;
     use std::str::FromStr;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,17 +287,9 @@ mod int {
                 }
                 Error => {
                     if c == '.' {
-                        return Err(ParseError::NotAnInteger {
-                            value: self.value.to_string(),
-                            backtrace: Backtrace::capture(),
-                        });
+                        NotAnIntegerError::fail(self.value.to_string())?;
                     }
-                    return Err(ParseError::UnexpectedChar {
-                        value: self.value.to_string(),
-                        character: c,
-                        index: i,
-                        backtrace: Backtrace::capture(),
-                    });
+                    UnexpectedCharError::fail(self.value.to_string(), c, i)?;
                 }
                 _ => {}
             }
@@ -198,11 +312,7 @@ mod int {
                 .exponent()
                 .map(i64::from_str)
                 .transpose()
-                .map_err(|err| ParseError::FailedToParseExponent {
-                    value: value.to_string(),
-                    source: err,
-                    backtrace: Backtrace::capture(),
-                })?;
+                .map_err(|err| FailedToParseExpontentError::new(value.to_string(), err))?;
             let mut result = BigRational::from_integer(integer);
 
             if let Some(exp) = exponent {
@@ -212,14 +322,11 @@ mod int {
                 #[cfg(target_pointer_width = "64")]
                 let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
                 if is_positive {
-                    result *= pow(ten().clone(), exp);
+                    result *= pow(TEN.clone(), exp);
                 } else {
-                    result /= pow(ten().clone(), exp);
+                    result /= pow(TEN.clone(), exp);
                     if !result.is_integer() {
-                        return Err(ParseError::NotAnInteger {
-                            value: value.to_string(),
-                            backtrace: Backtrace::capture(),
-                        });
+                        NotAnIntegerError::fail(value.to_string())?;
                     }
                 }
             }
@@ -262,13 +369,7 @@ mod int {
                 assert_eq!(int, expected);
             }
 
-            let _invalid_tests = [(
-                "12.345",
-                ParseError::NotAnInteger {
-                    value: "12.345".to_string(),
-                    backtrace: Backtrace::capture(),
-                },
-            )];
+            // let _invalid_tests = [("12.345", NotAnIntegerError::new("12.345".into()).into())];
 
             // for (input, expected) in invalid_tests {
             //     let err = parse_int(input);
@@ -321,11 +422,12 @@ mod int {
     }
 }
 mod rational {
-    use super::{ten, u64_to_usize, ParseError};
+    use crate::big::UnexpectedCharError;
+
+    use super::{u64_to_usize, FailedToParseExpontentError, ParseError, TEN};
     use std::str::FromStr;
 
     use num::{pow, BigInt, BigRational, One, Zero};
-    use snafu::Backtrace;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum State {
@@ -410,12 +512,7 @@ mod rational {
                     self.exponent_index = Some(i);
                 }
                 Error => {
-                    return Err(ParseError::UnexpectedChar {
-                        value: self.value.to_string(),
-                        character: c,
-                        index: i,
-                        backtrace: Backtrace::capture(),
-                    })
+                    UnexpectedCharError::fail(self.value.to_string(), c, i)?;
                 }
                 _ => {}
             }
@@ -441,7 +538,7 @@ mod rational {
 
             let denom = parser
                 .fraction()
-                .map_or(BigInt::one(), |f| pow(ten().clone(), f.len()));
+                .map_or(BigInt::one(), |f| pow(TEN.clone(), f.len()));
 
             let fraction = BigRational::new(fraction, denom);
             let mut result = fraction + integer;
@@ -449,11 +546,7 @@ mod rational {
                 .exponent()
                 .map(i64::from_str)
                 .transpose()
-                .map_err(|err| ParseError::FailedToParseExponent {
-                    value: value.to_string(),
-                    source: err,
-                    backtrace: Backtrace::capture(),
-                })?;
+                .map_err(|err| FailedToParseExpontentError::new(value.to_string(), err))?;
 
             if let Some(exp) = exponent {
                 let is_positive = exp.is_positive();
@@ -464,9 +557,9 @@ mod rational {
                 // safety: usize is the same width as u64 on 64-bit systems
                 let exp = u64_to_usize(exp.unsigned_abs()).unwrap();
                 if is_positive {
-                    result *= pow(ten().clone(), exp);
+                    result *= pow(TEN.clone(), exp);
                 } else {
-                    result /= pow(ten().clone(), exp);
+                    result /= pow(TEN.clone(), exp);
                 }
             }
             Ok(result)

@@ -13,7 +13,7 @@ where
     S: Specification<K>,
     K: Key,
 {
-    fn compile<'i>(
+    fn compile<'int>(
         &self,
         compile: alias::Compile<S, K>,
     ) -> Option<Result<(), alias::CompileError<S, K>>> {

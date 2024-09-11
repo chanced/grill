@@ -152,13 +152,14 @@
 //! assert_eq!(uri.fragment(), Some("top"));
 //! ```
 
-use snafu::Backtrace;
-pub use url;
-pub use urn;
-
-pub mod error;
-
-use percent_encoding::percent_decode;
+#![deny(clippy::all, clippy::pedantic)]
+#![allow(
+    clippy::must_use_candidate,
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    // a lot of methods unwrap but never panic
+    clippy::missing_panics_doc
+)]
 
 mod encode;
 mod get;
@@ -166,16 +167,14 @@ mod parse;
 mod set;
 mod write;
 
-pub use error::Error;
-
 use crate::error::UrnError;
-#[doc(no_inline)]
-pub use url::Url;
-#[doc(no_inline)]
-pub use urn::Urn;
-
+pub use error::Error;
+use error::{InvalidSchemeError, NotAbsoluteError};
+pub use url;
+pub use urn;
+pub mod error;
 use crate::error::{OverflowError, RelativeUriError};
-
+use percent_encoding::percent_decode;
 use std::{
     borrow::{Borrow, Cow},
     fmt::Display,
@@ -185,13 +184,17 @@ use std::{
     str::{FromStr, Split},
     string::{String, ToString},
 };
+#[doc(no_inline)]
+pub use url::Url;
+#[doc(no_inline)]
+pub use urn::Urn;
 
 #[macro_export]
 macro_rules! uri {
     ($($t:tt)*) => {
         {
             let uri = format!($($t)*);
-            crate::Uri::parse(&uri).expect(&format!("failed to parse uri \"{}\"", uri))
+            $crate::Uri::parse(&uri).expect(&format!("failed to parse uri \"{}\"", uri))
         }
     };
 }
@@ -201,7 +204,7 @@ macro_rules! absolute_uri {
     ($($t:tt)*) => {
         {
             let uri = format!($($t)*);
-            crate::AbsoluteUri::parse(&uri).expect(format!("failed to parse uri {}", uri))
+            $crate::AbsoluteUri::parse(&uri).expect(format!("failed to parse uri {}", uri))
         }
     };
 }
@@ -592,7 +595,7 @@ impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
     ///
     /// # Errors
-    /// Returns [`UriError`] if `value` can not be parsed as a
+    /// Returns [`Error`] if `value` can not be parsed as a
     /// [`Url`](`url::Url`) or [`Urn`](`urn::Urn`)
     pub fn parse(value: &str) -> Result<Self, Error> {
         if value.starts_with("urn:") {
@@ -731,12 +734,22 @@ impl AbsoluteUri {
         }
     }
 
+    /// Returns a clone of this `AbsoluteUri` with the fragment component set to
+    /// `fragment`.
+    ///
+    /// ## Errors
+    /// returns [`Error`] if setting the fragment would exceed the maximum
+    /// length (4gb).
     pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, Error> {
         let mut new = self.clone();
         let _ = new.set_fragment(fragment)?;
         Ok(new)
     }
 
+    /// Returns a clone of this `AbsoluteUri` without a fragment
+    #[must_use]
+    // this method is not fallible
+    #[allow(clippy::missing_panics_doc)]
     pub fn without_fragment(&self) -> AbsoluteUri {
         self.with_fragment(None).unwrap()
     }
@@ -761,6 +774,10 @@ impl AbsoluteUri {
     }
 
     /// Sets the path (`Url`) or Name Specific String (`Urn`)
+    ///
+    /// ## Errors
+    /// Returns [`Error`] if setting the path would exceed the maximum length
+    /// (4gb)
     pub fn set_path_or_nss(&mut self, path_or_nss: &str) -> Result<String, Error> {
         match self {
             Self::Url(url) => Ok(set::url::path(url, path_or_nss)),
@@ -769,6 +786,10 @@ impl AbsoluteUri {
     }
 
     /// Sets the authority (`Url`) or namespace (`Urn`)
+    ///
+    /// ## Errors
+    /// Returns [`Error`] if setting the authority or namespace to
+    /// `authority_or_namespace` would exceed the maximum length (4gb)
     pub fn set_authority_or_namespace(
         &mut self,
         authority_or_namespace: &str,
@@ -877,13 +898,20 @@ impl AbsoluteUri {
             Self::Urn(urn) => urn.q_component(),
         }
     }
+
     /// Returns an [`Iterator`] of [`QueryParameter`] of this `AbsoluteUri`.
     #[must_use]
+    // self.query is always < u32::MAX
+    #[allow(clippy::missing_panics_doc)]
     pub fn query_parameters(&self) -> QueryParameters<'_> {
         QueryParameters::new(self.query()).unwrap()
     }
+
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
+    ///
+    /// # Errors
+    /// Returns an [`UrnError`] if the query is not a valid URN query.
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, UrnError> {
         let prev = self.query().map(ToString::to_string);
         match self {
@@ -912,6 +940,7 @@ impl AbsoluteUri {
     /// ## Errors
     /// Returns an [`Error`] if resolving the `reference` results in a malformed
     /// URI or if the URI exceeds 4GB.
+    #[allow(clippy::missing_panics_doc)]
     pub fn resolve(&self, reference: &impl AsUriRef) -> Result<AbsoluteUri, Error> {
         let reference = reference.as_uri_ref();
 
@@ -995,10 +1024,6 @@ impl AbsoluteUri {
         let scheme = scheme.trim_end_matches('/').trim_end_matches(':');
 
         let prev = self.scheme().to_string();
-        let to_uri_err = |()| Error::InvalidScheme {
-            scheme: scheme.to_string(),
-            backtrace: Backtrace::capture(),
-        };
         match self {
             AbsoluteUri::Url(url) => {
                 if scheme == "urn" {
@@ -1008,7 +1033,8 @@ impl AbsoluteUri {
                     let urn = Urn::from_str(&s)?;
                     *self = AbsoluteUri::Urn(urn);
                 } else {
-                    url.set_scheme(scheme).map_err(to_uri_err)?;
+                    url.set_scheme(scheme)
+                        .map_err(|()| InvalidSchemeError::new(scheme.to_string()))?;
                 }
             }
             AbsoluteUri::Urn(urn) => {
@@ -1055,6 +1081,7 @@ impl AbsoluteUri {
     /// uri.normalize_path();
     /// assert_eq!(uri.path_or_nss(), "/bar");
     /// ```
+    #[allow(clippy::missing_panics_doc)]
     pub fn normalize_path(&mut self) {
         let normalized = normalize(self.path_or_nss()).to_string();
         self.set_path_or_nss(&normalized).unwrap();
@@ -1075,21 +1102,13 @@ impl AbsoluteUri {
     /// contains one or more non-whitespace characters.
     #[must_use]
     pub fn has_non_empty_fragment(&self) -> bool {
-        self.fragment()
-            .map(str::trim)
-            .map(str::is_empty)
-            .unwrap_or(false)
+        self.fragment().map(str::trim).map_or(false, str::is_empty)
     }
 }
 
 impl Borrow<str> for AbsoluteUri {
     fn borrow(&self) -> &str {
         self.as_str()
-    }
-}
-impl Borrow<[u8]> for AbsoluteUri {
-    fn borrow(&self) -> &[u8] {
-        self.as_str().as_bytes()
     }
 }
 
@@ -1295,10 +1314,9 @@ impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
         match self {
             UriRef::Uri(uri) => uri.try_into_absolute_uri(),
             UriRef::AbsoluteUri(uri) => Ok(uri.clone()),
-            UriRef::RelativeUri(rel) => Err(Error::NotAbsolute {
-                uri: Uri::Relative(rel.clone()),
-                backtrace: Backtrace::capture(),
-            }),
+            UriRef::RelativeUri(rel) => {
+                Error::err_with(|| NotAbsoluteError::new(rel.clone().into()))
+            }
         }
     }
 }
@@ -1416,6 +1434,7 @@ impl<'a> QueryParameter<'a> {
     ///
     /// # Errors
     /// Returns `OverflowError` if the length of `full` is greater than `u32::MAX`
+    #[allow(clippy::missing_panics_doc)]
     pub fn new(full: &'a str) -> Result<Self, OverflowError> {
         usize_to_u32(full.len())?;
         let eq_index = full.find('=').map(|i| i.try_into().unwrap());
@@ -1480,14 +1499,16 @@ pub struct QueryParameters<'a> {
 }
 impl<'a> QueryParameters<'a> {
     /// Creates a new `QueryParameters` iterator from the given query string.
+    ///
+    /// # Errors
+    /// Returns `OverflowError` if the length of `query` is greater than `u32::MAX`
     pub fn new(query: Option<&'a str>) -> Result<Self, OverflowError> {
         let Some(query) = query else {
             return Ok(Self { query: None });
         };
         if query.len() > u32::MAX as usize {
             return Err(OverflowError {
-                value: query.len() as u64,
-                backtrace: Backtrace::capture(),
+                len: query.len() as u64,
             });
         }
         Ok(Self {
@@ -1587,11 +1608,16 @@ impl RelativeUri {
         PathSegments::from(self.path())
     }
 
-    /// returns a new `Uri` that is the result of resolving the given
-    /// reference against this `RelativeUri`.
+    /// returns a new `Uri` that is the result of resolving the given reference
+    /// against this `RelativeUri`.
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    ///
+    /// ## Errors
+    /// Returns [`Error`] if the length of the `Uri` exceeds 4GB after
+    /// resolving.
+    #[allow(clippy::missing_panics_doc)]
     pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, Error> {
         let reference = reference.as_uri_ref();
 
@@ -1601,7 +1627,7 @@ impl RelativeUri {
             return Ok(uri.into());
         }
 
-        // safety: urls and urns will get processed in the match above
+        // urls and urns will get processed in the match above
         let reference = reference.as_relative_uri().unwrap();
 
         if let Some(authority) = reference.authority() {
@@ -1762,6 +1788,9 @@ impl RelativeUri {
     /// Sets the query string portion of the `RelativeUri` and returns the
     /// previous query, if it existed.
     ///
+    /// ## Errors
+    /// Returns a [`RelativeUriError`] if the length of the new query exceeds
+    /// `u32::MAX` (4GB)
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, RelativeUriError> {
         let existing_query = self.query().map(ToString::to_string);
         let cap = self.len() - existing_query.as_ref().map(String::len).unwrap_or_default()
@@ -1793,6 +1822,10 @@ impl RelativeUri {
     /// Sets the path of the `RelativeUri` and returns the previous path.
     ///
     /// Note, fragments are left intact. Use `set_fragment` to change the fragment.
+    ///
+    /// ## Errors
+    /// Returns a [`RelativeUriError`] if the length of the uri exceeds
+    /// `u32::MAX` (4GB) after setting the path
     pub fn set_path(&mut self, path: &str) -> Result<String, RelativeUriError> {
         let existing_path = self.path().to_string();
         let mut buf = String::with_capacity(self.len() - existing_path.len() + path.len());
@@ -1819,8 +1852,12 @@ impl RelativeUri {
         Ok(existing_path)
     }
 
-    /// Sets the fragment of the `RelativeUri` and returns the previous fragment, if
-    /// present.
+    /// Sets the fragment of the `RelativeUri` and returns the previous
+    /// fragment, if present.
+    ///
+    /// ## Errors
+    /// Returns a [`RelativeUriError`] if the length of the uri exceeds
+    /// `u32::MAX` (4GB) after setting the fragment
     pub fn set_fragment(
         &mut self,
         fragment: Option<&str>,
@@ -1889,7 +1926,12 @@ impl RelativeUri {
         self.port
     }
 
-    /// Sets the authority and returns the previous value as an [`Authority`], if it existed.
+    /// Sets the authority and returns the previous value as an [`Authority`],
+    /// if it existed.
+    ///
+    /// ## Errors
+    /// Returns a [`RelativeUriError`] if the length of the uri exceeds
+    /// `u32::MAX` (4GB) after setting the authority.
     pub fn set_authority<'a>(
         &'a mut self,
         authority: Option<&str>,
@@ -2479,7 +2521,7 @@ impl PartialEq<str> for &Component<'_> {
 }
 impl PartialEq<String> for &Component<'_> {
     fn eq(&self, other: &String) -> bool {
-        self == other
+        self.as_str() == other
     }
 }
 impl<'a> PartialEq<Component<'a>> for str {
@@ -2636,6 +2678,11 @@ pub enum Uri {
 }
 
 impl Uri {
+    /// Attempts to convert this `Uri` into an [`AbsoluteUri`]
+    ///
+    /// ## Errors
+    /// Returns a [`Error`] if the conversion fails due to the `Uri` not
+    /// being absolute (has a scheme and an authority (URL) or a namespace (URN))
     pub fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         AbsoluteUri::try_from(self)
     }
@@ -2670,6 +2717,10 @@ impl Uri {
     ///
     /// See [RFC3986, Section
     /// 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2).
+    ///
+    /// ## Errors
+    /// Returns a [`Error`] if resolving the `reference` would cause the
+    /// resulting `Uri` to exceed `u32::MAX`.
     pub fn resolve(&self, reference: &impl AsUriRef) -> Result<Uri, Error> {
         let reference = reference.as_uri_ref();
 
@@ -2842,6 +2893,10 @@ impl Uri {
 
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the
     /// previous query, if it existed.
+    ///
+    /// ## Errors
+    /// Returns [`Error`] if this `Uri` would exceed `u32::MAX` after setting
+    /// the query.
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, Error> {
         let prev = self.query().map(ToString::to_string);
         match self {
@@ -2932,6 +2987,10 @@ impl Uri {
     }
     /// Sets the authority (if a `Url` or `RelativeUri`) or namespace (if a
     /// `Urn`) to `authority_or_namespace`.
+    ///
+    /// ## Errors
+    /// Returns an [`Error`] if setting `authority_or_namespace` would cause
+    /// this `Uri` to exceed `u32::MAX` (4GB).
     pub fn set_authority_or_namespace(
         &mut self,
         authority_or_namespace: &str,
@@ -3058,6 +3117,9 @@ impl Uri {
         }
     }
     /// Attempts to convert this `Uri` into a [`RelativeUri`].
+    ///
+    /// ## Errors
+    /// Returns `Err(self)` if the `Uri` is not a `RelativeUri`.
     pub fn try_into_relative(self) -> Result<RelativeUri, Self> {
         if let Self::Relative(v) = self {
             Ok(v)
@@ -3067,6 +3129,9 @@ impl Uri {
     }
     /// Consumes and returns this `Uri` as a [`Urn`] if it is a `Urn` or
     /// returns `Err(self)` otherwise.
+    ///
+    /// ## Errors
+    /// Returns `Err(self)` if the `Uri` is not a `Urn`.
     pub fn try_into_urn(self) -> Result<Urn, Self> {
         if let Self::Urn(v) = self {
             Ok(v)
@@ -3077,6 +3142,9 @@ impl Uri {
 
     /// Consumes and returns this `Uri` as a [`Url`] if it is a `Url` or
     /// returns `Err(self)` otherwise.
+    ///
+    /// ## Errors
+    /// Returns `Err(self)` if the `Uri` is not a `Url`.
     pub fn try_into_url(self) -> Result<Url, Self> {
         if let Self::Url(v) = self {
             Ok(v)
@@ -3431,6 +3499,9 @@ pub fn resolve(base: &str, path: &str) -> String {
 }
 
 /// Percent decodes `value`
+///
+/// # Errors
+/// Returns a `std::str::Utf8Error` if the decoded value is not valid utf-8
 pub fn decode(value: &str) -> Result<String, std::str::Utf8Error> {
     Ok(percent_encoding::percent_decode_str(value)
         .decode_utf8()?
@@ -3452,10 +3523,9 @@ pub fn decode_lossy(fragment: &str) -> String {
 /// `u32::MAX` (`4294967295`)
 #[inline]
 pub(crate) fn usize_to_u32(value: usize) -> Result<u32, OverflowError> {
-    value.try_into().map_err(|_| OverflowError {
-        value: value as u64,
-        backtrace: Backtrace::capture(),
-    })
+    value
+        .try_into()
+        .map_err(|_| OverflowError { len: value as u64 })
 }
 
 /*
@@ -3766,6 +3836,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_set_fragment() {
         let tests = [
             (
@@ -3890,6 +3961,7 @@ mod tests {
         }
     }
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_set_path() {
         let tests = [
             (

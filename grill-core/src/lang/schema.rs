@@ -2,12 +2,11 @@
 
 use grill_uri::AbsoluteUri;
 use slotmap::{new_key_type, Key, SlotMap};
-use snafu::{ensure, Snafu};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::iter::{AllCompiledSchemas, AllSchemas, Iter};
 
-use super::source::Sources;
+use super::source::{Source, SourceKey, Sources};
 
 new_key_type! {
     /// Default key type used as a unique identifier for a schema.
@@ -21,6 +20,21 @@ pub trait EmbeddedIn<K> {
     fn embedded_in(&self) -> Option<K>;
 }
 
+pub trait ReferencedBy<K> {
+    type Ref;
+    fn referenced_by(&self) -> &[Self::Ref];
+}
+
+pub trait Reference<K> {
+    fn reference(&self) -> K;
+    fn referrer(&self) -> K;
+}
+
+pub trait References<K> {
+    type Ref: Reference<K>;
+    fn references(&self) -> &[Self::Ref];
+}
+
 /// A trait which indicates that a schema is capable of having subschemas.
 pub trait Embedded<K> {
     /// Returns a slice of subschema keys for this schema.
@@ -32,8 +46,9 @@ pub trait Embedded<K> {
 /// This trait is satisfied by [`Language`](crate::lang::Language)
 /// implementations. See your desired language's documentation for more
 /// information.
-pub trait Schema<'i, K>: AsRef<K> {
+pub trait Schema<'int, K>: AsRef<K> {
     fn key(&self) -> K;
+    fn source(&'int self) -> Source<'int>;
 }
 
 /// A trait satisfied by a type that represents a compiled schema.
@@ -41,9 +56,13 @@ pub trait Schema<'i, K>: AsRef<K> {
 /// This trait is satisfied by [`Language`](crate::lang::Language)
 /// implementations. See your desired language's documentation for more
 /// information.
-pub trait CompiledSchema<K>: AsRef<K> + Clone + PartialEq {
+pub trait CompiledSchema<K>: AsRef<K> + Clone + PartialEq + Send + Sync {
     /// The borrowed schema representation.
-    type Schema<'i>: Schema<'i, K>;
+    type Schema<'int>: Schema<'int, K>
+    where
+        Self: 'int;
+
+    fn source_key(&self) -> SourceKey;
 
     /// Returns the key of the schema.
     fn key(&self) -> K;
@@ -52,7 +71,7 @@ pub trait CompiledSchema<K>: AsRef<K> + Clone + PartialEq {
     fn set_key(&mut self, key: K);
 
     /// Returns the borrowed [`Self::Schema`] representation.
-    fn to_schema<'i>(&self, sources: &Sources) -> Self::Schema<'i>;
+    fn to_schema<'int>(&'int self, sources: &'int Sources) -> Self::Schema<'int>;
 }
 
 /// A graph of schemas indexed by [`AbsoluteUri`]s.
@@ -95,7 +114,11 @@ where
     /// given `uri`.
     pub fn assign(&mut self, uri: AbsoluteUri, key: K) -> Result<(), DuplicateLinkError<K>> {
         match self.uris.get(&uri).copied() {
-            Some(existing) => ensure!(existing == key, DuplicateLinkSnafu { existing, uri }),
+            Some(existing) => {
+                if existing != key {
+                    DuplicateLinkError::fail(uri, existing)?
+                }
+            }
             None => self.insert_uri(uri, key),
         }
         Ok(())
@@ -133,13 +156,13 @@ where
     pub fn all_compiled_schemas(&self) -> AllCompiledSchemas<'_, S, K> {
         AllCompiledSchemas::new(self)
     }
-    pub fn all_schemas<'i>(&'i self, sources: &'i Sources) -> AllSchemas<'i, S, K> {
+    pub fn all_schemas<'int>(&'int self, sources: &'int Sources) -> AllSchemas<'int, S, K> {
         self.all_compiled_schemas().into_all_schemas(sources)
     }
 
-    pub fn iter<'i, I>(&'i self, sources: &'i Sources, keys: I) -> Iter<'i, I, S, K>
+    pub fn iter<'int, I>(&'int self, sources: &'int Sources, keys: I) -> Iter<'int, I, S, K>
     where
-        I: 'i + Iterator<Item = K>,
+        I: 'int + Iterator<Item = K>,
     {
         Iter::new(self, sources, keys)
     }
@@ -164,12 +187,23 @@ where
 }
 
 /// A duplicate [`CompiledSchema`] already exists at the given `uri`.
-#[derive(Debug, Snafu)]
+#[derive(Debug, PartialEq)]
 pub struct DuplicateLinkError<K> {
     /// The URI that the schema is already linked to.
     pub uri: AbsoluteUri,
     /// The key of the existing schema.
     pub existing: K,
+}
+impl<K> DuplicateLinkError<K> {
+    /// Creates a new `DuplicateLinkError` with the given `uri` and `existing`
+    /// key.
+    pub fn new(uri: AbsoluteUri, existing: K) -> Self {
+        Self { uri, existing }
+    }
+
+    pub fn fail<T>(uri: AbsoluteUri, existing: K) -> Result<T, Self> {
+        Err(Self::new(uri, existing))
+    }
 }
 
 #[cfg(test)]
@@ -191,29 +225,33 @@ mod tests {
         }
     }
     #[derive(Debug, PartialEq, Eq)]
-    struct TestSchema<'i> {
+    struct TestSchema<'int> {
         key: DefaultKey,
-        _marker: PhantomData<&'i ()>,
+        _marker: PhantomData<&'int ()>,
     }
-    impl<'i> AsRef<DefaultKey> for TestSchema<'i> {
+    impl<'int> AsRef<DefaultKey> for TestSchema<'int> {
         fn as_ref(&self) -> &DefaultKey {
             &self.key
         }
     }
-    impl<'i> Schema<'i, DefaultKey> for TestSchema<'i> {
+    impl<'int> Schema<'int, DefaultKey> for TestSchema<'int> {
         fn key(&self) -> DefaultKey {
             self.key
+        }
+
+        fn source(&'int self) -> Source<'int> {
+            todo!()
         }
     }
 
     impl CompiledSchema<DefaultKey> for Compiled {
-        type Schema<'i> = TestSchema<'i>;
+        type Schema<'int> = TestSchema<'int>;
 
         fn set_key(&mut self, key: DefaultKey) {
             self.key = key;
         }
 
-        fn to_schema<'i>(&self, _sources: &Sources) -> Self::Schema<'i> {
+        fn to_schema<'int>(&'int self, _sources: &'int Sources) -> Self::Schema<'int> {
             TestSchema {
                 key: self.key,
                 _marker: PhantomData,
@@ -222,6 +260,10 @@ mod tests {
 
         fn key(&self) -> DefaultKey {
             self.key
+        }
+
+        fn source_key(&self) -> SourceKey {
+            todo!()
         }
     }
 
@@ -237,8 +279,15 @@ mod tests {
     }
 }
 
-#[derive(Debug, Snafu)]
-#[snafu(display("invalid key: {key:?}"))]
+#[derive(Debug, PartialEq)]
 pub struct InvalidKeyError<K: Key = DefaultKey> {
     pub key: K,
 }
+
+impl Display for InvalidKeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid key: {:?}", self.key)
+    }
+}
+
+impl std::error::Error for InvalidKeyError {}

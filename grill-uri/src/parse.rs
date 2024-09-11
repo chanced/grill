@@ -4,7 +4,6 @@ use crate::usize_to_u32;
 
 use super::{encode, write, RelativeUri, Uri};
 use crate::error::{AuthorityError, Error, InvalidPortError};
-use snafu::Backtrace;
 use url::Url;
 use urn::Urn;
 
@@ -43,7 +42,7 @@ impl<'a> Parse<'a> {
     }
 
     fn authority(input: &'a str) -> Result<super::Authority, AuthorityError> {
-        use AuthorityState::*;
+        use AuthorityState::Username;
         let mut parser = Self {
             state: State::Authority(Username),
             input,
@@ -61,7 +60,6 @@ impl<'a> Parse<'a> {
 
         if !parser.path().is_empty() {
             return Err(AuthorityError::ContainsPath {
-                backtrace: Backtrace::capture(),
                 value: parser.path().into(),
             });
         }
@@ -69,29 +67,28 @@ impl<'a> Parse<'a> {
         if !query.is_empty() {
             return Err(AuthorityError::ContainsQuery {
                 value: query.to_string(),
-                backtrace: Backtrace::capture(),
             });
         }
         let fragment = parser.fragment().unwrap_or_default();
         if !fragment.is_empty() {
             return Err(AuthorityError::ContainsFragment {
                 value: fragment.to_string(),
-                backtrace: Backtrace::capture(),
             });
         }
-
+        let port = parser.port().transpose()?;
         Ok(super::Authority {
             value: input.into(),
+            port,
             username_index: parser.username_index,
             password_index: parser.password_index,
             host_index: parser.host_index,
             port_index: parser.port_index,
-            port: parser.port().transpose()?,
         })
     }
 
     fn next(&mut self, index: usize, next: char) -> Option<Result<Uri, Error>> {
-        use AuthorityState::*;
+        use AuthorityState::{Host, Password, Port, Username};
+        #[allow(clippy::enum_glob_use)]
         use State::*;
         let index = match usize_to_u32(index) {
             Ok(i) => i,
@@ -103,8 +100,8 @@ impl<'a> Parse<'a> {
             Authority(Password) => self.set_password(index),
             Authority(Host) => self.set_host(index),
             Authority(Port) => self.set_port(index),
-            UrlSchemeComplete => return self.parse_url(),
-            UrnSchemeComplete => return self.parse_urn(),
+            UrlSchemeComplete => return Some(self.parse_url()),
+            UrnSchemeComplete => return Some(self.parse_urn()),
             Path => self.set_path_index(index),
             Query => self.set_query(index),
             Fragment => self.set_fragment(index),
@@ -152,24 +149,16 @@ impl<'a> Parse<'a> {
         }
         .into())
     }
-    fn parse_url(&mut self) -> Option<Result<Uri, Error>> {
+    fn parse_url(&mut self) -> Result<Uri, Error> {
         Url::parse(self.input)
             .map(Uri::Url)
-            .map_err(|source| Error::FailedToParseUrl {
-                source,
-                backtrace: Backtrace::capture(),
-            })
-            .into()
+            .map_err(Error::FailedToParseUrl)
     }
 
-    fn parse_urn(&mut self) -> Option<Result<Uri, Error>> {
+    fn parse_urn(&mut self) -> Result<Uri, Error> {
         Urn::from_str(self.input)
             .map(Uri::Urn)
-            .map_err(|source| Error::FailedToParseUrn {
-                source,
-                backtrace: Backtrace::capture(),
-            })
-            .into()
+            .map_err(Error::FailedToParseUrn)
     }
 
     fn host(&self) -> Option<&str> {
@@ -185,10 +174,7 @@ impl<'a> Parse<'a> {
     fn port(&self) -> Option<Result<u16, InvalidPortError>> {
         let port = self.port_str()?;
         port.parse::<u16>()
-            .map_err(|_| InvalidPortError {
-                value: port.into(),
-                backtrace: Backtrace::capture(),
-            })
+            .map_err(|_| InvalidPortError { value: port.into() })
             .into()
     }
 
@@ -339,7 +325,9 @@ enum State {
 impl State {
     #[allow(clippy::match_same_arms, clippy::too_many_lines)]
     fn next(self, next: char) -> Self {
+        #[allow(clippy::enum_glob_use)]
         use AuthorityState::*;
+        #[allow(clippy::enum_glob_use)]
         use State::*;
         use UrnSchemeState::{N, R, U};
         match self {
@@ -585,6 +573,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_state_single_transitions() {
         type Test = (State, Box<dyn Fn(char) -> State>);
         let tests: &[Test] = &[

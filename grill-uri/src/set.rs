@@ -30,7 +30,6 @@ pub(crate) mod url {
     use crate::error::{AuthorityError, Error};
 
     use super::parse;
-    use snafu::Backtrace;
     use url::Url;
     pub(crate) fn fragment(url: &mut Url, fragment: Option<&str>) -> Option<String> {
         let existing = url.fragment().map(ToString::to_string);
@@ -56,7 +55,6 @@ pub(crate) mod url {
                 return Err(AuthorityError::UsernameNotAllowed {
                     value: username.to_string(),
                     scheme: u.scheme().to_string(),
-                    backtrace: Backtrace::capture(),
                 }
                 .into());
             }
@@ -69,7 +67,6 @@ pub(crate) mod url {
                 return Err(AuthorityError::PasswordNotAllowed {
                     scheme: u.scheme().to_string(),
                     value: password.to_string(),
-                    backtrace: Backtrace::capture(),
                 }
                 .into());
             }

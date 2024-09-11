@@ -182,7 +182,7 @@ where
 
 /// A compiled schema.
 #[derive(Clone, Debug)]
-pub struct Schema<'i, L, K>
+pub struct Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -191,16 +191,16 @@ where
     pub key: K,
 
     /// The `$id` or `id` of the schema, if any
-    pub id: Option<Cow<'i, AbsoluteUri>>,
+    pub id: Option<Cow<'int, AbsoluteUri>>,
 
     /// The path to the schema from the root schema as a JSON Pointer
-    pub path: Cow<'i, Pointer>,
+    pub path: Cow<'int, Pointer>,
 
     /// All URIs which this schema can be referenced by.
-    pub uris: Cow<'i, [AbsoluteUri]>,
+    pub uris: Cow<'int, [AbsoluteUri]>,
 
     /// The URI of the schema's `Metaschema`.
-    pub metaschema: Cow<'i, AbsoluteUri>,
+    pub metaschema: Cow<'int, AbsoluteUri>,
 
     /// The `Key` of the parent `Schema`, if any.
     ///
@@ -213,23 +213,23 @@ where
     /// Note that if any embedded `Schema` has an `id`, then it will not be
     /// be present in this list as per the specification, `Schema`s which are
     /// identified are to be treated as root schemas.
-    pub subschemas: Cow<'i, [K]>,
+    pub subschemas: Cow<'int, [K]>,
 
     /// Anchors within this `Schema`
-    pub anchors: Cow<'i, [Anchor]>,
+    pub anchors: Cow<'int, [Anchor]>,
 
     /// Dependents of this `Schema`.
-    pub dependents: Cow<'i, [K]>,
+    pub dependents: Cow<'int, [K]>,
 
     ///  Dependencies of this `Schema`.
-    pub references: Cow<'i, [Reference<K>]>,
+    pub references: Cow<'int, [Reference<K>]>,
 
     /// Compiled [`Keyword`]s.
-    pub keywords: Cow<'i, [L::Keyword]>,
+    pub keywords: Cow<'int, [L::Keyword]>,
 
     /// The schema's source [`Value`], [`AbsoluteUri`], and path as a JSON
     /// [`Pointer`]
-    pub source: Source<'i>,
+    pub source: Source<'int>,
 }
 
 impl<L, K> PartialEq<Schema<'_, L, K>> for Value
@@ -261,7 +261,7 @@ where
     }
 }
 
-impl<'i, L, K> Schema<'i, L, K>
+impl<'int, L, K> Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -304,7 +304,7 @@ where
     }
 }
 
-impl<'i, L, K> Schema<'i, L, K>
+impl<'int, L, K> Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -316,7 +316,7 @@ where
     }
 }
 
-impl<'i, L, K> Deref for Schema<'i, L, K>
+impl<'int, L, K> Deref for Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -328,7 +328,7 @@ where
     }
 }
 
-impl<'i, L, K> PartialEq for Schema<'i, L, K>
+impl<'int, L, K> PartialEq for Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -337,7 +337,7 @@ where
         self.id == other.id && self.metaschema == other.metaschema
     }
 }
-impl<'i, L, K> Eq for Schema<'i, L, K>
+impl<'int, L, K> Eq for Schema<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
@@ -462,9 +462,9 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn evaluate<'i, 'v>(
+    pub fn evaluate<'int, 'v>(
         &self,
-        eval: Evaluate<'i, 'v, L, K>,
+        eval: Evaluate<'int, 'v, L, K>,
     ) -> Result<<L as LanguageReport<'v, L, K>, EvaluateError<K>> {
         let Evaluate {
             key,
@@ -595,11 +595,11 @@ where
     //     self.store().iter()
     // }
 
-    pub(crate) fn ancestors<'i>(&'i self, key: K, sources: &'i Sources) -> Ancestors<'i, L, K> {
+    pub(crate) fn ancestors<'int>(&'int self, key: K, sources: &'int Sources) -> Ancestors<'int, L, K> {
         Ancestors::new(key, self, sources)
     }
 
-    pub(crate) fn descendants<'i>(&'i self, key: K, sources: &'i Sources) -> Descendants<'i, L, K> {
+    pub(crate) fn descendants<'int>(&'int self, key: K, sources: &'int Sources) -> Descendants<'int, L, K> {
         Descendants::new(key, self, sources)
     }
 
@@ -617,39 +617,39 @@ where
         }
     }
 
-    pub(crate) fn direct_dependents<'i>(
-        &'i self,
+    pub(crate) fn direct_dependents<'int>(
+        &'int self,
         key: K,
-        sources: &'i Sources,
-    ) -> DirectDependents<'i, L, K> {
+        sources: &'int Sources,
+    ) -> DirectDependents<'int, L, K> {
         DirectDependents::new(key, self, sources)
     }
 
-    pub(crate) fn all_dependents<'i>(
-        &'i self,
+    pub(crate) fn all_dependents<'int>(
+        &'int self,
         key: K,
-        sources: &'i Sources,
-    ) -> AllDependents<'i, L, K> {
+        sources: &'int Sources,
+    ) -> AllDependents<'int, L, K> {
         AllDependents::new(key, self, sources)
     }
 
-    pub(crate) fn transitive_dependencies<'i>(
-        &'i self,
+    pub(crate) fn transitive_dependencies<'int>(
+        &'int self,
         key: K,
-        sources: &'i Sources,
-    ) -> TransitiveDependencies<'i, L, K> {
+        sources: &'int Sources,
+    ) -> TransitiveDependencies<'int, L, K> {
         TransitiveDependencies::new(key, self, sources)
     }
 
-    pub(crate) fn direct_dependencies<'i>(
-        &'i self,
+    pub(crate) fn direct_dependencies<'int>(
+        &'int self,
         key: K,
-        sources: &'i Sources,
-    ) -> DirectDependencies<'i, L, K> {
+        sources: &'int Sources,
+    ) -> DirectDependencies<'int, L, K> {
         DirectDependencies::new(key, self, sources)
     }
 
-    pub(crate) fn get_unchecked<'i>(&'i self, key: K, sources: &'i Sources) -> Schema<'i, L, K> {
+    pub(crate) fn get_unchecked<'int>(&'int self, key: K, sources: &'int Sources) -> Schema<'int, L, K> {
         self.get(key, sources).unwrap()
     }
 
@@ -658,11 +658,11 @@ where
     }
 
     /// Returns the [`Schema`] with the given `Key` if it exists.
-    pub(crate) fn get<'i>(
-        &'i self,
+    pub(crate) fn get<'int>(
+        &'int self,
         key: K,
-        sources: &'i Sources,
-    ) -> Result<Schema<'i, L, K>, UnknownKeyError<K>> {
+        sources: &'int Sources,
+    ) -> Result<Schema<'int, L, K>, UnknownKeyError<K>> {
         let schema = self.store().get(key).ok_or(UnknownKeyError {
             key,
             backtrace: Backtrace::capture(),
@@ -709,11 +709,11 @@ where
     }
 
     #[must_use]
-    pub(crate) fn get_by_uri<'i>(
-        &'i self,
+    pub(crate) fn get_by_uri<'int>(
+        &'int self,
         uri: &AbsoluteUri,
-        sources: &'i Sources,
-    ) -> Option<Schema<'i, L, K>> {
+        sources: &'int Sources,
+    ) -> Option<Schema<'int, L, K>> {
         let key = self.store().index.get(uri).copied()?;
         Some(self.get_unchecked(key, sources))
     }
@@ -769,22 +769,22 @@ pub struct Reference<Key> {
 /// [`Interrogator`](`crate::Interrogator`). If this is not a concern, use
 /// [`unchecked`](`Iter::unchecked`) which unwraps all `Result`s.
 ///
-pub struct Iter<'i, L, K>
+pub struct Iter<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
 {
-    sources: &'i Sources,
-    schemas: &'i Schemas<L, K>,
-    inner: Either<std::slice::Iter<'i, K>, std::vec::IntoIter<K>>,
+    sources: &'int Sources,
+    schemas: &'int Schemas<L, K>,
+    inner: Either<std::slice::Iter<'int, K>, std::vec::IntoIter<K>>,
 }
 
-impl<'i, L, K> Iter<'i, L, K>
+impl<'int, L, K> Iter<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
 {
-    pub(crate) fn new(keys: &'i [K], schemas: &'i Schemas<L, K>, sources: &'i Sources) -> Self {
+    pub(crate) fn new(keys: &'int [K], schemas: &'int Schemas<L, K>, sources: &'int Sources) -> Self {
         Self {
             sources,
             schemas,
@@ -798,11 +798,11 @@ where
     /// Do not use this unless you are certain all `Key`s are associated with
     /// the [`Interrogator`] from which this is originated.
     #[must_use]
-    pub fn unchecked(self) -> IterUnchecked<'i, L, K> {
+    pub fn unchecked(self) -> IterUnchecked<'int, L, K> {
         IterUnchecked { inner: self }
     }
 
-    // pub(crate) fn from_vec(keys: Vec<Key>, schemas: &'i Schemas, sources: &'i Sources) -> Self {
+    // pub(crate) fn from_vec(keys: Vec<Key>, schemas: &'int Schemas, sources: &'int Sources) -> Self {
     //     Self {
     //         sources,
     //         schemas,
@@ -810,12 +810,12 @@ where
     //     }
     // }
 }
-impl<'i, L, K> Iterator for Iter<'i, L, K>
+impl<'int, L, K> Iterator for Iter<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
 {
-    type Item = Result<Schema<'i, L, K>, UnknownKeyError<K>>;
+    type Item = Result<Schema<'int, L, K>, UnknownKeyError<K>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let key = match self.inner.as_mut() {
@@ -830,20 +830,20 @@ where
 /// # Panics
 /// This will panic if any of the [`Key`]s are not associated with the same
 /// [`Interrogator`](`crate::Interrogator`).
-pub struct IterUnchecked<'i, L, K>
+pub struct IterUnchecked<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
 {
-    inner: Iter<'i, L, K>,
+    inner: Iter<'int, L, K>,
 }
 
-impl<'i, L, K> Iterator for IterUnchecked<'i, L, K>
+impl<'int, L, K> Iterator for IterUnchecked<'int, L, K>
 where
     L: Language<K>,
     K: 'static + Key,
 {
-    type Item = Schema<'i, L, K>;
+    type Item = Schema<'int, L, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(std::result::Result::unwrap)

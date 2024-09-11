@@ -29,6 +29,50 @@ fn null() -> Arc<Value> {
 
 type Map<K, V> = HashMap<K, V, LenHasher>;
 
+pub struct Cache {
+    pub values: Values,
+    pub numbers: Numbers,
+}
+
+impl Cache {
+    pub fn new() -> Self {
+        Cache {
+            values: Values::new(),
+            numbers: Numbers::new(),
+        }
+    }
+    pub fn value(&self, value: &Value) -> Option<Arc<Value>> {
+        self.values.get(value)
+    }
+    pub fn number_arc(&self, number: &Number) -> Option<Arc<BigRational>> {
+        self.numbers.get_arc(number)
+    }
+    pub fn number_ref(&self, number: &Number) -> Option<&BigRational> {
+        self.numbers.get_ref(number)
+    }
+    pub fn value_or_insert(&mut self, value: &Value) -> Arc<Value> {
+        self.values.get_or_insert(value)
+    }
+    pub fn number_or_insert_arc(
+        &mut self,
+        number: &Number,
+    ) -> Result<Arc<BigRational>, big::ParseError> {
+        self.numbers.get_or_insert_arc(number)
+    }
+    pub fn number_or_insert_ref(
+        &mut self,
+        number: &Number,
+    ) -> Result<&BigRational, big::ParseError> {
+        self.numbers.get_or_insert_ref(number)
+    }
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -58,6 +102,28 @@ impl Values {
             arrays: Map::default(),
         }
     }
+
+    pub fn get(&self, value: &Value) -> Option<Arc<Value>> {
+        match value {
+            Value::Number(_) => self.numbers.iter().find(|v| &***v == value).cloned(),
+            Value::String(_) => self.strings.iter().find(|v| &***v == value).cloned(),
+            Value::Array(a) => self
+                .arrays
+                .get(&a.len())?
+                .iter()
+                .find(|v| &***v == value)
+                .cloned(),
+            Value::Object(o) => self
+                .objects
+                .get(&o.len())?
+                .iter()
+                .find(|v| &***v == value)
+                .cloned(),
+            Value::Bool(value) => Some(boolean(*value)),
+            Value::Null => Some(null()),
+        }
+    }
+
     /// Returns an `Arc<Value>` representation of `value`, either by returning
     /// an existing cached instance or inserts and returns a new instance.
     #[must_use]

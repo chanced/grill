@@ -3,41 +3,45 @@
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(clippy::all, clippy::pedantic)]
-#![warn(missing_docs)]
-#![allow(clippy::implicit_hasher, clippy::wildcard_imports)]
+// #![warn(missing_docs)]
+#![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    clippy::must_use_candidate,
+    clippy::implicit_hasher,
+    clippy::wildcard_imports,
+    clippy::module_name_repetitions
+)]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]
 
 pub mod compile;
+pub mod invalid_type;
 pub mod keyword;
 pub mod report;
 pub mod schema;
 pub mod spec;
 
-use std::borrow::Cow;
+use core::fmt;
+use std::marker::PhantomData;
 
-use compile::Compiler;
-use grill_core::{lang::Init, Key, Language, Resolve};
-use grill_uri::AbsoluteUri;
-use report::Error;
-use schema::{dialect::Dialect, CompiledSchema};
-use snafu::Snafu;
-use spec::{alias, Specification};
-
+use grill_core::{lang, Key, Language, Resolve};
+use schema::CompiledSchema;
+use slotmap::DefaultKey;
+pub use spec::Spec;
+use spec::Specification;
 pub use {
     compile::CompileError,
     report::{Output, Report},
 };
 
 /*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔═══════════════════════════════════════════════════════════════════════╗
-║                                                                       ║
-║                               IntoOwned                               ║
-║                              ¯¯¯¯¯¯¯¯¯¯¯                              ║
-╚═══════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   IntoOwned                                  ║
+║                                  ¯¯¯¯¯¯¯¯¯¯¯                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 /// A trait implemented by types that can be converted into an owned type.
 pub trait IntoOwned {
@@ -47,122 +51,132 @@ pub trait IntoOwned {
     fn into_owned(self) -> Self::Owned;
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                  JsonSchema                                  ║
+║                                 ¯¯¯¯¯¯¯¯¯¯¯¯                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// JSON Schema with support for drafts 2020-12, 2019-09, 07, and 04.
 #[derive(Debug, Clone)]
-pub struct JsonSchema<S = Spec>(pub S);
+pub struct JsonSchema<K = DefaultKey, S = Spec<K>>
+where
+    K: 'static + Key + Send + Sync,
+    S: Specification<K>,
+{
+    spec: S,
+    _marker: PhantomData<K>,
+}
 
-impl<S> JsonSchema<S> {
+impl<K, S> JsonSchema<K, S>
+where
+    K: 'static + Key + Send + Sync,
+    S: Specification<K> + Send + Sync,
+{
     /// Creates a new JSON Schema language for the given [`Specification`].
     pub fn new(spec: S) -> Self {
-        Self(spec)
+        Self {
+            spec,
+            _marker: PhantomData,
+        }
+    }
+    pub fn spec(&self) -> &S {
+        &self.spec
+    }
+    pub fn spec_mut(&mut self) -> &mut S {
+        &mut self.spec
     }
 }
 
-/// Std JSON Schema specification.
-#[derive(Clone, Debug)]
-pub struct Spec {
-    dialects: Vec<Dialect<keyword::Keyword>>,
-    primary_dialect_idx: usize,
-}
-
-impl<K: 'static + Key + Send> Specification<K> for Spec {
-    type InitError = ();
-
-    type CompileError = CompileError<Error<'static>>;
-
-    type EvaluateError = EvaluateError<K>;
-
-    type Evaluate<'i> = keyword::Evaluate<'i>;
-
-    type Compile<'i> = keyword::Compile<'i, Self, K>;
-
-    type Keyword = keyword::Keyword;
-
-    type Keywords<'i> = keyword::Keywords<'i>;
-
-    type Annotation<'v> = report::Annotation<'v>;
-
-    type Error<'v> = report::Error<'v>;
-
-    type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
-
-    async fn compile<'i, R: Resolve + Send + Sync>(
-        &'i mut self,
-        compile: grill_core::lang::Compile<'i, AbsoluteUri, CompiledSchema<Self, K>, R, K>,
-    ) -> Result<Self::Compile<'i>, Self::CompileError> {
-        todo!()
-    }
-
-    fn evaluate<'i, 'v>(
-        &'i self,
-        eval: grill_core::lang::Evaluate<'i, 'v, CompiledSchema<Self, K>, Output, K>,
-    ) -> Result<Self::Evaluate<'i>, Self::EvaluateError> {
-        todo!()
-    }
-}
-
-impl<S, K> Language<K> for JsonSchema<S>
+impl<K, S> Language<K> for JsonSchema<K, S>
 where
-    S: Specification<K> + Send,
-    K: 'static + Key + Send,
+    K: 'static + Key + Send + Sync,
+    S: Specification<K> + Send + 'static,
 {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
     type CompiledSchema = CompiledSchema<S, K>;
 
     /// The error type possibly returned from [`compile`](Language::compile).
-    type CompileError = alias::CompileError<S, K>;
+    type CompileError<R> = S::CompileError<R>
+    where
+    R: 'static + Resolve;
 
     /// The result type returned from [`evaluate`](Language::evaluate).
-    type EvaluateResult<'v> = alias::EvaluateResult<'v, S, K>;
+    type EvaluateResult<'rpt> =
+        Result<Report<S::Annotation<'rpt>, S::Error<'rpt>>, S::EvaluateError>;
 
     /// Context type supplied to `evaluate`.
     type Context = Output;
 
-    /// The error type that can be returned when initializing the language.
-    type InitError = alias::InitError<S, K>;
-
     /// Initializes the language with the given [`Init`] request.
-    fn init(&mut self, init: Init<'_, Self::CompiledSchema, K>) -> Result<(), Self::InitError> {
-        self.0.init(init)
+    fn init(&mut self, init: lang::Init<'_, Self::CompiledSchema, K>) {
+        self.spec.init(init)
     }
 
-    /// Compiles a schema for the given [`Compile`] request and returns the key,
-    /// if successful.
+    /// Compiles a schema or set of schemas for the given [`Compile`] request
+    /// and returns an iterator of keys, if successful.
     ///
-    /// This method is `async` to allow for languages that need to fetch schemas
-    /// during compilation.
+    /// This method is `async` in order to allow for fetching of schemas during
+    /// compilation and if implementations need to perform io in order to setup.
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    async fn compile<'i, R: Resolve + Send + Sync>(
-        &'i mut self,
-        compile: grill_core::lang::Compile<'i, AbsoluteUri, Self::CompiledSchema, R, K>,
-    ) -> Result<K, Self::CompileError> {
-        let ctx = self.0.compile(compile).await?;
-        // Compiler::new(ctx).compile().await
-        todo!()
-    }
-
-    /// Compiles all schemas for the given [`CompileAll`] request and returns the
-    /// keys, if successful.
-    async fn compile_all<'i, R: Resolve + Send + Sync>(
-        &'i mut self,
-        compile_all: grill_core::lang::Compile<'i, Vec<AbsoluteUri>, Self::CompiledSchema, R, K>,
-    ) -> Result<Vec<K>, Self::CompileError> {
-        todo!()
+    async fn compile<'int, R>(
+        &'int mut self,
+        ctx: lang::Compile<'int, Self, R, K>,
+    ) -> Result<Vec<K>, Self::CompileError>
+    where
+        R: 'static + Resolve + Send + Sync,
+    {
+        compile::compile::<R, S, K>(self.spec.init_compile(ctx).await?).await
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
-    fn evaluate<'i, 'v>(
-        &'i self,
-        eval: grill_core::lang::Evaluate<'i, 'v, Self::CompiledSchema, Self::Context, K>,
+    fn evaluate<'int, 'v>(
+        &'int self,
+        eval: lang::Evaluate<'int, 'v, Self::CompiledSchema, Self::Context, K>,
     ) -> Self::EvaluateResult<'v> {
+        _ = eval;
         todo!()
     }
 }
 
-#[derive(Debug, Snafu)]
-#[snafu(display("failed to evaluate schema {key:?}"))]
-pub struct EvaluateError<K: std::fmt::Debug + Send> {
-    pub key: K,
+#[derive(Debug, PartialEq, Eq)]
+pub enum EvaluateError<K: Key> {
+    X(K),
+}
+
+impl<K: Key + Send> fmt::Display for EvaluateError<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "failed to evaluate value")
+    }
+}
+
+impl<K: Key + Send> std::error::Error for EvaluateError<K> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            EvaluateError::X(_) => todo!(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UriError {
+    pub actul: String,
+    pub source: grill_uri::Error,
+}
+
+impl fmt::Display for UriError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to parse uri: \"{}\"", self.actul)
+    }
+}
+
+impl std::error::Error for UriError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
 }

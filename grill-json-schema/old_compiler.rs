@@ -52,14 +52,14 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'i, L: Language<K>, K: 'static + Key> {
-    schemas: &'i mut Schemas<L, K>,
-    sources: &'i mut Sources,
-    dialects: &'i Dialects<L, K>,
-    deserializers: &'i Deserializers,
-    resolvers: &'i Resolvers,
-    numbers: &'i mut Numbers,
-    values: &'i mut Values,
+pub(crate) struct Compiler<'int, L: Language<K>, K: 'static + Key> {
+    schemas: &'int mut Schemas<L, K>,   // now context
+    sources: &'int mut Sources,         // now context
+    dialects: &'int Dialects<L, K>,     // now context
+    deserializers: &'int Deserializers, // gone
+    resolvers: &'int Resolvers,         // gone
+    numbers: &'int mut Numbers,         // now context
+    values: &'int mut Values,           // now context
     validate: Validate,
     indexed: HashSet<AbsoluteUri>,
     ids: HashMap<AbsoluteUri, Option<AbsoluteUri>>,
@@ -70,8 +70,8 @@ pub(crate) struct Compiler<'i, L: Language<K>, K: 'static + Key> {
     primary_uris: HashMap<AbsoluteUri, AbsoluteUri>,
     paths: HashMap<AbsoluteUri, Pointer>,
     refs: HashMap<AbsoluteUri, Vec<Ref>>,
-    keywords: HashMap<AbsoluteUri, &'i [L::Keyword]>,
-    language: &'i mut L,
+    keywords: HashMap<AbsoluteUri, &'int [L::Keyword]>,
+    language: &'int mut L,
 }
 
 impl From<Validate> for bool {
@@ -81,12 +81,12 @@ impl From<Validate> for bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<'i, L, K> Compiler<'i, L, K>
+impl<'int, L, K> Compiler<'int, L, K>
 where
     L: Language<K>,
     K: Key,
 {
-    pub(crate) fn new(interrogator: &'i mut Interrogator<L, K>, validate: Validate) -> Self {
+    pub(crate) fn new(interrogator: &'int mut Interrogator<L, K>, validate: Validate) -> Self {
         Self {
             schemas: &mut interrogator.schemas,
             sources: &mut interrogator.sources,
@@ -172,12 +172,6 @@ where
         &mut self,
         uri: &AbsoluteUri,
     ) -> Result<Option<(Link, Value)>, CompileError<L, K>> {
-        let mut indexed = self
-            .indexed
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect::<Vec<_>>();
-        indexed.sort();
         if self.indexed.contains(uri) {
             let (link, src) = self
                 .sources
@@ -801,10 +795,10 @@ fn append_all_front<K: Key>(
     true
 }
 
-fn append_anchor_uris<'i, L: Language<K>, K: Key>(
+fn append_anchor_uris<'int, L: Language<K>, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
-    base_uri: &'i AbsoluteUri,
-    anchors: &'i [Anchor],
+    base_uri: &'int AbsoluteUri,
+    anchors: &'int [Anchor],
 ) -> Result<(), CompileError<L, K>> {
     for anchor in anchors {
         let mut uri = base_uri.clone();
