@@ -24,9 +24,8 @@ pub mod spec;
 use core::fmt;
 use std::marker::PhantomData;
 
-use grill_core::{lang, Key, Language, Resolve};
+use grill_core::{lang, state::State, Key, Language, Resolve};
 use schema::CompiledSchema;
-use slotmap::DefaultKey;
 pub use spec::Spec;
 use spec::Specification;
 pub use {
@@ -62,7 +61,7 @@ pub trait IntoOwned {
 */
 /// JSON Schema with support for drafts 2020-12, 2019-09, 07, and 04.
 #[derive(Debug, Clone)]
-pub struct JsonSchema<K = DefaultKey, S = Spec<K>>
+pub struct JsonSchema<K, S>
 where
     K: 'static + Key + Send + Sync,
     S: Specification<K>,
@@ -105,14 +104,14 @@ where
     R: 'static + Resolve;
 
     /// The result type returned from [`evaluate`](Language::evaluate).
-    type EvaluateResult<'rpt> =
-        Result<Report<S::Annotation<'rpt>, S::Error<'rpt>>, S::EvaluateError>;
+    type EvaluateResult<'val> =
+        Result<Report<S::Annotation<'val>, S::Error<'val>>, S::EvaluateError>;
 
     /// Context type supplied to `evaluate`.
     type Context = Output;
 
     /// Initializes the language with the given [`Init`] request.
-    fn init(&mut self, init: lang::Init<'_, Self::CompiledSchema, K>) {
+    fn init(&mut self, init: &mut State<Self, K>) {
         self.spec.init(init)
     }
 
@@ -124,10 +123,10 @@ where
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    async fn compile<'int, R>(
+    async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: lang::Compile<'int, Self, R, K>,
-    ) -> Result<Vec<K>, Self::CompileError>
+        ctx: lang::Compile<'int, 'txn, 'res, Self, R, K>,
+    ) -> Result<Vec<K>, Self::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
@@ -135,10 +134,10 @@ where
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
-    fn evaluate<'int, 'v>(
+    fn evaluate<'int, 'val>(
         &'int self,
-        eval: lang::Evaluate<'int, 'v, Self::CompiledSchema, Self::Context, K>,
-    ) -> Self::EvaluateResult<'v> {
+        eval: lang::Evaluate<'int, '_, 'val, Self, K>,
+    ) -> Self::EvaluateResult<'val> {
         _ = eval;
         todo!()
     }

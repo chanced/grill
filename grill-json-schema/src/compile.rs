@@ -21,13 +21,16 @@ mod resolve;
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-pub(crate) async fn compile<R, S, K>(
-    ctx: S::Compile<'_, '_, '_, R>,
+pub(crate) async fn compile<'int, 'txn, 'res, R, S, K>(
+    ctx: S::Compile<'int, 'txn, 'res, R>,
 ) -> Result<Vec<K>, S::CompileError<R>>
 where
     R: 'static + Resolve + Send + Sync,
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
+    'int: 'res,
+    'txn: 'int,
+    'res: 'int,
 {
     Compiler::<R, S, K>::new(ctx).compile().await
 }
@@ -108,7 +111,7 @@ where
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
-struct Compiler<'txn, 'int, 'res, R, S, K>
+struct Compiler<'int, 'txn, 'res, R, S, K>
 where
     R: 'static + Resolve + Send + Sync,
     S: 'static + Specification<K>,
@@ -116,16 +119,16 @@ where
     Self: 'txn + 'int + 'res,
     'int: 'txn,
 {
-    ctx: S::Compile<'txn, 'int, 'res, R>,
+    ctx: S::Compile<'int, 'txn, 'res, R>,
 }
 
-impl<'txn, 'int, 'res, R, S, K> Compiler<'txn, 'int, 'res, R, S, K>
+impl<'int, 'txn, 'res, R, S, K> Compiler<'int, 'txn, 'res, R, S, K>
 where
     R: 'static + Resolve + Send + Sync,
-    S: 'int + Specification<K>,
+    S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
 {
-    fn new(ctx: S::Compile<'txn, 'int, 'res, R>) -> Self {
+    fn new(ctx: S::Compile<'int, 'txn, 'res, R>) -> Self {
         Self { ctx }
     }
     async fn compile(mut self) -> Result<Vec<K>, S::CompileError<R>>

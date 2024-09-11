@@ -262,7 +262,7 @@ where
     A: 'v + From<Annotation<'v>> + From<Value> + Debug + Send,
     E: 'v + From<Error<'v>> + From<String> + Debug + Send,
 {
-    type Assess<'rpt> = Assess<'rpt, A, E> where Self: 'rpt;
+    type Assess<'val> = Assess<'val, A, E> where Self: 'val;
 
     fn new(output: Output, location: Location) -> Self {
         todo!()
@@ -535,7 +535,7 @@ pub mod verbose {
             &self.location.absolute_keyword
         }
 
-        pub fn assess<'rpt>(&'rpt self, location: super::Location) -> super::Assess<'rpt, A, E> {
+        pub fn assess<'val>(&'val self, location: super::Location) -> super::Assess<'val, A, E> {
             todo!()
         }
     }

@@ -10,6 +10,7 @@ use crate::{
     JsonSchema,
 };
 use grill_core::{
+    cache::Cache,
     lang::{Schemas, Sources},
     state::{State, Transaction},
     Key, Resolve,
@@ -47,9 +48,9 @@ where
         todo!()
     }
 
-    fn evaluate<'rpt, 'int>(
+    fn evaluate<'int, 'val, 'req>(
         &self,
-        eval: S::Evaluate<'rpt, 'int>,
+        eval: S::Evaluate<'int, 'val, 'req>,
     ) -> Result<(), spec::alias::EvaluateError<S, K>> {
         _ = eval;
         todo!()
@@ -114,20 +115,20 @@ impl AsRef<[Keyword]> for Keywords<'_> {
 */
 
 /// Context for [`Keyword::compile`].
-pub struct Compile<'txn, 'int, 'res, R, S, K>
+pub struct Compile<'int, 'txn, 'res, R, S, K>
 where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
 {
     pub targets: Vec<AbsoluteUri>,
-    pub txn: &'txn mut Transaction<'txn, 'int, JsonSchema<K, S>, K>,
+    pub txn: &'txn mut Transaction<'int, 'txn, JsonSchema<K, S>, K>,
     pub resolve: &'res R,
     pub dialects: &'int Dialects<S, K>,
     pub validate: bool,
 }
 
-impl<'txn, 'int, 'res, R, S, K> spec::Compile<'txn, 'int, 'res, R, S, K>
-    for Compile<'txn, 'int, 'res, R, S, K>
+impl<'int, 'txn, 'res, R, S, K> spec::Compile<'int, 'txn, 'res, R, S, K>
+    for Compile<'int, 'txn, 'res, R, S, K>
 where
     R: 'static + Resolve + Send + Sync,
     K: 'static + Key + Send + Sync,
@@ -145,7 +146,7 @@ where
         &self.targets
     }
 
-    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K>, K> {
+    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K, S>, K> {
         todo!()
     }
 
@@ -165,20 +166,23 @@ where
 */
 
 /// Context for [`Keyword::evaluate`].
-pub struct Evaluate<'rpt, 'int, S, K>
+pub struct Evaluate<'int, 'val, 'req, S, K>
 where
     S: Specification<K>,
     K: 'static + Key + Send + Sync,
+    K: 'static + Send,
 {
     pub target: K,
-    pub state: &'int State<JsonSchema<K>, K>,
+    pub eval: &'req mut Cache,
+    pub state: &'int State<JsonSchema<K, S>, K>,
     pub schemas: &'int Schemas<CompiledSchema<S, K>, K>,
     pub assess:
-        <S::Report<'rpt> as spec::Report<'rpt, S::Annotation<'rpt>, S::Error<'rpt>>>::Assess<'rpt>,
+        <S::Report<'val> as spec::Report<'val, S::Annotation<'val>, S::Error<'val>>>::Assess<'val>,
     pub dialects: &'int Dialects<S, K>,
+    pub value: &'val Value,
 }
 
-impl<'rpt, 'int, S, K> spec::Evaluate<'rpt, 'int, S, K> for Evaluate<'rpt, 'int, S, K>
+impl<'int, 'val, 'req, S, K> spec::Evaluate<'int, 'val, S, K> for Evaluate<'int, 'val, 'req, S, K>
 where
     K: 'static + Key + Send + Sync,
     S: Specification<K>,
@@ -189,7 +193,7 @@ where
 
     fn assess(
         &mut self,
-    ) -> &mut <S::Report<'rpt> as spec::Report<'rpt, S::Annotation<'rpt>, S::Error<'rpt>>>::Assess<'rpt>
+    ) -> &mut <S::Report<'val> as spec::Report<'val, S::Annotation<'val>, S::Error<'val>>>::Assess<'val>
     {
         &mut self.assess
     }

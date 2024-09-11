@@ -73,7 +73,7 @@ where
         self._compile(uris, resolve, true).await
     }
 
-    async fn _compile<'x, 'int, 'res, R>(
+    async fn _compile<'int, 'txn, 'res, R>(
         &'int mut self,
         uris: Vec<AbsoluteUri>,
         resolve: &'res R,
@@ -83,16 +83,6 @@ where
         R: 'static + Resolve + Send + Sync,
     {
         // I really wanted to use a closure here, but I simply could not get it to work.
-        // self.state
-        //     .transaction(|transaction: Transaction<'x, 'int, L, K>| {
-        //         async {
-        //             self.lang
-        //                 .compile(Compile::new(uris, transaction, resolve, validate))
-        //                 .await
-        //         }
-        //         .boxed()
-        //     })
-        //     .await
         let mut schemas = self.state.schemas.clone();
         let mut sources = self.state.sources.clone();
         let transaction = Transaction::new(&mut schemas, &mut sources, &mut self.state.cache);
@@ -106,12 +96,15 @@ where
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
-    pub fn evaluate<'v>(
-        &self,
+    pub fn evaluate<'int, 'val>(
+        &'int self,
         key: K,
         context: L::Context,
-        value: &'v Value,
-    ) -> L::EvaluateResult<'v> {
+        value: &'val Value,
+    ) -> L::EvaluateResult<'val>
+    where
+        L::Context: 'int,
+    {
         // TODO: pool these
         let mut eval = Cache::new();
 

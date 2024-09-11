@@ -51,16 +51,16 @@ impl<L: Language<K>, K: 'static + Key + Send + Sync> Default for State<L, K> {
     }
 }
 
-pub struct Transaction<'x, 'int, L: Language<K>, K: 'static + Key + Send + Sync> {
-    pub schemas: &'x mut Schemas<L::CompiledSchema, K>,
-    pub sources: &'x mut Sources,
+pub struct Transaction<'int, 'txn, L: Language<K>, K: 'static + Key + Send + Sync> {
+    pub schemas: &'txn mut Schemas<L::CompiledSchema, K>,
+    pub sources: &'txn mut Sources,
     pub cache: &'int mut Cache,
 }
 
-impl<'x, 'int, L: Language<K>, K: 'static + Key + Send + Sync> Transaction<'x, 'int, L, K> {
+impl<'int, 'txn, L: Language<K>, K: 'static + Key + Send + Sync> Transaction<'int, 'txn, L, K> {
     pub fn new(
-        schemas: &'x mut Schemas<L::CompiledSchema, K>,
-        sources: &'x mut Sources,
+        schemas: &'txn mut Schemas<L::CompiledSchema, K>,
+        sources: &'txn mut Sources,
         cache: &'int mut Cache,
     ) -> Self {
         Self {

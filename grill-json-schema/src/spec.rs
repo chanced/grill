@@ -34,11 +34,11 @@ pub mod alias {
     pub type EvaluateError<S, K> = <S as Specification<K>>::EvaluateError;
 
     /// Alias for [`Specification::Evaluate`].
-    pub type Evaluate<'rpt, 'int, S, K> = <S as Specification<K>>::Evaluate<'rpt, 'int>;
+    pub type Evaluate<'int, 'val, 'req, S, K> = <S as Specification<K>>::Evaluate<'int, 'val, 'req>;
 
     /// Alias for [`Specification::Compile`].
-    pub type Compile<'txn, 'int, 'res, R, S, K> =
-        <S as Specification<K>>::Compile<'txn, 'int, 'res, R>;
+    pub type Compile<'int, 'txn, 'res, R, S, K> =
+        <S as Specification<K>>::Compile<'int, 'txn, 'res, R>;
 
     /// Alias for [`Specification::Report`].
     pub type Report<'v, S, K> = <S as Specification<K>>::Report<'v>;
@@ -79,9 +79,12 @@ where
 
     type EvaluateError = EvaluateError<K>;
 
-    type Evaluate<'rpt, 'int> = schema::keyword::Evaluate<'rpt, 'int, Self, K>;
+    type Evaluate<'int, 'val, 'req> = schema::keyword::Evaluate<'int, 'val, 'req, Self, K>;
 
-    type Compile<'txn, 'int, 'res, R> = schema::keyword::Compile<'txn, 'int, 'res, R, Self, K> where R: std::marker::Sized, Self: 'txn, Self: 'int, Self: 'res, 'int: 'txn, R: 'static, R: grill_core::Resolve, R: std::marker::Send, R: std::marker::Sync, K: grill_core::Key, K: 'static;
+    type Compile<'int, 'txn, 'res, R> = schema::keyword::Compile<'int, 'txn, 'res, R, Self, K> 
+        where R: 'static + Resolve + Sized, 
+        'int: 'txn,
+        Self: 'txn + 'int;
 
     type Keyword = schema::keyword::Keyword;
 
@@ -93,10 +96,10 @@ where
 
     type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
 
-    async fn init_compile<'txn, 'int, 'res, R>(
+    async fn init_compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: lang::Compile<'txn, 'int, 'res, JsonSchema<K>, R, K>,
-    ) -> Result<Self::Compile<'txn, 'int, 'res, R>, Self::CompileError<R>>
+        compile: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+    ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync,
@@ -104,10 +107,10 @@ where
         todo!()
     }
 
-    fn init_evaluate<'rpt, 'int>(
+    fn init_evaluate<'int, 'val, 'req>(
         &'int self,
-        eval: lang::Evaluate<'int, '_, JsonSchema<K>, K>,
-    ) -> Result<Self::Evaluate<'rpt, 'int>, Self::EvaluateError> {
+        eval: lang::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
+    ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError> {
         todo!()
     }
 }
@@ -138,25 +141,25 @@ where
 /// A trait implemented by types which are capable of evaluating a specification
 /// of JSON Schema.
 #[trait_variant::make(Send)]
-pub trait Specification<K>: Sized + Debug + Clone + Send + Sync
+pub trait Specification<K>: 'static + Sized + Debug + Clone + Send + Sync
 where
     K: 'static + Key + Send + Sync,
 {
     /// The error type that can be returned when compiling a schema.
-    type CompileError<R>: CompileError<Self, K, R>
+    type CompileError<R>: 'static + CompileError<Self, K, R>
     where
         R: 'static + Resolve;
 
     type EvaluateError: Send + StdError + From<EvaluateError<K>>;
 
     /// Context type supplied to `evaluate`.
-    type Evaluate<'rpt, 'int>: Evaluate<'rpt, 'int, Self, K>
+    type Evaluate<'int, 'val, 'req>: Evaluate<'int, 'val, Self, K>
     where
-        Self: 'int + 'rpt,
+        Self: 'int + 'val + 'req,
         K: 'static + Send;
 
     /// Context type supplied to `compile`.
-    type Compile<'txn, 'int, 'res, R>: Compile<'txn, 'int, 'res, R, Self, K> + Send
+    type Compile<'int, 'txn, 'res, R>: Compile<'int, 'txn, 'res, R, Self, K> + Send
     where
         Self: 'txn + 'int + 'res,
         'int: 'txn,
@@ -185,6 +188,7 @@ where
     type Annotation<'v>: Serialize + ShouldSerialize;
 
     /// The error type to be used in `Self::Report`.
+    /// 
     type Error<'v>: Send + IntoOwned + Display;
 
     type Report<'v>: Report<'v, Self::Annotation<'v>, Self::Error<'v>>;
@@ -195,7 +199,7 @@ where
     /// Returns [`Self::InitError`] if an error occurs while initializing the
     /// specification.
     #[allow(unused_variables)]
-    fn init(&mut self, init: Init<Self, K>) {}
+    fn init(&mut self, state: &mut State<JsonSchema<K, Self>, K>) {}
 
     /// Initializes a `Self::Compile` context
     ///
@@ -204,10 +208,10 @@ where
     /// context.
     ///
     /// [`Self::CompileError`]: Specification::CompileError
-    async fn init_compile<'txn, 'int, 'res, R>(
+    async fn init_compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: lang::Compile<'txn, 'int, 'res, JsonSchema<K>, R, K>,
-    ) -> Result<Self::Compile<'txn, 'int, 'res, R>, Self::CompileError<R>>
+        compile: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+    ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync;
@@ -219,15 +223,15 @@ where
     /// value
     ///
     /// [Self::EvaluateError]: Specification::EvaluateError
-    fn init_evaluate<'rpt, 'int>(
+    fn init_evaluate<'int,  'val, 'req>(
         &'int self,
-        eval: lang::Evaluate<'int, '_, JsonSchema<K>, K>,
-    ) -> Result<Self::Evaluate<'rpt, 'int>, Self::EvaluateError>;
+        eval: lang::Evaluate<'int,  'val, 'req, JsonSchema<K, Self>, K>,
+    ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError>;
 }
 
 #[trait_variant::make(Send)]
 /// Context for [`Keyword::compile`].
-pub trait Compile<'txn, 'int, 'res, R, S, K>: Send + Sync
+pub trait Compile<'int, 'txn, 'res, R, S, K>: Send + Sync
 where
     R: 'static + Resolve + Send,
     S: Specification<K>,
@@ -235,7 +239,7 @@ where
 {
     fn targets(&mut self) -> &[AbsoluteUri];
 
-    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K>, K>;
+    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K, S>, K>;
 
     fn dialects(&self) -> &Dialects<S, K>;
 
@@ -248,7 +252,7 @@ where
 }
 
 /// Context for [`Keyword::evaluate`].
-pub trait Evaluate<'rpt, 'int, S, K>
+pub trait Evaluate<'int, 'val, S, K>
 where
     S: Specification<K>,
     K: 'static + Key + Send + Sync,
@@ -257,7 +261,7 @@ where
 
     fn assess(
         &mut self,
-    ) -> &mut <S::Report<'rpt> as Report<'rpt, S::Annotation<'rpt>, S::Error<'rpt>>>::Assess<'rpt>;
+    ) -> &mut <S::Report<'val> as Report<'val, S::Annotation<'val>, S::Error<'val>>>::Assess<'val>;
 }
 
 /// A trait implemented by types which are capable of evaluating one or more
@@ -282,9 +286,9 @@ where
     /// returns the [`Specification`]'s
     /// [`EvaluateError`](`Specification::EvaluateError`) if an error occurs while validating.
     /// Failing to validate is not an error.
-    fn evaluate<'rpt, 'int>(
+    fn evaluate<'int, 'val, 'req>(
         &'int self,
-        eval: S::Evaluate<'rpt, 'int>,
+        eval: S::Evaluate<'int, 'val, 'req>,
     ) -> Result<(), S::EvaluateError>;
 
     /// Returns the string URI for the referenced schema this keyword is capable
@@ -301,7 +305,7 @@ where
 }
 
 /// The result of evaluating a JSON Schema.
-pub trait Report<'v, A, E>:
+pub trait Report<'val, A, E>:
     for<'de> Deserialize<'de> + Serialize + Display + Debug + Send + std::error::Error
 {
     /// A type which should allow for modification of a unit within the report.

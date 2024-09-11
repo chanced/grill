@@ -52,7 +52,9 @@ where
         R: 'static + Resolve;
 
     /// The result type returned from [`evaluate`](Language::evaluate).
-    type EvaluateResult<'v>;
+    type EvaluateResult<'val>
+    where
+        Self: 'val;
 
     /// Context type supplied to `evaluate`.
     type Context;
@@ -65,18 +67,18 @@ where
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    async fn compile<'x, 'int, 'res, R>(
+    async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: Compile<'x, 'int, 'res, Self, R, K>,
+        compile: Compile<'int, 'txn, 'res, Self, R, K>,
     ) -> Result<Vec<K>, Self::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync;
 
     /// Evaluates a schema for the given [`Evaluae`] request.
-    fn evaluate<'int, 'v>(
+    fn evaluate<'int, 'val>(
         &'int self,
-        eval: Evaluate<'int, 'v, Self, K>,
-    ) -> Self::EvaluateResult<'v>;
+        eval: Evaluate<'int, '_, 'val, Self, K>,
+    ) -> Self::EvaluateResult<'val>;
 }
 
 pub mod alias {
@@ -100,7 +102,7 @@ pub mod alias {
 }
 
 /// Request to compile a schema.
-pub struct Compile<'txn, 'int, 'res, L, R, K>
+pub struct Compile<'int, 'txn, 'res, L, R, K>
 where
     L: Language<K>,
     K: 'static + Key + Send + Sync,
@@ -110,7 +112,7 @@ where
 
     /// Current state of the [`Interrogator`], including schemas, sources, and
     /// cache. Upon successful compilation, the data will become to new state.
-    pub txn: Transaction<'txn, 'int, L, K>,
+    pub txn: Transaction<'int, 'txn, L, K>,
 
     /// Implementation of [`Resolve`]
     pub resolve: &'res R,
@@ -119,14 +121,14 @@ where
     pub validate: bool,
 }
 
-impl<'x, 'int, 'res, L, R, K> Compile<'x, 'int, 'res, L, R, K>
+impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
 where
     L: Language<K>,
     K: 'static + Key + Send + Sync,
 {
     pub(crate) fn new(
         uris: Vec<AbsoluteUri>,
-        transaction: Transaction<'x, 'int, L, K>,
+        txn: Transaction<'int, 'txn, L, K>,
         resolve: &'res R,
         validate: bool,
     ) -> Self
@@ -137,7 +139,7 @@ where
     {
         Self {
             uris,
-            txn: transaction,
+            txn,
             resolve,
             validate,
         }
@@ -145,7 +147,7 @@ where
 }
 
 /// Request to evaluate a schema.
-pub struct Evaluate<'int, 'v, L, K>
+pub struct Evaluate<'int, 'req, 'val, L, K>
 where
     L: Language<K>,
     K: 'static + Key + Send + Sync,
@@ -156,11 +158,11 @@ where
     /// The current, immutable state of the [`Interrogator`]
     pub state: &'int State<L, K>,
 
-    pub eval: &'int mut Cache,
+    pub eval: &'req mut Cache,
 
     /// The key of the schema to evaluate
     pub key: K,
 
     /// The value to evaluate
-    pub value: &'v Value,
+    pub value: &'val Value,
 }
