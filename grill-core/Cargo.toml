@@ -1,0 +1,38 @@
+[package]
+authors     = ["chance dinkins"]
+description = "core logic and types for grill"
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+name        = "grill-core"
+repository  = "https://github.com/chanced/grill"
+version     = "0.1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+grill-uri = { workspace = true, features = ["serde"] }
+
+either        = { workspace = true }
+futures       = { workspace = true }
+indexmap      = { workspace = true }
+jsonptr       = { workspace = true }
+num           = { workspace = true }
+num-rational  = { workspace = true }
+once_cell     = { workspace = true }
+paste         = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true, features = ["arbitrary_precision"] }
+slotmap       = { workspace = true }
+strum         = { workspace = true }
+trait-variant = { workspace = true }
+
+[dev-dependencies]
+# grill              = { workspace = true }
+mockall            = { workspace = true }
+similar            = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[features]
+default = []

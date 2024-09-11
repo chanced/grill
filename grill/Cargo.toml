@@ -1,0 +1,22 @@
+[package]
+authors     = ["chance dinkins"]
+description = "wip"
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+name        = "grill"
+repository  = "https://github.com/chanced/grill"
+version     = "0.1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+grill-core        = { workspace = true }
+grill-json-schema = { workspace = true }
+
+[features]
+
+[[bench]]
+harness = false
+name    = "benchmark"

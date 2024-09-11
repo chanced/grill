@@ -1,0 +1,45 @@
+[workspace]
+members = [
+	"grill",
+	"grill-core",
+	"grill-uri",
+	"grill-json-schema",
+	"grill-macros",
+	# "grill-test-builder",
+	# "tests",
+]
+resolver = "2"
+
+[workspace.dependencies]
+grill             = { version = "0.1.0", path = "grill" }
+grill-core        = { version = "0.1.0", path = "grill-core" }
+grill-json-schema = { workspace = "0.1.0", path = "grill-json-schema" }
+grill-macros      = { version = "0.1.0", path = "grill-macros" }
+grill-uri         = { version = "0.1.0", path = "grill-uri" }
+
+either             = { version = "1.8.1" }
+futures            = { version = "0.3.0" }
+indexmap           = { version = "2.2.6", features = ["serde"] }
+jsonptr            = { version = "0.6.0" }
+mockall            = { version = "0.13" }
+num                = { version = "0.4", features = ["serde"] }
+num-rational       = { version = "0.4.1" }
+once_cell          = { version = "1.10" }
+paste              = { version = "1.0.14" }
+percent-encoding   = { version = "2.3" }
+polonius-the-crab  = { version = "0.4.1" }
+regex              = { version = "1.5.4" }
+reqwest            = { version = "0.12.4" }
+serde              = { version = "1.0.163", features = ["derive", "rc"] }
+serde_json         = { version = "1.0.107", features = ["arbitrary_precision"] }
+similar            = { version = "2.2.1" }
+slotmap            = { version = "1.0.6" }
+strum              = { version = "0.26", features = ["derive"] }
+tokio              = { version = "1.33" }
+toml               = { version = "0.8.2" }
+tracing            = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.17" }
+trait-variant      = { version = "0.1.2" }
+url                = { version = "2.2.2" }
+urn                = { version = "0.7.0" }
+variantly          = { version = "0.4" }
