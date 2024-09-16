@@ -25,7 +25,6 @@ mod interrogator;
 pub mod big;
 pub mod cache;
 pub mod iter;
-pub mod key;
 pub mod lang;
 pub mod resolve;
 pub mod state;

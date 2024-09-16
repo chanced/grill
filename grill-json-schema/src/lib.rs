@@ -24,10 +24,11 @@ pub mod spec;
 use core::fmt;
 use std::marker::PhantomData;
 
+use compile::compile;
 use grill_core::{lang, state::State, Key, Language, Resolve};
 use schema::CompiledSchema;
-pub use spec::Spec;
 use spec::Specification;
+pub use spec::Standard;
 pub use {
     compile::CompileError,
     report::{Output, Report},
@@ -37,8 +38,8 @@ pub use {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                                   IntoOwned                                  ║
-║                                  ¯¯¯¯¯¯¯¯¯¯¯                                 ║
+║                                  IntoOwned                                   ║
+║                                 ¯¯¯¯¯¯¯¯¯¯¯                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -112,7 +113,7 @@ where
 
     /// Initializes the language with the given [`Init`] request.
     fn init(&mut self, init: &mut State<Self, K>) {
-        self.spec.init(init)
+        self.spec.init(init);
     }
 
     /// Compiles a schema or set of schemas for the given [`Compile`] request
@@ -130,7 +131,7 @@ where
     where
         R: 'static + Resolve + Send + Sync,
     {
-        compile::compile::<R, S, K>(self.spec.init_compile(ctx).await?).await
+        compile::<R, S, K>(self.spec.init_compile(ctx).await?).await
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
@@ -143,6 +144,15 @@ where
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                EvaluateError                                 ║
+║                               ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 #[derive(Debug, PartialEq, Eq)]
 pub enum EvaluateError<K: Key> {
     X(K),
@@ -162,6 +172,15 @@ impl<K: Key + Send> std::error::Error for EvaluateError<K> {
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   UriError                                   ║
+║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 #[derive(Debug)]
 pub struct UriError {
     pub actul: String,

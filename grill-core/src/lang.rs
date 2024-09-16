@@ -32,13 +32,24 @@ use crate::{
 };
 use grill_uri::AbsoluteUri;
 use slotmap::Key;
-use std::fmt;
+use std::{
+    fmt::{self, Debug},
+    future::Future,
+};
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Language                                   ║
+║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// A trait which defines how to compile and evaluate a schema against a
 /// [`Value`].
 ///
 /// See the [`mod`](crate::lang) for more information.
-#[trait_variant::make(Send)]
 pub trait Language<K>: Sized + Clone + fmt::Debug
 where
     K: 'static + Key + Send + Sync,
@@ -67,10 +78,10 @@ where
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    async fn compile<'int, 'txn, 'res, R>(
+    fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
         compile: Compile<'int, 'txn, 'res, Self, R, K>,
-    ) -> Result<Vec<K>, Self::CompileError<R>>
+    ) -> impl Future<Output = Result<Vec<K>, Self::CompileError<R>>>
     where
         R: 'static + Resolve + Send + Sync;
 
@@ -81,34 +92,24 @@ where
     ) -> Self::EvaluateResult<'val>;
 }
 
-pub mod alias {
-    use super::Language;
-    /// Alias for [`Language::Context`].
-    pub type Context<L, K> = <L as Language<K>>::Context;
-
-    /// Alias for [`Language::CompiledSchema`].
-    pub type CompiledSchema<L, K> = <L as Language<K>>::CompiledSchema;
-
-    /// Alias for [`CompiledSchema::Schema`]
-    /// [CompiledSchema::Schema]: super::schema::CompiledSchema::Schema.
-    pub type Schema<'int, L, K> =
-        <CompiledSchema<L, K> as super::schema::CompiledSchema<K>>::Schema<'int>;
-
-    /// Alias for [`Language::CompileError`].
-    pub type CompileError<L, K, R> = <L as Language<K>>::CompileError<R>;
-
-    /// Alias for [`Language::EvaluateResult`].
-    pub type EvaluateResult<'v, L, K> = <L as Language<K>>::EvaluateResult<'v>;
-}
-
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Compile                                    ║
+║                                      ¯¯¯¯¯¯¯¯¯                                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// Request to compile a schema.
+#[derive(Debug)]
 pub struct Compile<'int, 'txn, 'res, L, R, K>
 where
     L: Language<K>,
     K: 'static + Key + Send + Sync,
 {
     /// Uris to compile
-    pub uris: Vec<AbsoluteUri>,
+    pub targets: Vec<AbsoluteUri>,
 
     /// Current state of the [`Interrogator`], including schemas, sources, and
     /// cache. Upon successful compilation, the data will become to new state.
@@ -118,7 +119,7 @@ where
     pub resolve: &'res R,
 
     /// Whether or not to validate the schemas during compilation
-    pub validate: bool,
+    pub must_validate: bool,
 }
 
 impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
@@ -138,14 +139,23 @@ where
         R: 'static + Resolve + Send + Sync,
     {
         Self {
-            uris,
+            targets: uris,
             txn,
             resolve,
-            validate,
+            must_validate: validate,
         }
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Evaluate                                   ║
+║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// Request to evaluate a schema.
 pub struct Evaluate<'int, 'req, 'val, L, K>
 where

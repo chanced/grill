@@ -1,77 +1,51 @@
 use crate::{
     compile,
     report::{self, Location},
-    schema::{self, dialect::Dialects},
+    schema::{self, dialect::{Dialect, Dialects}},
     EvaluateError, IntoOwned, JsonSchema, Output,
 };
 use grill_core::{
-    lang,
-    state::{State, Transaction},
-    Key, Resolve,
+    lang, state::{State, Transaction}, DefaultKey, Key, Resolve
 };
 use grill_uri::AbsoluteUri;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    error::Error as StdError,
-    fmt::{Debug, Display},
+    collections::HashMap, error::Error as StdError, fmt::{Debug, Display}
 };
 
-/// Return types & errors utilized in the [`Keyword`] trait.
+/// Return types [`Keyword`] trait.
 pub mod found;
 
-/// Type aliases for all associated types of the [`Specification`] trait.
-pub mod alias {
-    use super::Specification;
-
-    /// Alias for [`Specification::Keyword`]
-    pub type Keyword<S, K> = <S as Specification<K>>::Keyword;
-
-    /// Alias for [`Specification::CompileError`].
-    pub type CompileError<S, K, R> = <S as Specification<K>>::CompileError<R>;
-
-    /// Alias for [`Specification::EvaluateError`].
-    pub type EvaluateError<S, K> = <S as Specification<K>>::EvaluateError;
-
-    /// Alias for [`Specification::Evaluate`].
-    pub type Evaluate<'int, 'val, 'req, S, K> = <S as Specification<K>>::Evaluate<'int, 'val, 'req>;
-
-    /// Alias for [`Specification::Compile`].
-    pub type Compile<'int, 'txn, 'res, R, S, K> =
-        <S as Specification<K>>::Compile<'int, 'txn, 'res, R>;
-
-    /// Alias for [`Specification::Report`].
-    pub type Report<'v, S, K> = <S as Specification<K>>::Report<'v>;
-
-    /// Alias for [`Specification::Annotation`].
-    pub type Annotation<'v, S, K> = <S as Specification<K>>::Annotation<'v>;
-
-    /// Alias for [`Specification::Error`].
-    pub type Error<'v, S, K> = <S as Specification<K>>::Error<'v>;
-
-    /// Alias for `Result<Specification::Report, Specification::EvaluateError>`.
-    pub type EvaluateResult<'v, S, K> = Result<Report<'v, S, K>, EvaluateError<S, K>>;
-}
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                                     Spec                                     ║
-║                                    ¯¯¯¯¯¯                                    ║
+║                                   Standard                                   ║
+║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-/// Std JSON Schema specification.
+/// Standard JSON Schema [`Specification`].
 #[derive(Clone, Debug)]
-pub struct Spec<K>
+pub struct Standard<K = DefaultKey>
 where
     K: 'static + Key + Send + Sync,
 {
     dialects: Dialects<Self, K>,
 }
 
-impl<K> Specification<K> for Spec<K>
+
+impl<K> Standard<K> where K: 'static + Key + Send + Sync {
+    pub fn new(dialects: Dialects<Self, K>) ->Standard<K> {
+        Self {
+            dialects,
+        }
+    }
+}
+
+impl<K> Specification<K> for Standard<K>
 where
     K: 'static + Key + Send + Sync,
 {
@@ -98,46 +72,39 @@ where
 
     async fn init_compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        ctx: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync,
     {
-        todo!()
+        Ok(schema::keyword::Compile {
+            dialects: &self.dialects,
+            resolve: ctx.resolve,
+            targets: ctx.targets,
+            txn: ctx.txn,
+            must_validate: ctx.must_validate
+        })
     }
 
     fn init_evaluate<'int, 'val, 'req>(
         &'int self,
-        eval: lang::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
+        ctx: lang::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError> {
+        println!("init_evaluate");
         todo!()
     }
 }
 
-pub trait ShouldSerialize {
-    fn should_serialize(&self) -> bool;
-}
-
-pub struct Init<'int, S, K>
-where
-    K: 'static + Key + Send + Sync,
-    S: 'static + Specification<K>,
-{
-    pub state: &'int mut State<JsonSchema<K, S>, K>,
-    pub dialects: &'int mut Dialects<S, K>,
-}
-
-pub trait CompileError<S, K, R>:
-    'static + Send + StdError + From<compile::CompileError<S::Report<'static>, R>>
-where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
-    R: 'static + Resolve,
-{
-    fn is_recoverable(&self) -> bool;
-}
-
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                Specification                                 ║
+║                               ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// A trait implemented by types which are capable of evaluating a specification
 /// of JSON Schema.
 #[trait_variant::make(Send)]
@@ -229,6 +196,69 @@ where
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError>;
 }
 
+
+
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                               ShouldSerialize                                ║
+║                              ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+pub trait ShouldSerialize {
+    fn should_serialize(&self) -> bool;
+}
+
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                     Init                                     ║
+║                                    ¯¯¯¯¯¯                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+pub struct Init<'int, S, K>
+where
+    K: 'static + Key + Send + Sync,
+    S: 'static + Specification<K>,
+{
+    pub state: &'int mut State<JsonSchema<K, S>, K>,
+    pub dialects: &'int mut Dialects<S, K>,
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                 CompileError                                 ║
+║                                ¯¯¯¯¯¯¯¯¯¯¯¯¯¯                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+pub trait CompileError<S, K, R>:
+    'static + Send + StdError + From<compile::CompileError<S::Report<'static>, R>>
+where
+    S: Specification<K>,
+    K: 'static + Key + Send + Sync,
+    R: 'static + Resolve,
+{
+    fn is_recoverable(&self) -> bool;
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Compile                                    ║
+║                                  ¯¯¯¯¯¯¯¯¯                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 #[trait_variant::make(Send)]
 /// Context for [`Keyword::compile`].
 pub trait Compile<'int, 'txn, 'res, R, S, K>: Send + Sync
@@ -264,6 +294,15 @@ where
     ) -> &mut <S::Report<'val> as Report<'val, S::Annotation<'val>, S::Error<'val>>>::Assess<'val>;
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Keyword                                    ║
+║                                  ¯¯¯¯¯¯¯¯¯                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// A trait implemented by types which are capable of evaluating one or more
 /// keywords of a JSON Schema specification.
 #[trait_variant::make(Send)]
@@ -286,9 +325,9 @@ where
     /// returns the [`Specification`]'s
     /// [`EvaluateError`](`Specification::EvaluateError`) if an error occurs while validating.
     /// Failing to validate is not an error.
-    fn evaluate<'int, 'val, 'req>(
-        &'int self,
-        eval: S::Evaluate<'int, 'val, 'req>,
+    fn evaluate(
+        &self,
+        eval: S::Evaluate<'_, '_, '_>,
     ) -> Result<(), S::EvaluateError>;
 
     /// Returns the string URI for the referenced schema this keyword is capable
@@ -304,6 +343,15 @@ where
     }
 }
 
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                    Report                                    ║
+║                                   ¯¯¯¯¯¯¯¯                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 /// The result of evaluating a JSON Schema.
 pub trait Report<'val, A, E>:
     for<'de> Deserialize<'de> + Serialize + Display + Debug + Send + std::error::Error
@@ -322,6 +370,16 @@ pub trait Report<'val, A, E>:
     fn assess(&mut self, location: Location) -> Self::Assess<'_>;
 }
 
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                    Assess                                    ║
+║                                   ¯¯¯¯¯¯¯¯                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
 pub trait Assess<'rpt, A, E> {
     fn annotate(&mut self, annotation: A) -> Option<A>;
     fn fail(&mut self, error: E);

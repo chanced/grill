@@ -51,6 +51,7 @@ impl<L: Language<K>, K: 'static + Key + Send + Sync> Default for State<L, K> {
     }
 }
 
+#[derive(Debug)]
 pub struct Transaction<'int, 'txn, L: Language<K>, K: 'static + Key + Send + Sync> {
     pub schemas: &'txn mut Schemas<L::CompiledSchema, K>,
     pub sources: &'txn mut Sources,

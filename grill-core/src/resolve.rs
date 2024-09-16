@@ -17,7 +17,6 @@ use crate::lang::source::InvalidLinkPathError;
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-
 /// A trait for resolving and deserializing a [`Value`] at a given [`AbsoluteUri`].
 #[trait_variant::make(Send)]
 pub trait Resolve: fmt::Debug + Send + Sync {
@@ -77,12 +76,11 @@ impl Resolve for () {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                                ResolveError                                  ║
-║                               ¯¯¯¯¯¯¯¯¯¯¯¯¯                                  ║
+║                                 ResolveError                                 ║
+║                                ¯¯¯¯¯¯¯¯¯¯¯¯¯                                 ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-
 #[derive(Debug)]
 pub enum ResolveError<R: 'static + Resolve> {
     FailedToResolve {
@@ -155,7 +153,6 @@ impl<R: Resolve> fmt::Display for ResolveError<R> {
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-
 /// A source was not found at the given URI.
 #[derive(Debug, PartialEq)]
 pub struct NotFoundError {

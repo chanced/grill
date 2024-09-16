@@ -1,6 +1,6 @@
 use grill_core::Key;
 
-use crate::{alias, CompileError, EvaluateError, Report, Specification};
+use crate::{CompileError, EvaluateError, Report, Specification};
 
 use crate::keyword::{Compile, Evaluate, Keyword};
 

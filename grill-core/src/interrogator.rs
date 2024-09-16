@@ -15,19 +15,10 @@ pub struct Interrogator<L: Language<K>, K: 'static + Key + Send + Sync = Default
     state: State<L, K>,
 }
 
-impl<L, K> Interrogator<L, K>
+impl<L> Interrogator<L, DefaultKey>
 where
-    L: 'static + Language<K>,
-    K: 'static + Key + Send + Sync,
+    L: 'static + Language<DefaultKey> + Send + Sync,
 {
-    fn init(mut self) -> Self {
-        self.lang.init(&mut self.state);
-        self
-    }
-
-    // fn iter(&self) -> (){
-    //     self.schemas.
-    // }
     /// Creates a new `Interrogator`.
     pub fn new(lang: L) -> Self {
         Self {
@@ -35,6 +26,25 @@ where
             state: State::new(),
         }
         .init()
+    }
+}
+
+impl<L, K> Interrogator<L, K>
+where
+    L: 'static + Language<K>,
+    K: 'static + Key + Send + Sync,
+{
+    /// Creates a new `Interrogator` using the specificed Key.
+    pub fn new_with_key(lang: L) -> Self {
+        Self {
+            lang,
+            state: State::new(),
+        }
+        .init()
+    }
+    fn init(mut self) -> Self {
+        self.lang.init(&mut self.state);
+        self
     }
 
     /// Compiles a schema for the given [`Compile`] request and returns the key,
@@ -82,7 +92,9 @@ where
     where
         R: 'static + Resolve + Send + Sync,
     {
-        // I really wanted to use a closure here, but I simply could not get it to work.
+        // I really wanted to use an closure here, but I simply could not get it
+        // to work.
+        // https://users.rust-lang.org/t/is-it-possible-to-accept-async-closures-without-pin-box-dyn-or-nightly/117330
         let mut schemas = self.state.schemas.clone();
         let mut sources = self.state.sources.clone();
         let transaction = Transaction::new(&mut schemas, &mut sources, &mut self.state.cache);
@@ -105,9 +117,8 @@ where
     where
         L::Context: 'int,
     {
-        // TODO: pool these
+        // TODO: need a cache pool
         let mut eval = Cache::new();
-
         self.lang.evaluate(Evaluate {
             context,
             value,
