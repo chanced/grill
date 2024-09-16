@@ -164,12 +164,6 @@ impl<'i> Compiler<'i> {
         &mut self,
         uri: &AbsoluteUri,
     ) -> Result<Option<(Link, Value)>, CompileError> {
-        let mut indexed = self
-            .indexed
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect::<Vec<_>>();
-        indexed.sort();
         if self.indexed.contains(uri) {
             let (link, src) = self
                 .sources
