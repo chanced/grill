@@ -15,6 +15,8 @@
 #![recursion_limit = "256"]
 
 pub mod compile;
+pub mod dialect;
+pub mod draft;
 pub mod invalid_type;
 pub mod keyword;
 pub mod report;

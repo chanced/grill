@@ -1,8 +1,5 @@
 use crate::{
-    compile,
-    report::{self, Location},
-    schema::{self, dialect::{Dialect, Dialects}},
-    EvaluateError, IntoOwned, JsonSchema, Output,
+    compile, dialect::Dialects, keyword, report::{self, Location}, schema::{self, }, EvaluateError, IntoOwned, JsonSchema, Output
 };
 use grill_core::{
     lang, state::{State, Transaction}, DefaultKey, Key, Resolve
@@ -11,7 +8,7 @@ use grill_uri::AbsoluteUri;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::HashMap, error::Error as StdError, fmt::{Debug, Display}
+     error::Error as StdError, fmt::{Debug, Display}
 };
 
 /// Return types [`Keyword`] trait.
@@ -50,24 +47,16 @@ where
     K: 'static + Key + Send + Sync,
 {
     type CompileError<R> = super::CompileError<Self::Report<'static>, R> where R: 'static + Resolve;
-
     type EvaluateError = EvaluateError<K>;
-
-    type Evaluate<'int, 'val, 'req> = schema::keyword::Evaluate<'int, 'val, 'req, Self, K>;
-
-    type Compile<'int, 'txn, 'res, R> = schema::keyword::Compile<'int, 'txn, 'res, R, Self, K> 
+    type Evaluate<'int, 'val, 'req> = keyword::Evaluate<'int, 'val, 'req, Self, K>;
+    type Compile<'int, 'txn, 'res, R> = keyword::Compile<'int, 'txn, 'res, R, Self, K> 
         where R: 'static + Resolve + Sized, 
         'int: 'txn,
         Self: 'txn + 'int;
-
-    type Keyword = schema::keyword::Keyword;
-
-    type Keywords<'int> = schema::keyword::Keywords<'int>;
-
+    type Keyword = keyword::Keyword;
+    type Keywords<'int> = keyword::Keywords<'int>;
     type Annotation<'v> = report::Annotation<'v>;
-
     type Error<'v> = report::Error<'v>;
-
     type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
 
     async fn init_compile<'int, 'txn, 'res, R>(
@@ -78,7 +67,7 @@ where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync,
     {
-        Ok(schema::keyword::Compile {
+        Ok(keyword::Compile {
             dialects: &self.dialects,
             resolve: ctx.resolve,
             targets: ctx.targets,

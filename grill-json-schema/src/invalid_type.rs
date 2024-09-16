@@ -63,6 +63,7 @@ impl fmt::Display for Expected {
 }
 
 fn write_anyof(f: &mut fmt::Formatter<'_>, anyof: &[Expected]) -> fmt::Result {
+    // this isn't super effecient but simple enough for error output
     write!(f, "[")?;
     for (i, expected) in anyof.iter().enumerate() {
         if i > 0 {
