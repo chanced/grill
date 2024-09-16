@@ -118,7 +118,7 @@ where
 {
     pub targets: Vec<AbsoluteUri>,
     pub txn: Transaction<'int, 'txn, JsonSchema<K, S>, K>,
-    pub resolve: &'res R,
+    pub resolver: &'res R,
     pub dialects: &'int Dialects<S, K>,
     pub must_validate: bool,
 }
@@ -147,7 +147,7 @@ where
     }
 
     fn resolve(&self) -> &'res R {
-        todo!()
+        self.resolver
     }
 }
 

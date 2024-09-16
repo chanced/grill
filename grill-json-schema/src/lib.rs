@@ -9,7 +9,8 @@
     clippy::must_use_candidate,
     clippy::implicit_hasher,
     clippy::wildcard_imports,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    clippy::similar_names
 )]
 #![cfg_attr(test, allow(clippy::redundant_clone, clippy::too_many_lines))]
 #![recursion_limit = "256"]

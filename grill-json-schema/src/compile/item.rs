@@ -13,12 +13,13 @@ pub(super) struct Pending<K> {
     /// Whether to diregard some errors
     pub(super) continue_on_err: bool,
     pub(super) reference: Option<Reference<K>>,
-    pub(super) is_target: bool,
+    // index in the output queue
+    pub(super) index: Option<usize>,
 }
 
 pub(super) struct Compiled<K> {
     pub(super) key: K,
-    pub(super) is_target: bool,
+    pub(super) index: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -41,16 +42,20 @@ where
         Self {
             items: uris
                 .into_iter()
-                .map(|uri| Pending {
+                .enumerate()
+                .map(|(index, uri)| Pending {
                     key: None,
                     uri,
                     parent: None,
                     continue_on_err: false,
                     reference: None,
-                    is_target: true,
+                    index: Some(index),
                 })
                 .collect(),
         }
+    }
+    pub(super) fn len(&self) -> usize {
+        self.items.len()
     }
     pub(super) fn is_empty(&self) -> bool {
         self.items.is_empty()

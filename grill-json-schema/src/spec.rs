@@ -69,7 +69,7 @@ where
     {
         Ok(keyword::Compile {
             dialects: &self.dialects,
-            resolve: ctx.resolve,
+            resolver: ctx.resolve,
             targets: ctx.targets,
             txn: ctx.txn,
             must_validate: ctx.must_validate
@@ -119,8 +119,8 @@ where
     where
         Self: 'txn + 'int + 'res,
         'int: 'txn,
-        R: 'static + Resolve + Send + Sync,
-        K: Key + 'static;
+        K: Key + 'static,
+        R: 'static + Resolve + Send + Sync;
 
     type Keyword: 'static + Keyword<Self, K> + Send + Sync;
 
@@ -236,7 +236,6 @@ where
     K: 'static + Key + Send + Sync,
     R: 'static + Resolve,
 {
-    fn is_recoverable(&self) -> bool;
 }
 
 /*
