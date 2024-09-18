@@ -265,7 +265,7 @@ impl InternalLink {
             source_key: self.source_key,
         }
     }
-    fn to_owned_link(&self) -> Link<'static> {
+    fn into_owned_link(&self) -> Link<'static> {
         Link {
             uri: Cow::Owned(self.uri.clone()),
             document_key: self.document_key,
@@ -483,7 +483,7 @@ impl Sources {
             return SourceConflictError::err_with(|| SourceConflictError {
                 uri: uri.clone(),
                 value: Box::new(value.clone()),
-                existing_link: existing_link.to_owned_link(),
+                existing_link: existing_link.into_owned_link(),
                 existing_value: existing_value.clone(),
             });
         }
@@ -519,7 +519,7 @@ impl Sources {
             SourceConflictError::err_with(|| SourceConflictError {
                 uri: link.uri.clone(),
                 value: Box::new(link.path.to_string().into()),
-                existing_link: existing_link.to_owned_link(),
+                existing_link: existing_link.into_owned_link(),
                 existing_value: self.values[existing_link.document_key].clone(),
             })
         } else {

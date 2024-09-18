@@ -6,13 +6,7 @@ use crate::{
     spec::{self, Specification},
     JsonSchema,
 };
-use grill_core::{
-    cache::Cache,
-    lang::Schemas,
-    state::{State, Transaction},
-    Key, Resolve,
-};
-use grill_uri::AbsoluteUri;
+use grill_core::{cache::Cache, lang::Schemas, state::State, Key, Resolve};
 use serde_json::Value;
 
 /*
@@ -29,7 +23,7 @@ use serde_json::Value;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Keyword {}
 
-impl<S, K> spec::Keyword<S, K> for Keyword
+impl<S, K> spec::keyword::Keyword<S, K> for Keyword
 where
     S: Specification<K>,
     K: 'static + Key + Sync + Send,
@@ -116,38 +110,21 @@ where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
 {
-    pub targets: Vec<AbsoluteUri>,
-    pub txn: Transaction<'int, 'txn, JsonSchema<K, S>, K>,
-    pub resolver: &'res R,
+    pub context: grill_core::lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
     pub dialects: &'int Dialects<S, K>,
-    pub must_validate: bool,
 }
 
-impl<'int, 'txn, 'res, R, S, K> spec::Compile<'int, 'txn, 'res, R, S, K>
+impl<'int, 'txn, 'res, R, S, K> spec::compile::Context<'int, 'txn, 'res, R, S, K>
     for Compile<'int, 'txn, 'res, R, S, K>
 where
     R: 'static + Resolve + Send + Sync,
     K: 'static + Key + Send + Sync,
     S: Specification<K>,
 {
-    fn dialects(&self) -> &Dialects<S, K> {
-        self.dialects
-    }
-
-    fn should_validate(&self) -> bool {
-        self.must_validate
-    }
-
-    fn targets(&mut self) -> &[AbsoluteUri] {
-        &self.targets
-    }
-
-    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K, S>, K> {
-        todo!()
-    }
-
-    fn resolve(&self) -> &'res R {
-        self.resolver
+    fn core_ctx(
+        &mut self,
+    ) -> &mut grill_core::lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K> {
+        &mut self.context
     }
 }
 

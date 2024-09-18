@@ -1,11 +1,12 @@
-use crate::spec::{self, Compile, Specification};
-use grill_core::{resolve::ResolveError, Key, Resolve};
+use crate::spec::{self, compile::Context, Specification};
+use grill_core::{resolve::Error as ResolveError, Key, Resolve};
 use grill_uri::AbsoluteUri;
 use item::{Compiled, Pending, Queue};
-use std::{error::Error, fmt};
+use std::{error::Error as StdError, fmt};
 
 mod item;
 mod resolve;
+mod scan;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -28,8 +29,6 @@ where
     'txn: 'int,
     'res: 'int,
 {
-    let a = "".try_into().unwrap();
-    scan::<R, S, K>(&mut ctx, &a);
     Compiler::<R, S, K>::execute(ctx).await
 }
 
@@ -37,15 +36,15 @@ where
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║                                 CompileError                                 ║
-║                                ¯¯¯¯¯¯¯¯¯¯¯¯¯¯                                ║
+║                                    Error                                     ║
+║                                   ¯¯¯¯¯¯¯                                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
 /// Failed to compile a schema.
 #[derive(Debug)]
-pub enum CompileError<O, R>
+pub enum Error<O, R>
 where
     R: 'static + Resolve,
 {
@@ -53,20 +52,29 @@ where
     FailedToResolve(ResolveError<R>),
 }
 
-impl<O, R> Error for CompileError<O, R>
+impl<O, R> From<ResolveError<R>> for Error<O, R>
 where
-    O: 'static + Error,
     R: 'static + Resolve,
 {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+    fn from(value: ResolveError<R>) -> Self {
+        Self::FailedToResolve(value)
+    }
+}
+
+impl<O, R> StdError for Error<O, R>
+where
+    O: 'static + StdError,
+    R: 'static + Resolve,
+{
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::InvalidSchema(e) => Some(e),
-            CompileError::FailedToResolve(e) => Some(e),
+            Error::FailedToResolve(e) => Some(e),
         }
     }
 }
 
-impl<S, K, R> spec::CompileError<S, K, R> for CompileError<S::Report<'static>, R>
+impl<R, S, K> spec::compile::Error<R, S, K> for Error<S::Report<'static>, R>
 where
     K: 'static + Key + Send + Sync,
     S: 'static + Specification<K> + Send + Sync,
@@ -74,7 +82,7 @@ where
 {
 }
 
-impl<O, R> fmt::Display for CompileError<O, R>
+impl<O, R> fmt::Display for Error<O, R>
 where
     O: fmt::Display,
     R: 'static + Resolve,
@@ -82,7 +90,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchema(r) => fmt::Display::fmt(r, f),
-            CompileError::FailedToResolve(r) => fmt::Display::fmt(r, f),
+            Error::FailedToResolve(r) => fmt::Display::fmt(r, f),
         }
     }
 }
@@ -108,8 +116,8 @@ impl<O: fmt::Display> fmt::Display for InvalidSchemaError<O> {
         write!(f, "schema \"{}\" failed validation", self.uri)
     }
 }
-impl<O: 'static + Error> Error for InvalidSchemaError<O> {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+impl<O: 'static + StdError> StdError for InvalidSchemaError<O> {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         Some(&self.report)
     }
 }
@@ -148,7 +156,8 @@ where
         K: 'static + Key + Send,
     {
         let mut this = Self { ctx };
-        let mut q = Queue::<K>::new(this.ctx.targets().to_vec());
+
+        let mut q = Queue::<K>::new(this.ctx.core_ctx().targets.clone());
         let mut compiled = vec![K::default(); q.len()];
         while !q.is_empty() {
             let item = q.pop().unwrap();
@@ -168,25 +177,14 @@ where
     }
 }
 
-#[allow(clippy::unused_async)]
-
-async fn scan<R, S, K>(ctx: &mut S::Compile<'_, '_, '_, R>, _uri: &AbsoluteUri)
-where
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
-    R: 'static + Resolve + Send + Sync,
-{
-    let r = ctx.resolve();
-}
-
 fn handle<E, S, K, R>(
-    compiled: &mut Vec<K>,
+    compiled: &mut [K],
     result: Result<Option<Compiled<K>>, E>,
     continue_on_err: bool,
 ) -> Result<(), E>
 where
     K: 'static + Key + Send + Sync,
-    E: spec::CompileError<S, K, R>,
+    E: spec::compile::Error<R, S, K>,
     S: Specification<K>,
     R: 'static + Resolve + Send + Sync,
 {
@@ -197,7 +195,7 @@ where
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn handle_ok<E, K>(compiled: &mut Vec<K>, result: Option<Compiled<K>>) -> Result<(), E>
+fn handle_ok<E, K>(compiled: &mut [K], result: Option<Compiled<K>>) -> Result<(), E>
 where
     K: 'static + Key + Send + Sync,
 {
@@ -211,7 +209,7 @@ where
 fn handle_err<T, E, S, K, R>(e: E, _continue_on_err: bool) -> Result<T, E>
 where
     K: 'static + Key + Send + Sync,
-    E: spec::CompileError<S, K, R>,
+    E: spec::compile::Error<R, S, K>,
     S: Specification<K>,
     R: 'static + Resolve + Send + Sync,
 {

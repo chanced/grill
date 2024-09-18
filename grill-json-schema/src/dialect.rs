@@ -5,7 +5,7 @@ use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use slotmap::{new_key_type, Key};
 
-use crate::spec::{found, Keyword, Specification};
+use crate::spec::{found, keyword::Keyword, Specification};
 
 new_key_type! {
     pub struct DialectKey;

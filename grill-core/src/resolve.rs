@@ -82,7 +82,7 @@ impl Resolve for () {
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 #[derive(Debug)]
-pub enum ResolveError<R: 'static + Resolve> {
+pub enum Error<R: 'static + Resolve> {
     FailedToResolve {
         uri: AbsoluteUri,
         source: R::Error,
@@ -102,7 +102,7 @@ pub enum ResolveError<R: 'static + Resolve> {
     },
 }
 
-impl<R: Resolve> ResolveError<R> {
+impl<R: Resolve> Error<R> {
     pub fn uri(&self) -> &AbsoluteUri {
         match self {
             Self::FailedToResolve { uri, .. } => uri,
@@ -113,7 +113,7 @@ impl<R: Resolve> ResolveError<R> {
     }
 }
 
-impl<R: Resolve> fmt::Display for ResolveError<R> {
+impl<R: Resolve> fmt::Display for Error<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::FailedToResolve { uri, .. } => {
@@ -126,14 +126,14 @@ impl<R: Resolve> fmt::Display for ResolveError<R> {
                     uri.fragment().unwrap_or_default()
                 )
             }
-            ResolveError::PathNotFound { uri, .. } => {
+            Error::PathNotFound { uri, .. } => {
                 write!(
                     f,
                     "path \"{}\" is not present in value at \"{uri}\"",
                     uri.fragment().unwrap_or_default()
                 )
             }
-            ResolveError::UnknownAnchor { uri } => {
+            Error::UnknownAnchor { uri } => {
                 write!(
                     f,
                     "anchor \"{}\" is not linked to a location in the value at \"{uri}\"",
@@ -181,4 +181,4 @@ impl fmt::Display for NotFoundError {
     }
 }
 
-impl<R: Resolve> std::error::Error for ResolveError<R> {}
+impl<R: Resolve> std::error::Error for Error<R> {}

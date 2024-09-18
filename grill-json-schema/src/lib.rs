@@ -33,7 +33,7 @@ use schema::CompiledSchema;
 use spec::Specification;
 pub use spec::Standard;
 pub use {
-    compile::CompileError,
+    compile::Error,
     report::{Output, Report},
 };
 
@@ -129,7 +129,7 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: lang::Compile<'int, 'txn, 'res, Self, R, K>,
+        ctx: lang::compile::Context<'int, 'txn, 'res, Self, R, K>,
     ) -> Result<Vec<K>, Self::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
@@ -140,7 +140,7 @@ where
     /// Evaluates a schema for the given [`Evaluate`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: lang::Evaluate<'int, '_, 'val, Self, K>,
+        eval: lang::evaluate::Context<'int, '_, 'val, Self, K>,
     ) -> Self::EvaluateResult<'val> {
         _ = eval;
         todo!()

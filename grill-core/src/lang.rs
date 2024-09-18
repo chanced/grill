@@ -17,25 +17,18 @@
 //!
 //! ## Compiling a schema
 
+pub mod compile;
 pub mod error;
+pub mod evaluate;
 pub mod schema;
 pub mod source;
 
 pub use schema::Schemas;
-use serde_json::Value;
 pub use source::Sources;
 
-use crate::{
-    cache::Cache,
-    state::{State, Transaction},
-    Resolve,
-};
-use grill_uri::AbsoluteUri;
+use crate::{state::State, Resolve};
 use slotmap::Key;
-use std::{
-    fmt::{self, Debug},
-    future::Future,
-};
+use std::{fmt, future::Future};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -80,7 +73,7 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: Compile<'int, 'txn, 'res, Self, R, K>,
+        compile: compile::Context<'int, 'txn, 'res, Self, R, K>,
     ) -> impl Future<Output = Result<Vec<K>, Self::CompileError<R>>>
     where
         R: 'static + Resolve + Send + Sync;
@@ -88,91 +81,6 @@ where
     /// Evaluates a schema for the given [`Evaluae`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: Evaluate<'int, '_, 'val, Self, K>,
+        eval: evaluate::Context<'int, '_, 'val, Self, K>,
     ) -> Self::EvaluateResult<'val>;
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   Compile                                    ║
-║                                      ¯¯¯¯¯¯¯¯¯                                      ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-/// Request to compile a schema.
-#[derive(Debug)]
-pub struct Compile<'int, 'txn, 'res, L, R, K>
-where
-    L: Language<K>,
-    K: 'static + Key + Send + Sync,
-{
-    /// Uris to compile
-    pub targets: Vec<AbsoluteUri>,
-
-    /// Current state of the [`Interrogator`], including schemas, sources, and
-    /// cache. Upon successful compilation, the data will become to new state.
-    pub txn: Transaction<'int, 'txn, L, K>,
-
-    /// Implementation of [`Resolve`]
-    pub resolve: &'res R,
-
-    /// Whether or not to validate the schemas during compilation
-    pub must_validate: bool,
-}
-
-impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
-where
-    L: Language<K>,
-    K: 'static + Key + Send + Sync,
-{
-    pub(crate) fn new(
-        uris: Vec<AbsoluteUri>,
-        txn: Transaction<'int, 'txn, L, K>,
-        resolve: &'res R,
-        validate: bool,
-    ) -> Self
-    where
-        L: Language<K>,
-        K: 'static + Key + Send + Sync,
-        R: 'static + Resolve + Send + Sync,
-    {
-        Self {
-            targets: uris,
-            txn,
-            resolve,
-            must_validate: validate,
-        }
-    }
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   Evaluate                                   ║
-║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-/// Request to evaluate a schema.
-pub struct Evaluate<'int, 'req, 'val, L, K>
-where
-    L: Language<K>,
-    K: 'static + Key + Send + Sync,
-{
-    /// Evaluation context `S::Context`
-    pub context: L::Context,
-
-    /// The current, immutable state of the [`Interrogator`]
-    pub state: &'int State<L, K>,
-
-    pub eval: &'req mut Cache,
-
-    /// The key of the schema to evaluate
-    pub key: K,
-
-    /// The value to evaluate
-    pub value: &'val Value,
 }

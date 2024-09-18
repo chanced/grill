@@ -1,18 +1,20 @@
 use crate::{
-    compile, dialect::Dialects, keyword, report::{self, Location}, schema::{self, }, EvaluateError, IntoOwned, JsonSchema, Output
+dialect::Dialects, report::{self, Location},  EvaluateError, IntoOwned, JsonSchema, Output
 };
 use grill_core::{
-    lang, state::{State, Transaction}, DefaultKey, Key, Resolve
+    lang, state::State, DefaultKey, Key, Resolve
 };
-use grill_uri::AbsoluteUri;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{
      error::Error as StdError, fmt::{Debug, Display}
 };
 
 /// Return types [`Keyword`] trait.
 pub mod found;
+pub mod compile;
+pub mod evaluate;
+pub mod init;
+pub mod keyword;
 
 
 /*
@@ -46,39 +48,36 @@ impl<K> Specification<K> for Standard<K>
 where
     K: 'static + Key + Send + Sync,
 {
-    type CompileError<R> = super::CompileError<Self::Report<'static>, R> where R: 'static + Resolve;
+    type CompileError<R> = super::Error<Self::Report<'static>, R> where R: 'static + Resolve;
     type EvaluateError = EvaluateError<K>;
-    type Evaluate<'int, 'val, 'req> = keyword::Evaluate<'int, 'val, 'req, Self, K>;
-    type Compile<'int, 'txn, 'res, R> = keyword::Compile<'int, 'txn, 'res, R, Self, K> 
+    type Evaluate<'int, 'val, 'req> = crate::keyword::Evaluate<'int, 'val, 'req, Self, K>;
+    type Compile<'int, 'txn, 'res, R> = crate::keyword::Compile<'int, 'txn, 'res, R, Self, K> 
         where R: 'static + Resolve + Sized, 
         'int: 'txn,
         Self: 'txn + 'int;
-    type Keyword = keyword::Keyword;
-    type Keywords<'int> = keyword::Keywords<'int>;
+    type Keyword = crate::keyword::Keyword;
+    type Keywords<'int> = crate::keyword::Keywords<'int>;
     type Annotation<'v> = report::Annotation<'v>;
     type Error<'v> = report::Error<'v>;
     type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
 
     async fn init_compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        context: lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync,
     {
-        Ok(keyword::Compile {
+        Ok(crate::keyword::Compile {
             dialects: &self.dialects,
-            resolver: ctx.resolve,
-            targets: ctx.targets,
-            txn: ctx.txn,
-            must_validate: ctx.must_validate
+            context
         })
     }
 
     fn init_evaluate<'int, 'val, 'req>(
         &'int self,
-        ctx: lang::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
+        ctx: lang::evaluate::Context<'int, 'val, 'req, JsonSchema<K, Self>, K>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError> {
         println!("init_evaluate");
         todo!()
@@ -102,7 +101,7 @@ where
     K: 'static + Key + Send + Sync,
 {
     /// The error type that can be returned when compiling a schema.
-    type CompileError<R>: 'static + CompileError<Self, K, R>
+    type CompileError<R>: 'static + compile::Error<R, Self, K>
     where
         R: 'static + Resolve;
 
@@ -115,14 +114,14 @@ where
         K: 'static + Send;
 
     /// Context type supplied to `compile`.
-    type Compile<'int, 'txn, 'res, R>: Compile<'int, 'txn, 'res, R, Self, K> + Send
+    type Compile<'int, 'txn, 'res, R>: compile::Context<'int, 'txn, 'res, R, Self, K> + Send
     where
         Self: 'txn + 'int + 'res,
         'int: 'txn,
         K: Key + 'static,
         R: 'static + Resolve + Send + Sync;
 
-    type Keyword: 'static + Keyword<Self, K> + Send + Sync;
+    type Keyword: 'static + keyword::Keyword<Self, K> + Send + Sync;
 
     /// A type which can hold a slice [`Self::Keyword`]s, returned from
     /// [`JsonSchema::keywords`].
@@ -166,7 +165,7 @@ where
     /// [`Self::CompileError`]: Specification::CompileError
     async fn init_compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: lang::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        compile: lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
@@ -181,7 +180,7 @@ where
     /// [Self::EvaluateError]: Specification::EvaluateError
     fn init_evaluate<'int,  'val, 'req>(
         &'int self,
-        eval: lang::Evaluate<'int,  'val, 'req, JsonSchema<K, Self>, K>,
+        eval: lang::evaluate::Context<'int,  'val, 'req, JsonSchema<K, Self>, K>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError>;
 }
 
@@ -202,72 +201,7 @@ pub trait ShouldSerialize {
 }
 
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                     Init                                     ║
-║                                    ¯¯¯¯¯¯                                    ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-pub struct Init<'int, S, K>
-where
-    K: 'static + Key + Send + Sync,
-    S: 'static + Specification<K>,
-{
-    pub state: &'int mut State<JsonSchema<K, S>, K>,
-    pub dialects: &'int mut Dialects<S, K>,
-}
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                 CompileError                                 ║
-║                                ¯¯¯¯¯¯¯¯¯¯¯¯¯¯                                ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-pub trait CompileError<S, K, R>:
-    'static + Send + StdError + From<compile::CompileError<S::Report<'static>, R>>
-where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
-    R: 'static + Resolve,
-{
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   Compile                                    ║
-║                                  ¯¯¯¯¯¯¯¯¯                                   ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-#[trait_variant::make(Send)]
-/// Context for [`Keyword::compile`].
-pub trait Compile<'int, 'txn, 'res, R, S, K>: Send + Sync
-where
-    R: 'static + Resolve + Send,
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
-{
-    fn targets(&mut self) -> &[AbsoluteUri];
-
-    fn txn(&mut self) -> &mut Transaction<'_, 'int, JsonSchema<K, S>, K>;
-
-    fn dialects(&self) -> &Dialects<S, K>;
-
-    fn resolve(&self) -> &'res R;
-
-    /// Indicates whether or not the schemas should be validated.
-    ///
-    /// This is needed for compiling meta-schemas. A value of `false`
-    fn should_validate(&self) -> bool;
-}
 
 /// Context for [`Keyword::evaluate`].
 pub trait Evaluate<'int, 'val, S, K>
@@ -280,55 +214,6 @@ where
     fn assess(
         &mut self,
     ) -> &mut <S::Report<'val> as Report<'val, S::Annotation<'val>, S::Error<'val>>>::Assess<'val>;
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   Keyword                                    ║
-║                                  ¯¯¯¯¯¯¯¯¯                                   ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-/// A trait implemented by types which are capable of evaluating one or more
-/// keywords of a JSON Schema specification.
-#[trait_variant::make(Send)]
-pub trait Keyword<S, K>: Send + Debug + Clone + PartialEq + Eq
-where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
-{
-    /// Compiles the keyword.
-    async fn compile<R>(
-        &self,
-        compile: S::Compile<'_, '_, '_, R>,
-    ) -> Option<Result<(), S::CompileError<R>>>
-    where
-        R: 'static + Resolve + Send + Sync;
-
-    /// Evaluates the keyword.
-    ///
-    /// ## Errors
-    /// returns the [`Specification`]'s
-    /// [`EvaluateError`](`Specification::EvaluateError`) if an error occurs while validating.
-    /// Failing to validate is not an error.
-    fn evaluate(
-        &self,
-        eval: S::Evaluate<'_, '_, '_>,
-    ) -> Result<(), S::EvaluateError>;
-
-    /// Returns the string URI for the referenced schema this keyword is capable
-    /// of handling, if present.
-    fn reference(&self, _schema: &Value) -> Option<found::Reference> {
-        None
-    }
-
-    /// Returns the name of the anchor this keyword is capable of handling, if
-    /// present.
-    fn anchor(&self, _schema: &Value) -> Option<found::Anchor> {
-        None
-    }
 }
 
 /*
