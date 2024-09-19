@@ -11,8 +11,6 @@ use std::{
 
 /// Return types [`Keyword`] trait.
 pub mod found;
-pub mod compile;
-pub mod evaluate;
 pub mod init;
 pub mod keyword;
 
@@ -101,7 +99,7 @@ where
     K: 'static + Key + Send + Sync,
 {
     /// The error type that can be returned when compiling a schema.
-    type CompileError<R>: 'static + compile::Error<R, Self, K>
+    type CompileError<R>: 'static + CompileError<R, Self, K>
     where
         R: 'static + Resolve;
 
@@ -114,7 +112,7 @@ where
         K: 'static + Send;
 
     /// Context type supplied to `compile`.
-    type Compile<'int, 'txn, 'res, R>: compile::Context<'int, 'txn, 'res, R, Self, K> + Send
+    type Compile<'int, 'txn, 'res, R>:  Compile<'int, 'txn, 'res, R, Self, K> + Send
     where
         Self: 'txn + 'int + 'res,
         'int: 'txn,
@@ -256,4 +254,64 @@ pub trait Report<'val, A, E>:
 pub trait Assess<'rpt, A, E> {
     fn annotate(&mut self, annotation: A) -> Option<A>;
     fn fail(&mut self, error: E);
+}
+
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                    Error                                     ║
+║                                   ¯¯¯¯¯¯¯                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+pub trait CompileError<R, S, K>:
+    'static + Send + StdError + From<crate::compile::Error<S::Report<'static>, R>>
+where
+    S: Specification<K>,
+    K: 'static + Key + Send + Sync,
+    R: 'static + Resolve,
+{
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                   Compile                                    ║
+║                                  ¯¯¯¯¯¯¯¯¯                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+#[trait_variant::make(Send)]
+/// Context for [`Keyword::compile`].
+pub trait Compile<'int, 'txn, 'res, R, S, K>: Send + Sync
+where
+    R: 'static + Resolve + Send,
+    S: Specification<K>,
+    K: 'static + Key + Send + Sync,
+{
+    fn core(
+        &mut self,
+    ) -> &mut grill_core::lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>;
+}
+
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                     Init                                     ║
+║                                    ¯¯¯¯¯¯                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+pub struct Init<'int, S, K>
+where
+    K: 'static + Key + Send + Sync,
+    S: 'static + Specification<K>,
+{
+    pub state: &'int mut State<JsonSchema<K, S>, K>,
+    pub dialects: &'int mut Dialects<S, K>,
 }

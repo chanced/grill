@@ -114,14 +114,14 @@ where
     pub dialects: &'int Dialects<S, K>,
 }
 
-impl<'int, 'txn, 'res, R, S, K> spec::compile::Context<'int, 'txn, 'res, R, S, K>
+impl<'int, 'txn, 'res, R, S, K> spec::Compile<'int, 'txn, 'res, R, S, K>
     for Compile<'int, 'txn, 'res, R, S, K>
 where
     R: 'static + Resolve + Send + Sync,
     K: 'static + Key + Send + Sync,
     S: Specification<K>,
 {
-    fn core_ctx(
+    fn core(
         &mut self,
     ) -> &mut grill_core::lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K> {
         &mut self.context

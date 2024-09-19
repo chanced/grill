@@ -1,4 +1,4 @@
-use crate::spec::{self, compile::Context, Specification};
+use crate::spec::{self, Compile, Specification};
 use grill_core::{resolve::Error as ResolveError, Key, Resolve};
 use grill_uri::AbsoluteUri;
 use item::{Compiled, Pending, Queue};
@@ -19,7 +19,7 @@ mod scan;
 */
 
 pub(crate) async fn compile<'int, 'txn, 'res, R, S, K>(
-    mut ctx: S::Compile<'int, 'txn, 'res, R>,
+    ctx: S::Compile<'int, 'txn, 'res, R>,
 ) -> Result<Vec<K>, S::CompileError<R>>
 where
     R: 'static + Resolve + Send + Sync,
@@ -74,7 +74,7 @@ where
     }
 }
 
-impl<R, S, K> spec::compile::Error<R, S, K> for Error<S::Report<'static>, R>
+impl<R, S, K> spec::CompileError<R, S, K> for Error<S::Report<'static>, R>
 where
     K: 'static + Key + Send + Sync,
     S: 'static + Specification<K> + Send + Sync,
@@ -156,8 +156,7 @@ where
         K: 'static + Key + Send,
     {
         let mut this = Self { ctx };
-
-        let mut q = Queue::<K>::new(this.ctx.core_ctx().targets.clone());
+        let mut q = Queue::<K>::new(this.ctx.core().targets.clone());
         let mut compiled = vec![K::default(); q.len()];
         while !q.is_empty() {
             let item = q.pop().unwrap();
@@ -184,7 +183,7 @@ fn handle<E, S, K, R>(
 ) -> Result<(), E>
 where
     K: 'static + Key + Send + Sync,
-    E: spec::compile::Error<R, S, K>,
+    E: spec::CompileError<R, S, K>,
     S: Specification<K>,
     R: 'static + Resolve + Send + Sync,
 {
@@ -209,7 +208,7 @@ where
 fn handle_err<T, E, S, K, R>(e: E, _continue_on_err: bool) -> Result<T, E>
 where
     K: 'static + Key + Send + Sync,
-    E: spec::compile::Error<R, S, K>,
+    E: spec::CompileError<R, S, K>,
     S: Specification<K>,
     R: 'static + Resolve + Send + Sync,
 {
