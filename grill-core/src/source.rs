@@ -12,6 +12,9 @@ use grill_uri::AbsoluteUri;
 use jsonptr::{Pointer, PointerBuf, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use walk::WalkValue;
+
+pub mod walk;
 
 new_key_type! {
     /// Key to root documents within [`Sources`]
@@ -37,6 +40,7 @@ pub struct Document<'int> {
     uri: Cow<'int, AbsoluteUri>,
     value: Arc<Value>,
     links: Cow<'int, [InternalLink]>,
+    indexed: bool,
 }
 
 impl Document<'_> {
@@ -74,6 +78,7 @@ impl Document<'_> {
             uri: Cow::Owned(self.uri.into_owned()),
             value: self.value.clone(),
             links: Cow::Owned(self.links.into_owned()),
+            indexed: self.indexed,
         }
     }
 }
@@ -123,8 +128,8 @@ impl<'int> Source<'int> {
 
     /// The path of the source, as a JSON [`Pointer`], within the root
     /// document.
-    pub fn path(&self) -> &Pointer {
-        &self.link.path
+    pub fn pointer(&self) -> &Pointer {
+        &self.link.pointer
     }
 
     /// Returns the `LinkKey` of the source.
@@ -148,7 +153,7 @@ impl<'int> Source<'int> {
     /// Resolves source the path within the document, returning the
     /// [`Value`] at the location.
     pub fn resolve(&self) -> &Value {
-        self.link.path.resolve(&*self.document.value).unwrap()
+        self.link.pointer.resolve(&*self.document.value).unwrap()
     }
 
     /// Consumes this `Source`` and returns an owned, `'static` variant.
@@ -189,7 +194,7 @@ impl<'s> Link<'s> {
             document_key: link.document_key,
             source_key: link.source_key,
             uri: Cow::Borrowed(&link.uri),
-            path: Cow::Borrowed(&link.path),
+            path: Cow::Borrowed(&link.pointer),
         }
     }
     pub fn into_owned(self) -> Link<'static> {
@@ -253,7 +258,7 @@ struct InternalLink {
     uri: AbsoluteUri,
     document_key: DocumentKey,
     source_key: SourceKey,
-    path: PointerBuf,
+    pointer: PointerBuf,
 }
 
 impl InternalLink {
@@ -261,15 +266,7 @@ impl InternalLink {
         Link {
             uri: Cow::Borrowed(&self.uri),
             document_key: self.document_key,
-            path: Cow::Borrowed(&self.path),
-            source_key: self.source_key,
-        }
-    }
-    fn into_owned_link(&self) -> Link<'static> {
-        Link {
-            uri: Cow::Owned(self.uri.clone()),
-            document_key: self.document_key,
-            path: Cow::Owned(self.path.clone()),
+            path: Cow::Borrowed(&self.pointer),
             source_key: self.source_key,
         }
     }
@@ -317,6 +314,7 @@ pub struct Sources {
     src_keys: HashMap<AbsoluteUri, SourceKey>,
     doc_links: SecondaryMap<DocumentKey, Vec<InternalLink>>,
     doc_uris: SecondaryMap<DocumentKey, AbsoluteUri>,
+    indexed: SecondaryMap<DocumentKey, ()>,
 }
 
 impl Sources {
@@ -328,6 +326,7 @@ impl Sources {
             src_keys: HashMap::new(),
             doc_links: SecondaryMap::new(),
             doc_uris: SecondaryMap::new(),
+            indexed: SecondaryMap::new(),
         }
     }
     /// Inserts new [`Link`] into the store.
@@ -371,7 +370,7 @@ impl Sources {
         let link = InternalLink {
             document_key: key,
             uri,
-            path,
+            pointer: path,
             source_key: SourceKey::default(),
         };
         match self.src_keys.get(&link.uri) {
@@ -386,6 +385,7 @@ impl Sources {
             uri: Cow::Borrowed(self.doc_uris.get(key)?),
             value: self.values.get(key)?.clone(),
             links: Cow::Borrowed(self.doc_links.get(key)?.as_slice()),
+            indexed: self.indexed.contains_key(key),
         })
     }
 
@@ -395,19 +395,25 @@ impl Sources {
             .map(|link| self.values[link.document_key].as_ref())
     }
 
-    pub fn source(&self, key: SourceKey) -> Option<Source<'_>> {
-        let link = Cow::Borrowed(self.links.get(key)?);
-        let document = self.document(link.document_key)?;
-        Some(Source {
+    pub fn source(&self, key: SourceKey) -> Source<'_> {
+        let link = Cow::Borrowed(self.links.get(key).unwrap());
+        let document = self.document(link.document_key).unwrap();
+        Source {
             key,
             link,
             document,
-        })
+        }
     }
     /// Retrieves a [`Source`] from the store by [`AbsoluteUri`], if a [`Link`]
     /// exists.
     pub fn source_by_uri<'s>(&'s self, uri: &AbsoluteUri) -> Option<Source<'s>> {
-        self.src_keys.get(uri).map(|&key| self.source(key).unwrap())
+        self.source_key_by_uri(uri).map(|key| self.source(key))
+    }
+
+    /// Retrieves a [`SourceKey`] from the store by [`AbsoluteUri`], if a [`Link`]
+    /// exists.
+    pub fn source_key_by_uri(&self, uri: &AbsoluteUri) -> Option<SourceKey> {
+        self.src_keys.get(uri).copied()
     }
 
     pub fn uris_for_source(&self, key: SourceKey) -> impl Iterator<Item = &AbsoluteUri> {
@@ -417,10 +423,13 @@ impl Sources {
     }
 
     /// Retrieves the root document [`Value`] by [`SrcKey`].
-    pub fn document_value(&self, key: DocumentKey) -> Option<&Value> {
-        self.values.get(key).map(|v| v.as_ref())
+    pub fn document_value(&self, key: DocumentKey) -> &Value {
+        self.values.get(key).unwrap().as_ref()
     }
 
+    pub fn document_key_for(&self, src_key: SourceKey) -> DocumentKey {
+        self.links.get(src_key).unwrap().document_key
+    }
     /// Inserts a new source document for the given **absolute** (meaning it
     /// must not contain a fragment) [`AbsoluteUri`] into the repository,
     /// creating and returning a [`Link`] to the document.
@@ -459,7 +468,7 @@ impl Sources {
             .insert_link(InternalLink {
                 document_key: doc_key,
                 uri: without_fragment,
-                path: PointerBuf::new(),
+                pointer: PointerBuf::new(),
                 source_key: SourceKey::default(),
             })
             .unwrap();
@@ -468,31 +477,49 @@ impl Sources {
         self.insert_link(InternalLink {
             document_key: doc_key,
             uri: with_fragment,
-            path: PointerBuf::new(),
+            pointer: PointerBuf::new(),
             source_key: SourceKey::default(),
         })
         .unwrap();
         source_key
     }
+    pub fn index<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
+    where
+        F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
+        E: From<LinkError>,
+    {
+        if self.indexed.contains_key(document_key) {
+            return Ok(());
+        }
+        let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
+        let value = self.values.get(document_key).unwrap().clone();
+        let walk = WalkValue::new(PointerBuf::new(), &value);
+        for (path, value) in walk {
+            let uri = doc_uri.with_fragment(Some(path.as_str())).unwrap();
+            let source_key = self.link(uri, document_key, path.clone())?;
+            f(source_key, path, value)?;
+        }
+        Ok(())
+    }
 
     fn check_existing(&self, uri: AbsoluteUri, value: &Value) -> Result<SourceKey, InsertError> {
-        let existing_key = self.src_keys.get(&uri).copied().unwrap();
-        let existing_link = self.links.get(existing_key).unwrap();
-        let existing_value = &self.values[existing_link.document_key];
+        let existing_src_key = self.src_keys.get(&uri).copied().unwrap();
+        let existing_doc_key = self.document_key_for(existing_src_key);
+        let existing_value = &self.values[existing_doc_key];
         if value != existing_value.as_ref() {
             return SourceConflictError::err_with(|| SourceConflictError {
                 uri: uri.clone(),
                 value: Box::new(value.clone()),
-                existing_link: existing_link.into_owned_link(),
+                existing_link: self.links[existing_src_key].as_link().into_owned(),
                 existing_value: existing_value.clone(),
             });
         }
-        Ok(existing_link.source_key)
+        Ok(existing_src_key)
     }
 
     fn insert_link(&mut self, link: InternalLink) -> Result<SourceKey, LinkError> {
         let src = self.values.get(link.document_key).unwrap();
-        src.resolve(&link.path)
+        src.resolve(&link.pointer)
             .map_err(|source| InvalidLinkPathError::new(source, link.as_link()))?;
 
         let uri = link.uri.clone();
@@ -518,8 +545,8 @@ impl Sources {
         if &link != existing_link {
             SourceConflictError::err_with(|| SourceConflictError {
                 uri: link.uri.clone(),
-                value: Box::new(link.path.to_string().into()),
-                existing_link: existing_link.into_owned_link(),
+                value: Box::new(link.pointer.to_string().into()),
+                existing_link: existing_link.as_link().into_owned(),
                 existing_value: self.values[existing_link.document_key].clone(),
             })
         } else {
@@ -841,7 +868,7 @@ mod tests {
         let mut sources = Sources::new();
         // Insert the root document at the base uri
         let source_key = sources.insert(base_uri.clone(), document).unwrap();
-        let source = sources.source(source_key).unwrap();
+        let source = sources.source(source_key);
         // creates a Link from the uri `https://example.com#/foo/bar` to the
         // value at the path (as a JSON Pointer) `/foo/bar` within the document.
         sources.link(uri, source.document_key(), path).unwrap();

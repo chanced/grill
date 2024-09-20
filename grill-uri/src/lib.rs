@@ -588,6 +588,11 @@ impl std::fmt::Debug for AbsoluteUri {
         write!(f, "{}", self.as_str())
     }
 }
+impl<'a> PartialEq<&'a AbsoluteUri> for AbsoluteUri {
+    fn eq(&self, other: &&AbsoluteUri) -> bool {
+        (*other).eq(self)
+    }
+}
 
 impl AbsoluteUri {
     /// Attempts to parse an `AbsoluteUri`.
@@ -1739,7 +1744,7 @@ impl RelativeUri {
     #[must_use]
     pub fn fragment(&self) -> Option<&str> {
         let fragment_index = self.fragment_index()?;
-        if fragment_index + 1 == self.len() {
+        if fragment_index + 1 == self.as_str().len() {
             return Some("");
         }
 
@@ -1750,10 +1755,10 @@ impl RelativeUri {
     #[must_use]
     pub fn query(&self) -> Option<&str> {
         let query_index = self.query_index()?;
-        if query_index + 1 == self.len() {
+        if query_index + 1 == self.as_str().len() {
             return Some("");
         }
-        let last = self.fragment_index().unwrap_or(self.len());
+        let last = self.fragment_index().unwrap_or(self.as_str().len());
         Some(&self.value[query_index + 1..last])
     }
 
@@ -1789,7 +1794,8 @@ impl RelativeUri {
     /// `u32::MAX` (4GB)
     pub fn set_query(&mut self, query: Option<&str>) -> Result<Option<String>, RelativeUriError> {
         let existing_query = self.query().map(ToString::to_string);
-        let cap = self.len() - existing_query.as_ref().map(String::len).unwrap_or_default()
+        let cap = self.as_str().len()
+            - existing_query.as_ref().map(String::len).unwrap_or_default()
             + query.map(str::len).unwrap_or_default();
         let mut buf = String::with_capacity(cap);
         let username_index = write::username(&mut buf, self.username())?;
@@ -1824,7 +1830,7 @@ impl RelativeUri {
     /// `u32::MAX` (4GB) after setting the path
     pub fn set_path(&mut self, path: &str) -> Result<String, RelativeUriError> {
         let existing_path = self.path().to_string();
-        let mut buf = String::with_capacity(self.len() - existing_path.len() + path.len());
+        let mut buf = String::with_capacity(self.as_str().len() - existing_path.len() + path.len());
         let username_index = write::username(&mut buf, self.username())?;
         let password_index = write::password(&mut buf, self.password())?;
         let host_index = write::host(&mut buf, self.host())?;
@@ -1860,7 +1866,7 @@ impl RelativeUri {
     ) -> Result<Option<String>, RelativeUriError> {
         let existing_fragment = self.fragment().map(ToString::to_string);
         let mut buf = String::with_capacity(
-            self.len()
+            self.as_str().len()
                 - existing_fragment
                     .as_ref()
                     .map(String::len)
@@ -1938,7 +1944,7 @@ impl RelativeUri {
             .transpose()?
             .unwrap_or_default();
         let mut buf = String::with_capacity(
-            self.len()
+            self.as_str().len()
                 - existing_authority
                     .as_deref()
                     .map(str::len)
@@ -2136,13 +2142,6 @@ impl From<&RelativeUri> for String {
     }
 }
 
-impl Deref for RelativeUri {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.value.as_str()
-    }
-}
-
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -2336,13 +2335,6 @@ impl<'a> UriRef<'a> {
     #[must_use]
     pub fn path_normalized(&self) -> Cow<'_, str> {
         normalize(self.path_or_nss())
-    }
-}
-
-impl Deref for UriRef<'_> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
     }
 }
 
@@ -3280,17 +3272,6 @@ impl TryFrom<&String> for Uri {
     type Error = Error;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::parse(value)
-    }
-}
-
-impl Deref for Uri {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Uri::Url(url) => url.as_str(),
-            Uri::Urn(urn) => urn.as_str(),
-            Uri::Relative(rel) => rel.as_str(),
-        }
     }
 }
 

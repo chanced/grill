@@ -5,7 +5,6 @@ use item::{Compiled, Pending, Queue};
 use std::{error::Error as StdError, fmt};
 
 mod item;
-mod resolve;
 mod scan;
 
 /*

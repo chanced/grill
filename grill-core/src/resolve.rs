@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::lang::source::InvalidLinkPathError;
+use crate::source::InvalidLinkPathError;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

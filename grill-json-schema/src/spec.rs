@@ -2,18 +2,16 @@ use crate::{
 dialect::Dialects, report::{self, Location},  EvaluateError, IntoOwned, JsonSchema, Output
 };
 use grill_core::{
-    lang, state::State, DefaultKey, Key, Resolve
+    lang::context, state::State, DefaultKey, Key, Resolve
 };
 use serde::{Deserialize, Serialize};
 use std::{
      error::Error as StdError, fmt::{Debug, Display}
 };
 
-/// Return types [`Keyword`] trait.
-pub mod found;
-pub mod init;
 pub mod keyword;
 
+pub use keyword::Keyword;
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -48,8 +46,8 @@ where
 {
     type CompileError<R> = super::Error<Self::Report<'static>, R> where R: 'static + Resolve;
     type EvaluateError = EvaluateError<K>;
-    type Evaluate<'int, 'val, 'req> = crate::keyword::Evaluate<'int, 'val, 'req, Self, K>;
-    type Compile<'int, 'txn, 'res, R> = crate::keyword::Compile<'int, 'txn, 'res, R, Self, K> 
+    type Evaluate<'int, 'val, 'req> = crate::keyword::context::Evaluate<'int, 'val, 'req, Self, K>;
+    type Compile<'int, 'txn, 'res, R> = crate::keyword::context::Compile<'int, 'txn, 'res, R, Self, K> 
         where R: 'static + Resolve + Sized, 
         'int: 'txn,
         Self: 'txn + 'int;
@@ -59,23 +57,23 @@ where
     type Error<'v> = report::Error<'v>;
     type Report<'v> = report::Report<Self::Annotation<'v>, Self::Error<'v>>;
 
-    async fn init_compile<'int, 'txn, 'res, R>(
+    async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        context: lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        ctx: context::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
         R: 'static + Resolve + Send + Sync,
     {
-        Ok(crate::keyword::Compile {
+        Ok(crate::keyword::context::Compile {
             dialects: &self.dialects,
-            context
+            context: ctx
         })
     }
 
-    fn init_evaluate<'int, 'val, 'req>(
+    fn evaluate<'int, 'val, 'req>(
         &'int self,
-        ctx: lang::evaluate::Context<'int, 'val, 'req, JsonSchema<K, Self>, K>,
+        ctx: context::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError> {
         println!("init_evaluate");
         todo!()
@@ -161,9 +159,9 @@ where
     /// context.
     ///
     /// [`Self::CompileError`]: Specification::CompileError
-    async fn init_compile<'int, 'txn, 'res, R>(
+    async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        compile: context::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
@@ -176,9 +174,9 @@ where
     /// value
     ///
     /// [Self::EvaluateError]: Specification::EvaluateError
-    fn init_evaluate<'int,  'val, 'req>(
+    fn evaluate<'int,  'val, 'req>(
         &'int self,
-        eval: lang::evaluate::Context<'int,  'val, 'req, JsonSchema<K, Self>, K>,
+        eval: context::Evaluate<'int,  'val, 'req, JsonSchema<K, Self>, K>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError>;
 }
 
@@ -294,24 +292,8 @@ where
 {
     fn core(
         &mut self,
-    ) -> &mut grill_core::lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>;
+    ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>;
+    
 }
 
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                     Init                                     ║
-║                                    ¯¯¯¯¯¯                                    ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-pub struct Init<'int, S, K>
-where
-    K: 'static + Key + Send + Sync,
-    S: 'static + Specification<K>,
-{
-    pub state: &'int mut State<JsonSchema<K, S>, K>,
-    pub dialects: &'int mut Dialects<S, K>,
-}

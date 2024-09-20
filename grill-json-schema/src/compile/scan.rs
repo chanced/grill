@@ -1,24 +1,12 @@
-use crate::compile::{resolve::Resolved, Error as CompileError};
-use crate::schema::CompiledSchema;
-use grill_core::lang::source::Source;
-use grill_core::lang::{Schemas, Sources};
-use grill_core::resolve::Error as ResolveError;
-use grill_core::{
-    lang::{self},
-    Resolve,
-};
-use grill_uri::AbsoluteUri;
-use polonius_the_crab::polonius;
+use crate::{compile::Error as CompileError, keyword::context, spec::Specification};
+use grill_core::{resolve::Error as ResolveError, source::Source, Resolve};
+use grill_uri::{AbsoluteUri, Uri};
+use jsonptr::PointerBuf;
 use slotmap::Key;
-use std::fmt;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt, path::PathBuf};
 
-use crate::{
-    spec::{found::Anchor, Specification},
-    JsonSchema,
-};
-
-use super::resolve::{resolve, resolved};
+mod resolve;
+use resolve::{resolve, resolved, Resolved};
 
 #[derive(Debug)]
 pub(super) enum Error<R: 'static + Resolve> {
@@ -46,54 +34,77 @@ impl<R: 'static + Resolve> From<ResolveError<R>> for Error<R> {
         Error::Resolve(value)
     }
 }
-
-pub(super) enum Scanned<'scan, K: 'static + Key> {
-    Previous(&'scan Scan),
-    Pending,
-    Scanned(&'scan Scan),
+pub(super) enum Scanned<'scan, K> {
+    Scan(&'scan mut Scan<K>),
     Compiled(K),
 }
 
 #[derive(Debug)]
-pub(super) struct Scan {
-    pub(super) id: Option<AbsoluteUri>,
-    pub(super) anchors: Vec<Anchor>,
-    pub(super) uris: Vec<AbsoluteUri>,
-    pub(super) source: Source<'static>,
-    pub(super) subschemas: Vec<PathBuf>,
+pub(super) struct Scan<K> {
+    pub id: Option<AbsoluteUri>,
+    pub anchors: Vec<Anchor>,
+    pub uris: Vec<AbsoluteUri>,
+    pub source: Source<'static>,
+    pub embeds: Vec<PathBuf>,
+    pub refs: Vec<Reference<K>>,
+}
+impl<K> Scan<K> {
+    pub(super) fn unresolved_refs(&mut self) -> impl Iterator<Item = &mut Reference<K>> {
+        self.refs.iter_mut().filter(|r| r.schema_key.is_none())
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Anchor {
+    pub uri: AbsoluteUri,
+    pub name: String,
+    pub keyword: &'static str,
+}
+
+#[derive(Debug)]
+pub(super) struct Reference<K> {
+    pub absolute_uri: AbsoluteUri,
+    pub uri: Uri,
+    pub keyword: &'static str,
+    pub schema_key: Option<K>,
 }
 
 #[derive(Debug, Default)]
-pub(super) struct Scanner {
-    scans: Vec<Scan>,
+pub(super) struct Scanner<K> {
+    scans: Vec<Scan<K>>,
     scanned: HashMap<AbsoluteUri, usize>,
 }
-impl Scanner {
-    pub(super) async fn scan<'scan, 'cmp, 'int, 'txn, 'res, R, S, K>(
+
+impl<K> Scanner<K>
+where
+    K: 'static + Key + Send + Sync,
+{
+    pub(super) async fn scan<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
         &'scan mut self,
-        ctx: &mut lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
         uri: &'cmp AbsoluteUri,
-    ) -> Result<Scanned<'scan, K>, Error<R>>
+    ) -> Result<Scanned<K>, Error<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
-        K: 'static + Key + Send + Sync,
         'cmp: 'scan,
         'res: 'int,
     {
-        if let Some(&index) = self.scanned.get(uri) {
-            return Ok(Scanned::Previous(&self.scans[index]));
+        if let Some(key) = ctx.context.state.schemas.get_key_of(uri) {
+            return Ok(Scanned::Compiled(key));
         }
-
-        match resolve(&mut ctx.state.sources, ctx.resolve, uri).await? {
-            Resolved::Source(src) => self.resolve_src(ctx, uri, src),
-            Resolved::Document(doc) => self.resolve_doc(ctx, uri, doc),
+        if let Some(&index) = self.scanned.get(uri) {
+            return Ok(Scanned::Scan(&mut self.scans[index]));
+        }
+        match resolve(ctx.context.state.sources, ctx.context.resolve, uri).await? {
+            Resolved::Source(src) => self.scan_src(ctx, uri, src),
+            Resolved::UnknownAnchor(doc) => self.scan_for_anchor(ctx, uri, doc),
         }
     }
 
-    fn resolve_src<'scan, 'cmp, 'int, 'txn, 'res, R, S, K>(
+    fn scan_src<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
         &'scan mut self,
-        ctx: &mut lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
         uri: &AbsoluteUri,
         src: resolved::Src,
     ) -> Result<Scanned<'scan, K>, Error<R>>
@@ -102,15 +113,17 @@ impl Scanner {
         S: 'static + Specification<K>,
         K: 'static + Key + Send + Sync,
     {
-        todo!()
+        let source = ctx.context.state.sources.source(src.source_key);
+        let root = source.document().value_ref();
+        let mut path = source.pointer().to_buf();
     }
 
-    fn resolve_doc<'scan, 'cmp, 'int, 'txn, 'res, R, S, K>(
-        &self,
-        ctx: &mut lang::compile::Context<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
+    fn scan_for_anchor<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
+        &'scan mut self,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
         uri: &AbsoluteUri,
-        doc: resolved::Doc,
-    ) -> Result<Scanned<'_, K>, Error<R>>
+        doc: resolved::UnknownAnchor,
+    ) -> Result<Scanned<'scan, K>, Error<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,

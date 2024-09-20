@@ -3,7 +3,7 @@
 use core::fmt;
 use grill_uri::AbsoluteUri;
 use slotmap::{new_key_type, Key, SlotMap};
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use crate::iter::{AllCompiledSchemas, AllSchemas, Iter};
 
@@ -143,7 +143,7 @@ pub trait CompiledSchema<K>: AsRef<K> + fmt::Debug + Clone + PartialEq + Send + 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
 ║                                   Schemas                                    ║
-║                                      ¯¯¯¯¯¯¯¯¯                                      ║
+║                                  ¯¯¯¯¯¯¯¯¯                                   ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
@@ -200,24 +200,21 @@ where
     fn insert_uri(&mut self, uri: AbsoluteUri, key: K) {
         self.uris.insert(uri, key);
     }
+
+    pub fn get_key_of(&self, uri: &AbsoluteUri) -> Option<K> {
+        self.uris.get(uri).copied()
+    }
     /// Returns [`Self::C::Schema`](CompiledSchema::Schema) for the supplied
     /// [`AbsoluteUri`], if it exists.
     pub fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&S> {
-        self.uris.get(uri).copied().and_then(|k| self.get(k).ok())
+        self.uris.get(uri).copied().map(|k| self.get_compiled(k))
     }
 
     /// Returns a reference to compiled schema ([`Self::C`](`CompiledSchema`))
     /// with the supplied `key` or returns `InvalidKeyError` if the key does
     /// not exist.
-    pub fn get(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
-        self.map.get(key).ok_or(InvalidKeyError { key })
-    }
-
-    /// Returns a reference to compiled schema ([`Self::C`](`CompiledSchema`))
-    /// with the supplied `key` or returns `InvalidKeyError` if the key does
-    /// not exist.
-    pub fn get_by_key(&self, key: K) -> Result<&S, InvalidKeyError<K>> {
-        self.map.get(key).ok_or(InvalidKeyError { key })
+    pub fn get_compiled(&self, key: K) -> &S {
+        self.map.get(key).expect("invalid schema key")
     }
 
     /// Returns a mutable reference to the schema ([`C`](`CompiledSchema`)) with
@@ -369,16 +366,3 @@ mod tests {
         assert_eq!(schemas.get_by_uri(&uri).unwrap().key, key);
     }
 }
-
-#[derive(Debug, PartialEq)]
-pub struct InvalidKeyError<K: Key = DefaultKey> {
-    pub key: K,
-}
-
-impl Display for InvalidKeyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "invalid key: {:?}", self.key)
-    }
-}
-
-impl std::error::Error for InvalidKeyError {}

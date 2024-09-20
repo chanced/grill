@@ -5,32 +5,13 @@ use grill_uri::AbsoluteUri;
 use serde_json::Value;
 use slotmap::{new_key_type, Key};
 
-use crate::spec::{found, keyword::Keyword, Specification};
+use crate::spec::{
+    keyword::{Found, Keyword},
+    Specification,
+};
 
 new_key_type! {
     pub struct DialectKey;
-}
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   identify                                   ║
-║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-
-/// Modern schema identification (draft 06 and later), identifies a schema by
-/// the `$id` keyword.
-pub fn identify(value: &Value) -> Option<Cow<str>> {
-    value.get("$id").and_then(Value::as_str).map(Cow::Borrowed)
-}
-
-/// Legacy schema identification (draft 04 and earlier), identifies a schema by
-/// the `id` keyword.
-pub fn identify_legacy(value: &Value) -> Option<Cow<str>> {
-    value.get("id").and_then(Value::as_str).map(Cow::Borrowed)
 }
 
 /*
@@ -52,12 +33,14 @@ where
     /// Primary [`AbsoluteUri`] of the dialect (e.g.
     /// `"https://json-schema.org/draft/2020-12/schema"`)
     pub uri: AbsoluteUri,
+    /// Secondary [`AbsoluteUri`]s of the dialect (e.g. http://json-schema.org/draft-07/schema)
+    pub secondary_uris: Vec<AbsoluteUri>,
     /// All possible keywords of this `Dialect`
     pub keywords: Vec<S::Keyword>,
     /// Metaschema sources of this `Dialect`
     pub sources: HashMap<AbsoluteUri, Arc<Value>>,
     /// Identifies a schema
-    pub identify: fn(&Value) -> Option<Cow<str>>,
+    pub identifier_field: Cow<'static, str>,
 }
 
 impl<S, K> PartialEq for Dialect<S, K>
@@ -74,12 +57,28 @@ where
     S: Specification<K> + Send + Sync,
     K: 'static + Key + Clone + Send + Sync,
 {
-    pub fn identify<'v>(&self, value: &'v Value) -> Option<Cow<'v, str>> {
-        (self.identify)(value)
+    pub fn identify<'v>(&self, value: &'v Value) -> Option<&'v str> {
+        value
+            .get(self.identifier_field.as_ref())
+            .and_then(Value::as_str)
     }
-
+    pub fn is_relevant_to(&self, value: &Value) -> bool {
+        let Some(dolla_dolla_schema_yall) = value.get("$schema") else {
+            return false;
+        };
+        let Value::String(uri) = dolla_dolla_schema_yall else {
+            return false;
+        };
+        self.contains_uri(uri)
+    }
     pub fn uri(&self) -> &AbsoluteUri {
         &self.uri
+    }
+    pub fn contains_uri(&self, uri: &str) -> bool {
+        if self.uri == uri {
+            return true;
+        }
+        self.secondary_uris.iter().any(|u| u == uri)
     }
     pub fn keywords(&self) -> &[S::Keyword] {
         &self.keywords
@@ -87,11 +86,16 @@ where
     pub fn sources(&self) -> &HashMap<AbsoluteUri, Arc<Value>> {
         &self.sources
     }
-
-    pub fn references(&self, value: &Value) -> Vec<found::Reference> {
+    pub fn references(&self, value: &Value) -> Vec<Found> {
         self.keywords
             .iter()
             .filter_map(|keyword| keyword.reference(value))
+            .collect()
+    }
+    pub fn anchors(&self, value: &Value) -> Vec<Found> {
+        self.keywords
+            .iter()
+            .filter_map(|keyword| keyword.anchor(value))
             .collect()
     }
 }
@@ -145,8 +149,8 @@ where
     }
 
     /// Returns the `Dialect` with the given key.
-    pub fn get(&self, key: DialectKey) -> Option<&Dialect<S, K>> {
-        self.table.get(key)
+    pub fn get(&self, key: DialectKey) -> &Dialect<S, K> {
+        self.table.get(key).unwrap()
     }
 
     /// Inserts a new `Dialect` into the `Dialects` and returns its key.

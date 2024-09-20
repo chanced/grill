@@ -1,6 +1,6 @@
 use crate::{
     cache::Cache,
-    lang::{compile::Context as CompileCtx, evaluate::Context as EvalCtx},
+    lang::context,
     state::{State, Transaction},
     DefaultKey, Language, Resolve,
 };
@@ -100,7 +100,7 @@ where
         let transaction = Transaction::new(&mut schemas, &mut sources, &mut self.state.cache);
         let keys = self
             .lang
-            .compile(CompileCtx::new(uris, transaction, resolve, validate))
+            .compile(context::Compile::new(uris, transaction, resolve, validate))
             .await?;
         self.state.schemas = schemas;
         self.state.sources = sources;
@@ -119,7 +119,7 @@ where
     {
         // TODO: need a cache pool
         let mut eval = Cache::new();
-        self.lang.evaluate(EvalCtx {
+        self.lang.evaluate(context::Evaluate {
             context,
             value,
             key,

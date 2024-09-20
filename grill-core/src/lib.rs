@@ -16,8 +16,9 @@
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
 pub use interrogator::Interrogator;
-pub use lang::{schema::DefaultKey, Language};
+pub use lang::Language;
 pub use resolve::Resolve;
+pub use schema::DefaultKey;
 pub use slotmap::{new_key_type, Key};
 
 mod interrogator;
@@ -27,4 +28,6 @@ pub mod cache;
 pub mod iter;
 pub mod lang;
 pub mod resolve;
+pub mod schema;
+pub mod source;
 pub mod state;

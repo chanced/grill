@@ -2,11 +2,7 @@ use std::{future::Future, pin::Pin};
 
 use slotmap::Key;
 
-use crate::{
-    cache::Cache,
-    lang::{Schemas, Sources},
-    Language,
-};
+use crate::{cache::Cache, schema::Schemas, source::Sources, Language};
 
 pub struct State<L: Language<K>, K: 'static + Key + Send + Sync> {
     /// Schema graph

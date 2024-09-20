@@ -28,7 +28,7 @@ use core::fmt;
 use std::marker::PhantomData;
 
 use compile::compile;
-use grill_core::{lang, state::State, Key, Language, Resolve};
+use grill_core::{lang::context, state::State, Key, Language, Resolve};
 use schema::CompiledSchema;
 use spec::Specification;
 pub use spec::Standard;
@@ -129,18 +129,18 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: lang::compile::Context<'int, 'txn, 'res, Self, R, K>,
+        ctx: context::Compile<'int, 'txn, 'res, Self, R, K>,
     ) -> Result<Vec<K>, Self::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
-        compile::<R, S, K>(self.spec.init_compile(ctx).await?).await
+        compile::<R, S, K>(self.spec.compile(ctx).await?).await
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: lang::evaluate::Context<'int, '_, 'val, Self, K>,
+        eval: context::Evaluate<'int, '_, 'val, Self, K>,
     ) -> Self::EvaluateResult<'val> {
         _ = eval;
         todo!()

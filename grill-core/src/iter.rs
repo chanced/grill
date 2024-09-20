@@ -3,11 +3,8 @@
 use slotmap::Key;
 
 use crate::{
-    lang::{
-        schema::{CompiledSchema, InvalidKeyError},
-        source::Sources,
-        Schemas,
-    },
+    schema::{CompiledSchema, Schemas},
+    source::Sources,
     DefaultKey,
 };
 
@@ -61,12 +58,12 @@ where
     S: CompiledSchema<K>,
     K: Key,
 {
-    type Item = Result<S::Schema<'int>, InvalidKeyError<K>>;
+    type Item = S::Schema<'int>;
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
             .map(|i| *i.as_ref())
-            .map(|k| self.schemas.get(k).map(|k| k.to_schema(self.sources)))
+            .map(|k| self.schemas.get_compiled(k).to_schema(self.sources))
     }
 }
 
@@ -98,21 +95,5 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.compiled.next().map(|s| s.to_schema(self.sources))
-    }
-}
-
-pub struct Unchecked<I> {
-    iter: I,
-}
-
-impl<I, T, K> Iterator for Unchecked<I>
-where
-    K: Key,
-    I: Iterator<Item = Result<T, InvalidKeyError<K>>>,
-{
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(Result::unwrap)
     }
 }

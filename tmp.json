@@ -1,8 +1,8 @@
 {
     "$defs": {
-        "str": {
-            "$id": "str",
-            "type": "string"
+        "target": {
+            "$id": "target",
+            "$ref": "anchored#anchor"
         },
         "anchored": {
             "$id": "anchored",

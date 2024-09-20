@@ -17,16 +17,7 @@
 //!
 //! ## Compiling a schema
 
-pub mod compile;
-pub mod error;
-pub mod evaluate;
-pub mod schema;
-pub mod source;
-
-pub use schema::Schemas;
-pub use source::Sources;
-
-use crate::{state::State, Resolve};
+use crate::{schema, state::State, Resolve};
 use slotmap::Key;
 use std::{fmt, future::Future};
 
@@ -73,7 +64,7 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: compile::Context<'int, 'txn, 'res, Self, R, K>,
+        compile: context::Compile<'int, 'txn, 'res, Self, R, K>,
     ) -> impl Future<Output = Result<Vec<K>, Self::CompileError<R>>>
     where
         R: 'static + Resolve + Send + Sync;
@@ -81,6 +72,101 @@ where
     /// Evaluates a schema for the given [`Evaluae`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: evaluate::Context<'int, '_, 'val, Self, K>,
+        eval: context::Evaluate<'int, '_, 'val, Self, K>,
     ) -> Self::EvaluateResult<'val>;
+}
+
+pub mod context {
+    use crate::{
+        cache::Cache,
+        state::{State, Transaction},
+        Key, Language, Resolve,
+    };
+    use grill_uri::AbsoluteUri;
+    use serde_json::Value;
+
+    /*
+    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                                                                              ║
+    ║                                   Compile                                    ║
+    ║                                  ¯¯¯¯¯¯¯¯¯                                   ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+    */
+    /// Request to compile a schema.
+    #[derive(Debug)]
+    pub struct Compile<'int, 'txn, 'res, L, R, K>
+    where
+        L: Language<K>,
+        K: 'static + Key + Send + Sync,
+    {
+        /// Uris to compile
+        pub targets: Vec<AbsoluteUri>,
+
+        /// Current state of the [`Interrogator`], including schemas, sources, and
+        /// cache. Upon successful compilation, the data will become to new state.
+        pub state: Transaction<'int, 'txn, L, K>,
+
+        /// Implementation of [`Resolve`]
+        pub resolve: &'res R,
+
+        /// Whether or not to validate the schemas during compilation
+        pub must_validate: bool,
+    }
+
+    impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
+    where
+        L: Language<K>,
+        K: 'static + Key + Send + Sync,
+    {
+        pub(crate) fn new(
+            uris: Vec<AbsoluteUri>,
+            txn: Transaction<'int, 'txn, L, K>,
+            resolve: &'res R,
+            validate: bool,
+        ) -> Self
+        where
+            L: Language<K>,
+            K: 'static + Key + Send + Sync,
+            R: 'static + Resolve + Send + Sync,
+        {
+            Self {
+                targets: uris,
+                state: txn,
+                resolve,
+                must_validate: validate,
+            }
+        }
+    }
+
+    /*
+    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                                                                              ║
+    ║                                   Evaluate                                   ║
+    ║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+    */
+    /// Request to evaluate a schema.
+    pub struct Evaluate<'int, 'req, 'val, L, K>
+    where
+        L: Language<K>,
+        K: 'static + Key + Send + Sync,
+    {
+        /// Evaluation context `S::Context`
+        pub context: L::Context,
+
+        /// The current, immutable state of the [`Interrogator`]
+        pub state: &'int State<L, K>,
+
+        pub eval: &'req mut Cache,
+
+        /// The key of the schema to evaluate
+        pub key: K,
+
+        /// The value to evaluate
+        pub value: &'val Value,
+    }
 }

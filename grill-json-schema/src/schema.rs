@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
 use grill_core::{
-    lang::{
-        schema,
-        source::{self, Source, SourceKey},
-    },
+    schema,
+    source::{Source, SourceKey, Sources},
     DefaultKey, Key,
 };
 use grill_uri::{AbsoluteUri, Uri};
@@ -209,13 +207,13 @@ where
         self.key = key;
     }
 
-    fn to_schema<'int>(&'int self, sources: &'int source::Sources) -> Self::Schema<'int> {
+    fn to_schema<'int>(&'int self, sources: &'int Sources) -> Self::Schema<'int> {
         Schema {
             key: self.key,
             uris: Cow::Borrowed(&self.uris),
             keywords: Cow::Borrowed(&self.keywords),
             references: Cow::Borrowed(&self.references),
-            source: sources.source(self.source_key).unwrap(),
+            source: sources.source(self.source_key),
             referenced_by: Cow::Borrowed(&self.references),
             embedded_in: self.embedded_in,
             embedded: Cow::Borrowed(&self.embedded),
@@ -235,7 +233,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reference<K> {
     /// Key to the referenced [`Schema`]
-    pub key: K,
+    pub referenced_key: K,
 
     /// Key to the referring [`Schema`]
     pub referrer_key: K,
@@ -243,7 +241,7 @@ pub struct Reference<K> {
     /// The URI of the reference, as per the JSON Schema specification
     pub uri: Uri,
 
-    /// The resolved Absolute URI
+    /// The resolved Absolute URI of the reference
     pub absolute_uri: AbsoluteUri,
 
     /// The keyword of the reference (e.g. $ref, $dynamicRef, $recursiveRef,
@@ -258,10 +256,16 @@ where
     K: Key,
 {
     fn reference(&self) -> K {
-        self.key
+        self.referenced_key
     }
 
     fn referrer(&self) -> K {
         self.referrer_key
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Anchor {
+    pub keyword: &'static str,
+    pub name: String,
 }

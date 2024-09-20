@@ -1,8 +1,7 @@
+use crate::Specification;
 use grill_core::Resolve;
 use serde_json::Value;
 use slotmap::Key;
-
-use super::{found, Specification};
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -39,13 +38,28 @@ where
 
     /// Returns the string URI for the referenced schema this keyword is capable
     /// of handling, if present.
-    fn reference(&self, _schema: &Value) -> Option<found::Reference> {
+    fn reference(&self, _schema: &Value) -> Option<Found> {
         None
     }
 
     /// Returns the name of the anchor this keyword is capable of handling, if
     /// present.
-    fn anchor(&self, _schema: &Value) -> Option<found::Anchor> {
+    fn anchor(&self, _schema: &Value) -> Option<Found> {
         None
     }
+}
+
+/*
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                                    Found                                     ║
+║                                   ¯¯¯¯¯¯¯                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+*/
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Found {
+    pub keyword: &'static str,
+    pub value: String,
 }
