@@ -174,30 +174,3 @@ impl<K: Key + Send> std::error::Error for EvaluateError<K> {
         }
     }
 }
-
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                   UriError                                   ║
-║                                  ¯¯¯¯¯¯¯¯¯¯                                  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
-#[derive(Debug)]
-pub struct UriError {
-    pub actul: String,
-    pub source: grill_uri::Error,
-}
-
-impl fmt::Display for UriError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "failed to parse uri: \"{}\"", self.actul)
-    }
-}
-
-impl std::error::Error for UriError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.source)
-    }
-}

@@ -1,7 +1,8 @@
 use core::fmt;
-use std::{borrow::Cow, collections::HashMap, fmt::Debug, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug, iter::once, sync::Arc};
 
-use grill_uri::AbsoluteUri;
+use grill_uri::{AbsoluteUri, Uri};
+use jsonptr::PointerBuf;
 use serde_json::Value;
 use slotmap::{new_key_type, Key};
 
@@ -30,11 +31,15 @@ where
     S: Specification<K> + Send + Sync,
     K: 'static + Key + Clone + Send + Sync,
 {
+    /// The key of the dialect.
+    ///
+    /// When initializing, set to `DialectKey::default()`
+    pub key: DialectKey,
     /// Primary [`AbsoluteUri`] of the dialect (e.g.
     /// `"https://json-schema.org/draft/2020-12/schema"`)
     pub uri: AbsoluteUri,
     /// Secondary [`AbsoluteUri`]s of the dialect (e.g. http://json-schema.org/draft-07/schema)
-    pub secondary_uris: Vec<AbsoluteUri>,
+    pub additional_uris: Vec<AbsoluteUri>,
     /// All possible keywords of this `Dialect`
     pub keywords: Vec<S::Keyword>,
     /// Metaschema sources of this `Dialect`
@@ -57,11 +62,14 @@ where
     S: Specification<K> + Send + Sync,
     K: 'static + Key + Clone + Send + Sync,
 {
-    pub fn identify<'v>(&self, value: &'v Value) -> Option<&'v str> {
+    pub fn identify(&self, value: &Value) -> Result<Option<Uri>, grill_uri::Error> {
         value
             .get(self.identifier_field.as_ref())
             .and_then(Value::as_str)
+            .map(|s| Uri::parse(s))
+            .transpose()
     }
+
     pub fn is_relevant_to(&self, value: &Value) -> bool {
         let Some(dolla_dolla_schema_yall) = value.get("$schema") else {
             return false;
@@ -78,7 +86,7 @@ where
         if self.uri == uri {
             return true;
         }
-        self.secondary_uris.iter().any(|u| u == uri)
+        self.additional_uris.iter().any(|u| u == uri)
     }
     pub fn keywords(&self) -> &[S::Keyword] {
         &self.keywords
@@ -86,17 +94,32 @@ where
     pub fn sources(&self) -> &HashMap<AbsoluteUri, Arc<Value>> {
         &self.sources
     }
-    pub fn references(&self, value: &Value) -> Vec<Found> {
+    pub fn references(&self, value: &Value) -> Vec<Found<String>> {
         self.keywords
             .iter()
             .filter_map(|keyword| keyword.reference(value))
             .collect()
     }
-    pub fn anchors(&self, value: &Value) -> Vec<Found> {
+    pub fn anchors(&self, value: &Value) -> Vec<Found<String>> {
         self.keywords
             .iter()
             .filter_map(|keyword| keyword.anchor(value))
             .collect()
+    }
+
+    pub fn embedded_schemas(&self, value: &Value) -> Vec<Found<PointerBuf>>
+    where
+        K: 'static + Key + Send + Sync,
+        S: 'static + Specification<K>,
+        K: 'static + Key + Send + Sync,
+    {
+        self.keywords
+            .iter()
+            .flat_map(|keyword| keyword.embedded_schemas(value))
+            .collect()
+    }
+    pub fn all_uris(&self) -> impl Iterator<Item = &AbsoluteUri> {
+        once(&self.uri).chain(self.additional_uris.iter())
     }
 }
 
@@ -153,39 +176,51 @@ where
         self.table.get(key).unwrap()
     }
 
+    pub fn primary_dialect_key(&self) -> DialectKey {
+        self.primary_key
+    }
+
+    pub fn primary_dialect(&self) -> &Dialect<S, K> {
+        self.get(self.primary_key)
+    }
+
+    pub fn find_dialect(&self, value: &Value) -> Option<&Dialect<S, K>> {
+        self.find_dialect_key(value).map(|key| &self.table[key])
+    }
+    pub fn find_dialect_key(&self, value: &Value) -> Option<DialectKey> {
+        let schema = value.get("$schema")?;
+        let uri = schema.as_str()?;
+        self.uris.get(uri).copied()
+    }
+
     /// Inserts a new `Dialect` into the `Dialects` and returns its key.
     ///
     /// # Errors
-    /// This method returns the `dialect` attempted if a different `Dialect` is associated
-    /// with the same `AbsoluteUri`.
-    #[allow(clippy::missing_panics_doc)]
+    /// This method returns the `dialect` attempting to be inserted if a
+    /// different `Dialect` is associated with the same `AbsoluteUri`.
     pub fn insert(
         &mut self,
         dialect: Dialect<S, K>,
     ) -> Result<DialectKey, DuplicateDialectError<S, K>> {
-        if let Some(&existing) = self.uris.get(&dialect.uri) {
-            return if self.table[existing] == dialect {
-                Ok(existing)
-            } else {
-                Err(DuplicateDialectError { dialect })
-            };
+        // ensuring a unique uris - can't use Dialect::all_uris here as it will
+        // borrow `dialect` and force a clone on the err branch
+        for uri in once(&dialect.uri).chain(dialect.additional_uris.iter()) {
+            if let Some(&existing) = self.uris.get(uri) {
+                return if self.table[existing] == dialect {
+                    // found, returning existing
+                    Ok(existing)
+                } else {
+                    Err(DuplicateDialectError { dialect })
+                };
+            }
         }
-        let without_frag = dialect
-            .uri
-            .fragment()
-            .is_some_and(str::is_empty)
-            .then(|| dialect.uri.with_fragment(None).unwrap());
-        let with_empty_frag = dialect
-            .uri
-            .fragment()
-            .is_none()
-            .then(|| dialect.uri.clone());
+        // inserting dialect
         let key = self.table.insert(dialect);
-        self.uris.insert(self.table[key].uri.clone(), key);
-        if let Some(uri) = without_frag {
-            self.uris.insert(uri, key);
-        } else if let Some(uri) = with_empty_frag {
-            self.uris.insert(uri, key);
+        self.table[key].key = key;
+
+        // associating all uris
+        for uri in self.table[key].all_uris() {
+            self.uris.insert(uri.clone(), key);
         }
         Ok(key)
     }

@@ -1,8 +1,12 @@
 use crate::spec::{self, Compile, Specification};
-use grill_core::{resolve::Error as ResolveError, Key, Resolve};
+use grill_core::{
+    resolve::Error as ResolveError,
+    source::{LinkError, SourceConflictError},
+    Key, Resolve,
+};
 use grill_uri::AbsoluteUri;
 use item::{Compiled, Pending, Queue};
-use std::{error::Error as StdError, fmt};
+use std::{error::Error as StdError, f32::consts::E, fmt};
 
 mod item;
 mod scan;
@@ -47,8 +51,10 @@ pub enum Error<O, R>
 where
     R: 'static + Resolve,
 {
-    InvalidSchema(InvalidSchemaError<O>),
-    FailedToResolve(ResolveError<R>),
+    InvalidSchema(Box<InvalidSchemaError<O>>),
+    FailedToResolve(Box<ResolveError<R>>),
+    SourceConflict(Box<SourceConflictError>),
+    InvalidUri(Box<grill_uri::Error>),
 }
 
 impl<O, R> From<ResolveError<R>> for Error<O, R>
@@ -56,7 +62,7 @@ where
     R: 'static + Resolve,
 {
     fn from(value: ResolveError<R>) -> Self {
-        Self::FailedToResolve(value)
+        Self::FailedToResolve(Box::new(value))
     }
 }
 
@@ -67,8 +73,10 @@ where
 {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            Self::InvalidSchema(e) => Some(e),
+            Error::InvalidSchema(e) => Some(e),
             Error::FailedToResolve(e) => Some(e),
+            Error::SourceConflict(e) => Some(e),
+            Error::InvalidUri(e) => Some(e),
         }
     }
 }
@@ -88,8 +96,10 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidSchema(r) => fmt::Display::fmt(r, f),
+            Error::InvalidSchema(r) => fmt::Display::fmt(r, f),
             Error::FailedToResolve(r) => fmt::Display::fmt(r, f),
+            Error::SourceConflict(r) => fmt::Display::fmt(r, f),
+            Error::InvalidUri(r) => fmt::Display::fmt(r, f),
         }
     }
 }

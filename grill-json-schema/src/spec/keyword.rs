@@ -1,5 +1,6 @@
 use crate::Specification;
 use grill_core::Resolve;
+use jsonptr::PointerBuf;
 use serde_json::Value;
 use slotmap::Key;
 
@@ -38,14 +39,18 @@ where
 
     /// Returns the string URI for the referenced schema this keyword is capable
     /// of handling, if present.
-    fn reference(&self, _schema: &Value) -> Option<Found> {
+    fn reference(&self, _schema: &Value) -> Option<Found<String>> {
         None
     }
 
     /// Returns the name of the anchor this keyword is capable of handling, if
     /// present.
-    fn anchor(&self, _schema: &Value) -> Option<Found> {
+    fn anchor(&self, _schema: &Value) -> Option<Found<String>> {
         None
+    }
+
+    fn embedded_schemas(&self, _schema: &Value) -> Vec<Found<PointerBuf>> {
+        Vec::new()
     }
 }
 
@@ -59,7 +64,7 @@ where
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Found {
+pub struct Found<T> {
     pub keyword: &'static str,
-    pub value: String,
+    pub value: T,
 }

@@ -12,7 +12,6 @@ use grill_uri::AbsoluteUri;
 use jsonptr::{Pointer, PointerBuf, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
-use walk::WalkValue;
 
 pub mod walk;
 
@@ -128,8 +127,8 @@ impl<'int> Source<'int> {
 
     /// The path of the source, as a JSON [`Pointer`], within the root
     /// document.
-    pub fn pointer(&self) -> &Pointer {
-        &self.link.pointer
+    pub fn path(&self) -> &Pointer {
+        &self.link.absolute_path
     }
 
     /// Returns the `LinkKey` of the source.
@@ -153,7 +152,10 @@ impl<'int> Source<'int> {
     /// Resolves source the path within the document, returning the
     /// [`Value`] at the location.
     pub fn resolve(&self) -> &Value {
-        self.link.pointer.resolve(&*self.document.value).unwrap()
+        self.link
+            .absolute_path
+            .resolve(&*self.document.value)
+            .unwrap()
     }
 
     /// Consumes this `Source`` and returns an owned, `'static` variant.
@@ -194,7 +196,7 @@ impl<'s> Link<'s> {
             document_key: link.document_key,
             source_key: link.source_key,
             uri: Cow::Borrowed(&link.uri),
-            path: Cow::Borrowed(&link.pointer),
+            path: Cow::Borrowed(&link.absolute_path),
         }
     }
     pub fn into_owned(self) -> Link<'static> {
@@ -244,6 +246,12 @@ impl DoubleEndedIterator for Links<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Fragment {
+    Anchor(String),
+    Pointer(PointerBuf),
+}
+
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -258,7 +266,9 @@ struct InternalLink {
     uri: AbsoluteUri,
     document_key: DocumentKey,
     source_key: SourceKey,
-    pointer: PointerBuf,
+    /// absolute path of the value from the document root
+    absolute_path: PointerBuf,
+    fragment: Option<Fragment>,
 }
 
 impl InternalLink {
@@ -266,7 +276,7 @@ impl InternalLink {
         Link {
             uri: Cow::Borrowed(&self.uri),
             document_key: self.document_key,
-            path: Cow::Borrowed(&self.pointer),
+            path: Cow::Borrowed(&self.absolute_path),
             source_key: self.source_key,
         }
     }
@@ -316,6 +326,12 @@ pub struct Sources {
     doc_uris: SecondaryMap<DocumentKey, AbsoluteUri>,
     indexed: SecondaryMap<DocumentKey, ()>,
 }
+pub struct New {
+    pub uri: AbsoluteUri,
+    pub fragment: Option<Fragment>,
+    pub document_key: DocumentKey,
+    pub absolute_path: PointerBuf,
+}
 
 impl Sources {
     /// Instantiates a new `Sources`
@@ -361,17 +377,13 @@ impl Sources {
     /// Returns [`LinkError`] if:
     /// - The URI is already linked to a different source.
     /// - The JSON pointer of the link cannot be resolved within the source.
-    pub fn link(
-        &mut self,
-        uri: AbsoluteUri,
-        key: DocumentKey,
-        path: PointerBuf,
-    ) -> Result<SourceKey, LinkError> {
+    pub fn link(&mut self, new: New) -> Result<SourceKey, LinkError> {
         let link = InternalLink {
-            document_key: key,
-            uri,
-            pointer: path,
-            source_key: SourceKey::default(),
+            document_key: new.document_key,
+            uri: new.uri,
+            absolute_path: new.absolute_path,
+            fragment: new.fragment,
+            source_key: SourceKey::default(), // will be updated
         };
         match self.src_keys.get(&link.uri) {
             None => self.insert_link(link),
@@ -468,7 +480,8 @@ impl Sources {
             .insert_link(InternalLink {
                 document_key: doc_key,
                 uri: without_fragment,
-                pointer: PointerBuf::new(),
+                fragment: None,
+                absolute_path: PointerBuf::new(),
                 source_key: SourceKey::default(),
             })
             .unwrap();
@@ -477,30 +490,32 @@ impl Sources {
         self.insert_link(InternalLink {
             document_key: doc_key,
             uri: with_fragment,
-            pointer: PointerBuf::new(),
+            fragment: Some(Fragment::Anchor(String::from(""))),
+            absolute_path: PointerBuf::new(),
             source_key: SourceKey::default(),
         })
         .unwrap();
         source_key
     }
-    pub fn index<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
-    where
-        F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
-        E: From<LinkError>,
-    {
-        if self.indexed.contains_key(document_key) {
-            return Ok(());
-        }
-        let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
-        let value = self.values.get(document_key).unwrap().clone();
-        let walk = WalkValue::new(PointerBuf::new(), &value);
-        for (path, value) in walk {
-            let uri = doc_uri.with_fragment(Some(path.as_str())).unwrap();
-            let source_key = self.link(uri, document_key, path.clone())?;
-            f(source_key, path, value)?;
-        }
-        Ok(())
-    }
+
+    // pub fn index<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
+    // where
+    //     F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
+    //     E: From<LinkError>,
+    // {
+    //     if self.indexed.contains_key(document_key) {
+    //         return Ok(());
+    //     }
+    //     let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
+    //     let value = self.values.get(document_key).unwrap().clone();
+    //     let walk = WalkValue::new(PointerBuf::new(), &value);
+    //     for (path, value) in walk {
+    //         let uri = doc_uri.with_fragment(Some(path.as_str())).unwrap();
+    //         let source_key = self.link(uri, document_key, path.clone())?;
+    //         f(source_key, path, value)?;
+    //     }
+    //     Ok(())
+    // }
 
     fn check_existing(&self, uri: AbsoluteUri, value: &Value) -> Result<SourceKey, InsertError> {
         let existing_src_key = self.src_keys.get(&uri).copied().unwrap();
@@ -519,10 +534,11 @@ impl Sources {
 
     fn insert_link(&mut self, link: InternalLink) -> Result<SourceKey, LinkError> {
         let src = self.values.get(link.document_key).unwrap();
-        src.resolve(&link.pointer)
+        src.resolve(&link.absolute_path)
             .map_err(|source| InvalidLinkPathError::new(source, link.as_link()))?;
 
         let uri = link.uri.clone();
+
         let doc_key = link.document_key;
         let src_key = self.links.insert(link.clone());
         self.links.get_mut(src_key).unwrap().source_key = src_key;
@@ -545,7 +561,7 @@ impl Sources {
         if &link != existing_link {
             SourceConflictError::err_with(|| SourceConflictError {
                 uri: link.uri.clone(),
-                value: Box::new(link.pointer.to_string().into()),
+                value: Box::new(link.absolute_path.to_string().into()),
                 existing_link: existing_link.as_link().into_owned(),
                 existing_value: self.values[existing_link.document_key].clone(),
             })
@@ -862,8 +878,10 @@ mod tests {
     fn test_link() {
         let document = Arc::new(json!({"foo": { "bar": "baz" }}));
         let base_uri = AbsoluteUri::parse("https://example.com").unwrap();
-        let path = PointerBuf::from_tokens(["foo", "bar"]);
-        let uri = base_uri.with_fragment(Some(path.as_str())).unwrap();
+        let absolute_path = PointerBuf::from_tokens(["foo", "bar"]);
+        let uri = base_uri
+            .with_fragment(Some(absolute_path.as_str()))
+            .unwrap();
 
         let mut sources = Sources::new();
         // Insert the root document at the base uri
@@ -871,7 +889,14 @@ mod tests {
         let source = sources.source(source_key);
         // creates a Link from the uri `https://example.com#/foo/bar` to the
         // value at the path (as a JSON Pointer) `/foo/bar` within the document.
-        sources.link(uri, source.document_key(), path).unwrap();
+        sources
+            .link(New {
+                uri,
+                document_key: source.document_key(),
+                absolute_path,
+                fragment: Some(Fragment::Pointer("/foo/bar".parse().unwrap())),
+            })
+            .unwrap();
 
         let uri = AbsoluteUri::parse("https://example.com/#/foo/bar").unwrap();
         let source = sources.source_by_uri(&uri).unwrap();
