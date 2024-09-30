@@ -3,28 +3,23 @@ use crate::{
     dialect::{Dialect, DialectKey, Dialects},
     keyword::context,
     schema::CompiledSchema,
-    spec::Specification,
+    spec::{keyword::Found, Specification},
 };
 use grill_core::{
     resolve::Error as ResolveError,
     schema::Schemas,
-    source::{LinkError, Source, SourceConflictError, SourceKey, Sources},
+    source::{Fragment, LinkError, New, Source, SourceConflictError, SourceKey, Sources},
     Resolve,
 };
 use grill_uri::{AbsoluteUri, Uri};
-use jsonptr::{Pointer, PointerBuf, Token};
+use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::Key;
-
-use jsonptr::Resolve as _;
-use std::{
-    collections::{vec_deque, HashMap, VecDeque},
-    fmt,
-    path::PathBuf,
-};
+use std::{collections::HashMap, fmt};
 
 mod resolve;
 use resolve::{resolve, resolved, Resolved};
+
 pub(super) enum Scanned<'scan, K> {
     Scan(&'scan mut Scan<K>),
     Compiled(K),
@@ -32,10 +27,10 @@ pub(super) enum Scanned<'scan, K> {
 
 #[derive(Debug)]
 pub(super) struct Scan<K> {
+    pub index: usize,
     pub id: Option<AbsoluteUri>,
     pub dialect_key: DialectKey,
     pub anchors: Vec<Anchor>,
-    pub uris: Vec<AbsoluteUri>,
     pub source: Source<'static>,
     pub embeds: Vec<Embed<K>>,
     pub references: Vec<Reference<K>>,
@@ -62,7 +57,7 @@ where
         &'scan mut self,
         ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
         uri: &'cmp AbsoluteUri,
-    ) -> Result<Scanned<K>, Error<R>>
+    ) -> Result<Scanned<K>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
@@ -81,88 +76,160 @@ where
         }
     }
 
-    fn scan_src<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
+    fn scan_src<'scan, R, S>(
         &'scan mut self,
-        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
-        uri: &AbsoluteUri,
+        ctx: &mut context::Compile<R, S, K>,
+        _uri: &AbsoluteUri,
         src: resolved::Src,
-    ) -> Result<Scanned<'scan, K>, Error<R>>
+    ) -> Result<Scanned<'scan, K>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
         K: 'static + Key + Send + Sync,
     {
-        #[derive(Debug)]
-        struct Cursor {
-            source: Source<'static>,
-            remaining: PointerBuf,
-            super_dialect_key: Option<DialectKey>,
-            next: Option<Box<Cursor>>,
-        }
-
         let sources = &mut *ctx.context.state.sources;
         let schemas = &mut *ctx.context.state.schemas;
-
-        let source = sources.source(src.source_key).into_owned();
-        let doc_key = source.document().key();
-        let doc_value = source.document().value_arc();
-
         let dialects = ctx.dialects;
-        let ptr = source.path();
+        let source = sources.source(src.source_key).into_owned();
+        let mut stack = vec![(source, Pointer::root())];
+        let mut super_key = None;
 
-        let mut cursor = Some(Cursor {
-            source,
-            remaining: PointerBuf::default(),
-            super_dialect_key: None,
-            next: None,
-        });
-
-        while let Some(c) = cursor.take() {
-            let Cursor {
+        while let Some((source, remaining)) = stack.pop() {
+            self.scan_src_item(
+                &mut stack,
+                &mut super_key,
+                sources,
+                schemas,
+                dialects,
                 source,
-                mut remaining,
-                super_dialect_key,
-                next,
-            } = c;
-            let mut scan_and_insert = |dialect_key| {
-                let scan = self.scan_value(schemas, sources, dialects, source, dialect_key)?;
-                let idx =self.scans.len();
-                self.scanned.insert(source.uri().clone(), idx);
-                self.scans.push(scan);
-                Ok(idx)
-            };
-            let mut advance_cursor = | dialect_key | {
-                if let Some(mut next) = next {
-                    next.super_dialect_key = Some(dialect_key);
-                    cursor = Some(*next);
-                }
-            };
-
-            if let Some(scan_idx) = self.scanned.get(source.uri()).copied() {
-            }
-            let value = source.resolve();
-
-
-            let Some(dialect_key) = dialects.find_dialect_key(value) else {
-                if let Some((ptr, tok)) = source.path().split_back() {
-
-                    sources.link(uri, key, path)
-                }
-                else {
-                    scan_and_insert(dialects.primary_dialect_key())?;
-                    advance_cursor(dialects.primary_dialect_key());
-                    continue;
-                } 
-                todo!()
-            };
-
-            let Some(dialect_key) =  else {
-                if remaining.is_root() {
-                }
-            };
+                remaining,
+            )?;
         }
         todo!()
     }
+
+    fn scan_src_item<'r, R, S>(
+        &mut self,
+        stack: &mut Vec<(Source<'static>, &'r Pointer)>,
+        super_key: &mut Option<DialectKey>,
+        sources: &mut Sources,
+        schemas: &mut Schemas<CompiledSchema<S, K>, K>,
+        dialects: &Dialects<S, K>,
+        source: Source<'static>,
+        remaining: &'r Pointer,
+    ) -> Result<(), Cause<R>>
+    where
+        R: 'static + Resolve + Send + Sync,
+        S: 'static + Specification<K>,
+    {
+        if let Some(scan_idx) = self.scanned.get(source.uri()).copied() {
+            super_key.replace(self.scans[scan_idx].dialect_key);
+            return Ok(());
+        }
+        if let Some(dialect_key) = dialects.find_dialect_key(source.resolve()).or(*super_key) {
+            return self.scan_src_item_found_dialect(
+                dialect_key,
+                stack,
+                sources,
+                schemas,
+                dialects,
+                super_key,
+                source,
+                remaining,
+            );
+        }
+        if let Some((remaining, token)) = remaining.split_back() {
+            let absolute_path = source.absolute_path().with_trailing_token(token);
+            let uri = source.uri().with_fragment(absolute_path.as_str()).unwrap();
+            let fragment = Some(Fragment::Pointer(absolute_path.clone()));
+            let document_key = source.document_key();
+            let source_key = sources.link(New {
+                uri,
+                fragment,
+                document_key,
+                absolute_path,
+            })?;
+            let source = sources.source(source_key).into_owned();
+            stack.push((source, remaining));
+            return Ok(());
+        }
+        super_key.replace(dialects.default_dialect_key());
+        stack.push((source, remaining));
+        Ok(())
+    }
+
+    fn scan_src_item_found_dialect<'r, R, S>(
+        &mut self,
+        dialect_key: DialectKey,
+        stack: &mut Vec<(Source<'static>, &'r Pointer)>,
+        sources: &mut Sources,
+        schemas: &mut Schemas<CompiledSchema<S, K>, K>,
+        dialects: &Dialects<S, K>,
+        super_key: &mut Option<DialectKey>,
+        source: Source<'static>,
+        remaining: &'r Pointer,
+    ) -> Result<(), Cause<R>>
+    where
+        R: 'static + Resolve + Send + Sync,
+        S: 'static + Specification<K>,
+    {
+        super_key.replace(dialect_key);
+        let scan = match self.scan_value::<R, S>(schemas, sources, dialects, source, dialect_key) {
+            Ok(scan) => Ok(scan),
+            Err(err) if remaining.is_root() => Err(err.cause),
+            Err(err) => {
+                // we are not at the root but failed to scan the value
+                let source = err.src;
+                // in order to move on, we check the next node in the path to
+                // see if we can find the container schema of our target
+                let (_, remaining) = remaining.split_front().unwrap();
+                if remaining.is_root() {
+                    // next node is our target - we assume the default dialect
+                    super_key.replace(dialects.default_dialect_key());
+                    return Ok(());
+                }
+                let document_key = source.document_key();
+                let absolute_path = source.absolute_path().concat(remaining);
+                let uri = source.uri().with_fragment(absolute_path.as_str()).unwrap();
+                let fragment = Some(Fragment::Pointer(absolute_path.clone()));
+                let source_key = sources.link(New {
+                    uri,
+                    fragment,
+                    document_key,
+                    absolute_path,
+                })?;
+                let source = sources.source(source_key).into_owned();
+
+                stack.push((source, remaining));
+                return Ok(());
+            }
+        }?;
+        let path = scan.source.absolute_path();
+        let document_key = scan.source.document_key();
+        // At this point, the target schema's path is not discoverable with the
+        // current schema's embeds. We need to pop a token off the path and
+        // try again.
+
+        let (tok, remaining) = remaining.split_front().unwrap();
+        let ptr = Pointer::parse(tok.encoded()).unwrap();
+        let absolute_path = path.concat(ptr);
+        let uri = scan
+            .source
+            .uri()
+            .with_fragment(absolute_path.as_str())
+            .unwrap();
+        let fragment = Some(Fragment::Pointer(absolute_path.clone()));
+        let source_key = sources.link(New {
+            absolute_path,
+            uri,
+            fragment,
+            document_key,
+        })?;
+        let source = sources.source(source_key).into_owned();
+        stack.push((source, remaining));
+        Ok(())
+    }
+
     fn insert_scan(&mut self, scan: Scan<K>) -> usize {
         let idx = self.scans.len();
         self.scanned.insert(scan.source.uri().clone(), idx);
@@ -175,7 +242,7 @@ where
         _ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
         _uri: &AbsoluteUri,
         _doc: resolved::UnknownAnchor,
-    ) -> Result<Scanned<'scan, K>, Error<R>>
+    ) -> Result<Scanned<'scan, K>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
@@ -184,45 +251,60 @@ where
         todo!()
     }
 
-    fn scan_value<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
-        &'scan mut self,
+    fn scan_value<R, S>(
+        &mut self,
         schemas: &mut Schemas<CompiledSchema<S, K>, K>,
         sources: &mut Sources,
         dialects: &Dialects<S, K>,
-        source: Source<'static>,
+        src: Source<'static>,
         dialect_key: DialectKey,
-    ) -> Result<Scan<K>, Error<R>>
+    ) -> Result<&Scan<K>, Error<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
         K: 'static + Key + Send + Sync,
     {
         let dialect = dialects.get(dialect_key);
-        let value = source.resolve();
-        let uri = source.uri();
-        let references = link_and_collect_refs(schemas, dialect, uri, value)?;
-        let embeds = link_and_collect_embeds(schemas, sources, dialect, &source, uri, value)?;
-        let anchors = link_and_collect_anchors(sources, dialect, uri, value, &source)?;
-        let id = dialect
-            .identify(value)?
-            .map(|id| uri.resolve(&id))
-            .transpose()?;
-        let mut uris = Vec::new();
-        if let Some(id) = &id {
-            uris.push(id.clone());
-        }
-        if Some(uri) != id.as_ref() {
-            uris.push(uri.clone());
-        }
+        let value = src.resolve();
+        let uri = src.uri();
 
-        Ok(Scan {
+        let handle_err = |cause| Error {
+            cause,
+            src: src.clone(),
+        };
+
+        let references =
+            link_and_collect_refs(schemas, dialect, uri, value).map_err(|cause| Error {
+                cause,
+                src: src.clone(),
+            })?;
+
+        let embeds = link_and_collect_embeds(schemas, sources, dialect, &src, uri, value)
+            .map_err(handle_err)?;
+
+        let anchors =
+            link_and_collect_anchors(sources, dialect, uri, value, &src).map_err(handle_err)?;
+
+        let id = dialect
+            .identify(value)
+            .map_err(|err| handle_err(err.into()))?
+            .map(|id| uri.resolve(&id))
+            .transpose()
+            .map_err(|err| handle_err(err.into()))?;
+
+        let index = self.scans.len();
+        self.scanned.insert(src.uri().clone(), index);
+        let scan = Scan {
+            index,
             id,
+            dialect_key,
             anchors,
-            uris,
-            source,
+            source: src,
             embeds,
             references,
-        })
+        };
+        self.scans.push(scan);
+        Ok(&self.scans[index])
     }
 }
 
@@ -232,20 +314,23 @@ fn link_and_collect_anchors<S, K, R>(
     uri: &AbsoluteUri,
     value: &Value,
     src: &Source,
-) -> Result<Vec<Anchor>, Error<R>>
+) -> Result<Vec<Anchor>, Cause<R>>
 where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
     R: 'static + Resolve + Send + Sync,
 {
     let mut anchors = Vec::new();
-    for anchor in dialect.anchors(value) {
-        let uri = uri.with_fragment(Some(&anchor.value)).unwrap();
-        let source_key = sources.link(uri.clone(), src.document_key(), src.path().to_buf())?;
-        anchors.push(Anchor {
+    for Found { keyword, value } in dialect.anchors(value) {
+        let uri = uri.with_fragment(&value).unwrap();
+        let source_key = sources.link(New {
             uri,
-            name: anchor.value,
-            keyword: anchor.keyword,
+            document_key: src.document_key(),
+            absolute_path: src.absolute_path().to_buf(),
+            fragment: Some(Fragment::Anchor(value)),
+        })?;
+        anchors.push(Anchor {
+            keyword,
             source_key,
         });
     }
@@ -259,7 +344,7 @@ fn link_and_collect_embeds<'int, 'txn, 'res, R, S, K>(
     source: &Source,
     uri: &AbsoluteUri,
     value: &Value,
-) -> Result<Vec<Embed<K>>, Error<R>>
+) -> Result<Vec<Embed<K>>, Cause<R>>
 where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
@@ -267,12 +352,16 @@ where
 {
     let mut embeds = Vec::new();
     for embed in dialect.embedded_schemas(value) {
-        let embed_uri = uri.with_fragment(Some(embed.value.as_str())).unwrap();
-        let mut path = source.path().to_buf();
-        path.append(&embed.value);
-        let source_key = sources.link(embed_uri.clone(), source.document_key(), path)?;
+        let embed_uri = uri.with_fragment(embed.value.as_str()).unwrap();
+        let absolute_path = source.absolute_path().to_buf().concat(&embed.value);
+        let source_key = sources.link(New {
+            uri: embed_uri,
+            document_key: source.document_key(),
+            absolute_path,
+            fragment: Some(Fragment::Pointer(embed.value)),
+        })?;
+
         embeds.push(Embed {
-            relative_pointer: embed.value.clone(),
             source_key,
             schema_key: schemas.get_key_of(uri),
         });
@@ -285,7 +374,7 @@ fn link_and_collect_refs<'int, 'txn, 'res, R, S, K>(
     dialect: &Dialect<S, K>,
     uri: &AbsoluteUri,
     value: &Value,
-) -> Result<Vec<Reference<K>>, Error<R>>
+) -> Result<Vec<Reference<K>>, Cause<R>>
 where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
@@ -311,8 +400,6 @@ where
 
 #[derive(Debug)]
 pub(super) struct Anchor {
-    pub uri: AbsoluteUri,
-    pub name: String,
     pub keyword: &'static str,
     pub source_key: SourceKey,
 }
@@ -327,50 +414,54 @@ pub(super) struct Reference<K> {
 
 #[derive(Debug)]
 pub(super) struct Embed<K> {
-    pub relative_pointer: PointerBuf,
     pub source_key: SourceKey,
     pub schema_key: Option<K>,
 }
 
+pub(super) struct Error<R: 'static + Resolve> {
+    pub src: Source<'static>,
+    pub cause: Cause<R>,
+}
+
 #[derive(Debug)]
-pub(super) enum Error<R: 'static + Resolve> {
+pub(super) enum Cause<R: 'static + Resolve> {
     Resolve(ResolveError<R>),
     SourceConflict(Box<SourceConflictError>),
     Uri(grill_uri::Error),
 }
-impl<R: 'static + Resolve> From<LinkError> for Error<R> {
+impl<R: 'static + Resolve> From<LinkError> for Cause<R> {
     fn from(value: LinkError) -> Self {
         match value {
-            LinkError::SourceConflict(e) => Error::SourceConflict(e),
+            LinkError::SourceConflict(e) => Cause::SourceConflict(e),
             LinkError::InvalidPath(_) => unreachable!(),
         }
     }
 }
-impl<R: 'static + Resolve> fmt::Display for Error<R> {
+impl<R: 'static + Resolve> fmt::Display for Cause<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "failed to scan schema")
     }
 }
-impl<R: 'static + Resolve> From<grill_uri::Error> for Error<R> {
+impl<R: 'static + Resolve> From<grill_uri::Error> for Cause<R> {
     fn from(value: grill_uri::Error) -> Self {
-        Error::Uri(value)
+        Cause::Uri(value)
     }
 }
 
-impl<O, R> From<Error<R>> for CompileError<O, R>
+impl<O, R> From<Cause<R>> for CompileError<O, R>
 where
     R: 'static + Resolve,
 {
-    fn from(value: Error<R>) -> Self {
+    fn from(value: Cause<R>) -> Self {
         match value {
-            Error::Resolve(e) => CompileError::FailedToResolve(Box::new(e)),
-            Error::SourceConflict(e) => CompileError::SourceConflict(e),
-            Error::Uri(e) => CompileError::InvalidUri(Box::new(e)),
+            Cause::Resolve(e) => CompileError::FailedToResolve(Box::new(e)),
+            Cause::SourceConflict(e) => CompileError::SourceConflict(e),
+            Cause::Uri(e) => CompileError::InvalidUri(Box::new(e)),
         }
     }
 }
-impl<R: 'static + Resolve> From<ResolveError<R>> for Error<R> {
+impl<R: 'static + Resolve> From<ResolveError<R>> for Cause<R> {
     fn from(value: ResolveError<R>) -> Self {
-        Error::Resolve(value)
+        Cause::Resolve(value)
     }
 }

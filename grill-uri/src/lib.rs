@@ -743,9 +743,9 @@ impl AbsoluteUri {
     /// ## Errors
     /// returns [`Error`] if setting the fragment would exceed the maximum
     /// length (4gb).
-    pub fn with_fragment(&self, fragment: Option<&str>) -> Result<AbsoluteUri, Error> {
+    pub fn with_fragment(&self, fragment: &str) -> Result<AbsoluteUri, Error> {
         let mut new = self.clone();
-        let _ = new.set_fragment(fragment)?;
+        let _ = new.set_fragment(Some(fragment))?;
         Ok(new)
     }
 
@@ -754,7 +754,9 @@ impl AbsoluteUri {
     // this method is not fallible
     #[allow(clippy::missing_panics_doc)]
     pub fn without_fragment(&self) -> AbsoluteUri {
-        self.with_fragment(None).unwrap()
+        let mut new = self.clone();
+        let _ = new.set_fragment(None).unwrap();
+        new
     }
 
     /// Returns the authority (`Url`) or namespace (`Urn`)

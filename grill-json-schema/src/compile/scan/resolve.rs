@@ -2,7 +2,7 @@ use grill_core::{
     resolve::{Error, Resolve},
     source::{Fragment, LinkError, New, Sources},
 };
-use grill_uri::{decode_lossy, AbsoluteUri};
+use grill_uri::AbsoluteUri;
 use jsonptr::Pointer;
 use polonius_the_crab::{polonius, polonius_return};
 use serde_json::Value;
@@ -111,7 +111,10 @@ async fn resolve_path<'int, R: 'static + Resolve>(
         uri: uri.clone(),
         source,
     })?;
-    let mut absolute_path = sources.source(resolved_root.source_key).path().to_buf();
+    let mut absolute_path = sources
+        .source(resolved_root.source_key)
+        .absolute_path()
+        .to_buf();
     absolute_path.append(&relative_path);
     let source_key = sources
         .link(New {

@@ -176,7 +176,7 @@ where
         self.table.get(key).unwrap()
     }
 
-    pub fn primary_dialect_key(&self) -> DialectKey {
+    pub fn default_dialect_key(&self) -> DialectKey {
         self.primary_key
     }
 
