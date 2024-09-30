@@ -111,7 +111,7 @@ where
     fn scan_src_item<'r, R, S>(
         &mut self,
         stack: &mut Vec<(Source<'static>, &'r Pointer)>,
-        super_key: &mut Option<DialectKey>,
+        default_dialect_key: &mut Option<DialectKey>,
         sources: &mut Sources,
         schemas: &mut Schemas<CompiledSchema<S, K>, K>,
         dialects: &Dialects<S, K>,
@@ -122,18 +122,25 @@ where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
     {
+        // checking to see if we have already scanned the source
         if let Some(scan_idx) = self.scanned.get(source.uri()).copied() {
-            super_key.replace(self.scans[scan_idx].dialect_key);
+            // we have already scanned this source so we have a dialect key to use
+            default_dialect_key.replace(self.scans[scan_idx].dialect_key);
             return Ok(());
         }
-        if let Some(dialect_key) = dialects.find_dialect_key(source.resolve()).or(*super_key) {
+        // checking to see if we can determine the dialect of the source
+        if let Some(dialect_key) = dialects
+            .find_dialect_key(source.resolve())
+            .or(*default_dialect_key)
+        {
+            // we were able to determine the dialect so we can scan the value
             return self.scan_src_item_found_dialect(
                 dialect_key,
                 stack,
                 sources,
                 schemas,
                 dialects,
-                super_key,
+                default_dialect_key,
                 source,
                 remaining,
             );
@@ -153,7 +160,7 @@ where
             stack.push((source, remaining));
             return Ok(());
         }
-        super_key.replace(dialects.default_dialect_key());
+        default_dialect_key.replace(dialects.default_dialect_key());
         stack.push((source, remaining));
         Ok(())
     }
