@@ -67,7 +67,7 @@ where
     {
         Ok(crate::keyword::context::Compile {
             dialects: &self.dialects,
-            context: ctx
+            interrogator: ctx
         })
     }
 
@@ -290,10 +290,11 @@ where
     S: Specification<K>,
     K: 'static + Key + Send + Sync,
 {
-    fn core(
+    fn interrogator(
         &mut self,
     ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>;
     
+    fn language(&mut self) -> &mut crate::keyword::context::Compile<'int, 'txn, 'res, R, S, K>;
 }
 
 

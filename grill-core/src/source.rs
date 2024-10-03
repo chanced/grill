@@ -12,7 +12,6 @@ use grill_uri::AbsoluteUri;
 use jsonptr::{Pointer, PointerBuf, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
-use walk::WalkValue;
 
 pub mod walk;
 
@@ -565,28 +564,28 @@ impl Sources {
         source_key
     }
 
-    pub fn index_document<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
-    where
-        F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
-        E: From<LinkError>,
-    {
-        if self.indexed.contains_key(document_key) {
-            return Ok(());
-        }
-        let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
-        let value = self.values.get(document_key).unwrap().clone();
-        for (path, value) in WalkValue::new(PointerBuf::new(), &value) {
-            let uri = doc_uri.with_fragment(path.as_str()).unwrap();
-            let source_key = self.link(New {
-                uri,
-                absolute_path: path.clone(),
-                document_key,
-                fragment: Some(Fragment::Pointer(path.clone())),
-            })?;
-            f(source_key, path, value)?;
-        }
-        Ok(())
-    }
+    // pub fn index_document<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
+    // where
+    //     F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
+    //     E: From<LinkError>,
+    // {
+    //     if self.indexed.contains_key(document_key) {
+    //         return Ok(());
+    //     }
+    //     let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
+    //     let value = self.values.get(document_key).unwrap().clone();
+    //     for (path, value) in WalkFromValue::new(PointerBuf::new(), &value) {
+    //         let uri = doc_uri.with_fragment(path.as_str()).unwrap();
+    //         let source_key = self.link(New {
+    //             uri,
+    //             absolute_path: path.clone(),
+    //             document_key,
+    //             fragment: Some(Fragment::Pointer(path.clone())),
+    //         })?;
+    //         f(source_key, path, value)?;
+    //     }
+    //     Ok(())
+    // }
 
     fn check_existing(&self, uri: AbsoluteUri, value: &Value) -> Result<SourceKey, InsertError> {
         let existing_src_key = self.src_keys.get(&uri).copied().unwrap();

@@ -8,6 +8,8 @@
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 
+use std::ops::DerefMut;
+
 use crate::{
     dialect::Dialects,
     schema::CompiledSchema,
@@ -24,7 +26,7 @@ where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
 {
-    pub context: grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
+    pub interrogator: grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
     pub dialects: &'int Dialects<S, K>,
 }
 
@@ -35,10 +37,14 @@ where
     K: 'static + Key + Send + Sync,
     S: Specification<K>,
 {
-    fn core(
+    fn interrogator(
         &mut self,
     ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K> {
-        &mut self.context
+        &mut self.interrogator
+    }
+
+    fn language(&mut self) -> &mut Compile<'int, 'txn, 'res, R, S, K> {
+        self
     }
 }
 

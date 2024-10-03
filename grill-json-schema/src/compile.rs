@@ -1,4 +1,7 @@
-use crate::spec::{self, Compile, Specification};
+use crate::{
+    keyword::context,
+    spec::{self, Compile, Specification},
+};
 use grill_core::{
     resolve::Error as ResolveError,
     source::{LinkError, SourceConflictError},
@@ -6,7 +9,13 @@ use grill_core::{
 };
 use grill_uri::AbsoluteUri;
 use item::{Compiled, Pending, Queue};
-use std::{error::Error as StdError, f32::consts::E, fmt};
+use scan::Scanner;
+use std::{
+    error::Error as StdError,
+    f32::consts::E,
+    fmt,
+    ops::{Deref, DerefMut},
+};
 
 mod item;
 mod scan;
@@ -150,6 +159,7 @@ where
     'int: 'txn,
 {
     ctx: S::Compile<'int, 'txn, 'res, R>,
+    scanner: Scanner<K>,
 }
 
 impl<'int, 'txn, 'res, R, S, K> Compiler<'int, 'txn, 'res, R, S, K>
@@ -164,14 +174,18 @@ where
         S: Specification<K>,
         K: 'static + Key + Send,
     {
-        let mut this = Self { ctx };
-        let mut q = Queue::<K>::new(this.ctx.core().targets.clone());
+        let scanner = Scanner::new();
+        let mut this = Self { ctx, scanner };
+        let mut q = Queue::<K>::new(this.ctx.interrogator().targets.clone());
         let mut compiled = vec![K::default(); q.len()];
         while !q.is_empty() {
             let item = q.pop().unwrap();
-            let continue_on_err = item.continue_on_err;
-            let result = this.compile(&mut q, item).await;
-            handle(&mut compiled, result, continue_on_err)?;
+            let Some(schema) = this.compile(&mut q, item).await? else {
+                continue;
+            };
+            if let Some(index) = schema.index {
+                compiled[index] = schema.key;
+            }
         }
         Ok(compiled)
     }
@@ -181,37 +195,9 @@ where
         q: &mut Queue<K>,
         item: Pending<K>,
     ) -> Result<Option<Compiled<K>>, S::CompileError<R>> {
+        let scan = self.scanner.scan(self.ctx.language(), &item.uri).await;
         todo!()
     }
-}
-
-fn handle<E, S, K, R>(
-    compiled: &mut [K],
-    result: Result<Option<Compiled<K>>, E>,
-    continue_on_err: bool,
-) -> Result<(), E>
-where
-    K: 'static + Key + Send + Sync,
-    E: spec::CompileError<R, S, K>,
-    S: Specification<K>,
-    R: 'static + Resolve + Send + Sync,
-{
-    match result {
-        Ok(ok) => handle_ok(compiled, ok),
-        Err(err) => handle_err(err, continue_on_err),
-    }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn handle_ok<E, K>(compiled: &mut [K], result: Option<Compiled<K>>) -> Result<(), E>
-where
-    K: 'static + Key + Send + Sync,
-{
-    let Some(schema) = result else { return Ok(()) };
-    if let Some(index) = schema.index {
-        compiled[index] = schema.key;
-    }
-    Ok(())
 }
 
 fn handle_err<T, E, S, K, R>(e: E, _continue_on_err: bool) -> Result<T, E>
