@@ -28,8 +28,7 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
     fn next(&mut self) -> Option<Self::Item> {
         let remaining_str = self.remaining.as_str();
         let next_str = self.next.map(|next| next.as_str());
-        println!("remaining: {remaining_str}");
-        println!("next: {next_str:?}");
+        let _ = (remaining_str, next_str);
 
         let next = self.next.take()?;
         let value = self.value.resolve(next).ok()?;
@@ -37,7 +36,6 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
             .full_path
             .split_at(self.offset)
             .unwrap_or((self.full_path, Pointer::root()));
-        println!("path: \"{path}\"");
         if !self.remaining.is_root() {
             if let Some(tok) = self.remaining.first() {
                 let offset = tok.encoded().len() + 1;
@@ -55,11 +53,6 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
                 self.next = None;
             }
         }
-        println!("\n---------------");
-        println!("\"{path}\"");
-        println!("{}", serde_json::to_string_pretty(value).unwrap());
-        println!("\n---------------");
-        println!("========================================================");
         Some((path, value))
     }
 }
