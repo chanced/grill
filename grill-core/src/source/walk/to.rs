@@ -1,21 +1,34 @@
 use std::{num::NonZeroUsize, path::Path};
 
-use jsonptr::{Pointer, Resolve, Token};
+use jsonptr::{resolve::ResolveError, Pointer, Resolve, Token};
 use serde_json::Value;
 
 #[derive(Debug)]
 pub struct WalkTo<'p, 'v> {
-    value: &'v Value,
+    cursor: &'v Value,
+    original_value: &'v Value,
     full_path: &'p Pointer,
     offset: Option<NonZeroUsize>,
 }
 impl<'p, 'v> WalkTo<'p, 'v> {
     pub fn new(value: &'v Value, to: &'p Pointer) -> Self {
         Self {
-            value,
+            cursor: value,
+            original_value: value,
             full_path: to,
             offset: None,
         }
+    }
+
+    fn handle_err(
+        &self,
+        _err: ResolveError,
+        path: &'p Pointer,
+        _resolvable: &'p Pointer,
+    ) -> Option<Result<(&'p Pointer, &'v Value), ResolveError>> {
+        // TODO: determine appropriate offsets and update error rather than re-resolving
+        // for now, we are just punting to `Resolve` to recreate the error
+        Some(Err(self.original_value.resolve(path).unwrap_err()))
     }
 }
 
@@ -23,7 +36,7 @@ impl<'p, 'v> WalkTo<'p, 'v> {
 //  ^
 
 impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
-    type Item = (&'p Pointer, &'v Value);
+    type Item = Result<(&'p Pointer, &'v Value), ResolveError>;
     fn next(&mut self) -> Option<Self::Item> {
         // we need to get the offset to determine where we are in the pointer
         let offset = if let Some(offset) = self.offset {
@@ -39,7 +52,7 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
                 // the target path is root, so we set the offset to 1 ensures we
                 // do not send repeats due to the bounds check on offset below.
                 self.offset = NonZeroUsize::new(1);
-                return Some((Pointer::root(), self.value));
+                return Some(Ok((Pointer::root(), self.cursor)));
             }
             // if the offset was not previously set, we start at 0
             0
@@ -78,10 +91,19 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
             .last()
             .map(|t| path.split_at(path.len() - t.encoded().len() - 1).unwrap().1)
             .unwrap_or(Pointer::root());
+
         // we attempt to resolve the value
-        let value = self.value.resolve(resolvable).ok()?;
-        self.value = value;
-        Some((path, value))
+        let result = self.cursor.resolve(resolvable);
+
+        let value = match result {
+            Ok(ok) => ok,
+            Err(err) => return self.handle_err(err, path, resolvable),
+        };
+
+        // moving the cursor value to the resolved value
+        self.cursor = value;
+
+        Some(Ok((path, value)))
     }
 }
 
@@ -116,15 +138,15 @@ mod test {
         assert_eq!(
             walk_to.collect::<Vec<_>>(),
             vec![
-                (Pointer::from_static(""), &value),
-                (Pointer::from_static("/foo"), foo),
-                (Pointer::from_static("/foo/bar"), foo_bar),
-                (Pointer::from_static("/foo/bar/0"), foo_bar_0),
-                (Pointer::from_static("/foo/bar/0/baz"), foo_bar_0_baz),
-                (
+                Ok((Pointer::from_static(""), &value)),
+                Ok((Pointer::from_static("/foo"), foo)),
+                Ok((Pointer::from_static("/foo/bar"), foo_bar)),
+                Ok((Pointer::from_static("/foo/bar/0"), foo_bar_0)),
+                Ok((Pointer::from_static("/foo/bar/0/baz"), foo_bar_0_baz)),
+                Ok((
                     Pointer::from_static("/foo/bar/0/baz/qux"),
                     foo_bar_0_baz_qux
-                ),
+                )),
             ]
         );
     }
