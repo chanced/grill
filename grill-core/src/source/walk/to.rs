@@ -1,6 +1,6 @@
-use std::{num::NonZeroUsize, path::Path};
+use std::num::NonZeroUsize;
 
-use jsonptr::{resolve::ResolveError, Pointer, Resolve, Token};
+use jsonptr::{resolve::ResolveError, Pointer, Resolve};
 use serde_json::Value;
 
 #[derive(Debug)]
@@ -83,10 +83,8 @@ impl<'p, 'v> Iterator for WalkTo<'p, 'v> {
         // we want the last token as a `&Pointer` so that we can use the resolve logic
         // the path is either splittable (contains a token) or is empty (root).
         //
-        // If it is splittable, we use the token's length to determine where the token's
-        // offset and split the path there.
-        //
-        // Otherwise, we use the root pointer.
+        // If it is splittable, we either use the token's length to determine the token's
+        // offset and split the path there or we use the root pointer.
         let resolvable = path
             .last()
             .map(|t| path.split_at(path.len() - t.encoded().len() - 1).unwrap().1)
@@ -115,8 +113,7 @@ mod test {
     use super::WalkTo;
 
     #[test]
-    fn walk() {
-        dbg!("inside test");
+    fn valid() {
         let value = json!({
             "foo": {
                 "bar": [
@@ -148,6 +145,65 @@ mod test {
                     foo_bar_0_baz_qux
                 )),
             ]
+        );
+    }
+
+    #[test]
+    fn root() {
+        let value = json!({
+            "foo": {
+                "bar": [
+                    {
+                        "baz": {
+                            "qux": 34
+                        }
+                    }
+                ]
+            }
+        });
+
+        let walk_to = WalkTo::new(&value, Pointer::from_static(""));
+        assert_eq!(
+            walk_to.collect::<Vec<_>>(),
+            vec![Ok((Pointer::from_static(""), &value))]
+        );
+    }
+
+    #[test]
+    fn invalid() {
+        use jsonptr::resolve::ResolveError;
+        let value = json!({
+            "foo": {
+                "bar": [
+                    {
+                        "baz": {
+                            "qux": 34
+                        }
+                    }
+                ]
+            }
+        });
+        let full_path = Pointer::from_static("/invalid");
+        let walk_to = WalkTo::new(&value, full_path);
+        let mut results = walk_to.collect::<Vec<_>>();
+        assert!(results.len() == 2);
+        assert!(results[0].is_ok()); // root is always valid
+        assert!(results[1].is_err());
+        assert_eq!(
+            results.pop().unwrap().unwrap_err(),
+            ResolveError::NotFound { offset: 0 }
+        );
+
+        let full_path = Pointer::from_static("/foo/invalid");
+        let walk_to = WalkTo::new(&value, full_path);
+        let mut results = walk_to.collect::<Vec<_>>();
+        assert!(results.len() == 3);
+        assert!(results[0].is_ok()); // root is always valid
+        assert!(results[1].is_ok());
+        assert!(results[2].is_err());
+        assert_eq!(
+            results.pop().unwrap().unwrap_err(),
+            ResolveError::NotFound { offset: 4 }
         );
     }
 }
