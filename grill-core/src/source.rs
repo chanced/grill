@@ -564,7 +564,7 @@ impl Sources {
         source_key
     }
 
-    // pub fn index_document<F, O, E>(&mut self, document_key: DocumentKey, f: F) -> Result<(), E>
+    // pub fn index_source<F, O, E>(&mut self, source_key: SourceKey, f: F) -> Result<(), E>
     // where
     //     F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
     //     E: From<LinkError>,

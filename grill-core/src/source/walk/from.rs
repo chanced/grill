@@ -1,33 +1,71 @@
-use core::slice;
-use either::Either;
-use jsonptr::{PointerBuf, Token};
-use serde_json::Value;
-use std::iter::{Enumerate, Map};
-
-type MapIterFn = for<'v> fn((&'v String, &'v Value)) -> (Token<'v>, &'v Value);
-type MapIter<'v> = Map<serde_json::map::Iter<'v>, MapIterFn>;
-type SliceIterFn = for<'v> fn((usize, &'v Value)) -> (Token<'v>, &'v Value);
-type SliceIter<'v> = Map<Enumerate<slice::Iter<'v, Value>>, SliceIterFn>;
+use core::slice::Iter as SliceIter;
+use jsonptr::{resolve::ResolveError, PointerBuf, Resolve, Token};
+use serde_json::{map::Iter as MapIter, Map, Value};
+use std::iter::{Enumerate, Peekable};
 
 /// An iterator that walks a JSON value from a specified path, emitting the
 /// value's path represented a JSON Pointer and the value itself.
 pub struct WalkFrom<'v> {
     steps: Vec<Step<'v>>,
 }
+impl<'v> WalkFrom<'v> {
+    pub fn new(from: PointerBuf, value: &'v Value) -> Result<Self, ResolveError> {
+        let value = value.resolve(&from)?;
+        Ok(Self {
+            steps: vec![Step::Root((from, value))],
+        })
+    }
+}
+
+enum Iter<'v> {
+    Object(MapIter<'v>),
+    Array(Enumerate<SliceIter<'v, Value>>),
+}
+impl<'v> Iter<'v> {
+    fn object(map: &'v Map<String, Value>) -> Self {
+        map.iter().into()
+    }
+
+    fn array(slice: &'v [Value]) -> Iter<'v> {
+        slice.iter().into()
+    }
+}
+impl<'v> From<MapIter<'v>> for Iter<'v> {
+    fn from(iter: MapIter<'v>) -> Self {
+        Self::Object(iter)
+    }
+}
+impl<'v> From<SliceIter<'v, Value>> for Iter<'v> {
+    fn from(iter: SliceIter<'v, Value>) -> Self {
+        Self::Array(iter.enumerate())
+    }
+}
+
+impl<'v> Iterator for Iter<'v> {
+    type Item = (Token<'v>, &'v Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Iter::Object(iter) => iter.next().map(|(k, v)| (Token::from(k), v)),
+            Iter::Array(iter) => iter.next().map(|(i, v)| (Token::from(i), v)),
+        }
+    }
+}
+
 struct Node<'v> {
     from: PointerBuf,
-    iter: Either<MapIter<'v>, SliceIter<'v>>,
+    iter: Peekable<Iter<'v>>,
 }
 impl<'v> Node<'v> {
     fn new(from: PointerBuf, value: &'v Value) -> Self {
         match value {
             Value::Object(map) => Self {
                 from,
-                iter: Either::Left(map.iter().map(object_entry_to_step)),
+                iter: Iter::object(map).peekable(),
             },
             Value::Array(slice) => Self {
                 from,
-                iter: Either::Right(slice.iter().enumerate().map(array_entry_to_step)),
+                iter: Iter::array(slice).peekable(),
             },
             _ => unreachable!(),
         }
@@ -39,33 +77,85 @@ enum Step<'v> {
     Root((PointerBuf, &'v Value)),
 }
 
-fn array_entry_to_step((index, value): (usize, &Value)) -> (Token, &Value) {
-    (Token::new(index.to_string()), value)
-}
-fn object_entry_to_step<'v>((key, value): (&'v String, &'v Value)) -> (Token<'v>, &'v Value) {
-    (Token::new(key), value)
-}
-
 impl<'v> Iterator for WalkFrom<'v> {
     type Item = (PointerBuf, &'v Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.steps.pop()? {
-            Step::Node(mut node) => {
-                let (token, value) = node.iter.next()?;
-                let mut path = node.from.clone();
-                path.push_back(token);
-                if value.is_array() || value.is_object() {
-                    self.steps.push(Step::Node(Node::new(path.clone(), value)));
+        while !self.steps.is_empty() {
+            match self.steps.pop().unwrap() {
+                Step::Node(mut node) => {
+                    let Some((token, value)) = node.iter.next() else {
+                        continue;
+                    };
+                    let path = node.from.with_trailing_token(token);
+                    if node.iter.peek().is_some() {
+                        self.steps.push(Step::Node(node));
+                    }
+                    if value.is_array() || value.is_object() {
+                        self.steps.push(Step::Node(Node::new(path.clone(), value)));
+                    }
+                    return Some((path, value));
                 }
-                Some((path, value))
-            }
-            Step::Root((path, value)) => {
-                if value.is_array() || value.is_object() {
-                    self.steps.push(Step::Node(Node::new(path.clone(), value)));
+                Step::Root((path, value)) => {
+                    if value.is_array() || value.is_object() {
+                        self.steps.push(Step::Node(Node::new(path.clone(), value)));
+                    }
+                    return Some((path, value));
                 }
-                Some((path, value))
             }
         }
+        None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::WalkFrom;
+    use jsonptr::PointerBuf;
+    use serde_json::json;
+
+    #[test]
+    fn valid() {
+        let value = json!({
+            "foo": {
+                "bar": [
+                    {
+                        "baz": {
+                            "qux": 34
+                        }
+                    },
+                    {
+                        "baz": {
+                            "qux": 21
+                        }
+                    }
+                ]
+            }
+        });
+        let foo = value.get("foo").unwrap();
+        let foo_bar = foo.get("bar").unwrap();
+        let foo_bar_0 = foo_bar.get(0).unwrap();
+        let foo_bar_0_baz = foo_bar_0.get("baz").unwrap();
+        let foo_bar_0_baz_qux = foo_bar_0_baz.get("qux").unwrap();
+        let foo_bar_1 = foo_bar.get(1).unwrap();
+        let foo_bar_1_baz = foo_bar_1.get("baz").unwrap();
+        let foo_bar_1_baz_qux = foo_bar_1_baz.get("qux").unwrap();
+
+        let from_root = WalkFrom::new(PointerBuf::default(), &value).unwrap();
+
+        assert_eq!(
+            from_root.collect::<Vec<_>>(),
+            vec![
+                ("".try_into().unwrap(), &value),
+                ("/foo".try_into().unwrap(), foo),
+                ("/foo/bar".try_into().unwrap(), foo_bar),
+                ("/foo/bar/0".try_into().unwrap(), foo_bar_0),
+                ("/foo/bar/0/baz".try_into().unwrap(), foo_bar_0_baz),
+                ("/foo/bar/0/baz/qux".try_into().unwrap(), foo_bar_0_baz_qux),
+                ("/foo/bar/1".try_into().unwrap(), foo_bar_1),
+                ("/foo/bar/1/baz".try_into().unwrap(), foo_bar_1_baz),
+                ("/foo/bar/1/baz/qux".try_into().unwrap(), foo_bar_1_baz_qux),
+            ]
+        );
     }
 }

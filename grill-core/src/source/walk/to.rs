@@ -11,7 +11,7 @@ pub struct WalkTo<'p, 'v> {
     offset: Option<NonZeroUsize>,
 }
 impl<'p, 'v> WalkTo<'p, 'v> {
-    pub fn new(value: &'v Value, to: &'p Pointer) -> Self {
+    pub fn new(to: &'p Pointer, value: &'v Value) -> Self {
         Self {
             cursor: value,
             original_value: value,
@@ -126,7 +126,7 @@ mod test {
             }
         });
         let full_path = Pointer::from_static("/foo/bar/0/baz/qux");
-        let walk_to = WalkTo::new(&value, full_path);
+        let walk_to = WalkTo::new(full_path, &value);
         let foo = value.get("foo").unwrap();
         let foo_bar = foo.get("bar").unwrap();
         let foo_bar_0 = foo_bar.get(0).unwrap();
@@ -162,7 +162,7 @@ mod test {
             }
         });
 
-        let walk_to = WalkTo::new(&value, Pointer::from_static(""));
+        let walk_to = WalkTo::new(Pointer::from_static(""), &value);
         assert_eq!(
             walk_to.collect::<Vec<_>>(),
             vec![Ok((Pointer::from_static(""), &value))]
@@ -184,7 +184,7 @@ mod test {
             }
         });
         let full_path = Pointer::from_static("/invalid");
-        let walk_to = WalkTo::new(&value, full_path);
+        let walk_to = WalkTo::new(full_path, &value);
         let mut results = walk_to.collect::<Vec<_>>();
         assert!(results.len() == 2);
         assert!(results[0].is_ok()); // root is always valid
@@ -195,7 +195,7 @@ mod test {
         );
 
         let full_path = Pointer::from_static("/foo/invalid");
-        let walk_to = WalkTo::new(&value, full_path);
+        let walk_to = WalkTo::new(full_path, &value);
         let mut results = walk_to.collect::<Vec<_>>();
         assert!(results.len() == 3);
         assert!(results[0].is_ok()); // root is always valid

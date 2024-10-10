@@ -21,7 +21,11 @@ use std::{
 };
 
 mod resolve;
-use resolve::{resolve, resolved, Resolved};
+use resolve::{
+    resolve,
+    resolved::{self, Src},
+    Resolved,
+};
 
 pub(super) enum Scanned<'scan, K> {
     Scan(&'scan mut Scan<K>),
@@ -146,11 +150,6 @@ where
         // In order to scan this source, we first need to determine the
         // dialect. In order to do so, we may need to look at some of the
         // schema's ancestors.
-        //
-        // We check each source along the way, until we find a schema with a
-        // specified dialect or the root of the document. If we reach the root
-        // and do not find a $schema field, we use the user's specified deafult
-        // dialect
         let sources = &mut *ctx.interrogator.state.sources;
         let schemas = &mut *ctx.interrogator.state.schemas;
         let dialects = ctx.dialects;
@@ -175,16 +174,8 @@ where
     }
 
     /// Attempts to scan an item on the stack of [`scan_src`](Self::scan_src).
-    fn scan_src_item<R, S>(
-        &mut self,
-        stack: &mut Vec<SourceKey>,
-        source_key: SourceKey,
-        sources: &mut Sources,
-        schemas: &mut Schemas<CompiledSchema<S, K>, K>,
-        dialects: &Dialects<S, K>,
-        target_source_key: SourceKey,
-        default_dialect_key: Option<DialectKey>,
-    ) -> Result<Option<DialectKey>, Cause<R>>
+    #[allow(clippy::too_many_arguments)]
+    fn scan_src_item<R, S>(&mut self) -> Result<Option<DialectKey>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
@@ -219,7 +210,6 @@ where
         }
 
         // couldn't find the dialect
-
         stack.push(source_key);
 
         // if we aren't at the root, we need to check the next node in the path
@@ -368,6 +358,26 @@ where
         // Ok(&self.scans[index])
         todo!()
     }
+}
+
+#[derive(Debug)]
+struct SrcScanner<'c, S, K>
+where
+    S: Specification<K>,
+    K: 'static + Send + Sync + Key,
+{
+    source_key: SourceKey,
+    sources: &'c mut Sources,
+    schemas: &'c mut Schemas<CompiledSchema<S, K>, K>,
+    dialects: &'c Dialects<S, K>,
+}
+
+impl<'c, S, K> SrcScanner<'c, S, K>
+where
+    S: Specification<K>,
+    K: 'static + Send + Sync + Key,
+{
+
 }
 
 fn link_and_collect_anchors<S, K, R>(

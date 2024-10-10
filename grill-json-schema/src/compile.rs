@@ -12,7 +12,6 @@ use item::{Compiled, Pending, Queue};
 use scan::Scanner;
 use std::{
     error::Error as StdError,
-    f32::consts::E,
     fmt,
     ops::{Deref, DerefMut},
 };
