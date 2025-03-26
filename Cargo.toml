@@ -20,7 +20,7 @@ grill-uri         = { version = "0.1.0", path = "grill-uri" }
 either             = { version = "1.8.1" }
 futures            = { version = "0.3.0" }
 indexmap           = { version = "2.2.6", features = ["serde"] }
-jsonptr            = { version = "0.6.2" }
+jsonptr            = { version = "0.7.1" }
 mockall            = { version = "0.13" }
 num                = { version = "0.4", features = ["serde"] }
 num-rational       = { version = "0.4.1" }

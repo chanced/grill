@@ -7,18 +7,14 @@ use crate::{
 
 use grill_uri::AbsoluteUri;
 use serde_json::Value;
-use slotmap::Key;
 
 /// Evaluates the integrity of data through a schema language.
-pub struct Interrogator<L: Language<K>, K: 'static + Key + Send + Sync = DefaultKey> {
+pub struct Interrogator<L: Language> {
     lang: L,
-    state: State<L, K>,
+    state: State<L>,
 }
 
-impl<L> Interrogator<L, DefaultKey>
-where
-    L: 'static + Language<DefaultKey> + Send + Sync,
-{
+impl<L> Interrogator<L> {
     /// Creates a new `Interrogator`.
     pub fn new(lang: L) -> Self {
         Self {
@@ -29,9 +25,9 @@ where
     }
 }
 
-impl<L, K> Interrogator<L, K>
+impl<L, K> Interrogator<L>
 where
-    L: 'static + Language<K>,
+    L: 'static + Language,
     K: 'static + Key + Send + Sync,
 {
     /// Creates a new `Interrogator` using the specificed Key.

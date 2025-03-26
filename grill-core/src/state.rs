@@ -4,7 +4,7 @@ use slotmap::Key;
 
 use crate::{cache::Cache, schema::Schemas, source::Sources, Language};
 
-pub struct State<L: Language<K>, K: 'static + Key + Send + Sync> {
+pub struct State<L: Language, K: 'static + Key + Send + Sync> {
     /// Schema graph
     pub schemas: Schemas<L::CompiledSchema, K>,
     /// Source repository
@@ -13,7 +13,7 @@ pub struct State<L: Language<K>, K: 'static + Key + Send + Sync> {
     pub cache: Cache,
 }
 
-impl<L: Language<K>, K: 'static + Key + Send + Sync> State<L, K> {
+impl<L: Language, K: 'static + Key + Send + Sync> State<L, K> {
     pub fn new() -> Self {
         Self {
             schemas: Schemas::new(),
@@ -41,20 +41,20 @@ impl<L: Language<K>, K: 'static + Key + Send + Sync> State<L, K> {
     }
 }
 
-impl<L: Language<K>, K: 'static + Key + Send + Sync> Default for State<L, K> {
+impl<L: Language, K: 'static + Key + Send + Sync> Default for State<L, K> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Debug)]
-pub struct Transaction<'int, 'txn, L: Language<K>, K: 'static + Key + Send + Sync> {
+pub struct Transaction<'int, 'txn, L: Language, K: 'static + Key + Send + Sync> {
     pub schemas: &'txn mut Schemas<L::CompiledSchema, K>,
     pub sources: &'txn mut Sources,
     pub cache: &'int mut Cache,
 }
 
-impl<'int, 'txn, L: Language<K>, K: 'static + Key + Send + Sync> Transaction<'int, 'txn, L, K> {
+impl<'int, 'txn, L: Language, K: 'static + Key + Send + Sync> Transaction<'int, 'txn, L, K> {
     pub fn new(
         schemas: &'txn mut Schemas<L::CompiledSchema, K>,
         sources: &'txn mut Sources,

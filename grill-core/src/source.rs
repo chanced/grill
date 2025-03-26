@@ -13,8 +13,6 @@ use jsonptr::{Pointer, PointerBuf, Resolve as _};
 use serde_json::Value;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-pub mod walk;
-
 new_key_type! {
     /// Key to root documents within [`Sources`]
     pub struct DocumentKey;
@@ -39,7 +37,6 @@ pub struct Document<'int> {
     uri: Cow<'int, AbsoluteUri>,
     value: Arc<Value>,
     links: Cow<'int, [InternalLink]>,
-    indexed: bool,
 }
 
 impl Document<'_> {
@@ -54,7 +51,7 @@ impl Document<'_> {
     }
 
     /// The [`Value`] of the document as a reference.
-    pub fn value_ref(&self) -> &Value {
+    pub fn value(&self) -> &Value {
         &self.value
     }
 
@@ -77,7 +74,6 @@ impl Document<'_> {
             uri: Cow::Owned(self.uri.into_owned()),
             value: self.value.clone(),
             links: Cow::Owned(self.links.into_owned()),
-            indexed: self.indexed,
         }
     }
 }
@@ -390,7 +386,6 @@ pub struct Sources {
     src_keys: HashMap<AbsoluteUri, SourceKey>,
     doc_links: SecondaryMap<DocumentKey, Vec<InternalLink>>,
     doc_uris: SecondaryMap<DocumentKey, AbsoluteUri>,
-    indexed: SecondaryMap<DocumentKey, ()>,
 }
 pub struct New {
     pub uri: AbsoluteUri,
@@ -408,7 +403,6 @@ impl Sources {
             src_keys: HashMap::new(),
             doc_links: SecondaryMap::new(),
             doc_uris: SecondaryMap::new(),
-            indexed: SecondaryMap::new(),
         }
     }
     /// Inserts new [`Link`] into the store.
@@ -457,14 +451,13 @@ impl Sources {
         }
     }
 
-    pub fn document(&self, key: DocumentKey) -> Option<Document> {
-        Some(Document {
+    pub fn document(&self, key: DocumentKey) -> Document {
+        Document {
             key,
-            uri: Cow::Borrowed(self.doc_uris.get(key)?),
-            value: self.values.get(key)?.clone(),
-            links: Cow::Borrowed(self.doc_links.get(key)?.as_slice()),
-            indexed: self.indexed.contains_key(key),
-        })
+            uri: Cow::Borrowed(self.doc_uris.get(key).unwrap()),
+            value: self.values.get(key).unwrap().clone(),
+            links: Cow::Borrowed(self.doc_links.get(key).unwrap().as_slice()),
+        }
     }
 
     pub fn value(&self, key: SourceKey) -> Option<&Value> {
@@ -475,7 +468,7 @@ impl Sources {
 
     pub fn source(&self, key: SourceKey) -> Source<'_> {
         let link = Cow::Borrowed(self.links.get(key).unwrap());
-        let document = self.document(link.document_key).unwrap();
+        let document = self.document(link.document_key);
         Source {
             key,
             link,
@@ -563,29 +556,6 @@ impl Sources {
         .unwrap();
         source_key
     }
-
-    // pub fn index_source<F, O, E>(&mut self, source_key: SourceKey, f: F) -> Result<(), E>
-    // where
-    //     F: for<'v> Fn(SourceKey, PointerBuf, &'v Value) -> Result<O, E>,
-    //     E: From<LinkError>,
-    // {
-    //     if self.indexed.contains_key(document_key) {
-    //         return Ok(());
-    //     }
-    //     let doc_uri = self.doc_uris.get(document_key).cloned().unwrap();
-    //     let value = self.values.get(document_key).unwrap().clone();
-    //     for (path, value) in WalkFromValue::new(PointerBuf::new(), &value) {
-    //         let uri = doc_uri.with_fragment(path.as_str()).unwrap();
-    //         let source_key = self.link(New {
-    //             uri,
-    //             absolute_path: path.clone(),
-    //             document_key,
-    //             fragment: Some(Fragment::Pointer(path.clone())),
-    //         })?;
-    //         f(source_key, path, value)?;
-    //     }
-    //     Ok(())
-    // }
 
     fn check_existing(&self, uri: AbsoluteUri, value: &Value) -> Result<SourceKey, InsertError> {
         let existing_src_key = self.src_keys.get(&uri).copied().unwrap();

@@ -72,15 +72,6 @@ impl Resolve for () {
     }
 }
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                 ResolveError                                 ║
-║                                ¯¯¯¯¯¯¯¯¯¯¯¯¯                                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
 #[derive(Debug)]
 pub enum Error<R: 'static + Resolve> {
     FailedToResolve {
@@ -93,7 +84,7 @@ pub enum Error<R: 'static + Resolve> {
     /// The JSON pointer fragment of the uri is malformed.
     InvalidPointer {
         uri: AbsoluteUri,
-        source: jsonptr::ParseError,
+        source: jsonptr::RichParseError,
     },
     /// Failed to link source
     PathNotFound {

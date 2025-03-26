@@ -12,20 +12,12 @@ use grill_core::{
     Resolve,
 };
 use grill_uri::{AbsoluteUri, Uri};
-use jsonptr::{Pointer, Resolve as _};
 use serde_json::Value;
 use slotmap::Key;
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 mod resolve;
-use resolve::{
-    resolve,
-    resolved::{self, Src},
-    Resolved,
-};
+use resolve::{resolve, Resolved};
 
 pub(super) enum Scanned<'scan, K> {
     Scan(&'scan mut Scan<K>),
@@ -33,10 +25,10 @@ pub(super) enum Scanned<'scan, K> {
 }
 
 #[derive(Debug, Default)]
-pub struct Scans<K> {
+pub(super) struct Scans<K> {
     list: Vec<Scan<K>>,
     by_uri: HashMap<AbsoluteUri, usize>,
-    by_source_key: BTreeMap<SourceKey, usize>,
+    by_source_key: HashMap<SourceKey, usize>,
 }
 
 impl<K> Scans<K> {
@@ -88,12 +80,45 @@ pub(super) struct Scan<K> {
     pub embeds: Vec<Embed<K>>,
     pub references: Vec<Reference<K>>,
 }
+
 impl<K> Scan<K> {
     pub(super) fn unresolved_refs(&mut self) -> impl Iterator<Item = &mut Reference<K>> {
         self.references
             .iter_mut()
             .filter(|r| r.schema_key.is_none())
     }
+}
+
+/// Resolves the root document by calling `Resolve::resolve` on `resolver` and
+/// inserting it into `sources`.
+///
+/// ## Errors
+/// Returns `ResolveError::FailedToResolve` if the uri could not be resolved by
+/// `resolver`.
+async fn resolve_root<'int, R: 'static + Resolve>(
+    mut sources: &'int mut Sources,
+    resolver: &R,
+    uri: &AbsoluteUri,
+) -> Result<SourceKey, Error<R>> {
+    let uri = uri.without_fragment();
+    // polonius!(|sources| -> Result<SourceKey, Error<R>> {
+    // });
+    if let Some(source_key) = sources.source_key_by_uri(&uri) {
+        return Ok(source_key);
+    }
+    let value = fetch(resolver, &uri).await?;
+    // insert is safe due to the check above
+    Ok(sources.insert(uri, value).unwrap())
+}
+
+async fn fetch<'int, R: 'static + Resolve>(
+    resolver: &R,
+    uri: &AbsoluteUri,
+) -> Result<Arc<Value>, Error<R>> {
+    resolver.resolve(uri).await.map_err(|err| Error {
+        cause: Cause::Resolve(err),
+        source_key: SourceKey::default(),
+    })
 }
 
 #[derive(Debug, Default)]
@@ -119,58 +144,39 @@ where
         'cmp: 'scan,
         'res: 'int,
     {
-        if let Some(key) = ctx.interrogator.state.schemas.get_key_of(uri) {
+        if let Some(key) = ctx.instance.state.schemas.get_key_of(uri) {
             return Ok(Scanned::Compiled(key));
         }
+
         if self.scans.contains_uri(uri) {
             return Ok(Scanned::Scan(self.scans.get_mut_by_uri(uri).unwrap()));
         }
-        match resolve(
-            ctx.interrogator.state.sources,
-            ctx.interrogator.resolve,
-            uri,
-        )
-        .await?
-        {
-            Resolved::Source(src) => self.scan_src(ctx, src),
-            Resolved::UnknownAnchor(doc) => self.scan_for_anchor(ctx, doc),
+
+        if let Some(source_key) = sources.source_key_by_uri(uri) {
+            return Ok(source_key.into());
+        }
+        let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
+        let base = uri.without_fragment();
+        let root = resolve_root(sources, resolver, &base).await?;
+        if !fragment.is_empty() && !fragment.starts_with('/') {
+            resolve_path(sources, resolver, uri, base, fragment).await
+        } else {
+            resolve_unknown_anchor(sources, resolver, base, fragment).await
         }
     }
 
-    fn scan_src<'scan, R, S>(
+    fn scan_source<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
         &'scan mut self,
-        ctx: &mut context::Compile<R, S, K>,
-        src: resolved::Src,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
+        source_key: SourceKey,
+        dialect_key: DialectKey,
     ) -> Result<Scanned<'scan, K>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
         S: 'static + Specification<K>,
-        K: 'static + Key + Send + Sync,
+        'cmp: 'scan,
+        'res: 'int,
     {
-        // In order to scan this source, we first need to determine the
-        // dialect. In order to do so, we may need to look at some of the
-        // schema's ancestors.
-        let sources = &mut *ctx.interrogator.state.sources;
-        let schemas = &mut *ctx.interrogator.state.schemas;
-        let dialects = ctx.dialects;
-        let source_key = sources.source(src.source_key).key();
-        let mut stack = vec![source_key];
-        let mut super_dialect_key = None;
-        let target = source_key;
-        while let Some(source_key) = stack.pop() {
-            super_dialect_key = self
-                .scan_src_item(
-                    &mut stack,
-                    source_key,
-                    sources,
-                    schemas,
-                    dialects,
-                    target,
-                    super_dialect_key,
-                )?
-                .or(super_dialect_key);
-        }
-        todo!()
     }
 
     /// Attempts to scan an item on the stack of [`scan_src`](Self::scan_src).
@@ -322,24 +328,27 @@ where
         let uri = source.uri();
         // let handle_err = |cause| Error { cause, source_key };
 
-        // let references =
-        //     link_and_collect_refs(schemas, dialect, uri, value).map_err(|cause| Error {
-        //         cause,
-        //         src: source.clone(),
-        //     })?;
+        let references = link_and_collect_refs(schemas, dialect, uri, value)
+            .map_err(|cause| Error { cause, source_key })?;
 
-        // let embeds = link_and_collect_embeds(schemas, sources, dialect, &source, uri, value)
-        //     .map_err(handle_err)?;
+        let embeds = link_and_collect_embeds(schemas, sources, dialect, &source, uri, value)
+            .map_err(|cause| Error { cause, source_key })?;
 
-        // let anchors =
-        //     link_and_collect_anchors(sources, dialect, uri, value, &source).map_err(handle_err)?;
+        let anchors = link_and_collect_anchors(sources, dialect, uri, value, &source)
+            .map_err(|cause| Error { cause, source_key })?;
 
-        // let id = dialect
-        //     .identify(value)
-        //     .map_err(|err| handle_err(err.into()))?
-        //     .map(|id| uri.resolve(&id))
-        //     .transpose()
-        //     .map_err(|err| handle_err(err.into()))?;
+        let id = dialect
+            .identify(value)
+            .map_err(|err| Error {
+                cause: Cause::Uri(err),
+                source_key,
+            })?
+            .map(|id| uri.resolve(&id))
+            .transpose()
+            .map_err(|err| Error {
+                cause: Cause::Uri(err),
+                source_key,
+            })?;
 
         // let index = self.scans.len();
         // self.scanned.insert(source.uri().clone(), index);
@@ -359,27 +368,6 @@ where
         todo!()
     }
 }
-
-#[derive(Debug)]
-struct SrcScanner<'c, S, K>
-where
-    S: Specification<K>,
-    K: 'static + Send + Sync + Key,
-{
-    source_key: SourceKey,
-    sources: &'c mut Sources,
-    schemas: &'c mut Schemas<CompiledSchema<S, K>, K>,
-    dialects: &'c Dialects<S, K>,
-}
-
-impl<'c, S, K> SrcScanner<'c, S, K>
-where
-    S: Specification<K>,
-    K: 'static + Send + Sync + Key,
-{
-
-}
-
 fn link_and_collect_anchors<S, K, R>(
     sources: &mut Sources,
     dialect: &Dialect<S, K>,

@@ -52,7 +52,7 @@ struct Location<'v> {
     default_dialect_idx: usize,
 }
 
-pub(crate) struct Compiler<'int, L: Language<K>, K: 'static + Key> {
+pub(crate) struct Compiler<'int, L: Language, K: 'static + Key> {
     schemas: &'int mut Schemas<L, K>,   // now context
     sources: &'int mut Sources,         // now context
     dialects: &'int Dialects<L, K>,     // now context
@@ -83,7 +83,7 @@ impl From<Validate> for bool {
 #[allow(clippy::too_many_arguments)]
 impl<'int, L, K> Compiler<'int, L, K>
 where
-    L: Language<K>,
+    L: Language,
     K: Key,
 {
     pub(crate) fn new(interrogator: &'int mut Interrogator<L, K>, validate: Validate) -> Self {
@@ -751,7 +751,7 @@ where
     }
 }
 
-fn subschemas<'c, L: Language<K>, K: Key>(
+fn subschemas<'c, L: Language, K: Key>(
     key: K,
     uri: &AbsoluteUri,
     subschemas: impl ExactSizeIterator<Item = &'c Pointer>,
@@ -795,7 +795,7 @@ fn append_all_front<K: Key>(
     true
 }
 
-fn append_anchor_uris<'int, L: Language<K>, K: Key>(
+fn append_anchor_uris<'int, L: Language, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     base_uri: &'int AbsoluteUri,
     anchors: &'int [Anchor],
@@ -813,7 +813,7 @@ fn append_anchor_uris<'int, L: Language<K>, K: Key>(
     Ok(())
 }
 
-fn append_ancestry_uris<'a, L: Language<K>, K: Key>(
+fn append_ancestry_uris<'a, L: Language, K: Key>(
     uris: &mut Vec<AbsoluteUri>,
     path: &'a Pointer,
     parent_uris: &'a [AbsoluteUri],
@@ -830,7 +830,7 @@ fn append_ancestry_uris<'a, L: Language<K>, K: Key>(
     Ok(())
 }
 
-fn append_uri_path<L: Language<K>, K: Key>(
+fn append_uri_path<L: Language, K: Key>(
     path: &Pointer,
     uri: &AbsoluteUri,
     fragment: &str,
@@ -853,7 +853,7 @@ fn has_ptr_fragment(uri: &AbsoluteUri) -> bool {
     uri.fragment().unwrap_or_default().starts_with('/')
 }
 
-// fn identify<L: Language<K>, K: Key>(
+// fn identify<L: Language, K: Key>(
 //     uri: &AbsoluteUri,
 //     source: &Value,
 //     dialect: &Dialect<L, K>,

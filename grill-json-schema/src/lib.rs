@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<K, S> Language<K> for JsonSchema<K, S>
+impl<K, S> Language for JsonSchema<K, S>
 where
     K: 'static + Key + Send + Sync,
     S: Specification<K> + Send + 'static,

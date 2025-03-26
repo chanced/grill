@@ -252,7 +252,7 @@ impl From<Authority<'_>> for Cow<'_, str> {
     }
 }
 
-impl<'a> Authority<'a> {
+impl Authority<'_> {
     /// Returns the username component if it exists.
     #[must_use]
     pub fn username(&self) -> Option<&str> {
@@ -356,7 +356,7 @@ pub enum PathSegment<'a> {
     Normal(Cow<'a, str>),
 }
 
-impl<'a> PathSegment<'a> {
+impl PathSegment<'_> {
     /// Returns `true` if the path segment is [`Root`].
     ///
     /// [`Root`]: PathSegment::Root
@@ -491,12 +491,12 @@ impl PartialEq<String> for &PathSegment<'_> {
     }
 }
 
-impl<'a> PartialEq<&PathSegment<'a>> for str {
+impl PartialEq<&PathSegment<'_>> for str {
     fn eq(&self, other: &&PathSegment) -> bool {
         other.eq(self)
     }
 }
-impl<'a> PartialEq<&PathSegment<'a>> for String {
+impl PartialEq<&PathSegment<'_>> for String {
     fn eq(&self, other: &&PathSegment) -> bool {
         other.eq(self)
     }
@@ -588,7 +588,7 @@ impl std::fmt::Debug for AbsoluteUri {
         write!(f, "{}", self.as_str())
     }
 }
-impl<'a> PartialEq<&'a AbsoluteUri> for AbsoluteUri {
+impl PartialEq<&'_ AbsoluteUri> for AbsoluteUri {
     fn eq(&self, other: &&AbsoluteUri) -> bool {
         (*other).eq(self)
     }
@@ -933,7 +933,7 @@ impl AbsoluteUri {
     /// Returns `true` if the fragment is either `None` or an empty string
     #[must_use]
     pub fn fragment_is_empty_or_none(&self) -> bool {
-        self.fragment().map_or(true, |f| f.trim().is_empty())
+        self.fragment().is_none_or(|f| f.trim().is_empty())
     }
 
     /// returns a new `AbsoluteUri` that is the result of resolving the given
@@ -1021,8 +1021,8 @@ impl AbsoluteUri {
     /// Returns a [`UriError`] if:
     /// - the scheme is invalid
     /// - the `AbsoluteUri` is currently an [`Urn`], the value of
-    ///  `scheme` is something other than `"urn"`, and the URN cannot be parsed
-    ///  as a URL.
+    ///   `scheme` is something other than `"urn"`, and the URN cannot be parsed
+    ///   as a URL.
     /// - the `AbsoluteUri` is currently an [`Url`], the value of
     ///   `scheme` is `"urn"`, and the URL cannot be parsed as a URN.
     pub fn set_scheme(&mut self, scheme: &str) -> Result<String, Error> {
@@ -1107,7 +1107,9 @@ impl AbsoluteUri {
     /// contains one or more non-whitespace characters.
     #[must_use]
     pub fn has_non_empty_fragment(&self) -> bool {
-        self.fragment().map(str::trim).map_or(false, str::is_empty)
+        self.fragment()
+            .map(str::trim)
+            .is_some_and(|s| !s.is_empty())
     }
 }
 
@@ -1314,7 +1316,7 @@ impl PartialEq<&UriRef<'_>> for AbsoluteUri {
     }
 }
 
-impl<'a> TryIntoAbsoluteUri for UriRef<'a> {
+impl TryIntoAbsoluteUri for UriRef<'_> {
     fn try_into_absolute_uri(self) -> Result<AbsoluteUri, Error> {
         match self {
             UriRef::Uri(uri) => uri.try_into_absolute_uri(),

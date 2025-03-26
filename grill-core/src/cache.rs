@@ -27,8 +27,6 @@ fn null() -> Arc<Value> {
     NULL.clone()
 }
 
-type Map<K, V> = HashMap<K, V, Unhasher>;
-
 #[derive(Debug)]
 pub struct Cache {
     pub values: Values,
@@ -74,15 +72,7 @@ impl Default for Cache {
     }
 }
 
-/*
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║                                    Values                                    ║
-║                                   ¯¯¯¯¯¯¯¯                                   ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-*/
+type Map<K, V> = HashMap<K, V, Unhasher>;
 
 /// A cache store of [`Value`]s.
 #[derive(Clone, Debug, Default)]
@@ -106,8 +96,16 @@ impl Values {
 
     pub fn get(&self, value: &Value) -> Option<Arc<Value>> {
         match value {
-            Value::Number(_) => self.numbers.iter().find(|v| &***v == value).cloned(),
-            Value::String(_) => self.strings.iter().find(|v| &***v == value).cloned(),
+            Value::Number(n) => self
+                .numbers
+                .binary_search_by(|v| v.as_number().unwrap().as_str().cmp(n.as_str()))
+                .map(|i| self.numbers[i].clone())
+                .ok(),
+            Value::String(s) => self
+                .strings
+                .binary_search_by(|v| v.as_str().unwrap().cmp(s.as_str()))
+                .map(|i| self.strings[i].clone())
+                .ok(),
             Value::Array(a) => self
                 .arrays
                 .get(&a.len())?

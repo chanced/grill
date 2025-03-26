@@ -34,12 +34,9 @@ use std::{fmt, future::Future};
 /// [`Value`].
 ///
 /// See the [`mod`](crate::lang) for more information.
-pub trait Language<K>: Sized + Clone + fmt::Debug
-where
-    K: 'static + Key + Send + Sync,
-{
+pub trait Language: Sized + Clone + fmt::Debug {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
-    type CompiledSchema: schema::CompiledSchema<K>;
+    type CompiledSchema: schema::CompiledSchema;
 
     /// The error type possibly returned from [`compile`](Language::compile).
     type CompileError<R>: 'static + Send + std::error::Error
@@ -98,7 +95,7 @@ pub mod context {
     #[derive(Debug)]
     pub struct Compile<'int, 'txn, 'res, L, R, K>
     where
-        L: Language<K>,
+        L: Language,
         K: 'static + Key + Send + Sync,
     {
         /// Uris to compile
@@ -117,7 +114,7 @@ pub mod context {
 
     impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
     where
-        L: Language<K>,
+        L: Language,
         K: 'static + Key + Send + Sync,
     {
         pub(crate) fn new(
@@ -127,7 +124,7 @@ pub mod context {
             validate: bool,
         ) -> Self
         where
-            L: Language<K>,
+            L: Language,
             K: 'static + Key + Send + Sync,
             R: 'static + Resolve + Send + Sync,
         {
@@ -152,7 +149,7 @@ pub mod context {
     /// Request to evaluate a schema.
     pub struct Evaluate<'int, 'req, 'val, L, K>
     where
-        L: Language<K>,
+        L: Language,
         K: 'static + Key + Send + Sync,
     {
         /// Evaluation context `S::Context`

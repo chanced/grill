@@ -26,7 +26,7 @@ where
     S: 'static + Specification<K>,
     K: 'static + Key + Send + Sync,
 {
-    pub interrogator: grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
+    pub instance: grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>,
     pub dialects: &'int Dialects<S, K>,
 }
 
@@ -40,7 +40,7 @@ where
     fn interrogator(
         &mut self,
     ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K> {
-        &mut self.interrogator
+        &mut self.instance
     }
 
     fn language(&mut self) -> &mut Compile<'int, 'txn, 'res, R, S, K> {

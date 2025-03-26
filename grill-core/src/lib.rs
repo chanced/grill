@@ -16,12 +16,12 @@
 #![cfg_attr(test, allow(clippy::too_many_lines))]
 
 pub use interrogator::Interrogator;
+pub use key::Key;
 pub use lang::Language;
 pub use resolve::Resolve;
-pub use schema::DefaultKey;
-pub use slotmap::{new_key_type, Key};
 
 mod interrogator;
+mod key;
 
 pub mod big;
 pub mod cache;

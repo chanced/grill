@@ -67,7 +67,7 @@ where
     {
         Ok(crate::keyword::context::Compile {
             dialects: &self.dialects,
-            interrogator: ctx
+            instance: ctx
         })
     }
 
