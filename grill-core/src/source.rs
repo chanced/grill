@@ -11,7 +11,7 @@ use std::{
 use grill_uri::AbsoluteUri;
 use jsonptr::{Pointer, PointerBuf, Resolve as _};
 use serde_json::Value;
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use slotmap::{SecondaryMap, SlotMap, new_key_type};
 
 new_key_type! {
     /// Key to root documents within [`Sources`]
@@ -466,7 +466,7 @@ impl Sources {
             .map(|link| self.values[link.document_key].as_ref())
     }
 
-    pub fn source(&self, key: SourceKey) -> Source<'_> {
+    pub fn get(&self, key: SourceKey) -> Source<'_> {
         let link = Cow::Borrowed(self.links.get(key).unwrap());
         let document = self.document(link.document_key);
         Source {
@@ -478,7 +478,7 @@ impl Sources {
     /// Retrieves a [`Source`] from the store by [`AbsoluteUri`], if a [`Link`]
     /// exists.
     pub fn source_by_uri<'s>(&'s self, uri: &AbsoluteUri) -> Option<Source<'s>> {
-        self.source_key_by_uri(uri).map(|key| self.source(key))
+        self.source_key_by_uri(uri).map(|key| self.get(key))
     }
 
     /// Retrieves a [`SourceKey`] from the store by [`AbsoluteUri`], if a [`Link`]
@@ -924,7 +924,7 @@ mod tests {
         let mut sources = Sources::new();
         // Insert the root document at the base uri
         let source_key = sources.insert(base_uri.clone(), document).unwrap();
-        let source = sources.source(source_key);
+        let source = sources.get(source_key);
         // creates a Link from the uri `https://example.com#/foo/bar` to the
         // value at the path (as a JSON Pointer) `/foo/bar` within the document.
         sources

@@ -1772,20 +1772,19 @@ impl RelativeUri {
         QueryParameters::new(self.query()).unwrap()
     }
 
-    /// Returns `true` if this `Uri` has a query component.
+    /// Returns `true` if this `RelativeUri` has a query component.
     #[must_use]
     pub fn has_query(&self) -> bool {
         self.query().is_some()
     }
 
-    /// Returns `true` if this `Uri` has a fragment component.
+    /// Returns `true` if this `RelativeUri` has a fragment component.
     #[must_use]
     pub fn has_fragment(&self) -> bool {
         self.fragment().is_some()
     }
 
-    /// Returns `true` if this
-
+    /// Returns `true` if this `RelativeUri` has a fragment component which
     fn has_path(&self) -> bool {
         !self.path().is_empty()
     }
@@ -2252,7 +2251,7 @@ impl<'a> UriRef<'a> {
     /// Returns `true` if the this `Uri` has a scheme.
     #[must_use]
     pub fn has_scheme(&self) -> bool {
-        return self.scheme().is_some();
+        self.scheme().is_some()
     }
 
     /// Returns the scheme of this `Uri` if it exists.
@@ -2491,7 +2490,7 @@ impl<'a> Component<'a> {
     }
 }
 
-impl<'a> Deref for Component<'a> {
+impl Deref for Component<'_> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.as_str()
@@ -2514,17 +2513,17 @@ impl PartialEq<String> for &Component<'_> {
         self.as_str() == other
     }
 }
-impl<'a> PartialEq<Component<'a>> for str {
+impl PartialEq<Component<'_>> for str {
     fn eq(&self, other: &Component) -> bool {
         other.eq(self)
     }
 }
-impl<'a> PartialEq<&Component<'a>> for str {
+impl PartialEq<&Component<'_>> for str {
     fn eq(&self, other: &&Component) -> bool {
         other.eq(self)
     }
 }
-impl<'a> PartialEq<&Component<'a>> for String {
+impl PartialEq<&Component<'_>> for String {
     fn eq(&self, other: &&Component) -> bool {
         other.eq(self)
     }
@@ -2878,7 +2877,7 @@ impl Uri {
     /// `None`.
     #[must_use]
     pub fn is_fragment_empty_or_none(&self) -> bool {
-        self.fragment().map_or(true, |f| f.trim().is_empty())
+        self.fragment().is_none_or(|f| f.trim().is_empty())
     }
 
     /// Sets the query component of the [`Url`] or [`Urn`] and returns the

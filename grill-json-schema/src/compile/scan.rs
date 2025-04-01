@@ -3,42 +3,41 @@ use crate::{
     dialect::{Dialect, DialectKey, Dialects},
     keyword::context,
     schema::CompiledSchema,
-    spec::{keyword::Found, Specification},
+    spec::{Specification, keyword::Found},
 };
 use grill_core::{
+    Key, Resolve,
     resolve::Error as ResolveError,
     schema::Schemas,
     source::{Fragment, LinkError, New, Source, SourceConflictError, SourceKey, Sources},
-    Resolve,
 };
 use grill_uri::{AbsoluteUri, Uri};
 use serde_json::Value;
-use slotmap::Key;
 use std::{collections::HashMap, fmt, sync::Arc};
 
 mod resolve;
-use resolve::{resolve, Resolved};
+use resolve::{Resolved, resolve};
 
-pub(super) enum Scanned<'scan, K> {
-    Scan(&'scan mut Scan<K>),
-    Compiled(K),
+pub(super) enum Scanned<'scan> {
+    Scan(&'scan mut Scan),
+    Compiled(Key),
 }
 
 #[derive(Debug, Default)]
-pub(super) struct Scans<K> {
-    list: Vec<Scan<K>>,
+pub(super) struct Scans {
+    list: Vec<Scan>,
     by_uri: HashMap<AbsoluteUri, usize>,
     by_source_key: HashMap<SourceKey, usize>,
 }
 
-impl<K> Scans<K> {
-    fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Scan<K>> {
+impl Scans {
+    fn get_by_uri(&self, uri: &AbsoluteUri) -> Option<&Scan> {
         self.by_uri.get(uri).map(|&idx| &self.list[idx])
     }
-    fn get(&self, idx: usize) -> &Scan<K> {
+    fn get(&self, idx: usize) -> &Scan {
         &self.list[idx]
     }
-    fn get_mut_by_uri(&mut self, uri: &AbsoluteUri) -> Option<&mut Scan<K>> {
+    fn get_mut_by_uri(&mut self, uri: &AbsoluteUri) -> Option<&mut Scan> {
         self.by_uri.get(uri).map(|&idx| &mut self.list[idx])
     }
     fn contains_uri(&self, uri: &AbsoluteUri) -> bool {
@@ -47,20 +46,20 @@ impl<K> Scans<K> {
     fn contains_source_key(&self, key: SourceKey) -> bool {
         self.by_source_key.contains_key(&key)
     }
-    fn get_by_source_key(&self, source_key: SourceKey) -> Option<&Scan<K>> {
+    fn get_by_source_key(&self, source_key: SourceKey) -> Option<&Scan> {
         self.by_source_key
             .get(&source_key)
             .copied()
             .map(|idx| &self.list[idx])
     }
-    fn get_mut_by_source_key(&mut self, source_key: SourceKey) -> Option<&mut Scan<K>> {
+    fn get_mut_by_source_key(&mut self, source_key: SourceKey) -> Option<&mut Scan> {
         self.by_source_key
             .get(&source_key)
             .copied()
             .map(|idx| &mut self.list[idx])
     }
 
-    fn insert(&mut self, mut scan: Scan<K>) -> &Scan<K> {
+    fn insert(&mut self, mut scan: Scan) -> &Scan {
         let index = self.list.len();
         scan.index = index;
         self.by_uri.insert(scan.source.uri().clone(), index);
@@ -71,18 +70,18 @@ impl<K> Scans<K> {
 }
 
 #[derive(Debug)]
-pub(super) struct Scan<K> {
+pub(super) struct Scan {
     pub index: usize,
     pub id: Option<AbsoluteUri>,
     pub dialect_key: DialectKey,
     pub anchors: Vec<Anchor>,
     pub source: Source<'static>,
-    pub embeds: Vec<Embed<K>>,
-    pub references: Vec<Reference<K>>,
+    pub embeds: Vec<Embed>,
+    pub references: Vec<Reference>,
 }
 
-impl<K> Scan<K> {
-    pub(super) fn unresolved_refs(&mut self) -> impl Iterator<Item = &mut Reference<K>> {
+impl Scan {
+    pub(super) fn unresolved_refs(&mut self) -> impl Iterator<Item = &mut Reference> {
         self.references
             .iter_mut()
             .filter(|r| r.schema_key.is_none())
@@ -115,68 +114,67 @@ async fn fetch<'int, R: 'static + Resolve>(
     resolver: &R,
     uri: &AbsoluteUri,
 ) -> Result<Arc<Value>, Error<R>> {
-    resolver.resolve(uri).await.map_err(|err| Error {
-        cause: Cause::Resolve(err),
+    resolver.resolve(uri).await.map_err(|source| Error {
+        cause: ResolveError::new_failed_to_resolve(uri.clone(), source).into(),
         source_key: SourceKey::default(),
     })
 }
 
 #[derive(Debug, Default)]
-pub(super) struct Scanner<K> {
-    scans: Scans<K>,
+pub(super) struct Scanner {
+    scans: Scans,
 }
 
-impl<K> Scanner<K>
-where
-    K: 'static + Key + Send + Sync,
-{
+impl Scanner {
     pub(super) fn new() -> Self {
         Self::default()
     }
     pub(super) async fn scan<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
         &'scan mut self,
-        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S>,
         uri: &'cmp AbsoluteUri,
-    ) -> Result<Scanned<'scan, K>, Cause<R>>
+    ) -> Result<Scanned<'scan>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
+        S: 'static + Specification,
         'cmp: 'scan,
         'res: 'int,
     {
         if let Some(key) = ctx.instance.state.schemas.get_key_of(uri) {
             return Ok(Scanned::Compiled(key));
         }
-
         if self.scans.contains_uri(uri) {
             return Ok(Scanned::Scan(self.scans.get_mut_by_uri(uri).unwrap()));
         }
+        // todo: review below
 
-        if let Some(source_key) = sources.source_key_by_uri(uri) {
-            return Ok(source_key.into());
-        }
-        let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
-        let base = uri.without_fragment();
-        let root = resolve_root(sources, resolver, &base).await?;
-        if !fragment.is_empty() && !fragment.starts_with('/') {
-            resolve_path(sources, resolver, uri, base, fragment).await
-        } else {
-            resolve_unknown_anchor(sources, resolver, base, fragment).await
-        }
+        // if let Some(source_key) = sources.source_key_by_uri(uri) {
+        //     return Ok(source_key.into());
+        // }
+        // let fragment = uri.fragment_decoded_lossy().unwrap_or_default();
+        // let base = uri.without_fragment();
+        // let root = resolve_root(sources, resolver, &base).await?;
+        // if !fragment.is_empty() && !fragment.starts_with('/') {
+        //     resolve_path(sources, resolver, uri, base, fragment).await
+        // } else {
+        //     resolve_unknown_anchor(sources, resolver, base, fragment).await
+        // }
+        todo!()
     }
 
     fn scan_source<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
         &'scan mut self,
-        ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
+        ctx: &mut context::Compile<'int, 'txn, 'res, R, S>,
         source_key: SourceKey,
         dialect_key: DialectKey,
-    ) -> Result<Scanned<'scan, K>, Cause<R>>
+    ) -> Result<Scanned<'scan>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
+        S: 'static + Specification,
         'cmp: 'scan,
         'res: 'int,
     {
+        todo!()
     }
 
     /// Attempts to scan an item on the stack of [`scan_src`](Self::scan_src).
@@ -184,60 +182,61 @@ where
     fn scan_src_item<R, S>(&mut self) -> Result<Option<DialectKey>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
+        S: 'static + Specification,
     {
-        // checking to see if we have already scanned the source
-        if self.scans.contains_source_key(source_key) {
-            // existing scan found so we have a dialect key to use
-            return Ok(Some(
-                self.scans
-                    .get_by_source_key(source_key)
-                    .unwrap()
-                    .dialect_key,
-            ));
-        }
+        todo!()
+        // // checking to see if we have already scanned the source
+        // if self.scans.contains_source_key(source_key) {
+        //     // existing scan found so we have a dialect key to use
+        //     return Ok(Some(
+        //         self.scans
+        //             .get_by_source_key(source_key)
+        //             .unwrap()
+        //             .dialect_key,
+        //     ));
+        // }
 
-        // checking the value to see if a dialect has been specified
-        if let Some(dialect_key) = dialects
-            .find_dialect_key(sources.source(source_key).resolve())
-            .or(default_dialect_key)
-        {
-            // we were able to determine the dialect so we can scan the value
-            return self.scan_src_item_found_dialect(
-                stack,
-                dialect_key,
-                source_key,
-                sources,
-                schemas,
-                dialects,
-                target_source_key,
-                default_dialect_key,
-            );
-        }
+        // // checking the value to see if a dialect has been specified
+        // if let Some(dialect_key) = dialects
+        //     .find_dialect_key(sources.source(source_key).resolve())
+        //     .or(default_dialect_key)
+        // {
+        //     // we were able to determine the dialect so we can scan the value
+        //     return self.scan_src_item_found_dialect(
+        //         stack,
+        //         dialect_key,
+        //         source_key,
+        //         sources,
+        //         schemas,
+        //         dialects,
+        //         target_source_key,
+        //         default_dialect_key,
+        //     );
+        // }
 
-        // couldn't find the dialect
-        stack.push(source_key);
+        // // couldn't find the dialect
+        // stack.push(source_key);
 
-        // if we aren't at the root, we need to check the next node in the path
-        let source = sources.source(source_key);
+        // // if we aren't at the root, we need to check the next node in the path
+        // let source = sources.source(source_key);
 
-        if source.absolute_path().is_root() {
-            // we are at the root and we need to use the default dialect
-            return Ok(default_dialect_key);
-        }
+        // if source.absolute_path().is_root() {
+        //     // we are at the root and we need to use the default dialect
+        //     return Ok(default_dialect_key);
+        // }
 
-        let absolute_path = source.absolute_path().split_back().unwrap().0.to_buf();
-        let uri = source.uri().with_fragment(absolute_path.as_str()).unwrap();
-        let fragment = Some(Fragment::Pointer(absolute_path.clone()));
-        let document_key = source.document_key();
-        let source_key = sources.link(New {
-            uri,
-            fragment,
-            document_key,
-            absolute_path,
-        })?;
-        stack.push(source_key);
-        Ok(default_dialect_key)
+        // let absolute_path = source.absolute_path().split_back().unwrap().0.to_buf();
+        // let uri = source.uri().with_fragment(absolute_path.as_str()).unwrap();
+        // let fragment = Some(Fragment::Pointer(absolute_path.clone()));
+        // let document_key = source.document_key();
+        // let source_key = sources.link(New {
+        //     uri,
+        //     fragment,
+        //     document_key,
+        //     absolute_path,
+        // })?;
+        // stack.push(source_key);
+        // Ok(default_dialect_key)
     }
 
     fn scan_src_item_found_dialect<'r, R, S>(
@@ -246,14 +245,14 @@ where
         dialect_key: DialectKey,
         source_key: SourceKey,
         sources: &mut Sources,
-        schemas: &mut Schemas<CompiledSchema<S, K>, K>,
-        dialects: &Dialects<S, K>,
+        schemas: &mut Schemas<CompiledSchema<S>>,
+        dialects: &Dialects<S>,
         target_source_key: SourceKey,
         previous_dialect_key: Option<DialectKey>,
     ) -> Result<Option<DialectKey>, Cause<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
+        S: 'static + Specification,
     {
         // let scan =
         //     match self.scan_value::<R, S>(schemas, sources, dialects, source_key, dialect_key) {
@@ -288,7 +287,7 @@ where
         todo!()
     }
 
-    fn insert_scan(&mut self, scan: Scan<K>) -> usize {
+    fn insert_scan(&mut self, scan: Scan) -> usize {
         // let idx = self.scans.len();
         // self.scanned.insert(scan.source.uri().clone(), idx);
         // self.scans.push(scan);
@@ -296,33 +295,19 @@ where
         todo!()
     }
 
-    fn scan_for_anchor<'scan, 'cmp, 'int, 'txn, 'res, R, S>(
-        &'scan mut self,
-        _ctx: &mut context::Compile<'int, 'txn, 'res, R, S, K>,
-        _doc: resolved::UnknownAnchor,
-    ) -> Result<Scanned<'scan, K>, Cause<R>>
-    where
-        R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
-        K: 'static + Key + Send + Sync,
-    {
-        todo!()
-    }
-
     fn scan_value<R, S>(
         &mut self,
-        schemas: &mut Schemas<CompiledSchema<S, K>, K>,
+        schemas: &mut Schemas<CompiledSchema<S>>,
         sources: &mut Sources,
-        dialects: &Dialects<S, K>,
+        dialects: &Dialects<S>,
         source_key: SourceKey,
         dialect_key: DialectKey,
-    ) -> Result<&Scan<K>, Error<R>>
+    ) -> Result<&Scan, Error<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: 'static + Specification<K>,
-        K: 'static + Key + Send + Sync,
+        S: 'static + Specification,
     {
-        let source = sources.source(source_key).into_owned();
+        let source = sources.get(source_key).into_owned();
         let dialect = dialects.get(dialect_key);
         let value = source.resolve();
         let uri = source.uri();
@@ -368,16 +353,15 @@ where
         todo!()
     }
 }
-fn link_and_collect_anchors<S, K, R>(
+fn link_and_collect_anchors<S, R>(
     sources: &mut Sources,
-    dialect: &Dialect<S, K>,
+    dialect: &Dialect<S>,
     uri: &AbsoluteUri,
     value: &Value,
     src: &Source,
 ) -> Result<Vec<Anchor>, Cause<R>>
 where
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: 'static + Specification,
     R: 'static + Resolve + Send + Sync,
 {
     let mut anchors = Vec::new();
@@ -397,17 +381,16 @@ where
     Ok(anchors)
 }
 
-fn link_and_collect_embeds<'int, 'txn, 'res, R, S, K>(
-    schemas: &Schemas<CompiledSchema<S, K>, K>,
+fn link_and_collect_embeds<'int, 'txn, 'res, R, S>(
+    schemas: &Schemas<CompiledSchema<S>>,
     sources: &mut Sources,
-    dialect: &Dialect<S, K>,
+    dialect: &Dialect<S>,
     source: &Source,
     uri: &AbsoluteUri,
     value: &Value,
-) -> Result<Vec<Embed<K>>, Cause<R>>
+) -> Result<Vec<Embed>, Cause<R>>
 where
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: 'static + Specification,
     R: 'static + Resolve + Send + Sync,
 {
     let mut embeds = Vec::new();
@@ -429,15 +412,14 @@ where
     Ok(embeds)
 }
 
-fn link_and_collect_refs<'int, 'txn, 'res, R, S, K>(
-    schemas: &Schemas<CompiledSchema<S, K>, K>,
-    dialect: &Dialect<S, K>,
+fn link_and_collect_refs<'int, 'txn, 'res, R, S>(
+    schemas: &Schemas<CompiledSchema<S>>,
+    dialect: &Dialect<S>,
     uri: &AbsoluteUri,
     value: &Value,
-) -> Result<Vec<Reference<K>>, Cause<R>>
+) -> Result<Vec<Reference>, Cause<R>>
 where
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: 'static + Specification,
     R: 'static + Resolve + Send + Sync,
 {
     let mut refs = Vec::new();
@@ -465,17 +447,17 @@ pub(super) struct Anchor {
 }
 
 #[derive(Debug)]
-pub(super) struct Reference<K> {
+pub(super) struct Reference {
     pub absolute_uri: AbsoluteUri,
     pub uri: Uri,
     pub keyword: &'static str,
-    pub schema_key: Option<K>,
+    pub schema_key: Option<Key>,
 }
 
 #[derive(Debug)]
-pub(super) struct Embed<K> {
+pub(super) struct Embed {
     pub source_key: SourceKey,
-    pub schema_key: Option<K>,
+    pub schema_key: Option<Key>,
 }
 
 pub(super) struct Error<R: 'static + Resolve> {

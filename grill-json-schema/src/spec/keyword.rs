@@ -16,10 +16,9 @@ use slotmap::Key;
 /// A trait implemented by types which are capable of evaluating one or more
 /// keywords of a JSON Schema specification.
 #[trait_variant::make(Send)]
-pub trait Keyword<S, K>: Send + std::fmt::Debug + Clone + PartialEq + Eq
+pub trait Keyword<S>: Send + std::fmt::Debug + Clone + PartialEq + Eq
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
     /// Compiles the keyword.
     async fn compile<R>(

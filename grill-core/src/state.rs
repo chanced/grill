@@ -4,16 +4,16 @@ use slotmap::Key;
 
 use crate::{cache::Cache, schema::Schemas, source::Sources, Language};
 
-pub struct State<L: Language, K: 'static + Key + Send + Sync> {
+pub struct State<L: Language> {
     /// Schema graph
-    pub schemas: Schemas<L::CompiledSchema, K>,
+    pub schemas: Schemas<L::CompiledSchema>,
     /// Source repository
     pub sources: Sources,
     /// Value and number cache
     pub cache: Cache,
 }
 
-impl<L: Language, K: 'static + Key + Send + Sync> State<L, K> {
+impl<L: Language> State<L> {
     pub fn new() -> Self {
         Self {
             schemas: Schemas::new(),
@@ -26,7 +26,7 @@ impl<L: Language, K: 'static + Key + Send + Sync> State<L, K> {
     pub async fn transaction<F, O, E>(&mut self, f: F) -> Result<O, E>
     where
         L::CompiledSchema: Send + Sync + 'static,
-        F: Send + FnOnce(Transaction<L, K>) -> Pin<Box<dyn Future<Output = Result<O, E>>>>,
+        F: Send + FnOnce(Transaction<L>) -> Pin<Box<dyn Future<Output = Result<O, E>>>>,
         O: Send + 'static,
         E: Send + 'static,
     {
@@ -41,22 +41,22 @@ impl<L: Language, K: 'static + Key + Send + Sync> State<L, K> {
     }
 }
 
-impl<L: Language, K: 'static + Key + Send + Sync> Default for State<L, K> {
+impl<L: Language> Default for State<L> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Debug)]
-pub struct Transaction<'int, 'txn, L: Language, K: 'static + Key + Send + Sync> {
-    pub schemas: &'txn mut Schemas<L::CompiledSchema, K>,
+pub struct Transaction<'int, 'txn, L: Language> {
+    pub schemas: &'txn mut Schemas<L::CompiledSchema>,
     pub sources: &'txn mut Sources,
     pub cache: &'int mut Cache,
 }
 
-impl<'int, 'txn, L: Language, K: 'static + Key + Send + Sync> Transaction<'int, 'txn, L, K> {
+impl<'int, 'txn, L: Language> Transaction<'int, 'txn, L> {
     pub fn new(
-        schemas: &'txn mut Schemas<L::CompiledSchema, K>,
+        schemas: &'txn mut Schemas<L::CompiledSchema>,
         sources: &'txn mut Sources,
         cache: &'int mut Cache,
     ) -> Self {

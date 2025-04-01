@@ -17,8 +17,7 @@
 //!
 //! ## Compiling a schema
 
-use crate::{schema, state::State, Resolve};
-use slotmap::Key;
+use crate::{schema, state::State, Key, Resolve};
 use std::{fmt, future::Future};
 
 /*
@@ -36,7 +35,7 @@ use std::{fmt, future::Future};
 /// See the [`mod`](crate::lang) for more information.
 pub trait Language: Sized + Clone + fmt::Debug {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
-    type CompiledSchema: schema::CompiledSchema;
+    type CompiledSchema: schema::CompiledSchema + fmt::Debug + Clone;
 
     /// The error type possibly returned from [`compile`](Language::compile).
     type CompileError<R>: 'static + Send + std::error::Error
@@ -52,24 +51,24 @@ pub trait Language: Sized + Clone + fmt::Debug {
     type Context;
 
     /// Initializes the language with the given [`Init`] request.
-    fn init(&mut self, init: &mut State<Self, K>);
+    fn init(&mut self, init: &mut State<Self>);
 
     /// Compiles schemas specified by the [`Compile`] request and returns an
     /// iterator of keys, if successful.
     ///
     /// # Errors
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
-    fn compile<'int, 'txn, 'res, R>(
+    fn compile<'int, R>(
         &'int mut self,
-        compile: context::Compile<'int, 'txn, 'res, Self, R, K>,
-    ) -> impl Future<Output = Result<Vec<K>, Self::CompileError<R>>>
+        compile: context::Compile<'int, '_, '_, Self, R>,
+    ) -> impl Future<Output = Result<Vec<Key>, Self::CompileError<R>>>
     where
         R: 'static + Resolve + Send + Sync;
 
     /// Evaluates a schema for the given [`Evaluae`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: context::Evaluate<'int, '_, 'val, Self, K>,
+        eval: context::Evaluate<'int, '_, 'val, Self>,
     ) -> Self::EvaluateResult<'val>;
 }
 
@@ -93,17 +92,16 @@ pub mod context {
     */
     /// Request to compile a schema.
     #[derive(Debug)]
-    pub struct Compile<'int, 'txn, 'res, L, R, K>
+    pub struct Compile<'int, 'txn, 'res, L, R>
     where
         L: Language,
-        K: 'static + Key + Send + Sync,
     {
         /// Uris to compile
         pub targets: Vec<AbsoluteUri>,
 
         /// Current state of the [`Interrogator`], including schemas, sources, and
         /// cache. Upon successful compilation, the data will become to new state.
-        pub state: Transaction<'int, 'txn, L, K>,
+        pub state: Transaction<'int, 'txn, L>,
 
         /// Implementation of [`Resolve`]
         pub resolve: &'res R,
@@ -112,20 +110,18 @@ pub mod context {
         pub must_validate: bool,
     }
 
-    impl<'int, 'txn, 'res, L, R, K> Compile<'int, 'txn, 'res, L, R, K>
+    impl<'int, 'txn, 'res, L, R> Compile<'int, 'txn, 'res, L, R>
     where
         L: Language,
-        K: 'static + Key + Send + Sync,
     {
         pub(crate) fn new(
             uris: Vec<AbsoluteUri>,
-            txn: Transaction<'int, 'txn, L, K>,
+            txn: Transaction<'int, 'txn, L>,
             resolve: &'res R,
             validate: bool,
         ) -> Self
         where
             L: Language,
-            K: 'static + Key + Send + Sync,
             R: 'static + Resolve + Send + Sync,
         {
             Self {
@@ -147,21 +143,20 @@ pub mod context {
     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
     */
     /// Request to evaluate a schema.
-    pub struct Evaluate<'int, 'req, 'val, L, K>
+    pub struct Evaluate<'int, 'req, 'val, L>
     where
         L: Language,
-        K: 'static + Key + Send + Sync,
     {
         /// Evaluation context `S::Context`
         pub context: L::Context,
 
         /// The current, immutable state of the [`Interrogator`]
-        pub state: &'int State<L, K>,
+        pub state: &'int State<L>,
 
         pub eval: &'req mut Cache,
 
         /// The key of the schema to evaluate
-        pub key: K,
+        pub key: Key,
 
         /// The value to evaluate
         pub value: &'val Value,

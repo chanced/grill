@@ -1,12 +1,13 @@
 use crate::{
-dialect::Dialects, report::{self, Location},  EvaluateError, IntoOwned, JsonSchema, Output
+    EvaluateError, IntoOwned, JsonSchema, Output,
+    dialect::Dialects,
+    report::{self, Location},
 };
-use grill_core::{
-    lang::context, state::State, DefaultKey, Key, Resolve
-};
+use grill_core::{Key, Resolve, lang::context, state::State};
 use serde::{Deserialize, Serialize};
 use std::{
-     error::Error as StdError, fmt::{Debug, Display}
+    error::Error as StdError,
+    fmt::{Debug, Display},
 };
 
 pub mod keyword;
@@ -24,31 +25,27 @@ pub use keyword::Keyword;
 */
 /// Standard JSON Schema [`Specification`].
 #[derive(Clone, Debug)]
-pub struct Standard<K = DefaultKey>
-where
-    K: 'static + Key + Send + Sync,
-{
-    dialects: Dialects<Self, K>,
+pub struct Standard {
+    dialects: Dialects<Self>,
 }
 
-
-impl<K> Standard<K> where K: 'static + Key + Send + Sync {
-    pub fn new(dialects: Dialects<Self, K>) ->Standard<K> {
-        Self {
-            dialects,
-        }
+impl Standard {
+    pub fn new(dialects: Dialects<Standard>) -> Standard {
+        Self { dialects }
     }
 }
 
-impl<K> Specification<K> for Standard<K>
-where
-    K: 'static + Key + Send + Sync,
-{
-    type CompileError<R> = super::Error<Self::Report<'static>, R> where R: 'static + Resolve;
-    type EvaluateError = EvaluateError<K>;
-    type Evaluate<'int, 'val, 'req> = crate::keyword::context::Evaluate<'int, 'val, 'req, Self, K>;
-    type Compile<'int, 'txn, 'res, R> = crate::keyword::context::Compile<'int, 'txn, 'res, R, Self, K> 
-        where R: 'static + Resolve + Sized, 
+impl Specification for Standard {
+    type CompileError<R>
+        = super::Error<Self::Report<'static>, R>
+    where
+        R: 'static + Resolve;
+    type EvaluateError = EvaluateError;
+    type Evaluate<'int, 'val, 'req> = crate::keyword::context::Evaluate<'int, 'val, 'req, Self>;
+    type Compile<'int, 'txn, 'res, R>
+        = crate::keyword::context::Compile<'int, 'txn, 'res, R, Self>
+    where
+        R: 'static + Resolve + Sized,
         'int: 'txn,
         Self: 'txn + 'int;
     type Keyword = crate::keyword::Keyword;
@@ -59,7 +56,7 @@ where
 
     async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: context::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        ctx: context::Compile<'int, 'txn, 'res, JsonSchema<Self>, R>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
@@ -67,13 +64,13 @@ where
     {
         Ok(crate::keyword::context::Compile {
             dialects: &self.dialects,
-            instance: ctx
+            instance: ctx,
         })
     }
 
     fn evaluate<'int, 'val, 'req>(
         &'int self,
-        ctx: context::Evaluate<'int, 'val, 'req, JsonSchema<K, Self>, K>,
+        ctx: context::Evaluate<'int, 'val, 'req, JsonSchema<Self>>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError> {
         println!("init_evaluate");
         todo!()
@@ -92,32 +89,27 @@ where
 /// A trait implemented by types which are capable of evaluating a specification
 /// of JSON Schema.
 #[trait_variant::make(Send)]
-pub trait Specification<K>: 'static + Sized + Debug + Clone + Send + Sync
-where
-    K: 'static + Key + Send + Sync,
-{
+pub trait Specification: 'static + Sized + Debug + Clone + Send + Sync {
     /// The error type that can be returned when compiling a schema.
-    type CompileError<R>: 'static + CompileError<R, Self, K>
+    type CompileError<R>: 'static + CompileError<R, Self>
     where
         R: 'static + Resolve;
 
-    type EvaluateError: Send + StdError + From<EvaluateError<K>>;
+    type EvaluateError: Send + StdError + From<EvaluateError>;
 
     /// Context type supplied to `evaluate`.
-    type Evaluate<'int, 'val, 'req>: Evaluate<'int, 'val, Self, K>
+    type Evaluate<'int, 'val, 'req>: Evaluate<'int, 'val, Self>
     where
-        Self: 'int + 'val + 'req,
-        K: 'static + Send;
+        Self: 'int + 'val + 'req;
 
     /// Context type supplied to `compile`.
-    type Compile<'int, 'txn, 'res, R>:  Compile<'int, 'txn, 'res, R, Self, K> + Send
+    type Compile<'int, 'txn, 'res, R>: Compile<'int, 'txn, 'res, R, Self> + Send
     where
         Self: 'txn + 'int + 'res,
         'int: 'txn,
-        K: Key + 'static,
         R: 'static + Resolve + Send + Sync;
 
-    type Keyword: 'static + keyword::Keyword<Self, K> + Send + Sync;
+    type Keyword: 'static + keyword::Keyword<Self> + Send + Sync;
 
     /// A type which can hold a slice [`Self::Keyword`]s, returned from
     /// [`JsonSchema::keywords`].
@@ -139,7 +131,7 @@ where
     type Annotation<'v>: Serialize + ShouldSerialize;
 
     /// The error type to be used in `Self::Report`.
-    /// 
+    ///
     type Error<'v>: Send + IntoOwned + Display;
 
     type Report<'v>: Report<'v, Self::Annotation<'v>, Self::Error<'v>>;
@@ -150,7 +142,7 @@ where
     /// Returns [`Self::InitError`] if an error occurs while initializing the
     /// specification.
     #[allow(unused_variables)]
-    fn init(&mut self, state: &mut State<JsonSchema<K, Self>, K>) {}
+    fn init(&mut self, state: &mut State<JsonSchema<Self>>) {}
 
     /// Initializes a `Self::Compile` context
     ///
@@ -161,7 +153,7 @@ where
     /// [`Self::CompileError`]: Specification::CompileError
     async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        compile: context::Compile<'int, 'txn, 'res, JsonSchema<K, Self>, R, K>,
+        compile: context::Compile<'int, 'txn, 'res, JsonSchema<Self>, R>,
     ) -> Result<Self::Compile<'int, 'txn, 'res, R>, Self::CompileError<R>>
     where
         'int: 'txn,
@@ -174,14 +166,11 @@ where
     /// value
     ///
     /// [Self::EvaluateError]: Specification::EvaluateError
-    fn evaluate<'int,  'val, 'req>(
+    fn evaluate<'int, 'val, 'req>(
         &'int self,
-        eval: context::Evaluate<'int,  'val, 'req, JsonSchema<K, Self>, K>,
+        eval: context::Evaluate<'int, 'val, 'req, JsonSchema<Self>>,
     ) -> Result<Self::Evaluate<'int, 'val, 'req>, Self::EvaluateError>;
 }
-
-
-
 
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -196,16 +185,12 @@ pub trait ShouldSerialize {
     fn should_serialize(&self) -> bool;
 }
 
-
-
-
 /// Context for [`Keyword::evaluate`].
-pub trait Evaluate<'int, 'val, S, K>
+pub trait Evaluate<'int, 'val, S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    fn dialects(&self) -> &Dialects<S, K>;
+    fn dialects(&self) -> &Dialects<S>;
 
     fn assess(
         &mut self,
@@ -239,7 +224,6 @@ pub trait Report<'val, A, E>:
     fn assess(&mut self, location: Location) -> Self::Assess<'_>;
 }
 
-
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -254,7 +238,6 @@ pub trait Assess<'rpt, A, E> {
     fn fail(&mut self, error: E);
 }
 
-
 /*
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -264,11 +247,10 @@ pub trait Assess<'rpt, A, E> {
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
-pub trait CompileError<R, S, K>:
+pub trait CompileError<R, S>:
     'static + Send + StdError + From<crate::compile::Error<S::Report<'static>, R>>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
     R: 'static + Resolve,
 {
 }
@@ -284,17 +266,14 @@ where
 */
 #[trait_variant::make(Send)]
 /// Context for [`Keyword::compile`].
-pub trait Compile<'int, 'txn, 'res, R, S, K>: Send + Sync
+pub trait Compile<'int, 'txn, 'res, R, S>: Send + Sync
 where
     R: 'static + Resolve + Send,
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    fn interrogator(
+    fn instance(
         &mut self,
-    ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<K, S>, R, K>;
-    
-    fn language(&mut self) -> &mut crate::keyword::context::Compile<'int, 'txn, 'res, R, S, K>;
+    ) -> &mut grill_core::lang::context::Compile<'int, 'txn, 'res, JsonSchema<S>, R>;
+
+    fn language(&mut self) -> &mut crate::keyword::context::Compile<'int, 'txn, 'res, R, S>;
 }
-
-

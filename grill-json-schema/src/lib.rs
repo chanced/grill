@@ -29,7 +29,7 @@ use core::fmt;
 use std::marker::PhantomData;
 
 use compile::compile;
-use grill_core::{lang::context, state::State, Key, Language, Resolve};
+use grill_core::{Key, Language, Resolve, lang::context, state::State};
 use schema::CompiledSchema;
 use spec::Specification;
 pub use spec::Standard;
@@ -66,26 +66,20 @@ pub trait IntoOwned {
 */
 /// JSON Schema with support for drafts 2020-12, 2019-09, 07, and 04.
 #[derive(Debug, Clone)]
-pub struct JsonSchema<K, S>
+pub struct JsonSchema<S>
 where
-    K: 'static + Key + Send + Sync,
-    S: Specification<K>,
+    S: Specification,
 {
     spec: S,
-    _marker: PhantomData<K>,
 }
 
-impl<K, S> JsonSchema<K, S>
+impl<S> JsonSchema<S>
 where
-    K: 'static + Key + Send + Sync,
-    S: Specification<K> + Send + Sync,
+    S: Specification + Send + Sync,
 {
     /// Creates a new JSON Schema language for the given [`Specification`].
     pub fn new(spec: S) -> Self {
-        Self {
-            spec,
-            _marker: PhantomData,
-        }
+        Self { spec }
     }
     pub fn spec(&self) -> &S {
         &self.spec
@@ -95,18 +89,18 @@ where
     }
 }
 
-impl<K, S> Language for JsonSchema<K, S>
+impl<S> Language for JsonSchema<S>
 where
-    K: 'static + Key + Send + Sync,
-    S: Specification<K> + Send + 'static,
+    S: Specification + Send + 'static,
 {
     /// The [`CompiledSchema`](schema::CompiledSchema) of this language.
-    type CompiledSchema = CompiledSchema<S, K>;
+    type CompiledSchema = CompiledSchema<S>;
 
     /// The error type possibly returned from [`compile`](Language::compile).
-    type CompileError<R> = S::CompileError<R>
+    type CompileError<R>
+        = S::CompileError<R>
     where
-    R: 'static + Resolve;
+        R: 'static + Resolve;
 
     /// The result type returned from [`evaluate`](Language::evaluate).
     type EvaluateResult<'val> =
@@ -116,7 +110,7 @@ where
     type Context = Output;
 
     /// Initializes the language with the given [`Init`] request.
-    fn init(&mut self, init: &mut State<Self, K>) {
+    fn init(&mut self, init: &mut State<Self>) {
         self.spec.init(init);
     }
 
@@ -130,18 +124,18 @@ where
     /// Returns [`Self::CompileError`] if the schema could not be compiled.
     async fn compile<'int, 'txn, 'res, R>(
         &'int mut self,
-        ctx: context::Compile<'int, 'txn, 'res, Self, R, K>,
-    ) -> Result<Vec<K>, Self::CompileError<R>>
+        ctx: context::Compile<'int, 'txn, 'res, Self, R>,
+    ) -> Result<Vec<Key>, Self::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
-        compile::<R, S, K>(self.spec.compile(ctx).await?).await
+        compile::<R, S>(self.spec.compile(ctx).await?).await
     }
 
     /// Evaluates a schema for the given [`Evaluate`] request.
     fn evaluate<'int, 'val>(
         &'int self,
-        eval: context::Evaluate<'int, '_, 'val, Self, K>,
+        eval: context::Evaluate<'int, '_, 'val, Self>,
     ) -> Self::EvaluateResult<'val> {
         _ = eval;
         todo!()
@@ -158,20 +152,16 @@ where
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 */
 #[derive(Debug, PartialEq, Eq)]
-pub enum EvaluateError<K: Key> {
-    X(K),
-}
+pub enum EvaluateError {}
 
-impl<K: Key + Send> fmt::Display for EvaluateError<K> {
+impl fmt::Display for EvaluateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "failed to evaluate value")
     }
 }
 
-impl<K: Key + Send> std::error::Error for EvaluateError<K> {
+impl std::error::Error for EvaluateError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            EvaluateError::X(_) => todo!(),
-        }
+        todo!()
     }
 }

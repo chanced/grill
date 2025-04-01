@@ -2,7 +2,7 @@ use crate::{
     cache::Cache,
     lang::context,
     state::{State, Transaction},
-    DefaultKey, Language, Resolve,
+    Key, Language, Resolve,
 };
 
 use grill_uri::AbsoluteUri;
@@ -14,7 +14,7 @@ pub struct Interrogator<L: Language> {
     state: State<L>,
 }
 
-impl<L> Interrogator<L> {
+impl<L: Language + 'static> Interrogator<L> {
     /// Creates a new `Interrogator`.
     pub fn new(lang: L) -> Self {
         Self {
@@ -25,10 +25,9 @@ impl<L> Interrogator<L> {
     }
 }
 
-impl<L, K> Interrogator<L>
+impl<L> Interrogator<L>
 where
     L: 'static + Language,
-    K: 'static + Key + Send + Sync,
 {
     /// Creates a new `Interrogator` using the specificed Key.
     pub fn new_with_key(lang: L) -> Self {
@@ -55,7 +54,7 @@ where
         &mut self,
         uri: AbsoluteUri,
         resolve: &R,
-    ) -> Result<K, L::CompileError<R>>
+    ) -> Result<Key, L::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
@@ -72,7 +71,7 @@ where
         &mut self,
         uris: Vec<AbsoluteUri>,
         resolve: &R,
-    ) -> Result<Vec<K>, L::CompileError<R>>
+    ) -> Result<Vec<Key>, L::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
@@ -84,7 +83,7 @@ where
         uris: Vec<AbsoluteUri>,
         resolve: &'res R,
         validate: bool,
-    ) -> Result<Vec<K>, L::CompileError<R>>
+    ) -> Result<Vec<Key>, L::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
     {
@@ -106,7 +105,7 @@ where
     /// Evaluates a schema for the given [`Evaluate`] request.
     pub fn evaluate<'int, 'val>(
         &'int self,
-        key: K,
+        key: Key,
         context: L::Context,
         value: &'val Value,
     ) -> L::EvaluateResult<'val>

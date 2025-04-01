@@ -4,7 +4,6 @@ use grill_core::{
 };
 use grill_uri::AbsoluteUri;
 use jsonptr::PointerBuf;
-use polonius_the_crab::{polonius, polonius_return};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -44,10 +43,11 @@ pub(super) async fn resolve<'res, 'int, R: 'static + Resolve>(
     let root = resolve_root(sources, resolver, &base).await?;
 
     if !fragment.is_empty() && !fragment.starts_with('/') {
-        resolve_source(sources, resolver, uri, base, fragment).await
+        // resolve_source(sources, resolver, uri, base, fragment).await
     } else {
-        resolve_unknown_anchor(sources, resolver, base, fragment).await
+        // resolve_unknown_anchor(sources, resolver, base, fragment).await
     }
+    todo!()
 }
 
 async fn fetch<'int, R: 'static + Resolve>(
@@ -70,13 +70,13 @@ async fn fetch<'int, R: 'static + Resolve>(
 /// Returns `ResolveError::FailedToResolve` if the uri could not be resolved by
 /// `resolver`.
 async fn resolve_root<'int, R: 'static + Resolve>(
-    mut sources: &'int mut Sources,
+    sources: &'int mut Sources,
     resolver: &R,
     uri: &AbsoluteUri,
 ) -> Result<SourceKey, Error<R>> {
     let uri = uri.without_fragment();
     if let Some(source_key) = sources.source_key_by_uri(&uri) {
-        polonius_return!(Ok(source_key));
+        return Ok(source_key);
     }
     let value = fetch(resolver, &uri).await?;
     // insert is safe due to the check above
@@ -90,33 +90,34 @@ async fn resolve_source<'int, R: 'static + Resolve>(
     base: AbsoluteUri,
     fragment: String,
 ) -> Result<Resolved, Error<R>> {
-    let Source {
-        source_key,
-        located,
-        document_key,
-    } = resolve_root(sources, resolver, &base).await?;
-    let relative_path = PointerBuf::parse(&fragment).map_err(|source| Error::InvalidPointer {
-        uri: uri.clone(),
-        source,
-    })?;
+    todo!()
+    // let Source {
+    //     source_key,
+    //     located,
+    //     document_key,
+    // } = resolve_root(sources, resolver, &base).await?;
+    // let relative_path = PointerBuf::parse(&fragment).map_err(|source| Error::InvalidPointer {
+    //     uri: uri.clone(),
+    //     source,
+    // })?;
 
-    let absolute_path = sources
-        .source(source_key)
-        .absolute_path()
-        .concat(&relative_path);
+    // let absolute_path = sources
+    //     .get(source_key)
+    //     .absolute_path()
+    //     .concat(&relative_path);
 
-    let link = sources.link(New {
-        uri: uri.clone(),
-        fragment: Some(relative_path.into()),
-        document_key,
-        absolute_path: absolute_path.clone(),
-    });
+    // let link = sources.link(New {
+    //     uri: uri.clone(),
+    //     fragment: Some(relative_path.into()),
+    //     document_key,
+    //     absolute_path: absolute_path.clone(),
+    // });
 
-    Ok(Resolved::Unlinked(Unlinked {
-        located,
-        absolute_path,
-        root_source_key: resolved_root.source_key,
-    }))
+    // Ok(Resolved::Unlinked(Unlinked {
+    //     located,
+    //     absolute_path,
+    //     root_source_key: resolved_root.source_key,
+    // }))
 }
 
 /// Indicates whether or not a `Source` was located within `Sources` or if it

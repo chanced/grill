@@ -1,54 +1,51 @@
 use std::borrow::Cow;
 
 use grill_core::{
-    schema,
+    Key, schema,
     source::{Source, SourceKey, Sources},
-    DefaultKey, Key,
 };
 use grill_uri::{AbsoluteUri, Uri};
 
 use crate::spec::Specification;
 
 /// A JSON Schema.
-pub struct Schema<'int, S, K = DefaultKey>
+pub struct Schema<'int, S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    key: K,
+    key: Key,
     uris: Cow<'int, [AbsoluteUri]>,
     keywords: Cow<'int, [S::Keyword]>,
-    references: Cow<'int, [Reference<K>]>,
-    referenced_by: Cow<'int, [Reference<K>]>,
+    references: Cow<'int, [Reference]>,
+    referenced_by: Cow<'int, [Reference]>,
     source: Source<'int>,
-    embedded_in: Option<K>,
-    embedded: Cow<'int, [K]>,
+    embedded_in: Option<Key>,
+    embedded: Cow<'int, [Key]>,
 }
 
-impl<'int, S, K> Schema<'int, S, K>
+impl<'int, S> Schema<'int, S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    pub fn key(&self) -> K {
+    pub fn key(&self) -> Key {
         self.key
     }
     pub fn primary_uri(&self) -> &AbsoluteUri {
         &self.uris[0]
     }
-    pub fn embedded_in(&self) -> Option<K> {
+    pub fn embedded_in(&self) -> Option<Key> {
         self.embedded_in
     }
-    pub fn embedded(&self) -> &[K] {
+    pub fn embedded(&self) -> &[Key] {
         self.embedded.as_ref()
     }
     pub fn source(&self) -> Source<'_> {
         self.source.as_borrowed()
     }
-    pub fn references(&self) -> &[Reference<K>] {
+    pub fn references(&self) -> &[Reference] {
         self.references.as_ref()
     }
-    pub fn referenced_by(&self) -> &[Reference<K>] {
+    pub fn referenced_by(&self) -> &[Reference] {
         self.referenced_by.as_ref()
     }
     pub fn uris(&self) -> &[AbsoluteUri] {
@@ -58,12 +55,11 @@ where
         self.keywords.as_ref()
     }
 }
-impl<'int, S, K> schema::Schema<'int, K> for Schema<'int, S, K>
+impl<'int, S> schema::Schema<'int> for Schema<'int, S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    fn key(&self) -> K {
+    fn key(&self) -> Key {
         self.key
     }
     fn source(&self) -> Source<'_> {
@@ -71,62 +67,48 @@ where
     }
 }
 
-impl<'int, S, K> schema::References<K> for Schema<'int, S, K>
+impl<'int, S> schema::References for Schema<'int, S>
 where
-    S: Specification<K> + Send + Sync,
-    K: Key + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    type Ref = Reference<K>;
+    type Ref = Reference;
 
     fn references(&self) -> &[Self::Ref] {
         self.references.as_ref()
     }
 }
 
-impl<'int, S, K> schema::ReferencedBy<K> for Schema<'int, S, K>
+impl<'int, S> schema::ReferencedBy for Schema<'int, S>
 where
-    S: Specification<K> + Send + Sync,
-    K: Key + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    type Ref = Reference<K>;
+    type Ref = Reference;
 
     fn referenced_by(&self) -> &[Self::Ref] {
         self.referenced_by.as_ref()
     }
 }
 
-impl<S, K> AsRef<K> for Schema<'_, S, K>
-where
-    S: Specification<K> + Send + Sync,
-    K: Key + Send + Sync,
-{
-    fn as_ref(&self) -> &K {
-        &self.key
-    }
-}
-
 #[derive(Debug)]
-pub struct CompiledSchema<S, K>
+pub struct CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    key: K,
+    key: Key,
     uris: Vec<AbsoluteUri>,
     keywords: Box<[S::Keyword]>,
-    references: Vec<Reference<K>>,
-    referenced_by: Vec<Reference<K>>,
+    references: Vec<Reference>,
+    referenced_by: Vec<Reference>,
     source_key: SourceKey,
-    embedded_in: Option<K>,
-    embedded: Vec<K>,
+    embedded_in: Option<Key>,
+    embedded: Vec<Key>,
 }
 
-impl<S, K> CompiledSchema<S, K>
+impl<S> CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    pub fn key(&self) -> K {
+    pub fn key(&self) -> Key {
         self.key
     }
 
@@ -135,52 +117,39 @@ where
     }
 }
 
-impl<S, K> schema::References<K> for CompiledSchema<S, K>
+impl<S> schema::References for CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    type Ref = Reference<K>;
+    type Ref = Reference;
 
     fn references(&self) -> &[Self::Ref] {
         &self.references
     }
 }
-impl<S, K> schema::ReferencedBy<K> for CompiledSchema<S, K>
+impl<S> schema::ReferencedBy for CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
-    type Ref = Reference<K>;
+    type Ref = Reference;
 
     fn referenced_by(&self) -> &[Self::Ref] {
         &self.referenced_by
     }
 }
-impl<S, K> AsRef<K> for CompiledSchema<S, K>
-where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
-{
-    fn as_ref(&self) -> &K {
-        &self.key
-    }
-}
 
-impl<S, K> PartialEq for CompiledSchema<S, K>
+impl<S> PartialEq for CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: Specification,
 {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.keywords == other.keywords
     }
 }
 
-impl<S, K> Clone for CompiledSchema<S, K>
+impl<S> Clone for CompiledSchema<S>
 where
-    S: Specification<K>,
-    K: Key + Send + Sync,
+    S: Specification,
 {
     fn clone(&self) -> Self {
         Self {
@@ -196,14 +165,16 @@ where
     }
 }
 
-impl<S, K> schema::CompiledSchema<K> for CompiledSchema<S, K>
+impl<S> schema::CompiledSchema for CompiledSchema<S>
 where
-    K: 'static + Key + Send + Sync,
-    S: Specification<K>,
+    S: Specification,
 {
-    type Schema<'int> = Schema<'int, S, K> where S: 'int;
+    type Schema<'int>
+        = Schema<'int, S>
+    where
+        S: 'int;
 
-    fn set_key(&mut self, key: K) {
+    fn set_key(&mut self, key: Key) {
         self.key = key;
     }
 
@@ -213,14 +184,14 @@ where
             uris: Cow::Borrowed(&self.uris),
             keywords: Cow::Borrowed(&self.keywords),
             references: Cow::Borrowed(&self.references),
-            source: sources.source(self.source_key),
+            source: sources.get(self.source_key),
             referenced_by: Cow::Borrowed(&self.references),
             embedded_in: self.embedded_in,
             embedded: Cow::Borrowed(&self.embedded),
         }
     }
 
-    fn key(&self) -> K {
+    fn key(&self) -> Key {
         self.key
     }
 
@@ -231,12 +202,12 @@ where
 
 /// A reference to another schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference<K> {
+pub struct Reference {
     /// Key to the referenced [`Schema`]
-    pub referenced_key: K,
+    pub referenced_key: Key,
 
     /// Key to the referring [`Schema`]
-    pub referrer_key: K,
+    pub referrer_key: Key,
 
     /// The URI of the reference, as per the JSON Schema specification
     pub uri: Uri,
@@ -249,17 +220,12 @@ pub struct Reference<K> {
     pub keyword: &'static str,
 }
 
-impl<K> Reference<K> {}
-
-impl<K> schema::Reference<K> for Reference<K>
-where
-    K: Key,
-{
-    fn reference(&self) -> K {
+impl schema::Reference for Reference {
+    fn reference(&self) -> Key {
         self.referenced_key
     }
 
-    fn referrer(&self) -> K {
+    fn referrer(&self) -> Key {
         self.referrer_key
     }
 }

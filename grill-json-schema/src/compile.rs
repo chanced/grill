@@ -1,5 +1,5 @@
 use crate::spec::{self, Compile, Specification};
-use grill_core::{resolve::Error as ResolveError, source::SourceConflictError, Key, Resolve};
+use grill_core::{Key, Resolve, resolve::Error as ResolveError, source::SourceConflictError};
 use grill_uri::AbsoluteUri;
 use scan::Scanner;
 use std::{error::Error as StdError, fmt};
@@ -10,38 +10,35 @@ use std::collections::VecDeque;
 use crate::schema::Reference;
 
 #[derive(Debug)]
-pub(super) struct Pending<K> {
-    pub(super) key: Option<K>,
+pub(super) struct Pending {
+    pub(super) key: Option<Key>,
     pub(super) uri: AbsoluteUri,
-    pub(super) parent: Option<K>,
+    pub(super) parent: Option<Key>,
     /// Whether to diregard some errors
     pub(super) continue_on_err: bool,
-    pub(super) reference: Option<Reference<K>>,
+    pub(super) reference: Option<Reference>,
     // index in the output queue
     pub(super) index: Option<usize>,
 }
 
-pub(super) struct Compiled<K> {
-    pub(super) key: K,
+pub(super) struct Compiled {
+    pub(super) key: Key,
     pub(super) index: Option<usize>,
 }
 
 #[derive(Debug)]
-pub(super) struct Queue<K> {
-    items: VecDeque<Pending<K>>,
+pub(super) struct Queue {
+    items: VecDeque<Pending>,
 }
-impl<K> IntoIterator for Queue<K> {
-    type Item = Pending<K>;
+impl IntoIterator for Queue {
+    type Item = Pending;
     type IntoIter = std::collections::vec_deque::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
     }
 }
 
-impl<K> Queue<K>
-where
-    K: Key,
-{
+impl Queue {
     pub(super) fn new(uris: Vec<AbsoluteUri>) -> Self {
         Self {
             items: uris
@@ -64,32 +61,31 @@ where
     pub(super) fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
-    pub(super) fn push_back(&mut self, item: Pending<K>) {
+    pub(super) fn push_back(&mut self, item: Pending) {
         self.items.push_back(item);
     }
-    pub(super) fn push_front(&mut self, item: Pending<K>) {
+    pub(super) fn push_front(&mut self, item: Pending) {
         self.items.push_front(item);
     }
-    pub(super) fn pop(&mut self) -> Option<Pending<K>> {
+    pub(super) fn pop(&mut self) -> Option<Pending> {
         self.items.pop_front()
     }
-    pub(super) fn contains_key(&self, key: K) -> bool {
+    pub(super) fn contains_key(&self, key: Key) -> bool {
         self.items.iter().any(|item| item.key == Some(key))
     }
 }
 
-pub(crate) async fn compile<'int, 'txn, 'res, R, S, K>(
+pub(crate) async fn compile<'int, 'txn, 'res, R, S>(
     ctx: S::Compile<'int, 'txn, 'res, R>,
-) -> Result<Vec<K>, S::CompileError<R>>
+) -> Result<Vec<Key>, S::CompileError<R>>
 where
     R: 'static + Resolve + Send + Sync,
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: 'static + Specification,
     'int: 'res,
     'txn: 'int,
     'res: 'int,
 {
-    Compiler::<R, S, K>::execute(ctx).await
+    Compiler::<R, S>::execute(ctx).await
 }
 
 /// Failed to compile a schema.
@@ -128,10 +124,9 @@ where
     }
 }
 
-impl<R, S, K> spec::CompileError<R, S, K> for Error<S::Report<'static>, R>
+impl<R, S> spec::CompileError<R, S> for Error<S::Report<'static>, R>
 where
-    K: 'static + Key + Send + Sync,
-    S: 'static + Specification<K> + Send + Sync,
+    S: 'static + Specification + Send + Sync,
     R: 'static + Resolve,
 {
 }
@@ -168,61 +163,59 @@ impl<O: 'static + StdError> StdError for InvalidSchemaError<O> {
     }
 }
 
-struct Compiler<'int, 'txn, 'res, R, S, K>
+struct Compiler<'int, 'txn, 'res, R, S>
 where
-    S: 'static + Specification<K>,
+    S: 'static + Specification,
     R: 'static + Resolve + Send + Sync,
-    K: 'static + Key + Send + Sync,
     Self: 'txn + 'int + 'res,
     'int: 'txn,
 {
     ctx: S::Compile<'int, 'txn, 'res, R>,
-    scanner: Scanner<K>,
+    scanner: Scanner,
 }
 
-impl<'int, 'txn, 'res, R, S, K> Compiler<'int, 'txn, 'res, R, S, K>
+impl<'int, 'txn, 'res, R, S> Compiler<'int, 'txn, 'res, R, S>
 where
     R: 'static + Resolve + Send + Sync,
-    S: 'static + Specification<K>,
-    K: 'static + Key + Send + Sync,
+    S: 'static + Specification,
 {
-    async fn execute(ctx: S::Compile<'int, 'txn, 'res, R>) -> Result<Vec<K>, S::CompileError<R>>
+    async fn execute(ctx: S::Compile<'int, 'txn, 'res, R>) -> Result<Vec<Key>, S::CompileError<R>>
     where
         R: 'static + Resolve + Send + Sync,
-        S: Specification<K>,
-        K: 'static + Key + Send,
+        S: Specification,
     {
         let scanner = Scanner::new();
         let mut this = Self { ctx, scanner };
-        let mut q = Queue::<K>::new(this.ctx.interrogator().targets.clone());
-        let mut compiled = vec![K::default(); q.len()];
+        let mut q = Queue::new(this.ctx.instance().targets.clone());
+        let mut compiled = Vec::new();
+
         while !q.is_empty() {
             let item = q.pop().unwrap();
             let Some(schema) = this.compile(&mut q, item).await? else {
                 continue;
             };
-            if let Some(index) = schema.index {
-                compiled[index] = schema.key;
+            if schema.index.is_some() {
+                compiled.push(schema)
             }
         }
-        Ok(compiled)
+        compiled.sort_by_key(|schema| schema.index.unwrap());
+        Ok(compiled.into_iter().map(|schema| schema.key).collect())
     }
 
     async fn compile(
         &mut self,
-        q: &mut Queue<K>,
-        item: Pending<K>,
-    ) -> Result<Option<Compiled<K>>, S::CompileError<R>> {
+        q: &mut Queue,
+        item: Pending,
+    ) -> Result<Option<Compiled>, S::CompileError<R>> {
         let scan = self.scanner.scan(self.ctx.language(), &item.uri).await;
         todo!()
     }
 }
 
-fn handle_err<T, E, S, K, R>(e: E, _continue_on_err: bool) -> Result<T, E>
+fn handle_err<T, E, S, R>(e: E, _continue_on_err: bool) -> Result<T, E>
 where
-    K: 'static + Key + Send + Sync,
-    E: spec::CompileError<R, S, K>,
-    S: Specification<K>,
+    E: spec::CompileError<R, S>,
+    S: Specification,
     R: 'static + Resolve + Send + Sync,
 {
     // TODO determine when to continue on error and if the trait should be responsible for it

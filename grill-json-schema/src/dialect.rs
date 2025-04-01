@@ -26,10 +26,9 @@ new_key_type! {
 */
 
 #[derive(Debug, Clone)]
-pub struct Dialect<S, K>
+pub struct Dialect<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
     /// The key of the dialect.
     ///
@@ -48,19 +47,17 @@ where
     pub identifier_field: Cow<'static, str>,
 }
 
-impl<S, K> PartialEq for Dialect<S, K>
+impl<S> PartialEq for Dialect<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
     fn eq(&self, other: &Self) -> bool {
         self.uri == other.uri && self.keywords == other.keywords && self.sources == other.sources
     }
 }
-impl<S, K> Dialect<S, K>
+impl<S> Dialect<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
     pub fn identify(&self, value: &Value) -> Result<Option<Uri>, grill_uri::Error> {
         value
@@ -109,9 +106,7 @@ where
 
     pub fn embedded_schemas(&self, value: &Value) -> Vec<Found<PointerBuf>>
     where
-        K: 'static + Key + Send + Sync,
-        S: 'static + Specification<K>,
-        K: 'static + Key + Send + Sync,
+        S: 'static + Specification,
     {
         self.keywords
             .iter()
@@ -135,22 +130,20 @@ where
 
 /// An insert-only collection of [`Dialect`]s.
 #[derive(Clone, Debug)]
-pub struct Dialects<S, K>
+pub struct Dialects<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    table: slotmap::SlotMap<DialectKey, Dialect<S, K>>,
+    table: slotmap::SlotMap<DialectKey, Dialect<S>>,
     primary_key: DialectKey,
     uris: HashMap<AbsoluteUri, DialectKey>,
 }
 
-impl<S, K> Dialects<S, K>
+impl<S> Dialects<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    pub fn new(default: Dialect<S, K>) -> Self {
+    pub fn new(default: Dialect<S>) -> Self {
         let mut table = slotmap::SlotMap::with_key();
         let primary_key = table.insert(default);
         let mut uris = HashMap::new();
@@ -172,7 +165,7 @@ where
     }
 
     /// Returns the `Dialect` with the given key.
-    pub fn get(&self, key: DialectKey) -> &Dialect<S, K> {
+    pub fn get(&self, key: DialectKey) -> &Dialect<S> {
         self.table.get(key).unwrap()
     }
 
@@ -180,11 +173,11 @@ where
         self.primary_key
     }
 
-    pub fn primary_dialect(&self) -> &Dialect<S, K> {
+    pub fn primary_dialect(&self) -> &Dialect<S> {
         self.get(self.primary_key)
     }
 
-    pub fn find_dialect(&self, value: &Value) -> Option<&Dialect<S, K>> {
+    pub fn find_dialect(&self, value: &Value) -> Option<&Dialect<S>> {
         self.find_dialect_key(value).map(|key| &self.table[key])
     }
     pub fn find_dialect_key(&self, value: &Value) -> Option<DialectKey> {
@@ -198,10 +191,7 @@ where
     /// # Errors
     /// This method returns the `dialect` attempting to be inserted if a
     /// different `Dialect` is associated with the same `AbsoluteUri`.
-    pub fn insert(
-        &mut self,
-        dialect: Dialect<S, K>,
-    ) -> Result<DialectKey, DuplicateDialectError<S, K>> {
+    pub fn insert(&mut self, dialect: Dialect<S>) -> Result<DialectKey, DuplicateDialectError<S>> {
         // ensuring a unique uris - can't use Dialect::all_uris here as it will
         // borrow `dialect` and force a clone on the err branch
         for uri in once(&dialect.uri).chain(dialect.additional_uris.iter()) {
@@ -242,18 +232,16 @@ where
 */
 
 #[derive(Debug)]
-pub struct DuplicateDialectError<S, K>
+pub struct DuplicateDialectError<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    dialect: Dialect<S, K>,
+    dialect: Dialect<S>,
 }
 
-impl<S, K> fmt::Display for DuplicateDialectError<S, K>
+impl<S> fmt::Display for DuplicateDialectError<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -264,15 +252,14 @@ where
     }
 }
 
-impl<S, K> DuplicateDialectError<S, K>
+impl<S> DuplicateDialectError<S>
 where
-    S: Specification<K> + Send + Sync,
-    K: 'static + Key + Clone + Send + Sync,
+    S: Specification + Send + Sync,
 {
-    pub fn dialect(&self) -> &Dialect<S, K> {
+    pub fn dialect(&self) -> &Dialect<S> {
         &self.dialect
     }
-    pub fn take_dialect(self) -> Dialect<S, K> {
+    pub fn take_dialect(self) -> Dialect<S> {
         self.dialect
     }
 }

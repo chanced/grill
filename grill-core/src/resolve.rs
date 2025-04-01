@@ -102,6 +102,9 @@ impl<R: Resolve> Error<R> {
             Self::UnknownAnchor { uri } => uri,
         }
     }
+    pub fn new_failed_to_resolve(uri: AbsoluteUri, source: R::Error) -> Self {
+        Self::FailedToResolve { uri, source }
+    }
 }
 
 impl<R: Resolve> fmt::Display for Error<R> {

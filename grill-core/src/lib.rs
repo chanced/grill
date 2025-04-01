@@ -1,8 +1,6 @@
 //! # grill-core
 //!
 
-#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
-#![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // #![deny(clippy::all, clippy::pedantic)]
 // #![warn(missing_docs)]

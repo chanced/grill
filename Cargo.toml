@@ -33,7 +33,7 @@ reqwest            = { version = "0.12.4" }
 serde              = { version = "1.0.163", features = ["derive", "rc"] }
 serde_json         = { version = "1.0.107", features = ["arbitrary_precision"] }
 similar            = { version = "2.2.1" }
-slotmap            = { version = "1.0.6" }
+slotmap            = { version = "1.0.6", features = ["serde"] }
 strum              = { version = "0.26", features = ["derive"] }
 tokio              = { version = "1.33" }
 toml               = { version = "0.8.2" }

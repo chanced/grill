@@ -19,10 +19,9 @@ pub mod context;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Keyword {}
 
-impl<S, K> spec::keyword::Keyword<S, K> for Keyword
+impl<S> spec::keyword::Keyword<S> for Keyword
 where
-    S: Specification<K>,
-    K: 'static + Key + Sync + Send,
+    S: Specification,
 {
     async fn compile<R>(
         &self,
